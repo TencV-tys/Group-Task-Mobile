@@ -34,9 +34,9 @@ export class AuthService{
         
       }  
     
-      static async signup(data:{name:string,email:string,password:string, confirmPassword:string ,phone:string,avatarUrl:string}){
+      static async signup(data:{fullName:string,email:string,password:string, confirmPassword:string ,gender:string,avatarUrl?:string}){
            try{ 
-             if(!data.email || !data.email || !data.password || !data.confirmPassword || !data.phone){
+             if(!data.email || !data.fullName || !data.password || !data.confirmPassword || !data.gender){
                 return {
                     success:false,
                     message:"All fields are required"

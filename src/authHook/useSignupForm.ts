@@ -1,86 +1,112 @@
-
 import { useState } from "react";
 import { AuthService } from "../authServices/AuthService";
 
-interface SignupData{
-    fullName:string;
-    email:string;
-    gender:string;
-    password:string;
-    confirmPassword:string;
+// Define valid gender options to match your backend Gender enum
+const VALID_GENDERS = ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'];
+
+interface SignupData {
+    fullName: string;
+    email: string;
+    gender: string;  // This will be string from the form
+    password: string;
+    confirmPassword: string;
 }
 
-export function useSignupForm(){
-      const [formData , setFormData] = useState<SignupData>({
-        fullName:"",
-        email:'',
-        gender:'',
-        password:"",
-        confirmPassword:""
-      });
-
-    const [ loading , setLoading ] = useState<boolean>(false);
-    const [ message, setMessage ] = useState<string>('');
-
-   const handleChange = (fields:keyof SignupData , value:string)=>{
-    setFormData(prev=>({
-      ...prev,
-      [fields]:value
-    }));
-
-   }
-      
-    const handleSubmit = async () => {
-    setLoading(true);
-    setMessage('');
-
-    try {
-      // Simple validation
-      if (formData.password !== formData.confirmPassword) {
-        setMessage('❌ Passwords do not match');
-        setLoading(false);
-        return;
-      }
-
-   
-      const result = await AuthService.signup(formData);
-      
-      if (!result.success) {
-        setMessage(`❌ ${result.message}`);
-      } else {
-        setMessage(`✅ ${result.message}`);
-        console.log('Signup successful:', result.user);
-        
-        // Could auto-login or navigate to login
-        // navigation.navigate('Login');
-      }
-      
-    } catch (e: any) {
-      setMessage(`❌ ${e.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resetForm = () => {
-    setFormData({ 
-      fullName: '', 
-      email: '', 
-      password: '',
-      gender:'', 
-      confirmPassword: '' 
+export function useSignupForm() {
+    const [formData, setFormData] = useState<SignupData>({
+        fullName: "",
+        email: '',
+        gender: '',
+        password: "",
+        confirmPassword: ""
     });
-    setMessage('');
-  };
 
-  return {
-    formData,
-    loading,
-    message,
-    handleChange,
-    handleSubmit,
-    resetForm
-  };
-  
+    const [loading, setLoading] = useState<boolean>(false);
+    const [message, setMessage] = useState<string>('');
+    const [success, setSuccess] = useState<boolean>(false);
 
+    const handleChange = (field: keyof SignupData, value: string) => {
+        setFormData(prev => ({
+            ...prev,
+            [field]: value
+        }));
+    }
+
+    const handleSubmit = async () => {
+        // Validation before API call
+        if (!formData.fullName.trim() || !formData.email.trim() || 
+            !formData.gender.trim() || !formData.password || !formData.confirmPassword) {
+            setMessage('❌ All fields are required');
+            return;
+        }
+
+        if (formData.password !== formData.confirmPassword) {
+            setMessage('❌ Passwords do not match');
+            return;
+        }
+
+        if (formData.password.length < 6) {
+            setMessage('❌ Password must be at least 6 characters');
+            return;
+        }
+
+        // Validate gender is one of the allowed values
+        if (!VALID_GENDERS.includes(formData.gender.toUpperCase())) {
+            setMessage(`❌ Gender must be one of: ${VALID_GENDERS.join(', ')}`);
+            return;
+        }
+
+        setLoading(true);
+        setMessage('');
+
+        try {
+          
+            const result = await AuthService.signup(formData);
+
+            if (result.success) {
+                setSuccess(true);
+                setMessage(`✅ ${result.message || 'Signup successful!'}`);
+                console.log('Signup successful:', result.user);
+                
+                // Auto-reset form after successful signup
+                setTimeout(() => {
+                    resetForm();
+                }, 3000);
+            } else {
+                setSuccess(false);
+                setMessage(`❌ ${result.message || 'Signup failed'}`);
+            }
+
+        } catch (e: any) {
+            setSuccess(false);
+            setMessage(`❌ ${e.message || 'Network error'}`);
+            console.error('Signup error:', e);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const resetForm = () => {
+        setFormData({
+            fullName: '',
+            email: '',
+            gender: '',
+            password: '',
+            confirmPassword: ''
+        });
+        setMessage('');
+        setSuccess(false);
+    };
+
+    return {
+        formData,
+        loading,
+        message,
+        success,
+        handleChange,
+        handleSubmit,
+        resetForm,
+        // Optional: Helper for gender options
+        genderOptions: VALID_GENDERS
+    };
 }

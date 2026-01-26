@@ -13,7 +13,7 @@ import { useLoginForm } from '../authHook/useLoginForm';
 
 export default function LoginScreen({ navigation }: any) {
   const {
-    formData,
+    formData, 
     loading,
     message,
     handleChange,

@@ -1,11 +1,12 @@
 
 
-const API_URL = 'http://localhost:5000/api/auth/users';
+const API_URL = 'http://10.219.65.2:5000/api/auth/users';
 
 export class AuthService{
 
       static async login(data:{email:string,password:string}){
              try{
+                
                  if(!data.email || !data.password){
                     return {
                         success:false,
@@ -26,6 +27,7 @@ export class AuthService{
 
              }catch(e:any){
                    console.error("Error login response: ", e);
+                
                    return{
                     success:false,
                     message:"Cannot connect to the server"

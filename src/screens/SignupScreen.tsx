@@ -8,52 +8,38 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  ScrollView,
-  Picker
+  ScrollView
 } from 'react-native';
-import { useSignupForm } from '../authHook//useSignupForm';
+import { useSignupForm } from '../authHook/useSignupForm';
+
+// Gender options that match your backend enum
+const GENDER_OPTIONS = [
+  { value: 'MALE', label: 'Male' },
+  { value: 'FEMALE', label: 'Female' },
+  { value: 'OTHER', label: 'Other' },
+  { value: 'PREFER_NOT_TO_SAY', label: 'Prefer not to say' }
+];
 
 // Simple gender picker for React Native
 const GenderPicker = ({ selectedValue, onValueChange }: any) => {
   return (
     <View style={styles.pickerContainer}>
-      <Text style={styles.label}>Gender:</Text>
-      <View style={styles.picker}>
-        <TouchableOpacity
-          style={[
-            styles.genderButton,
-            selectedValue === 'male' && styles.genderButtonSelected
-          ]}
-          onPress={() => onValueChange('male')}
-        >
-          <Text style={selectedValue === 'male' ? styles.genderTextSelected : styles.genderText}>
-            Male
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.genderButton,
-            selectedValue === 'female' && styles.genderButtonSelected
-          ]}
-          onPress={() => onValueChange('female')}
-        >
-          <Text style={selectedValue === 'female' ? styles.genderTextSelected : styles.genderText}>
-            Female
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.genderButton,
-            selectedValue === 'other' && styles.genderButtonSelected
-          ]}
-          onPress={() => onValueChange('other')}
-        >
-          <Text style={selectedValue === 'other' ? styles.genderTextSelected : styles.genderText}>
-            Other
-          </Text>
-        </TouchableOpacity>
+      <Text style={styles.label}>Gender *</Text>
+      <View style={styles.pickerRow}>
+        {GENDER_OPTIONS.map((gender) => (
+          <TouchableOpacity
+            key={gender.value}
+            style={[
+              styles.genderButton,
+              selectedValue === gender.value && styles.genderButtonSelected
+            ]}
+            onPress={() => onValueChange(gender.value)}
+          >
+            <Text style={selectedValue === gender.value ? styles.genderTextSelected : styles.genderText}>
+              {gender.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
@@ -70,6 +56,12 @@ export default function SignupScreen({ navigation }: any) {
   } = useSignupForm();
 
   const onSignupPress = async () => {
+    // Validate gender is selected
+    if (!formData.gender) {
+      Alert.alert('Error', 'Please select a gender');
+      return;
+    }
+    
     await handleSubmit();
     
     // If successful, navigate back to login
@@ -97,7 +89,7 @@ export default function SignupScreen({ navigation }: any) {
       {/* Full Name */}
       <TextInput
         style={styles.input}
-        placeholder="Full Name"
+        placeholder="Full Name *"
         value={formData.fullName}
         onChangeText={(text) => handleChange('fullName', text)}
         editable={!loading}
@@ -106,7 +98,7 @@ export default function SignupScreen({ navigation }: any) {
       {/* Email */}
       <TextInput
         style={styles.input}
-        placeholder="Email"
+        placeholder="Email *"
         value={formData.email}
         onChangeText={(text) => handleChange('email', text)}
         autoCapitalize="none"
@@ -123,7 +115,7 @@ export default function SignupScreen({ navigation }: any) {
       {/* Password */}
       <TextInput
         style={styles.input}
-        placeholder="Password"
+        placeholder="Password (min 6 characters) *"
         value={formData.password}
         onChangeText={(text) => handleChange('password', text)}
         secureTextEntry
@@ -133,7 +125,7 @@ export default function SignupScreen({ navigation }: any) {
       {/* Confirm Password */}
       <TextInput
         style={styles.input}
-        placeholder="Confirm Password"
+        placeholder="Confirm Password *"
         value={formData.confirmPassword}
         onChangeText={(text) => handleChange('confirmPassword', text)}
         secureTextEntry
@@ -195,14 +187,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#333',
   },
-  picker: {
+  pickerRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   genderButton: {
-    flex: 1,
+    width: '48%', // Two per row
     paddingVertical: 12,
-    marginHorizontal: 4,
+    marginBottom: 10,
     backgroundColor: '#f0f0f0',
     borderRadius: 8,
     alignItems: 'center',

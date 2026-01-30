@@ -1,9 +1,17 @@
+// src/authHook/useLoginForm.ts
 import {useState} from 'react';
 import { AuthService } from '../authServices/AuthService';
 
 interface LoginData{
   email:string;
   password:string;
+}
+
+// Define return type for handleSubmit
+interface LoginResult {
+  success: boolean;
+  message?: string;
+  user?: any;
 }
 
 export function useLoginForm(){
@@ -23,47 +31,40 @@ export function useLoginForm(){
           }));
     }
 
-    const handleSubmit = async()=>{
-        // Validate form
-        if(!formData.email.trim() || !formData.password.trim()){
-            setMessage('Please fill in all fields');
-            return;
-        }
-        
-        setLoading(true);
-        setMessage('');
+    const handleSubmit = async (): Promise<LoginResult> => { // Add return type
+            setLoading(true);
+            setMessage('');
 
-        try{
-            const result = await AuthService.login(formData);
-            
-            // CORRECTED: Check for success properly
-            if(result.success){
-                setSuccess(true);
-                setMessage(`✅ ${result.message || 'Login successful!'}`);
+            try{
+                const result = await AuthService.login(formData);
                 
-                // You might want to store the token/user data here
-                if(result.user){
-                    // Store user data in context/async storage
-                    console.log('Logged in user:', result.user);
+                if(result.success){
+                    setSuccess(true);
+                    setMessage(`✅ ${result.message || 'Login successful!'}`);
+                    return {
+                        success: true,
+                        message: result.message,
+                        user: result.user
+                    };
+                } else {
+                    setSuccess(false);
+                    setMessage(`❌ ${result.message || 'Login failed'}`);
+                    return {
+                        success: false,
+                        message: result.message
+                    };
                 }
-                
-                // Reset form on success
-                setTimeout(() => {
-                    resetForm();
-                }, 2000);
-                
-            } else {
-                setSuccess(false);
-                setMessage(`❌ ${result.message || 'Login failed'}`);
-            }
 
-        }catch(e:any){
-            setSuccess(false);
-            setMessage(`❌ ${e.message || 'Network error'}`);
-            console.error('Login error:', e);
-        }finally{
-            setLoading(false);
-        }
+            }catch(e:any){
+                setSuccess(false);
+                setMessage(`❌ ${e.message || 'Network error'}`);
+                return {
+                    success: false,
+                    message: e.message
+                };
+            }finally{
+                setLoading(false);
+            }
     }
         
     const resetForm = () => {

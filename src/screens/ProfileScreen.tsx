@@ -18,7 +18,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   const handleLogout = () => {
     console.log('Logging out...');
-    navigation.reset({
+    navigation.reset({ 
       index: 0,
       routes: [{ name: 'Login' }],
     });

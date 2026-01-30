@@ -1,15 +1,23 @@
+// src/authHook/useSignupForm.ts
 import { useState } from "react";
 import { AuthService } from "../authServices/AuthService";
 
-// Define valid gender options to match your backend Gender enum
+// Define valid gender options
 const VALID_GENDERS = ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'];
 
 interface SignupData {
     fullName: string;
     email: string;
-    gender: string;  // This will be string from the form
+    gender: string;
     password: string;
     confirmPassword: string;
+}
+
+// Define return type
+interface SignupResult {
+  success: boolean;
+  message?: string;
+  user?: any;
 }
 
 export function useSignupForm() {
@@ -32,59 +40,85 @@ export function useSignupForm() {
         }));
     }
 
-    const handleSubmit = async () => {
-        // Validation before API call
-        if (!formData.fullName.trim() || !formData.email.trim() || 
-            !formData.gender.trim() || !formData.password || !formData.confirmPassword) {
-            setMessage('❌ All fields are required');
-            return;
-        }
+  // In your useSignupForm.ts, update the handleSubmit function:
+const handleSubmit = async (): Promise<SignupResult> => {
+    console.log("Signup attempt with data:", formData);
+    
+    // Validation before API call
+    if (!formData.fullName.trim() || !formData.email.trim() || 
+        !formData.gender.trim() || !formData.password || !formData.confirmPassword) {
+        console.log("Validation failed: Missing fields");
+        setMessage('❌ All fields are required');
+        return { success: false, message: 'All fields are required' };
+    }
 
-        if (formData.password !== formData.confirmPassword) {
-            setMessage('❌ Passwords do not match');
-            return;
-        }
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+        console.log("Validation failed: Invalid email");
+        setMessage('❌ Please enter a valid email address');
+        return { success: false, message: 'Please enter a valid email address' };
+    }
 
-        if (formData.password.length < 6) {
-            setMessage('❌ Password must be at least 6 characters');
-            return;
-        }
+    if (formData.password !== formData.confirmPassword) {
+        console.log("Validation failed: Passwords don't match");
+        setMessage('❌ Passwords do not match');
+        return { success: false, message: 'Passwords do not match' };
+    }
 
-        // Validate gender is one of the allowed values
-        if (!VALID_GENDERS.includes(formData.gender.toUpperCase())) {
-            setMessage(`❌ Gender must be one of: ${VALID_GENDERS.join(', ')}`);
-            return;
-        }
+    if (formData.password.length < 6) {
+        console.log("Validation failed: Password too short");
+        setMessage('❌ Password must be at least 6 characters');
+        return { success: false, message: 'Password must be at least 6 characters' };
+    }
 
-        setLoading(true);
-        setMessage('');
+    // Validate gender is one of the allowed values
+    if (!VALID_GENDERS.includes(formData.gender.toUpperCase())) {
+        console.log("Validation failed: Invalid gender", formData.gender);
+        setMessage(`❌ Gender must be one of: ${VALID_GENDERS.join(', ')}`);
+        return { 
+            success: false, 
+            message: `Gender must be one of: ${VALID_GENDERS.join(', ')}` 
+        };
+    }
 
-        try {
-          
-            const result = await AuthService.signup(formData);
+    setLoading(true);
+    setMessage('');
 
-            if (result.success) {
-                setSuccess(true);
-                setMessage(`✅ ${result.message || 'Signup successful!'}`);
-                console.log('Signup successful:', result.user);
-                
-                // Auto-reset form after successful signup
-                setTimeout(() => {
-                    resetForm();
-                }, 3000);
-            } else {
-                setSuccess(false);
-                setMessage(`❌ ${result.message || 'Signup failed'}`);
-            }
+    try {
+        console.log("Calling AuthService.signup...");
+        const result = await AuthService.signup(formData);
+        console.log("AuthService result:", result);
 
-        } catch (e: any) {
+        if (result.success) {
+            setSuccess(true);
+            setMessage(`✅ ${result.message || 'Signup successful!'}`);
+            return {
+                success: true,
+                message: result.message,
+                user: result.user
+            };
+        } else {
             setSuccess(false);
-            setMessage(`❌ ${e.message || 'Network error'}`);
-            console.error('Signup error:', e);
-        } finally {
-            setLoading(false);
+            setMessage(`❌ ${result.message || 'Signup failed'}`);
+            return {
+                success: false,
+                message: result.message
+            };
         }
-    };
+
+    } catch (e: any) {
+        console.error("Signup error:", e);
+        setSuccess(false);
+        setMessage(`❌ ${e.message || 'Network error'}`);
+        return {
+            success: false,
+            message: e.message
+        };
+    } finally {
+        setLoading(false);
+    }
+};
 
     const resetForm = () => {
         setFormData({
@@ -106,7 +140,6 @@ export function useSignupForm() {
         handleChange,
         handleSubmit,
         resetForm,
-        // Optional: Helper for gender options
         genderOptions: VALID_GENDERS
     };
 }

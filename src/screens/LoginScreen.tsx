@@ -18,15 +18,28 @@ export default function LoginScreen({ navigation }: any) {
     message,
     handleChange,
     handleSubmit
-  } = useLoginForm();
+  } = useLoginForm(); 
 
-  const handleLogin = async () => {
-    await handleSubmit();
+   const handleLogin = async () => {
+    const result = await handleSubmit();
     
-    // If success, navigate to dashboard
-    // You would check a global state here (like Redux or Context)
+    if (result?.success) {
+      // SUCCESS: Navigate to HomeScreen
+      Alert.alert('Success', 'Logged in successfully!', [
+        { 
+          text: 'Continue', 
+          onPress: () => navigation.reset({
+            index: 0,
+            routes: [{ name: 'Home' }],
+          })
+        }
+      ]);
+    } else if (message) {
+      // ERROR: Show error message
+      Alert.alert('Error', message);
+    }
   };
-
+ 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Login</Text>

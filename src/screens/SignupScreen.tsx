@@ -1,5 +1,5 @@
-// src/screens/SignupScreen.tsx
-import React from 'react';
+ // src/screens/SignupScreen.tsx
+import React, { useState } from 'react'; // Add useState
 import { 
   View, 
   Text, 
@@ -45,6 +45,38 @@ const GenderPicker = ({ selectedValue, onValueChange }: any) => {
   );
 };
 
+// Password Input with Eye Icon Component
+const PasswordInput = ({ 
+  placeholder, 
+  value, 
+  onChangeText, 
+  editable,
+  showPassword, 
+  togglePasswordVisibility 
+}: any) => {
+  return (
+    <View style={styles.passwordContainer}>
+      <TextInput
+        style={styles.passwordInput}
+        placeholder={placeholder}
+        value={value}
+        onChangeText={onChangeText}
+        secureTextEntry={!showPassword}
+        editable={editable}
+      />
+      <TouchableOpacity 
+        style={styles.eyeButton}
+        onPress={togglePasswordVisibility}
+        disabled={!editable}
+      >
+        <Text style={styles.eyeIcon}>
+          {showPassword ? '👁️' : '👁️‍🗨️'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 export default function SignupScreen({ navigation }: any) {
   const {
     formData,
@@ -55,25 +87,38 @@ export default function SignupScreen({ navigation }: any) {
     resetForm
   } = useSignupForm();
 
+  // State for password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const onSignupPress = async () => {
-    // Validate gender is selected
-    if (!formData.gender) {
-      Alert.alert('Error', 'Please select a gender');
-      return;
-    }
+    const result = await handleSubmit();
     
-    await handleSubmit();
-    
-    // If successful, navigate back to login
-    if (message.includes('✅')) {
-      Alert.alert('Success', 'Account created! Please login.', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+    if (result.success) {
+        // SUCCESS: Show success alert and navigate to Home
+        Alert.alert('Success', 'Account created successfully!', [
+            { 
+                text: 'Continue to Home', 
+                onPress: () => {
+                    resetForm();
+                    navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Home' }],
+                    });
+                }
+            }
+        ]);
+    } else {
+        // ERROR: Show error message
+        Alert.alert('Error', result.message || 'Signup failed');
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView 
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+    >
       <Text style={styles.title}>Create Account</Text>
       
       {/* Message display */}
@@ -112,24 +157,24 @@ export default function SignupScreen({ navigation }: any) {
         onValueChange={(value: string) => handleChange('gender', value)}
       />
       
-      {/* Password */}
-      <TextInput
-        style={styles.input}
+      {/* Password with Eye Icon */}
+      <PasswordInput
         placeholder="Password (min 6 characters) *"
         value={formData.password}
         onChangeText={(text) => handleChange('password', text)}
-        secureTextEntry
         editable={!loading}
+        showPassword={showPassword}
+        togglePasswordVisibility={() => setShowPassword(!showPassword)}
       />
       
-      {/* Confirm Password */}
-      <TextInput
-        style={styles.input}
+      {/* Confirm Password with Eye Icon */}
+      <PasswordInput
         placeholder="Confirm Password *"
         value={formData.confirmPassword}
         onChangeText={(text) => handleChange('confirmPassword', text)}
-        secureTextEntry
         editable={!loading}
+        showPassword={showConfirmPassword}
+        togglePasswordVisibility={() => setShowConfirmPassword(!showConfirmPassword)}
       />
       
       {/* Signup Button */}
@@ -178,6 +223,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     marginBottom: 15,
     backgroundColor: 'white',
+  },
+  passwordContainer: {
+    position: 'relative',
+    marginBottom: 15,
+  },
+  passwordInput: {
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingRight: 50, // Space for eye icon
+    backgroundColor: 'white',
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    height: 50,
+    width: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  eyeIcon: {
+    fontSize: 20,
   },
   pickerContainer: {
     marginBottom: 20,

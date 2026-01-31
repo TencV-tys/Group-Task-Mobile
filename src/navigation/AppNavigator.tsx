@@ -46,7 +46,7 @@ export default function AppNavigator(){
         <Stack.Screen 
           name="CreateGroup" 
           component={CreateGroupScreen}
-          options={{ title: 'Create Group' }}
+          options={{ title: 'Create Group', headerShown:false }}
         />
         
         <Stack.Screen 

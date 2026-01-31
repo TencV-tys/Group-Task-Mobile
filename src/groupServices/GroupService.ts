@@ -37,6 +37,27 @@ export class GroupService{
 
     }
 
+    static async getUserGroups(){
+          try{ 
 
+            const response = await fetch(`${API_URL}/my-groups`,{
+                method:"GET",
+                credentials:"include"
+            });
+
+            const result = await response.json();
+
+            return result;
+
+          }catch(error:any){
+               console.error("GroupService: Error getting groups:", error);
+      return {
+        success: false,
+        message: "Failed to load groups. Please check your connection.",
+        error: error.message
+      };
+          }
+
+    }
 
 }

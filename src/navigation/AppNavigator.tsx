@@ -52,7 +52,7 @@ export default function AppNavigator(){
         <Stack.Screen 
           name="JoinGroup" 
           component={JoinGroupScreen}
-          options={{ title: 'Join Group' }}
+          options={{ headerShown:false }}
         />
         
         <Stack.Screen 

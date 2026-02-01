@@ -1,4 +1,6 @@
 
+
+
 const API_URL = "http://10.219.65.2:5000/api/group";
 
 
@@ -24,7 +26,7 @@ export class GroupService{
 
 
                 const result = await response.json();
-            console.log(result);
+        
                 return result;
 
 
@@ -57,6 +59,44 @@ export class GroupService{
         error: error.message
       };
           }
+
+    }
+
+    static async joinGroup(inviteCode:string){
+          try{
+             
+            if(!inviteCode || !inviteCode.trim()){
+                return{
+                    success:false,
+                    message:"Invite code is required"
+                }
+            }
+
+            const cleanInviteCode = inviteCode.trim().toUpperCase();
+
+             const response = await fetch(`${API_URL}/join`,{
+                method:"POST",
+                headers:{
+                    "Content-Type":"application/json"
+                },
+                body:JSON.stringify({inviteCode:cleanInviteCode}),
+                credentials:"include"
+             });
+
+             const result = await response.json();
+
+             return result;
+
+
+          }catch(e:any){
+             console.log(`Error in: ${e.message}`);
+             return {
+                success:false,
+                message:"Error fetching"
+             }
+
+          }
+
 
     }
 

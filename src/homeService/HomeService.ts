@@ -4,7 +4,7 @@ const API_URL = "http://10.219.65.2:5000/api/home"; // Adjust your base URL
 export class HomeService {
   static async getHomeData() {
     try {
-      const response = await fetch(`${API_URL}/user-data`, {
+      const response = await fetch(`${API_URL}/`, {
         method: "GET",
         credentials: "include"
       });
@@ -28,7 +28,7 @@ export class HomeService {
 
   static async getUserStats() {
     try {
-      const response = await fetch(`${API_URL}/home/stats`, {
+      const response = await fetch(`${API_URL}/stats`, {
         method: "GET",
         credentials: "include"
       });

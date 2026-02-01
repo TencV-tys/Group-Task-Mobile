@@ -214,9 +214,14 @@ export default function HomeScreen({ navigation }: any) {
               </TouchableOpacity>
             ))
           ) : (
-            <View style={styles.activityCard}>
-              <Text style={styles.activityText}>No recent activity</Text>
-              <Text style={styles.activitySubtext}>Complete tasks to see activity here</Text>
+            <View style={styles.emptyActivityContainer}>
+              <View style={styles.emptyActivityCard}>
+                <Text style={styles.emptyActivityIcon}>📭</Text>
+                <Text style={styles.emptyActivityText}>No recent activity</Text>
+                <Text style={styles.emptyActivitySubtext}>
+                  Complete tasks to see your activity here
+                </Text>
+              </View>
             </View>
           )}
         </View>
@@ -456,10 +461,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#6c757d',
   },
-  activitySubtext: {
-    fontSize: 14,
+  emptyActivityContainer: {
+    marginBottom: 10,
+  },
+  emptyActivityCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    borderStyle: 'dashed',
+  },
+  emptyActivityIcon: {
+    fontSize: 40,
+    marginBottom: 15,
+    opacity: 0.5,
+  },
+  emptyActivityText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#6c757d',
-    marginTop: 5,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyActivitySubtext: {
+    fontSize: 14,
+    color: '#adb5bd',
+    textAlign: 'center',
+    lineHeight: 20,
+    maxWidth: 250,
   },
   unreadDot: {
     position: 'absolute',

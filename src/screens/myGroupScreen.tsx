@@ -67,72 +67,85 @@ export default function MyGroupsScreen({ navigation }: any) {
   };
 
   const handleGroupPress = (group: any) => {
-    navigation.navigate('GroupDetails', { 
+    // UPDATED: Navigate to GroupTasksScreen instead of GroupDetails
+    navigation.navigate('GroupTasks', { 
       groupId: group.id,
       groupName: group.name,
-      groupRole: group.userRole || group.role
+      userRole: group.userRole || group.role || 'MEMBER'
     });
   };
 
-  const renderGroup = ({ item }: any) => (
-    <TouchableOpacity 
-      style={styles.groupCard}
-      onPress={() => handleGroupPress(item)}
-    >
-      <View style={styles.groupHeader}>
-        <View style={[
-          styles.groupIcon,
-          { 
-            backgroundColor: (item.userRole || item.role) === 'ADMIN' ? '#007AFF' : '#6c757d' 
-          }
-        ]}>
-          <Text style={styles.groupIconText}>{(item.name || "G").charAt(0).toUpperCase()}</Text>
-        </View>
-        <View style={styles.groupInfo}>
-          <Text style={styles.groupName}>{item.name}</Text>
-          <Text style={styles.groupRole}>
-            {(item.userRole || item.role) === 'ADMIN' ? '👑 Admin' : '👤 Member'}
-          </Text>
-          {item.description && (
-            <Text style={styles.groupDescription} numberOfLines={1}>
-              {item.description}
+  const renderGroup = ({ item }: any) => {
+    const groupName = item.name || 'Unnamed Group';
+    const userRole = item.userRole || item.role || 'MEMBER';
+    
+    return (
+      <TouchableOpacity 
+        style={styles.groupCard}
+        onPress={() => handleGroupPress(item)}
+      >
+        <View style={styles.groupHeader}>
+          <View style={[
+            styles.groupIcon,
+            { 
+              backgroundColor: userRole === 'ADMIN' ? '#007AFF' : '#6c757d' 
+            }
+          ]}>
+            <Text style={styles.groupIconText}>{groupName.charAt(0).toUpperCase()}</Text>
+          </View>
+          <View style={styles.groupInfo}>
+            <Text style={styles.groupName}>{groupName}</Text>
+            <Text style={styles.groupRole}>
+              {userRole === 'ADMIN' ? '👑 Admin' : '👤 Member'}
             </Text>
+            {item.description && (
+              <Text style={styles.groupDescription} numberOfLines={1}>
+                {item.description}
+              </Text>
+            )}
+          </View>
+          {item.inviteCode && (
+            <View style={styles.inviteBadge}>
+              <Text style={styles.inviteText}>{item.inviteCode}</Text>
+            </View>
           )}
         </View>
-        {item.inviteCode && (
-          <View style={styles.inviteBadge}>
-            <Text style={styles.inviteText}>{item.inviteCode}</Text>
-          </View>
-        )}
-      </View>
-      
-      <View style={styles.groupStats}>
-        <View style={styles.stat}>
-          <Text style={styles.statNumber}>
-            {item.memberCount || 1}
-          </Text>
-          <Text style={styles.statLabel}>members</Text>
-        </View>
-        <View style={styles.stat}>
-          <Text style={styles.statNumber}>
-            {item.taskCount || 0}
-          </Text>
-          <Text style={styles.statLabel}>tasks</Text>
-        </View>
-        {item.createdAt && (
+        
+        <View style={styles.groupStats}>
           <View style={styles.stat}>
             <Text style={styles.statNumber}>
-              {new Date(item.createdAt).toLocaleDateString('en-US', { 
-                month: 'short', 
-                day: 'numeric' 
-              })}
+              {item.memberCount || 1}
             </Text>
-            <Text style={styles.statLabel}>created</Text>
+            <Text style={styles.statLabel}>members</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.statNumber}>
+              {item.taskCount || 0}
+            </Text>
+            <Text style={styles.statLabel}>tasks</Text>
+          </View>
+          {item.createdAt && (
+            <View style={styles.stat}>
+              <Text style={styles.statNumber}>
+                {new Date(item.createdAt).toLocaleDateString('en-US', { 
+                  month: 'short', 
+                  day: 'numeric' 
+                })}
+              </Text>
+              <Text style={styles.statLabel}>created</Text>
+            </View>
+          )}
+        </View>
+        
+        {/* Show admin badge if user is admin */}
+        {userRole === 'ADMIN' && (
+          <View style={styles.adminBadge}>
+            <Text style={styles.adminBadgeText}>Can Create Tasks</Text>
           </View>
         )}
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderContent = () => {
     if (loading && !refreshing) {
@@ -147,13 +160,23 @@ export default function MyGroupsScreen({ navigation }: any) {
     if (error) {
       return (
         <View style={styles.errorContainer}>
+          <Text style={styles.errorIcon}>⚠️</Text>
+          <Text style={styles.errorTitle}>Error Loading Groups</Text>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={() => fetchGroups()}
-          >
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
+          <View style={styles.errorActions}>
+            <TouchableOpacity 
+              style={[styles.retryButton, styles.primaryButton]}
+              onPress={() => fetchGroups()}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.retryButton, styles.secondaryButton]}
+              onPress={() => navigation.navigate('Home')}
+            >
+              <Text style={styles.secondaryButtonText}>Go Home</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       );
     }
@@ -176,14 +199,22 @@ export default function MyGroupsScreen({ navigation }: any) {
             <Text style={styles.emptyIcon}>👥</Text>
             <Text style={styles.emptyText}>No groups yet</Text>
             <Text style={styles.emptySubtext}>
-              Create your first group or join an existing one to get started
+              Create your first group or join an existing one to get started with tasks
             </Text>
-            <TouchableOpacity 
-              style={styles.emptyButton}
-              onPress={handleCreateGroup}
-            >
-              <Text style={styles.emptyButtonText}>Create Your First Group</Text>
-            </TouchableOpacity>
+            <View style={styles.emptyButtons}>
+              <TouchableOpacity 
+                style={[styles.emptyButton, styles.primaryEmptyButton]}
+                onPress={handleCreateGroup}
+              >
+                <Text style={styles.emptyButtonText}>Create Group</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.emptyButton, styles.secondaryEmptyButton]}
+                onPress={handleJoinGroup}
+              >
+                <Text style={styles.secondaryEmptyButtonText}>Join Group</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         }
         contentContainerStyle={[
@@ -198,20 +229,30 @@ export default function MyGroupsScreen({ navigation }: any) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Groups</Text>
-        <TouchableOpacity 
-          onPress={refreshGroups}
-          disabled={refreshing}
-        >
-          {refreshing ? (
-            <ActivityIndicator size="small" color="#007AFF" />
-          ) : (
-            <Text style={styles.refreshButton}>🔄</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.createButton}
+            onPress={handleCreateGroup}
+          >
+            <Text style={styles.createButtonText}>+ Create</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            onPress={refreshGroups}
+            disabled={refreshing}
+            style={styles.refreshButtonContainer}
+          >
+            {refreshing ? (
+              <ActivityIndicator size="small" color="#007AFF" />
+            ) : (
+              <Text style={styles.refreshButton}>🔄</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {renderContent()}
 
+      {/* FAB for mobile */}
       {groups.length > 0 && (
         <View style={styles.fabContainer}>
           <TouchableOpacity 
@@ -252,9 +293,27 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#212529',
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  createButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#007AFF',
+    borderRadius: 6,
+  },
+  createButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  refreshButtonContainer: {
+    padding: 4,
+  },
   refreshButton: {
     fontSize: 20,
-    padding: 5,
     color: '#007AFF',
   },
   loadingContainer: {
@@ -274,21 +333,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+    color: '#dc3545',
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#dc3545',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
   errorText: {
     fontSize: 16,
-    color: '#dc3545',
+    color: '#495057',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  errorActions: {
+    flexDirection: 'row',
+    gap: 12,
   },
   retryButton: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#007AFF',
     borderRadius: 8,
+  },
+  primaryButton: {
+    backgroundColor: '#007AFF',
+  },
+  secondaryButton: {
+    backgroundColor: '#6c757d',
   },
   retryButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  secondaryButtonText: {
+    color: 'white',
+    fontSize: 14,
     fontWeight: '600',
   },
   listContainer: {
@@ -308,6 +394,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    position: 'relative',
   },
   groupHeader: {
     flexDirection: 'row',
@@ -378,6 +465,22 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     marginTop: 2,
   },
+  adminBadge: {
+    position: 'absolute',
+    top: 15,
+    right: 15,
+    backgroundColor: '#e7f5ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#a5d8ff',
+  },
+  adminBadgeText: {
+    fontSize: 10,
+    color: '#1971c2',
+    fontWeight: '600',
+  },
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 50,
@@ -399,16 +502,33 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 25,
     maxWidth: 300,
+    lineHeight: 20,
+  },
+  emptyButtons: {
+    flexDirection: 'row',
+    gap: 12,
   },
   emptyButton: {
-    paddingHorizontal: 30,
+    paddingHorizontal: 20,
     paddingVertical: 12,
+    borderRadius: 8,
+  },
+  primaryEmptyButton: {
     backgroundColor: '#007AFF',
-    borderRadius: 10,
+  },
+  secondaryEmptyButton: {
+    backgroundColor: '#f1f3f5',
+    borderWidth: 1,
+    borderColor: '#dee2e6',
   },
   emptyButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  secondaryEmptyButtonText: {
+    color: '#495057',
+    fontSize: 14,
     fontWeight: '600',
   },
   fabContainer: {

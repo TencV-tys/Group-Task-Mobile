@@ -8,9 +8,10 @@ import {
   ScrollView,
   SafeAreaView,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Image
 } from 'react-native';
-import { useHomeData } from '../homeHook/useHomeHook'; // Fixed import path
+import { useHomeData } from '../homeHook/useHomeHook';
 
 export default function HomeScreen({ navigation }: any) {
   const { loading, refreshing, error, homeData, refreshHomeData } = useHomeData();
@@ -20,7 +21,7 @@ export default function HomeScreen({ navigation }: any) {
     console.log("HomeScreen - homeData:", homeData);
   }, [homeData]);
 
-  // Extract data with proper fallbacks - FIXED to match backend structure
+  // Extract data with proper fallbacks
   const user = homeData?.user || { 
     fullName: 'User', 
     groupsCount: 0, 
@@ -38,6 +39,7 @@ export default function HomeScreen({ navigation }: any) {
   };
   
   const recentActivity = homeData?.recentActivity || [];
+  const groups = homeData?.groups || [];
 
   // Show loading state
   if (loading && !refreshing) {
@@ -71,6 +73,30 @@ export default function HomeScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header with Profile Button */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>Dashboard</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.profileButton}
+          onPress={() => navigation.navigate('Profile')}
+        >
+          {user.avatarUrl ? (
+            <Image 
+              source={{ uri: user.avatarUrl }} 
+              style={styles.avatar} 
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>
+                {user.fullName?.charAt(0) || 'U'}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         refreshControl={
           <RefreshControl
@@ -81,11 +107,11 @@ export default function HomeScreen({ navigation }: any) {
           />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
+        {/* Welcome Section */}
+        <View style={styles.welcomeSection}>
           <Text style={styles.welcomeText}>Welcome back,</Text>
           <Text style={styles.userName}>
-            {user.fullName || 'User'} {user.fullName && '👋'} {/* Fixed: fullName */}
+            {user.fullName || 'User'} {user.fullName && '👋'}
           </Text>
           {user.email && (
             <Text style={styles.userEmail}>{user.email}</Text>
@@ -104,7 +130,7 @@ export default function HomeScreen({ navigation }: any) {
           
           <TouchableOpacity 
             style={styles.statCard}
-            onPress={() => navigation.navigate('Tasks')}
+            onPress={() => navigation.navigate('MyGroups')}
           >
             <Text style={[styles.statNumber, stats.tasksDue > 0 && styles.statNumberWarning]}>
               {stats.tasksDue || 0}
@@ -114,7 +140,7 @@ export default function HomeScreen({ navigation }: any) {
 
           <TouchableOpacity 
             style={styles.statCard}
-            onPress={() => navigation.navigate('Tasks')}
+            onPress={() => navigation.navigate('MyGroups')}
           >
             <Text style={[styles.statNumber, styles.statNumberSuccess]}>
               {stats.completedTasks || 0}
@@ -173,7 +199,19 @@ export default function HomeScreen({ navigation }: any) {
 
           <TouchableOpacity 
             style={styles.actionCard}
-            onPress={() => navigation.navigate('CreateTask')}
+            onPress={() => {
+              // If user has groups, navigate to first group's tasks
+              if (groups.length > 0) {
+                navigation.navigate('GroupTasks', { 
+                  groupId: groups[0].id,
+                  groupName: groups[0].name,
+                  userRole: groups[0].role
+                });
+              } else {
+                // Or show message
+                alert('Create or join a group first to create tasks');
+              }
+            }}
           >
             <View style={[styles.iconCircle, { backgroundColor: '#AF52DE' }]}>
               <Text style={styles.iconText}>✓</Text>
@@ -184,6 +222,43 @@ export default function HomeScreen({ navigation }: any) {
             </View>
           </TouchableOpacity>
         </View>
+
+        {/* Your Groups Section */}
+        {groups.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Your Groups</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('MyGroups')}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {groups.slice(0, 2).map((group: any) => (
+              <TouchableOpacity 
+                key={group.id}
+                style={styles.groupCard}
+                onPress={() => navigation.navigate('GroupTasks', { 
+                  groupId: group.id,
+                  groupName: group.name,
+                  userRole: group.role || 'MEMBER'
+                })}
+              >
+                <View style={styles.groupIcon}>
+                  <Text style={styles.groupIconText}>
+                    {group.name?.charAt(0) || 'G'}
+                  </Text>
+                </View>
+                <View style={styles.groupInfo}>
+                  <Text style={styles.groupName}>{group.name || 'Group'}</Text>
+                  <Text style={styles.groupStats}>
+                    {group.taskCount || 0} tasks • {group.role || 'Member'}
+                  </Text>
+                </View>
+                <Text style={styles.groupArrow}>→</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Recent Activity */}
         <View style={styles.section}>
@@ -225,38 +300,6 @@ export default function HomeScreen({ navigation }: any) {
             </View>
           )}
         </View>
-
-        {/* If you have groups data */}
-        {homeData?.groups && homeData.groups.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Your Groups</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('MyGroups')}>
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            
-            {homeData.groups.slice(0, 2).map((group: any) => (
-              <TouchableOpacity 
-                key={group.id}
-                style={styles.groupCard}
-                onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}
-              >
-                <View style={styles.groupIcon}>
-                  <Text style={styles.groupIconText}>
-                    {group.name?.charAt(0) || 'G'}
-                  </Text>
-                </View>
-                <View style={styles.groupInfo}>
-                  <Text style={styles.groupName}>{group.name || 'Group'}</Text>
-                  <Text style={styles.groupStats}>
-                    {group.taskCount || 0} tasks • {group.role || 'Member'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -267,54 +310,58 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 100,
-  },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: '#6c757d',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#dc3545',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+  // Header Styles
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#212529',
+  },
+  profileButton: {
+    padding: 4,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  avatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  // Welcome Section
+  welcomeSection: {
     padding: 20,
-    paddingTop: 30,
+    paddingTop: 25,
+    paddingBottom: 15,
   },
   welcomeText: {
     fontSize: 16,
     color: '#6c757d',
   },
   userName: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#212529',
     marginTop: 5,
@@ -324,10 +371,11 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     marginTop: 5,
   },
+  // Stats Cards
   statsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    marginBottom: 30,
+    marginBottom: 25,
   },
   statCard: {
     flex: 1,
@@ -343,7 +391,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   statNumber: {
-    fontSize: 28,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#007AFF',
   },
@@ -365,9 +413,10 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
+  // Sections
   section: {
     paddingHorizontal: 20,
-    marginBottom: 30,
+    marginBottom: 25,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -385,6 +434,7 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '500',
   },
+  // Action Cards
   actionCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -414,7 +464,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   actionTitle: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: '600',
     color: '#212529',
     marginBottom: 3,
@@ -423,6 +473,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6c757d',
   },
+  // Group Cards
+  groupCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  groupIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  groupIconText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  groupInfo: {
+    flex: 1,
+  },
+  groupName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 3,
+  },
+  groupStats: {
+    fontSize: 12,
+    color: '#6c757d',
+  },
+  groupArrow: {
+    fontSize: 20,
+    color: '#adb5bd',
+    marginLeft: 10,
+  },
+  // Activity Cards
   activityCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -507,44 +604,43 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#007AFF',
   },
-  groupCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  groupIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#007AFF',
+  // Loading & Error States
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    paddingBottom: 100,
   },
-  groupIconText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: 'white',
+  loadingText: {
+    marginTop: 15,
+    fontSize: 16,
+    color: '#6c757d',
   },
-  groupInfo: {
+  errorContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
-  groupName: {
+  errorIcon: {
+    fontSize: 48,
+    marginBottom: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#dc3545',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    paddingHorizontal: 25,
+    paddingVertical: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
-    marginBottom: 3,
-  },
-  groupStats: {
-    fontSize: 12,
-    color: '#6c757d',
   },
 });

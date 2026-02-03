@@ -11,6 +11,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import GroupTasksScreen from '../screens/GroupTasksScreen'; // Add this import
 import CreateTaskScreen from '../screens/CreateTaskScreen'; // Add this import
 import UpdateTaskScreen from '../screens/UpdateTaskScreen';
+import GroupMembersScreen from '../screens/GroupMembersScreen';
 
 const Stack = createStackNavigator();
 
@@ -97,6 +98,17 @@ export default function AppNavigator() {
           },
         }}
       />
+       
+       <Stack.Screen 
+  name="GroupMembers" 
+  component={GroupMembersScreen}
+  options={{ 
+    headerShown: false,
+    title: 'Group Members'
+  }}
+/>
+
+
     </Stack.Navigator>
   );
 }

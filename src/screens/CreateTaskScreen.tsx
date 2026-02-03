@@ -22,7 +22,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     description: '',
     points: '1',
     frequency: 'ONCE',
-    category: ''
+    category: '' 
   });
 
   const handleSubmit = async () => {

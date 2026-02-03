@@ -11,7 +11,7 @@ import {
   RefreshControl,
   Image
 } from 'react-native';
-import { useHomeData } from '../homeHook/useHomeHook';
+import { useHomeData } from '../homeHook/useHomeHook'; // Fixed import path
 
 export default function HomeScreen({ navigation }: any) {
   const { loading, refreshing, error, homeData, refreshHomeData } = useHomeData();
@@ -27,7 +27,9 @@ export default function HomeScreen({ navigation }: any) {
     groupsCount: 0, 
     tasksDue: 0,
     email: '',
-    avatarUrl: null
+    avatarUrl: null,
+    pointsThisWeek: 0,
+    totalPoints: 0
   };
   
   const stats = homeData?.stats || { 
@@ -35,11 +37,17 @@ export default function HomeScreen({ navigation }: any) {
     tasksDue: 0, 
     completedTasks: 0,
     totalTasks: 0,
-    completionRate: 0
+    completionRate: 0,
+    overdueTasks: 0,
+    swapRequests: 0,
+    pointsThisWeek: 0
   };
   
   const recentActivity = homeData?.recentActivity || [];
   const groups = homeData?.groups || [];
+  const leaderboard = homeData?.leaderboard || [];
+  const currentWeekTasks = homeData?.currentWeekTasks || [];
+  const upcomingTasks = homeData?.upcomingTasks || [];
 
   // Show loading state
   if (loading && !refreshing) {
@@ -77,6 +85,11 @@ export default function HomeScreen({ navigation }: any) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Dashboard</Text>
+          {user.pointsThisWeek > 0 && (
+            <Text style={styles.headerSubtitle}>
+              {user.pointsThisWeek} points this week
+            </Text>
+          )}
         </View>
         <TouchableOpacity 
           style={styles.profileButton}
@@ -130,17 +143,20 @@ export default function HomeScreen({ navigation }: any) {
           
           <TouchableOpacity 
             style={styles.statCard}
-            onPress={() => navigation.navigate('MyGroups')}
+            onPress={() => navigation.navigate('Tasks')}
           >
             <Text style={[styles.statNumber, stats.tasksDue > 0 && styles.statNumberWarning]}>
               {stats.tasksDue || 0}
             </Text>
-            <Text style={styles.statLabel}>Tasks Due</Text>
+            <Text style={styles.statLabel}>Due This Week</Text>
+            {stats.overdueTasks > 0 && (
+              <Text style={styles.overdueBadge}>{stats.overdueTasks} overdue</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.statCard}
-            onPress={() => navigation.navigate('MyGroups')}
+            onPress={() => navigation.navigate('Tasks')}
           >
             <Text style={[styles.statNumber, styles.statNumberSuccess]}>
               {stats.completedTasks || 0}
@@ -153,6 +169,24 @@ export default function HomeScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
         </View>
+
+        {/* Points Display */}
+        {user.pointsThisWeek > 0 && (
+          <View style={styles.pointsContainer}>
+            <View style={styles.pointsCard}>
+              <Text style={styles.pointsIcon}>🏆</Text>
+              <View style={styles.pointsContent}>
+                <Text style={styles.pointsTitle}>Weekly Points</Text>
+                <Text style={styles.pointsValue}>{user.pointsThisWeek} points</Text>
+              </View>
+              <View style={styles.pointsDivider} />
+              <View style={styles.pointsContent}>
+                <Text style={styles.pointsTitle}>Total Points</Text>
+                <Text style={styles.pointsValue}>{user.totalPoints || 0} points</Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Quick Actions */}
         <View style={styles.section}>
@@ -197,31 +231,72 @@ export default function HomeScreen({ navigation }: any) {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.actionCard}
-            onPress={() => {
-              // If user has groups, navigate to first group's tasks
-              if (groups.length > 0) {
-                navigation.navigate('GroupTasks', { 
-                  groupId: groups[0].id,
-                  groupName: groups[0].name,
-                  userRole: groups[0].role
-                });
-              } else {
-                // Or show message
-                alert('Create or join a group first to create tasks');
-              }
-            }}
-          >
-            <View style={[styles.iconCircle, { backgroundColor: '#AF52DE' }]}>
-              <Text style={styles.iconText}>✓</Text>
-            </View>
-            <View style={styles.actionContent}>
-              <Text style={styles.actionTitle}>Create Task</Text>
-              <Text style={styles.actionSubtitle}>Assign new task</Text>
-            </View>
-          </TouchableOpacity>
+          {/* Removed Create Task action */}
+
+          {stats.swapRequests > 0 && (
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('SwapRequests')}
+            >
+              <View style={[styles.iconCircle, { backgroundColor: '#FF3B30' }]}>
+                <Text style={styles.iconText}>🔄</Text>
+              </View>
+              <View style={styles.actionContent}>
+                <Text style={styles.actionTitle}>Swap Requests</Text>
+                <Text style={styles.actionSubtitle}>
+                  {stats.swapRequests} pending
+                </Text>
+              </View>
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>{stats.swapRequests}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* Tasks This Week */}
+        {currentWeekTasks.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Tasks This Week</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Tasks')}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {currentWeekTasks.slice(0, 3).map((task: any) => (
+              <TouchableOpacity 
+                key={task.id}
+                style={styles.taskCard}
+                onPress={() => navigation.navigate('TaskDetail', { 
+                  taskId: task.taskId,
+                  assignmentId: task.id
+                })}
+              >
+                <View style={[styles.taskStatus, task.completed && styles.taskStatusCompleted]}>
+                  <Text style={styles.taskStatusIcon}>
+                    {task.completed ? '✓' : '○'}
+                  </Text>
+                </View>
+                <View style={styles.taskInfo}>
+                  <Text style={styles.taskTitle}>{task.title}</Text>
+                  <View style={styles.taskMeta}>
+                    <Text style={styles.taskGroup}>{task.groupName}</Text>
+                    <Text style={styles.taskPoints}>• {task.points} points</Text>
+                    {task.timeOfDay && (
+                      <Text style={styles.taskTime}>• {task.timeOfDay.toLowerCase()}</Text>
+                    )}
+                  </View>
+                </View>
+                <Text style={styles.taskDue}>
+                  {new Date(task.dueDate).toLocaleDateString('en-US', { 
+                    weekday: 'short' 
+                  })}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {/* Your Groups Section */}
         {groups.length > 0 && (
@@ -243,20 +318,72 @@ export default function HomeScreen({ navigation }: any) {
                   userRole: group.role || 'MEMBER'
                 })}
               >
-                <View style={styles.groupIcon}>
-                  <Text style={styles.groupIconText}>
-                    {group.name?.charAt(0) || 'G'}
-                  </Text>
-                </View>
+                {group.avatarUrl ? (
+                  <Image 
+                    source={{ uri: group.avatarUrl }} 
+                    style={styles.groupAvatar} 
+                  />
+                ) : (
+                  <View style={styles.groupIcon}>
+                    <Text style={styles.groupIconText}>
+                      {group.name?.charAt(0) || 'G'}
+                    </Text>
+                  </View>
+                )}
                 <View style={styles.groupInfo}>
                   <Text style={styles.groupName}>{group.name || 'Group'}</Text>
                   <Text style={styles.groupStats}>
-                    {group.taskCount || 0} tasks • {group.role || 'Member'}
+                    {group.stats?.yourTasksThisWeek || 0} tasks this week • {group.role || 'Member'}
                   </Text>
                 </View>
                 <Text style={styles.groupArrow}>→</Text>
               </TouchableOpacity>
             ))}
+          </View>
+        )}
+
+        {/* Leaderboard */}
+        {leaderboard.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Top Performers This Week</Text>
+            <View style={styles.leaderboardCard}>
+              {leaderboard.slice(0, 3).map((item: any, index: number) => (
+                <View key={item.user.id} style={styles.leaderboardItem}>
+                  <View style={styles.leaderboardRank}>
+                    <Text style={styles.leaderboardRankText}>
+                      #{index + 1}
+                    </Text>
+                  </View>
+                  <View style={styles.leaderboardAvatar}>
+                    {item.user.avatarUrl ? (
+                      <Image 
+                        source={{ uri: item.user.avatarUrl }} 
+                        style={styles.leaderboardAvatarImage} 
+                      />
+                    ) : (
+                      <Text style={styles.leaderboardAvatarText}>
+                        {item.user.fullName?.charAt(0) || 'U'}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.leaderboardInfo}>
+                    <Text style={styles.leaderboardName}>
+                      {item.user.fullName || 'User'}
+                      {item.isCurrentUser && ' (You)'}
+                    </Text>
+                    <Text style={styles.leaderboardStats}>
+                      {item.completedTasks} tasks • {item.totalPoints} points
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              <TouchableOpacity 
+                style={styles.viewLeaderboardButton}
+                onPress={() => navigation.navigate('Leaderboard')}
+              >
+                <Text style={styles.viewLeaderboardText}>View Full Leaderboard</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
@@ -329,6 +456,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#212529',
   },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#34c759',
+    marginTop: 2,
+    fontWeight: '500',
+  },
   profileButton: {
     padding: 4,
   },
@@ -375,7 +508,7 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    marginBottom: 25,
+    marginBottom: 15,
   },
   statCard: {
     flex: 1,
@@ -413,6 +546,53 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontWeight: '500',
   },
+  overdueBadge: {
+    fontSize: 9,
+    color: '#ff3b30',
+    backgroundColor: '#ffebee',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginTop: 4,
+    overflow: 'hidden',
+  },
+  // Points Section
+  pointsContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  pointsCard: {
+    backgroundColor: '#FFF3CD',
+    borderRadius: 12,
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FFECB5',
+  },
+  pointsIcon: {
+    fontSize: 30,
+    marginRight: 15,
+  },
+  pointsContent: {
+    flex: 1,
+  },
+  pointsTitle: {
+    fontSize: 12,
+    color: '#856404',
+    marginBottom: 2,
+  },
+  pointsValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#856404',
+  },
+  pointsDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#FFECB5',
+    marginHorizontal: 15,
+  },
   // Sections
   section: {
     paddingHorizontal: 20,
@@ -447,6 +627,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
+    position: 'relative',
   },
   iconCircle: {
     width: 50,
@@ -473,6 +654,89 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6c757d',
   },
+  notificationBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 15,
+    backgroundColor: '#FF3B30',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  // Task Cards
+  taskCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  taskStatus: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  taskStatusCompleted: {
+    backgroundColor: '#34c759',
+    borderColor: '#34c759',
+  },
+  taskStatusIcon: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: 'bold',
+  },
+  taskInfo: {
+    flex: 1,
+  },
+  taskTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 4,
+  },
+  taskMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  taskGroup: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '500',
+    marginRight: 6,
+  },
+  taskPoints: {
+    fontSize: 12,
+    color: '#34c759',
+    marginRight: 6,
+  },
+  taskTime: {
+    fontSize: 12,
+    color: '#6c757d',
+  },
+  taskDue: {
+    fontSize: 14,
+    color: '#6c757d',
+    fontWeight: '500',
+  },
   // Group Cards
   groupCard: {
     flexDirection: 'row',
@@ -494,6 +758,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 15,
+  },
+  groupAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     marginRight: 15,
   },
   groupIconText: {
@@ -518,6 +788,79 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#adb5bd',
     marginLeft: 10,
+  },
+  // Leaderboard
+  leaderboardCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  leaderboardItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  leaderboardRank: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  leaderboardRankText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#6c757d',
+  },
+  leaderboardAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e9ecef',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  leaderboardAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  leaderboardAvatarText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#6c757d',
+  },
+  leaderboardInfo: {
+    flex: 1,
+  },
+  leaderboardName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 3,
+  },
+  leaderboardStats: {
+    fontSize: 12,
+    color: '#6c757d',
+  },
+  viewLeaderboardButton: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+    alignItems: 'center',
+  },
+  viewLeaderboardText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500',
   },
   // Activity Cards
   activityCard: {

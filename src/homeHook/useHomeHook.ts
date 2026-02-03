@@ -1,6 +1,6 @@
 // src/hooks/useHomeData.ts
 import { useState, useEffect, useCallback } from 'react';
-import { HomeService } from '../homeService/HomeService'; // Make sure path is correct
+import { HomeService } from '../homeService/HomeService'; // Fixed import path
 
 export function useHomeData() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -23,26 +23,32 @@ export function useHomeData() {
       console.log("useHomeData: Full result:", JSON.stringify(result, null, 2));
       
       if (result.success && result.data) {
-        // Extract data with proper fallbacks
+        // Extract all data from the backend response
         const data = {
           user: result.data.user || {
             fullName: 'User',
             email: '',
             avatarUrl: null,
             groupsCount: 0,
-            tasksDue: 0,
-            totalTasks: 0,
-            completedTasks: 0
+            pointsThisWeek: 0,
+            totalPoints: 0
           },
           stats: result.data.stats || {
             groupsCount: 0,
-            tasksDue: 0,
+            tasksDueThisWeek: 0,
+            overdueTasks: 0,
             completedTasks: 0,
             totalTasks: 0,
-            completionRate: 0
+            swapRequests: 0,
+            completionRate: 0,
+            pointsThisWeek: 0
           },
+          currentWeekTasks: result.data.currentWeekTasks || [],
+          upcomingTasks: result.data.upcomingTasks || [],
+          groups: result.data.groups || [],
+          leaderboard: result.data.leaderboard || [],
           recentActivity: result.data.recentActivity || [],
-          groups: result.data.groups || []
+          rotationInfo: result.data.rotationInfo || {}
         };
         
         console.log("useHomeData: Processed data:", data);

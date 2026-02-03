@@ -15,6 +15,9 @@ export function useCreateTask() {
       points?: number;
       frequency?: string;
       category?: string;
+      timeOfDay?: string;
+      dayOfWeek?: string;
+      isRecurring?: boolean;
     }
   ) => {
     setLoading(true);
@@ -31,14 +34,33 @@ export function useCreateTask() {
         throw new Error('Points must be at least 1');
       }
 
-      const result = await TaskService.createTask(groupId, taskData);
+      // Prepare data with defaults
+      const requestData: any = {
+        ...taskData,
+        frequency: taskData.frequency || 'WEEKLY',
+        isRecurring: taskData.isRecurring !== false // Default to true if not specified
+      };
+
+      // Convert enum values to uppercase to match backend
+      if (requestData.timeOfDay) {
+        requestData.timeOfDay = requestData.timeOfDay.toUpperCase();
+      }
+      if (requestData.dayOfWeek) {
+        requestData.dayOfWeek = requestData.dayOfWeek.toUpperCase();
+      }
+
+      console.log("Creating task with data:", requestData);
+
+      const result = await TaskService.createTask(groupId, requestData);
+      
+      console.log("Result from server:", result);
       
       if (result.success) {
         setSuccess(true);
         return {
           success: true,
           message: result.message || 'Task created successfully',
-          task: result.task
+          task: result.task || result.data?.task
         };
       } else {
         throw new Error(result.message || 'Failed to create task');
@@ -46,6 +68,7 @@ export function useCreateTask() {
 
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to create task';
+      console.error("useCreateTask error:", err);
       setError(errorMessage);
       return {
         success: false,

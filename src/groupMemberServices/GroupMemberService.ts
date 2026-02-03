@@ -1,4 +1,4 @@
-// src/services/GroupMembersService.ts
+// src/groupMemberServices/GroupMemberService.ts
 const API_URL = "http://10.219.65.2:5000/api/group";
 
 export class GroupMembersService {
@@ -18,6 +18,26 @@ export class GroupMembersService {
       return {
         success: false,
         message: error.message || 'Failed to load members'
+      };
+    }
+  }
+
+  // Get group info including invite code
+  static async getGroupInfo(groupId: string) {
+    try {
+      const response = await fetch(`${API_URL}/${groupId}/info`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('GroupMembersService.getGroupInfo error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load group info'
       };
     }
   }
@@ -85,24 +105,4 @@ export class GroupMembersService {
       };
     }
   }
-
-  // Get group info including invite code
-  static async getGroupInfo(groupId: string) {
-    try {
-      const response = await fetch(`${API_URL}/${groupId}/info`, {
-        method: 'GET',
-        credentials: 'include'
-      });
-
-      const result = await response.json();
-      return result;
-
-    } catch (error: any) {
-      console.error('GroupMembersService.getGroupInfo error:', error);
-      return {
-        success: false,
-        message: error.message || 'Failed to load group info'
-      };
-    }
-  }
-} 
+}

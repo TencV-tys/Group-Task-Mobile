@@ -10,12 +10,12 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Image,
   Share,
   ScrollView
 } from 'react-native';
 import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
-import { GroupService } from '../groupServices/GroupService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Clipboard from '@react-native-clipboard/clipboard';
 
 export default function GroupMembersScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole, inviteCode } = route.params || {};
@@ -25,6 +25,22 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   const [members, setMembers] = useState<any[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>(userRole || 'MEMBER');
   const [groupInfo, setGroupInfo] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<string>(''); // Fixed: Added this state
+
+  // Get current user ID from AsyncStorage
+  useEffect(() => {
+    const loadCurrentUserId = async () => {
+      try {
+        const userId = await AsyncStorage.getItem('userId');
+        if (userId) {
+          setCurrentUserId(userId);
+        }
+      } catch (err) {
+        console.error('Error loading user ID:', err);
+      }
+    };
+    loadCurrentUserId();
+  }, []);
 
   const fetchData = async (isRefreshing = false) => {
     if (isRefreshing) {
@@ -39,19 +55,27 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       const membersResult = await GroupMembersService.getGroupMembers(groupId);
       
       if (membersResult.success) {
-        setMembers(membersResult.members || []);
+        // Make sure we're using the correct property names
+        const formattedMembers = (membersResult.members || []).map((member: any) => ({
+          ...member,
+          role: member.groupRole || member.role || 'MEMBER' // Use groupRole from API
+        }));
+        setMembers(formattedMembers);
         setCurrentUserRole(membersResult.userRole || userRole || 'MEMBER');
       } else {
         setError(membersResult.message || 'Failed to load members');
       }
 
-      // Try to get group info (including invite code)
-      const groupResult = await GroupService.getGroupInfo?.(groupId) || { success: false };
+      // Get group info (including invite code) - Fixed: Use GroupMembersService
+      const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
-        setGroupInfo(groupResult.group || groupResult.data);
+        setGroupInfo(groupResult.group);
+      } else {
+        console.warn('Could not load group info:', groupResult.message);
       }
 
     } catch (err: any) {
+      console.error('Error fetching data:', err);
       setError(err.message || 'Network error');
     } finally {
       setLoading(false);
@@ -73,7 +97,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     }
 
     Share.share({
-      message: `Join my group "${groupName}" on Task Manager! Use invite code: ${code}\n\nCopy this code: ${code}`,
+      message: `Join my group "${groupName}" on Task Manager! Use invite code: ${code}`,
       title: `Join ${groupName}`
     }).catch(err => console.error('Error sharing:', err));
   };
@@ -82,12 +106,27 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     const code = inviteCode || groupInfo?.inviteCode;
     if (!code) return;
     
-    // For React Native, you'd use Clipboard API
-    // Clipboard.setString(code);
-    Alert.alert('Invite Code', `Invite code: ${code}\n\nShare this code with others to join your group.`);
+    // Copy to clipboard
+    Clipboard.setString(code);
+    
+    Alert.alert(
+      'Copied!',
+      `Invite code "${code}" copied to clipboard.`,
+      [
+        {
+          text: 'Share',
+          onPress: handleShareInvite
+        },
+        {
+          text: 'OK',
+          style: 'cancel'
+        }
+      ]
+    );
   };
 
   const handleRemoveMember = async (member: any) => {
+    // Fixed: Check if it's the current user
     if (member.userId === currentUserId) {
       Alert.alert('Cannot Remove', 'You cannot remove yourself. Use "Leave Group" instead.');
       return;
@@ -103,6 +142,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           style: 'destructive',
           onPress: async () => {
             try {
+              // Fixed: Use member.id (which is the GroupMember ID, not user ID)
               const result = await GroupMembersService.removeMember(groupId, member.id);
               
               if (result.success) {
@@ -121,6 +161,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   };
 
   const handleUpdateRole = async (member: any, newRole: string) => {
+    // Fixed: Use role property (which we set in fetchData)
     if (member.role === newRole) return;
 
     Alert.alert(
@@ -132,6 +173,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           text: 'Confirm', 
           onPress: async () => {
             try {
+              // Fixed: Use member.id (GroupMember ID)
               const result = await GroupMembersService.updateMemberRole(groupId, member.id, newRole);
               
               if (result.success) {
@@ -189,7 +231,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
   const renderMember = ({ item }: any) => {
     const isAdmin = currentUserRole === 'ADMIN';
-    const isCurrentUser = item.userId === currentUserId; // You'll need to get current user ID from auth
+    const isCurrentUser = item.userId === currentUserId; // Fixed: Now this works
 
     return (
       <View style={styles.memberCard}>
@@ -211,11 +253,15 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               ]}>
                 {item.role === 'ADMIN' ? '👑 Admin' : '👤 Member'}
               </Text>
-              <Text style={styles.memberEmail}>{item.email}</Text>
+              {item.email && (
+                <Text style={styles.memberEmail}>{item.email}</Text>
+              )}
             </View>
-            <Text style={styles.memberJoined}>
-              Joined {new Date(item.joinedAt).toLocaleDateString()}
-            </Text>
+            {item.joinedAt && (
+              <Text style={styles.memberJoined}>
+                Joined {new Date(item.joinedAt).toLocaleDateString()}
+              </Text>
+            )}
           </View>
         </View>
 
@@ -241,6 +287,12 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             </TouchableOpacity>
           </View>
         )}
+
+        {isCurrentUser && (
+          <View style={styles.currentUserBadge}>
+            <Text style={styles.currentUserBadgeText}>You</Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -257,6 +309,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   }
 
   const inviteCodeToShow = inviteCode || groupInfo?.inviteCode;
+  const canSeeInviteCode = currentUserRole === 'ADMIN';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -272,42 +325,51 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView>
-        {/* Invite Code Section */}
-        <View style={styles.inviteSection}>
-          <Text style={styles.inviteTitle}>Invite Members</Text>
-          <Text style={styles.inviteSubtitle}>
-            Share this code with others to join your group
-          </Text>
-          
-          {inviteCodeToShow ? (
-            <TouchableOpacity 
-              style={styles.inviteCodeCard}
-              onPress={handleCopyInviteCode}
-            >
-              <View style={styles.inviteCodeContainer}>
-                <Text style={styles.inviteCodeLabel}>INVITE CODE</Text>
-                <Text style={styles.inviteCode}>{inviteCodeToShow}</Text>
-              </View>
+      <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchData(true)}
+            colors={['#007AFF']}
+          />
+        }
+      >
+        {/* Invite Code Section - Only show to admins */}
+        {canSeeInviteCode && (
+          <View style={styles.inviteSection}>
+            <Text style={styles.inviteTitle}>Invite Members</Text>
+            <Text style={styles.inviteSubtitle}>
+              Share this code with others to join your group
+            </Text>
+            
+            {inviteCodeToShow ? (
               <TouchableOpacity 
-                style={styles.shareButton}
-                onPress={handleShareInvite}
+                style={styles.inviteCodeCard}
+                onPress={handleCopyInviteCode}
               >
-                <Text style={styles.shareButtonText}>Share</Text>
+                <View style={styles.inviteCodeContainer}>
+                  <Text style={styles.inviteCodeLabel}>INVITE CODE</Text>
+                  <Text style={styles.inviteCode}>{inviteCodeToShow}</Text>
+                </View>
+                <TouchableOpacity 
+                  style={styles.shareButton}
+                  onPress={handleShareInvite}
+                >
+                  <Text style={styles.shareButtonText}>Share</Text>
+                </TouchableOpacity>
               </TouchableOpacity>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.noInviteCode}>
-              <Text style={styles.noInviteCodeText}>No invite code available</Text>
-            </View>
-          )}
+            ) : (
+              <View style={styles.noInviteCode}>
+                <Text style={styles.noInviteCodeText}>No invite code available</Text>
+              </View>
+            )}
 
-          <Text style={styles.inviteInstructions}>
-            • Share the code above with friends{'\n'}
-            • They can join from the "Join Group" screen{'\n'}
-            • Only admins can see and share this code
-          </Text>
-        </View>
+            <Text style={styles.inviteInstructions}>
+              • Share the code above with friends{'\n'}
+              • They can join from the "Join Group" screen
+            </Text>
+          </View>
+        )}
 
         {/* Members List */}
         <View style={styles.membersSection}>
@@ -531,7 +593,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f5'
+    borderBottomColor: '#f1f3f5',
+    position: 'relative'
   },
   memberInfo: {
     flexDirection: 'row',
@@ -615,6 +678,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#fa5252'
+  },
+  currentUserBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#e7f5ff',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#a5d8ff'
+  },
+  currentUserBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#1864ab'
   },
   emptyContainer: {
     padding: 30,

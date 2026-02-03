@@ -41,7 +41,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
     if (!form.title.trim()) {
       Alert.alert('Error', 'Please enter a task title');
       return;
-    }
+    } 
 
     const points = parseInt(form.points, 10);
     if (isNaN(points) || points < 1) {

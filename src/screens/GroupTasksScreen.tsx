@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
     maxWidth: 300,
     lineHeight: 20
   },
-  emptyButton: {
+  emptyButton: { 
     paddingHorizontal: 24,
     paddingVertical: 12,
     backgroundColor: '#007AFF',

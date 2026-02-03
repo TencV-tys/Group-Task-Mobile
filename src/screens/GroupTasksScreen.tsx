@@ -83,6 +83,14 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     });
   };
 
+  const handleViewMembers = () => {
+    navigation.navigate('GroupMembers', {
+      groupId,
+      groupName,
+      userRole
+    });
+  };
+
   const handleDeleteTask = async (taskId: string, taskTitle: string) => {
     Alert.alert(
       'Delete Task',
@@ -283,11 +291,19 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         <Text style={styles.title} numberOfLines={1}>
           {groupName || 'Tasks'}
         </Text>
-        {userRole === 'ADMIN' && (
-          <TouchableOpacity onPress={handleCreateTask}>
-            <Text style={styles.createButton}>+</Text>
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.membersButton}
+            onPress={handleViewMembers}
+          >
+            <Text style={styles.membersButtonText}>👥</Text>
           </TouchableOpacity>
-        )}
+          {userRole === 'ADMIN' && (
+            <TouchableOpacity onPress={handleCreateTask}>
+              <Text style={styles.createButton}>+</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {error ? (
@@ -374,6 +390,18 @@ const styles = StyleSheet.create({
     color: '#212529',
     flex: 1,
     marginHorizontal: 12
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  membersButton: {
+    padding: 4
+  },
+  membersButtonText: {
+    fontSize: 24,
+    color: '#007AFF'
   },
   createButton: {
     fontSize: 28,

@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Clipboard from '@react-native-clipboard/clipboard';
 
 export default function GroupMembersScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole, inviteCode } = route.params || {};
@@ -25,7 +24,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   const [members, setMembers] = useState<any[]>([]);
   const [currentUserRole, setCurrentUserRole] = useState<string>(userRole || 'MEMBER');
   const [groupInfo, setGroupInfo] = useState<any>(null);
-  const [currentUserId, setCurrentUserId] = useState<string>(''); // Fixed: Added this state
+  const [currentUserId, setCurrentUserId] = useState<string>('');
 
   // Get current user ID from AsyncStorage
   useEffect(() => {
@@ -55,10 +54,9 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       const membersResult = await GroupMembersService.getGroupMembers(groupId);
       
       if (membersResult.success) {
-        // Make sure we're using the correct property names
         const formattedMembers = (membersResult.members || []).map((member: any) => ({
           ...member,
-          role: member.groupRole || member.role || 'MEMBER' // Use groupRole from API
+          role: member.groupRole || member.role || 'MEMBER'
         }));
         setMembers(formattedMembers);
         setCurrentUserRole(membersResult.userRole || userRole || 'MEMBER');
@@ -66,7 +64,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         setError(membersResult.message || 'Failed to load members');
       }
 
-      // Get group info (including invite code) - Fixed: Use GroupMembersService
+      // Get group info
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
         setGroupInfo(groupResult.group);
@@ -106,12 +104,9 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     const code = inviteCode || groupInfo?.inviteCode;
     if (!code) return;
     
-    // Copy to clipboard
-    Clipboard.setString(code);
-    
     Alert.alert(
-      'Copied!',
-      `Invite code "${code}" copied to clipboard.`,
+      'Invite Code',
+      `Invite code: ${code}\n\nShare this code with others to join your group.`,
       [
         {
           text: 'Share',
@@ -126,10 +121,22 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   };
 
   const handleRemoveMember = async (member: any) => {
-    // Fixed: Check if it's the current user
+    // Check if it's the current user
     if (member.userId === currentUserId) {
       Alert.alert('Cannot Remove', 'You cannot remove yourself. Use "Leave Group" instead.');
       return;
+    }
+
+    // Check if trying to remove the only admin
+    if (member.role === 'ADMIN') {
+      const adminCount = members.filter(m => m.role === 'ADMIN').length;
+      if (adminCount <= 1) {
+        Alert.alert(
+          'Cannot Remove Admin',
+          'This is the only admin in the group. Promote another member to admin first.'
+        );
+        return;
+      }
     }
 
     Alert.alert(
@@ -142,7 +149,6 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Fixed: Use member.id (which is the GroupMember ID, not user ID)
               const result = await GroupMembersService.removeMember(groupId, member.id);
               
               if (result.success) {
@@ -161,8 +167,19 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   };
 
   const handleUpdateRole = async (member: any, newRole: string) => {
-    // Fixed: Use role property (which we set in fetchData)
     if (member.role === newRole) return;
+
+    // Check if trying to demote the only admin
+    if (member.role === 'ADMIN' && newRole === 'MEMBER') {
+      const adminCount = members.filter(m => m.role === 'ADMIN').length;
+      if (adminCount <= 1) {
+        Alert.alert(
+          'Cannot Demote',
+          'This is the only admin in the group. Promote another member to admin first.'
+        );
+        return;
+      }
+    }
 
     Alert.alert(
       'Change Role',
@@ -173,7 +190,6 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           text: 'Confirm', 
           onPress: async () => {
             try {
-              // Fixed: Use member.id (GroupMember ID)
               const result = await GroupMembersService.updateMemberRole(groupId, member.id, newRole);
               
               if (result.success) {
@@ -194,6 +210,18 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   };
 
   const handleLeaveGroup = () => {
+    // Check if user is the only admin
+    if (currentUserRole === 'ADMIN') {
+      const adminCount = members.filter(m => m.role === 'ADMIN').length;
+      if (adminCount <= 1) {
+        Alert.alert(
+          'Cannot Leave as Only Admin',
+          'You are the only admin in this group. Promote another member to admin before leaving.'
+        );
+        return;
+      }
+    }
+
     Alert.alert(
       'Leave Group',
       `Are you sure you want to leave "${groupName}"?`,
@@ -231,7 +259,9 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
   const renderMember = ({ item }: any) => {
     const isAdmin = currentUserRole === 'ADMIN';
-    const isCurrentUser = item.userId === currentUserId; // Fixed: Now this works
+    const isCurrentUser = item.userId === currentUserId;
+    const isOnlyAdmin = item.role === 'ADMIN' && 
+                      members.filter(m => m.role === 'ADMIN').length <= 1;
 
     return (
       <View style={styles.memberCard}>
@@ -245,13 +275,17 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             </Text>
           </View>
           <View style={styles.memberDetails}>
-            <Text style={styles.memberName}>{item.fullName}</Text>
+            <Text style={styles.memberName}>
+              {item.fullName} {isCurrentUser && '(You)'}
+            </Text>
             <View style={styles.memberMeta}>
               <Text style={[
                 styles.memberRole,
-                item.role === 'ADMIN' && styles.adminRole
+                item.role === 'ADMIN' && styles.adminRole,
+                isOnlyAdmin && styles.onlyAdminRole
               ]}>
                 {item.role === 'ADMIN' ? '👑 Admin' : '👤 Member'}
+                {isOnlyAdmin && ' (Only Admin)'}
               </Text>
               {item.email && (
                 <Text style={styles.memberEmail}>{item.email}</Text>
@@ -267,24 +301,34 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
         {isAdmin && !isCurrentUser && (
           <View style={styles.memberActions}>
-            <TouchableOpacity
-              style={[
-                styles.roleButton,
-                item.role === 'ADMIN' && styles.demoteButton
-              ]}
-              onPress={() => handleUpdateRole(item, item.role === 'ADMIN' ? 'MEMBER' : 'ADMIN')}
-            >
-              <Text style={styles.roleButtonText}>
-                {item.role === 'ADMIN' ? 'Demote' : 'Promote'}
-              </Text>
-            </TouchableOpacity>
+            {!isOnlyAdmin && (
+              <TouchableOpacity
+                style={[
+                  styles.roleButton,
+                  item.role === 'ADMIN' && styles.demoteButton
+                ]}
+                onPress={() => handleUpdateRole(item, item.role === 'ADMIN' ? 'MEMBER' : 'ADMIN')}
+              >
+                <Text style={styles.roleButtonText}>
+                  {item.role === 'ADMIN' ? 'Demote' : 'Promote'}
+                </Text>
+              </TouchableOpacity>
+            )}
             
-            <TouchableOpacity
-              style={styles.removeButton}
-              onPress={() => handleRemoveMember(item)}
-            >
-              <Text style={styles.removeButtonText}>Remove</Text>
-            </TouchableOpacity>
+            {!isOnlyAdmin && (
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => handleRemoveMember(item)}
+              >
+                <Text style={styles.removeButtonText}>Remove</Text>
+              </TouchableOpacity>
+            )}
+            
+            {isOnlyAdmin && (
+              <View style={styles.protectedBadge}>
+                <Text style={styles.protectedText}>Protected</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -310,6 +354,8 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
   const inviteCodeToShow = inviteCode || groupInfo?.inviteCode;
   const canSeeInviteCode = currentUserRole === 'ADMIN';
+  const adminCount = members.filter(m => m.role === 'ADMIN').length;
+  const isOnlyAdmin = currentUserRole === 'ADMIN' && adminCount <= 1;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -371,6 +417,17 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           </View>
         )}
 
+        {/* Admin Warning */}
+        {isOnlyAdmin && (
+          <View style={styles.warningSection}>
+            <Text style={styles.warningIcon}>⚠️</Text>
+            <Text style={styles.warningTitle}>You are the only admin</Text>
+            <Text style={styles.warningText}>
+              Promote another member to admin before leaving the group.
+            </Text>
+          </View>
+        )}
+
         {/* Members List */}
         <View style={styles.membersSection}>
           <View style={styles.sectionHeader}>
@@ -379,7 +436,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             </Text>
             <Text style={styles.sectionSubtitle}>
               {currentUserRole === 'ADMIN' 
-                ? 'You can manage members below' 
+                ? `Admins: ${adminCount} | You can manage members below` 
                 : 'View group members'}
             </Text>
           </View>
@@ -412,10 +469,19 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
         {/* Leave Group Button (for all members) */}
         <TouchableOpacity
-          style={styles.leaveButton}
+          style={[
+            styles.leaveButton,
+            isOnlyAdmin && styles.disabledLeaveButton
+          ]}
           onPress={handleLeaveGroup}
+          disabled={isOnlyAdmin}
         >
-          <Text style={styles.leaveButtonText}>Leave Group</Text>
+          <Text style={[
+            styles.leaveButtonText,
+            isOnlyAdmin && styles.disabledLeaveButtonText
+          ]}>
+            {isOnlyAdmin ? 'Cannot Leave (Only Admin)' : 'Leave Group'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -542,6 +608,33 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     lineHeight: 20
   },
+  warningSection: {
+    backgroundColor: '#fff3bf',
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#ffd43b',
+    flexDirection: 'row',
+    alignItems: 'flex-start'
+  },
+  warningIcon: {
+    fontSize: 24,
+    marginRight: 12,
+    color: '#e67700'
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#e67700',
+    marginBottom: 4
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#e67700',
+    flex: 1
+  },
   membersSection: {
     backgroundColor: 'white',
     marginHorizontal: 16,
@@ -626,7 +719,8 @@ const styles = StyleSheet.create({
   memberMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4
+    marginBottom: 4,
+    flexWrap: 'wrap'
   },
   memberRole: {
     fontSize: 13,
@@ -636,6 +730,10 @@ const styles = StyleSheet.create({
   adminRole: {
     color: '#007AFF',
     fontWeight: '600'
+  },
+  onlyAdminRole: {
+    color: '#e67700',
+    fontWeight: 'bold'
   },
   memberEmail: {
     fontSize: 12,
@@ -647,7 +745,8 @@ const styles = StyleSheet.create({
   },
   memberActions: {
     flexDirection: 'row',
-    gap: 8
+    gap: 8,
+    alignItems: 'center'
   },
   roleButton: {
     paddingHorizontal: 12,
@@ -678,6 +777,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#fa5252'
+  },
+  protectedBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#fff3bf',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ffd43b'
+  },
+  protectedText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#e67700'
   },
   currentUserBadge: {
     position: 'absolute',
@@ -718,9 +830,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ffc9c9'
   },
+  disabledLeaveButton: {
+    backgroundColor: '#f1f3f5',
+    borderColor: '#e9ecef'
+  },
   leaveButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#fa5252'
+  },
+  disabledLeaveButtonText: {
+    color: '#adb5bd'
   }
 });

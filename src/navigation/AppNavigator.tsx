@@ -10,6 +10,7 @@ import CreateGroupScreen from '../screens/CreateGroupScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import GroupTasksScreen from '../screens/GroupTasksScreen'; // Add this import
 import CreateTaskScreen from '../screens/CreateTaskScreen'; // Add this import
+import UpdateTaskScreen from '../screens/UpdateTaskScreen';
 
 const Stack = createStackNavigator();
 
@@ -72,6 +73,14 @@ export default function AppNavigator() {
           title: 'Create Task'
         }}
       />
+      <Stack.Screen 
+  name="UpdateTask" 
+  component={UpdateTaskScreen}
+  options={{ 
+    headerShown: false,
+    title: 'Edit Task'
+  }}
+/>
       
       <Stack.Screen 
         name="Profile" 

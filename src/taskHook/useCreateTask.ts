@@ -15,8 +15,8 @@ export function useCreateTask() {
       points?: number;
       frequency?: string;
       category?: string;
-      timeOfDay?: string;
-      dayOfWeek?: string;
+      timeOfDay?: string; // Will be converted to uppercase
+      dayOfWeek?: string; // Will be converted to uppercase
       isRecurring?: boolean;
     }
   ) => {
@@ -34,14 +34,14 @@ export function useCreateTask() {
         throw new Error('Points must be at least 1');
       }
 
-      // Prepare data with defaults
+      // Convert enum values to uppercase to match backend
       const requestData: any = {
         ...taskData,
         frequency: taskData.frequency || 'WEEKLY',
         isRecurring: taskData.isRecurring !== false // Default to true if not specified
       };
 
-      // Convert enum values to uppercase to match backend
+      // Convert enum strings to uppercase
       if (requestData.timeOfDay) {
         requestData.timeOfDay = requestData.timeOfDay.toUpperCase();
       }
@@ -49,11 +49,11 @@ export function useCreateTask() {
         requestData.dayOfWeek = requestData.dayOfWeek.toUpperCase();
       }
 
-      console.log("Creating task with data:", requestData);
+      console.log("useCreateTask: Creating task with data:", requestData);
 
       const result = await TaskService.createTask(groupId, requestData);
       
-      console.log("Result from server:", result);
+      console.log("useCreateTask: Result from server:", result);
       
       if (result.success) {
         setSuccess(true);

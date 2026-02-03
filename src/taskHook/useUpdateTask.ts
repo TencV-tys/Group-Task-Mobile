@@ -15,6 +15,9 @@ export function useUpdateTask() {
       points?: number;
       frequency?: string;
       category?: string;
+      timeOfDay?: string;
+      dayOfWeek?: string;
+      isRecurring?: boolean;
     }
   ) => {
     setLoading(true);
@@ -31,7 +34,19 @@ export function useUpdateTask() {
         throw new Error('Points must be at least 1');
       }
 
-      const result = await TaskService.updateTask(taskId, taskData);
+      // Prepare data - convert enum values to uppercase
+      const requestData: any = { ...taskData };
+      
+      if (requestData.timeOfDay) {
+        requestData.timeOfDay = requestData.timeOfDay.toUpperCase();
+      }
+      if (requestData.dayOfWeek) {
+        requestData.dayOfWeek = requestData.dayOfWeek.toUpperCase();
+      }
+
+      console.log("Updating task with data:", requestData);
+
+      const result = await TaskService.updateTask(taskId, requestData);
       
       if (result.success) {
         setSuccess(true);

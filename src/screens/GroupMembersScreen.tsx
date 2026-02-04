@@ -108,7 +108,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     }
 
     Share.share({
-      message: `Join my group "${groupInfo?.name || groupName}" on Task Manager! Use invite code: ${code}`,
+      message: `Join my group "${groupInfo?.name || groupName}" on Group Task! Use invite code: ${code}`,
       title: `Join ${groupInfo?.name || groupName}`
     }).catch(err => console.error('Error sharing:', err));
   };

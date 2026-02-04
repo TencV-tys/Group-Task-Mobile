@@ -278,7 +278,7 @@ export class GroupMembersService {
 
       const result = await response.json();
       return result;
-
+ 
     } catch (error: any) {
       console.error('GroupMembersService.getCurrentWeekAssignments error:', error);
       return {
@@ -287,4 +287,30 @@ export class GroupMembersService {
       };
     }
   }
+  // Add this method to src/groupMemberServices/GroupMemberService.ts
+static async updateGroup(groupId: string, groupData: { name?: string, description?: string }) {
+  try {
+    console.log(`GroupMembersService: Updating group ${groupId} with data:`, groupData);
+    
+    const response = await fetch(`${API_URL}/${groupId}/update`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(groupData),
+      credentials: 'include'
+    });
+
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('GroupMembersService.updateGroup error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to update group'
+    };
+  }
+}
 }

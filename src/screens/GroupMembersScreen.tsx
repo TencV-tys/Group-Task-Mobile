@@ -12,28 +12,39 @@ import {
   Alert,
   Share,
   ScrollView,
-  Dimensions
+  Dimensions,
+  Modal,
+  TextInput
 } from 'react-native';
 import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useGroupMembers } from '../groupHook/useGroupMembers';
 
 const { width } = Dimensions.get('window');
 
 export default function GroupMembersScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole, inviteCode } = route.params || {};
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [members, setMembers] = useState<any[]>([]);
+  
+  // Use the custom hook
+  const {
+    loading,
+    refreshing,
+    error,
+    members,
+    groupInfo,
+    fetchGroupMembers,
+    setMembers
+  } = useGroupMembers();
+
   const [currentUserRole, setCurrentUserRole] = useState<string>(userRole || 'MEMBER');
-  const [groupInfo, setGroupInfo] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingGroup, setEditingGroup] = useState({
     name: '',
     description: ''
   });
+  const [savingGroup, setSavingGroup] = useState(false);
 
   // Get current user ID from AsyncStorage
   useEffect(() => {
@@ -50,48 +61,28 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     loadCurrentUserId();
   }, []);
 
+  // Update user role from members data
+  useEffect(() => {
+    if (members.length > 0 && currentUserId) {
+      const currentUser = members.find(member => member.userId === currentUserId);
+      if (currentUser) {
+        setCurrentUserRole(currentUser.role || 'MEMBER');
+      }
+    }
+  }, [members, currentUserId]);
+
+  // Update editing group when groupInfo changes
+  useEffect(() => {
+    if (groupInfo) {
+      setEditingGroup({
+        name: groupInfo.name || '',
+        description: groupInfo.description || ''
+      });
+    }
+  }, [groupInfo]);
+
   const fetchData = async (isRefreshing = false) => {
-    if (isRefreshing) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      // Fetch members
-      const membersResult = await GroupMembersService.getGroupMembers(groupId);
-      
-      if (membersResult.success) {
-        const formattedMembers = (membersResult.members || []).map((member: any) => ({
-          ...member,
-          role: member.groupRole || member.role || 'MEMBER'
-        }));
-        setMembers(formattedMembers);
-        setCurrentUserRole(membersResult.userRole || userRole || 'MEMBER');
-      } else {
-        setError(membersResult.message || 'Failed to load members');
-      }
-
-      // Get group info
-      const groupResult = await GroupMembersService.getGroupInfo(groupId);
-      if (groupResult.success) {
-        setGroupInfo(groupResult.group);
-        setEditingGroup({
-          name: groupResult.group.name || '',
-          description: groupResult.group.description || ''
-        });
-      } else {
-        console.warn('Could not load group info:', groupResult.message);
-      }
-
-    } catch (err: any) {
-      console.error('Error fetching data:', err);
-      setError(err.message || 'Network error');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    await fetchGroupMembers(groupId, isRefreshing);
   };
 
   useEffect(() => {
@@ -118,9 +109,44 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   };
 
   const handleSaveGroupChanges = async () => {
-    // TODO: Implement API call to update group
-    Alert.alert('Info', 'Group update functionality coming soon!');
-    setShowEditModal(false);
+    // Validate input
+    if (!editingGroup.name.trim()) {
+      Alert.alert('Error', 'Group name is required');
+      return;
+    }
+
+    try {
+      setSavingGroup(true);
+      
+      // Check if group data has actually changed
+      const hasChanged = 
+        editingGroup.name.trim() !== (groupInfo?.name || '') ||
+        editingGroup.description !== (groupInfo?.description || '');
+
+      if (!hasChanged) {
+        Alert.alert('Info', 'No changes detected');
+        setShowEditModal(false);
+        return;
+      }
+
+      // Call the updateGroup method
+      const result = await GroupMembersService.updateGroup(groupId, {
+        name: editingGroup.name.trim(),
+        description: editingGroup.description.trim()
+      });
+      
+      if (result.success) {
+        Alert.alert('Success', 'Group updated successfully');
+        setShowEditModal(false);
+        fetchData(true); // Refresh data to get updated group info
+      } else {
+        Alert.alert('Error', result.message || 'Failed to update group');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update group');
+    } finally {
+      setSavingGroup(false);
+    }
   };
 
   const handleRemoveMember = async (member: any) => {
@@ -571,7 +597,9 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Group</Text>
+              <Text style={styles.modalTitle}>
+                Edit {editingGroup.name.trim() || groupInfo?.name || 'Group'}
+              </Text>
               <TouchableOpacity onPress={() => setShowEditModal(false)}>
                 <MaterialCommunityIcons name="close" size={24} color="#000" />
               </TouchableOpacity>
@@ -635,12 +663,16 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               <TouchableOpacity 
                 style={[
                   styles.saveButton,
-                  (!editingGroup.name.trim()) && styles.saveButtonDisabled
+                  (!editingGroup.name.trim() || savingGroup) && styles.saveButtonDisabled
                 ]}
                 onPress={handleSaveGroupChanges}
-                disabled={!editingGroup.name.trim()}
+                disabled={!editingGroup.name.trim() || savingGroup}
               >
-                <Text style={styles.saveButtonText}>Save Changes</Text>
+                {savingGroup ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

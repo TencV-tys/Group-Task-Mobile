@@ -11,10 +11,14 @@ import {
   RefreshControl,
   Alert,
   Share,
-  ScrollView
+  ScrollView,
+  Dimensions
 } from 'react-native';
 import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
 
 export default function GroupMembersScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole, inviteCode } = route.params || {};
@@ -25,6 +29,11 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   const [currentUserRole, setCurrentUserRole] = useState<string>(userRole || 'MEMBER');
   const [groupInfo, setGroupInfo] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingGroup, setEditingGroup] = useState({
+    name: '',
+    description: ''
+  });
 
   // Get current user ID from AsyncStorage
   useEffect(() => {
@@ -68,6 +77,10 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
         setGroupInfo(groupResult.group);
+        setEditingGroup({
+          name: groupResult.group.name || '',
+          description: groupResult.group.description || ''
+        });
       } else {
         console.warn('Could not load group info:', groupResult.message);
       }
@@ -95,29 +108,19 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     }
 
     Share.share({
-      message: `Join my group "${groupName}" on Task Manager! Use invite code: ${code}`,
-      title: `Join ${groupName}`
+      message: `Join my group "${groupInfo?.name || groupName}" on Task Manager! Use invite code: ${code}`,
+      title: `Join ${groupInfo?.name || groupName}`
     }).catch(err => console.error('Error sharing:', err));
   };
 
-  const handleCopyInviteCode = () => {
-    const code = inviteCode || groupInfo?.inviteCode;
-    if (!code) return;
-    
-    Alert.alert(
-      'Invite Code',
-      `Invite code: ${code}\n\nShare this code with others to join your group.`,
-      [
-        {
-          text: 'Share',
-          onPress: handleShareInvite
-        },
-        {
-          text: 'OK',
-          style: 'cancel'
-        }
-      ]
-    );
+  const handleEditGroup = () => {
+    setShowEditModal(true);
+  };
+
+  const handleSaveGroupChanges = async () => {
+    // TODO: Implement API call to update group
+    Alert.alert('Info', 'Group update functionality coming soon!');
+    setShowEditModal(false);
   };
 
   const handleRemoveMember = async (member: any) => {
@@ -224,7 +227,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
     Alert.alert(
       'Leave Group',
-      `Are you sure you want to leave "${groupName}"?`,
+      `Are you sure you want to leave "${groupInfo?.name || groupName}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         { 
@@ -257,6 +260,40 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     );
   };
 
+  const renderAvatar = (member: any, index: number) => {
+    const avatarSize = 50;
+    const overlap = -15;
+    
+    if (index >= 6) {
+      const remaining = members.length - 6;
+      return (
+        <View style={[styles.avatarContainer, { left: index * (avatarSize + overlap) }]}>
+          <View style={[styles.avatar, styles.moreAvatar]}>
+            <Text style={styles.moreAvatarText}>+{remaining}</Text>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View key={member.id} style={[styles.avatarContainer, { left: index * (avatarSize + overlap) }]}>
+        <View style={[
+          styles.avatar,
+          { backgroundColor: member.role === 'ADMIN' ? '#007AFF' : '#6c757d' }
+        ]}>
+          <Text style={styles.avatarText}>
+            {member.fullName?.charAt(0)?.toUpperCase() || 'U'}
+          </Text>
+        </View>
+        {member.role === 'ADMIN' && (
+          <View style={styles.adminCrown}>
+            <MaterialCommunityIcons name="crown" size={12} color="#FFD700" />
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderMember = ({ item }: any) => {
     const isAdmin = currentUserRole === 'ADMIN';
     const isCurrentUser = item.userId === currentUserId;
@@ -267,30 +304,28 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       <View style={styles.memberCard}>
         <View style={styles.memberInfo}>
           <View style={[
-            styles.avatar,
+            styles.memberAvatar,
             { backgroundColor: item.role === 'ADMIN' ? '#007AFF' : '#6c757d' }
           ]}>
-            <Text style={styles.avatarText}>
+            <Text style={styles.memberAvatarText}>
               {item.fullName?.charAt(0)?.toUpperCase() || 'U'}
             </Text>
           </View>
           <View style={styles.memberDetails}>
-            <Text style={styles.memberName}>
-              {item.fullName} {isCurrentUser && '(You)'}
-            </Text>
-            <View style={styles.memberMeta}>
-              <Text style={[
-                styles.memberRole,
-                item.role === 'ADMIN' && styles.adminRole,
-                isOnlyAdmin && styles.onlyAdminRole
-              ]}>
-                {item.role === 'ADMIN' ? '👑 Admin' : '👤 Member'}
-                {isOnlyAdmin && ' (Only Admin)'}
+            <View style={styles.memberHeader}>
+              <Text style={styles.memberName}>
+                {item.fullName} {isCurrentUser && '(You)'}
               </Text>
-              {item.email && (
-                <Text style={styles.memberEmail}>{item.email}</Text>
+              {item.role === 'ADMIN' && (
+                <View style={styles.adminBadge}>
+                  <MaterialCommunityIcons name="crown" size={14} color="#FFD700" />
+                  <Text style={styles.adminBadgeText}>Admin</Text>
+                </View>
               )}
             </View>
+            {item.email && (
+              <Text style={styles.memberEmail}>{item.email}</Text>
+            )}
             {item.joinedAt && (
               <Text style={styles.memberJoined}>
                 Joined {new Date(item.joinedAt).toLocaleDateString()}
@@ -309,9 +344,11 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 ]}
                 onPress={() => handleUpdateRole(item, item.role === 'ADMIN' ? 'MEMBER' : 'ADMIN')}
               >
-                <Text style={styles.roleButtonText}>
-                  {item.role === 'ADMIN' ? 'Demote' : 'Promote'}
-                </Text>
+                <MaterialCommunityIcons 
+                  name={item.role === 'ADMIN' ? 'account-arrow-down' : 'account-arrow-up'} 
+                  size={16} 
+                  color={item.role === 'ADMIN' ? '#fa5252' : '#1864ab'} 
+                />
               </TouchableOpacity>
             )}
             
@@ -320,13 +357,13 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 style={styles.removeButton}
                 onPress={() => handleRemoveMember(item)}
               >
-                <Text style={styles.removeButtonText}>Remove</Text>
+                <MaterialCommunityIcons name="account-remove" size={16} color="#fa5252" />
               </TouchableOpacity>
             )}
             
             {isOnlyAdmin && (
               <View style={styles.protectedBadge}>
-                <Text style={styles.protectedText}>Protected</Text>
+                <MaterialCommunityIcons name="shield-check" size={14} color="#e67700" />
               </View>
             )}
           </View>
@@ -346,7 +383,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading members...</Text>
+          <Text style={styles.loadingText}>Loading group...</Text>
         </View>
       </SafeAreaView>
     );
@@ -359,15 +396,14 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>←</Text>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#000" />
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>
-          {groupName || 'Group Members'}
-        </Text>
+        <Text style={styles.headerTitle}>Group Info</Text>
         <TouchableOpacity onPress={() => fetchData(true)}>
-          <Text style={styles.refreshButton}>🔄</Text>
+          <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
         </TouchableOpacity>
       </View>
 
@@ -380,39 +416,77 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           />
         }
       >
-        {/* Invite Code Section - Only show to admins */}
-        {canSeeInviteCode && (
-          <View style={styles.inviteSection}>
-            <Text style={styles.inviteTitle}>Invite Members</Text>
-            <Text style={styles.inviteSubtitle}>
-              Share this code with others to join your group
-            </Text>
+        {/* Group Avatar Banner */}
+        <View style={styles.avatarBanner}>
+          <View style={styles.avatarCircleContainer}>
+            {members.slice(0, 7).map((member, index) => renderAvatar(member, index))}
+          </View>
+          
+          {/* Group Info */}
+          <View style={styles.groupInfoContainer}>
+            <View style={styles.groupMainAvatar}>
+              <Text style={styles.groupAvatarText}>
+                {groupInfo?.name?.charAt(0) || groupName?.charAt(0) || 'G'}
+              </Text>
+            </View>
             
-            {inviteCodeToShow ? (
-              <TouchableOpacity 
-                style={styles.inviteCodeCard}
-                onPress={handleCopyInviteCode}
-              >
-                <View style={styles.inviteCodeContainer}>
-                  <Text style={styles.inviteCodeLabel}>INVITE CODE</Text>
-                  <Text style={styles.inviteCode}>{inviteCodeToShow}</Text>
+            <View style={styles.groupTextInfo}>
+              <Text style={styles.groupName}>{groupInfo?.name || groupName || 'Group'}</Text>
+              {groupInfo?.description && (
+                <Text style={styles.groupDescription}>{groupInfo.description}</Text>
+              )}
+              <View style={styles.groupStats}>
+                <View style={styles.statItem}>
+                  <MaterialCommunityIcons name="account-group" size={16} color="#6c757d" />
+                  <Text style={styles.statText}>{members.length} members</Text>
                 </View>
-                <TouchableOpacity 
-                  style={styles.shareButton}
-                  onPress={handleShareInvite}
-                >
-                  <Text style={styles.shareButtonText}>Share</Text>
-                </TouchableOpacity>
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.noInviteCode}>
-                <Text style={styles.noInviteCodeText}>No invite code available</Text>
+                <View style={styles.statItem}>
+                  <MaterialCommunityIcons name="crown" size={16} color="#FFD700" />
+                  <Text style={styles.statText}>{adminCount} admins</Text>
+                </View>
               </View>
-            )}
+            </View>
+          </View>
 
+          {/* Admin Actions */}
+          {currentUserRole === 'ADMIN' && (
+            <View style={styles.adminActions}>
+              <TouchableOpacity style={styles.adminButton} onPress={handleEditGroup}>
+                <MaterialCommunityIcons name="pencil" size={20} color="#007AFF" />
+                <Text style={styles.adminButtonText}>Edit Group</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.adminButton} onPress={handleShareInvite}>
+                <MaterialCommunityIcons name="share-variant" size={20} color="#34c759" />
+                <Text style={styles.adminButtonText}>Share</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* Invite Code Section - Only show to admins */}
+        {canSeeInviteCode && inviteCodeToShow && (
+          <View style={styles.inviteSection}>
+            <View style={styles.sectionHeader}>
+              <MaterialCommunityIcons name="qrcode" size={20} color="#007AFF" />
+              <Text style={styles.sectionTitle}>Invite Code</Text>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.inviteCodeCard}
+              onPress={() => {
+                Alert.alert('Invite Code', inviteCodeToShow, [
+                  { text: 'Share', onPress: handleShareInvite },
+                  { text: 'OK', style: 'cancel' }
+                ]);
+              }}
+            >
+              <Text style={styles.inviteCode}>{inviteCodeToShow}</Text>
+              <MaterialCommunityIcons name="content-copy" size={20} color="#007AFF" />
+            </TouchableOpacity>
+            
             <Text style={styles.inviteInstructions}>
-              • Share the code above with friends{'\n'}
-              • They can join from the "Join Group" screen
+              Share this code with friends to join the group
             </Text>
           </View>
         )}
@@ -420,29 +494,26 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         {/* Admin Warning */}
         {isOnlyAdmin && (
           <View style={styles.warningSection}>
-            <Text style={styles.warningIcon}>⚠️</Text>
-            <Text style={styles.warningTitle}>You are the only admin</Text>
-            <Text style={styles.warningText}>
-              Promote another member to admin before leaving the group.
-            </Text>
+            <MaterialCommunityIcons name="alert-circle" size={24} color="#e67700" />
+            <View style={styles.warningContent}>
+              <Text style={styles.warningTitle}>You are the only admin</Text>
+              <Text style={styles.warningText}>
+                Promote another member to admin before leaving the group.
+              </Text>
+            </View>
           </View>
         )}
 
         {/* Members List */}
         <View style={styles.membersSection}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              Members ({members.length})
-            </Text>
-            <Text style={styles.sectionSubtitle}>
-              {currentUserRole === 'ADMIN' 
-                ? `Admins: ${adminCount} | You can manage members below` 
-                : 'View group members'}
-            </Text>
+            <MaterialCommunityIcons name="account-multiple" size={20} color="#007AFF" />
+            <Text style={styles.sectionTitle}>Members ({members.length})</Text>
           </View>
 
           {error ? (
             <View style={styles.errorContainer}>
+              <MaterialCommunityIcons name="alert-circle" size={48} color="#dc3545" />
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity
                 style={styles.retryButton}
@@ -459,7 +530,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               scrollEnabled={false}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyIcon}>👥</Text>
+                  <MaterialCommunityIcons name="account-group" size={48} color="#adb5bd" />
                   <Text style={styles.emptyText}>No members found</Text>
                 </View>
               }
@@ -467,7 +538,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           )}
         </View>
 
-        {/* Leave Group Button (for all members) */}
+        {/* Leave Group Button */}
         <TouchableOpacity
           style={[
             styles.leaveButton,
@@ -476,6 +547,11 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           onPress={handleLeaveGroup}
           disabled={isOnlyAdmin}
         >
+          <MaterialCommunityIcons 
+            name="exit-to-app" 
+            size={20} 
+            color={isOnlyAdmin ? "#adb5bd" : "#fa5252"} 
+          />
           <Text style={[
             styles.leaveButtonText,
             isOnlyAdmin && styles.disabledLeaveButtonText
@@ -484,6 +560,92 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Edit Group Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Group</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              {/* Group Initial */}
+              <View style={styles.avatarEditSection}>
+                <View style={styles.editAvatar}>
+                  <Text style={styles.editAvatarText}>
+                    {editingGroup.name?.charAt(0) || groupInfo?.name?.charAt(0) || 'G'}
+                  </Text>
+                </View>
+                <Text style={styles.avatarNote}>Group initial</Text>
+              </View>
+
+              {/* Name Field */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Group Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={editingGroup.name}
+                  onChangeText={(text) => setEditingGroup({...editingGroup, name: text})}
+                  placeholder="Enter group name"
+                  maxLength={100}
+                />
+              </View>
+
+              {/* Description Field */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Description</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={editingGroup.description}
+                  onChangeText={(text) => setEditingGroup({...editingGroup, description: text})}
+                  placeholder="Enter group description"
+                  multiline
+                  numberOfLines={3}
+                  maxLength={500}
+                />
+                <Text style={styles.charCount}>
+                  {editingGroup.description.length}/500 characters
+                </Text>
+              </View>
+
+              <View style={styles.infoBox}>
+                <MaterialCommunityIcons name="information" size={16} color="#6c757d" />
+                <Text style={styles.infoText}>
+                  Group names and descriptions help members understand the purpose of the group.
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => setShowEditModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[
+                  styles.saveButton,
+                  (!editingGroup.name.trim()) && styles.saveButtonDisabled
+                ]}
+                onPress={handleSaveGroupChanges}
+                disabled={!editingGroup.name.trim()}
+              >
+                <Text style={styles.saveButtonText}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -491,7 +653,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa'
+    backgroundColor: '#fff'
   },
   loadingContainer: {
     flex: 1,
@@ -500,7 +662,8 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#6c757d'
+    color: '#6c757d',
+    fontSize: 16
   },
   header: {
     flexDirection: 'row',
@@ -508,121 +671,184 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0'
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000'
+  },
+  avatarBanner: {
+    padding: 20,
+    backgroundColor: '#f8f9fa',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef'
   },
-  backButton: {
+  avatarCircleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20,
+    height: 60,
+    position: 'relative'
+  },
+  avatarContainer: {
+    position: 'absolute',
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
+    backgroundColor: '#007AFF'
+  },
+  moreAvatar: {
+    backgroundColor: '#6c757d'
+  },
+  moreAvatarText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14
+  },
+  avatarText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 18
+  },
+  adminCrown: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: '#FFD700'
+  },
+  groupInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  groupMainAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16
+  },
+  groupAvatarText: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: 'bold'
+  },
+  groupTextInfo: {
+    flex: 1
+  },
+  groupName: {
     fontSize: 24,
-    color: '#007AFF',
-    padding: 4
+    fontWeight: 'bold',
+    color: '#000',
+    marginBottom: 4
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#212529',
+  groupDescription: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+    lineHeight: 22
+  },
+  groupStats: {
+    flexDirection: 'row',
+    gap: 16
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  statText: {
+    fontSize: 14,
+    color: '#6c757d'
+  },
+  adminActions: {
+    flexDirection: 'row',
+    gap: 12
+  },
+  adminButton: {
     flex: 1,
-    marginHorizontal: 12
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e9ecef'
   },
-  refreshButton: {
-    fontSize: 20,
-    color: '#007AFF',
-    padding: 4
+  adminButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF'
   },
   inviteSection: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0'
   },
-  inviteTitle: {
-    fontSize: 20,
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12
+  },
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 8
-  },
-  inviteSubtitle: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginBottom: 20,
-    lineHeight: 20
+    color: '#000'
   },
   inviteCodeCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#e7f5ff',
-    borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 8,
     borderWidth: 1,
     borderColor: '#a5d8ff'
   },
-  inviteCodeContainer: {
-    flex: 1
-  },
-  inviteCodeLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1864ab',
-    marginBottom: 4
-  },
   inviteCode: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#212529',
+    color: '#000',
     letterSpacing: 2
   },
-  shareButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8
-  },
-  shareButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 14
-  },
-  noInviteCode: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  noInviteCodeText: {
-    color: '#6c757d',
-    fontSize: 16
-  },
   inviteInstructions: {
-    fontSize: 13,
-    color: '#6c757d',
-    lineHeight: 20
+    fontSize: 14,
+    color: '#6c757d'
   },
   warningSection: {
-    backgroundColor: '#fff3bf',
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 16,
+    backgroundColor: '#fff3bf',
     borderWidth: 1,
     borderColor: '#ffd43b',
-    flexDirection: 'row',
-    alignItems: 'flex-start'
+    marginHorizontal: 20,
+    marginTop: 20,
+    borderRadius: 12,
+    gap: 12
   },
-  warningIcon: {
-    fontSize: 24,
-    marginRight: 12,
-    color: '#e67700'
+  warningContent: {
+    flex: 1
   },
   warningTitle: {
     fontSize: 16,
@@ -632,116 +858,95 @@ const styles = StyleSheet.create({
   },
   warningText: {
     fontSize: 14,
-    color: '#e67700',
-    flex: 1
+    color: '#e67700'
   },
   membersSection: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 16,
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  sectionHeader: {
-    marginBottom: 20
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 4
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#6c757d'
+    padding: 20
   },
   errorContainer: {
-    padding: 20,
-    alignItems: 'center'
+    alignItems: 'center',
+    padding: 30
   },
   errorText: {
     color: '#dc3545',
     textAlign: 'center',
-    marginBottom: 16
+    marginVertical: 16,
+    fontSize: 16
   },
   retryButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     backgroundColor: '#007AFF',
     borderRadius: 8
   },
   retryButtonText: {
-    color: 'white',
-    fontWeight: '600'
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 16
   },
   memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f5',
+    borderBottomColor: '#f0f0f0',
     position: 'relative'
   },
   memberInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1
+    flex: 1,
+    gap: 12
   },
-  avatar: {
+  memberAvatar: {
     width: 48,
     height: 48,
     borderRadius: 24,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12
+    alignItems: 'center'
   },
-  avatarText: {
-    fontSize: 20,
+  memberAvatarText: {
+    color: '#fff',
     fontWeight: 'bold',
-    color: 'white'
+    fontSize: 18
   },
   memberDetails: {
     flex: 1
   },
+  memberHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4
+  },
   memberName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
-    marginBottom: 4
+    color: '#000'
   },
-  memberMeta: {
+  adminBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
-    flexWrap: 'wrap'
+    gap: 2,
+    backgroundColor: '#FFD70020',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4
   },
-  memberRole: {
-    fontSize: 13,
-    color: '#6c757d',
-    marginRight: 8
-  },
-  adminRole: {
-    color: '#007AFF',
-    fontWeight: '600'
-  },
-  onlyAdminRole: {
-    color: '#e67700',
-    fontWeight: 'bold'
+  adminBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFD700'
   },
   memberEmail: {
-    fontSize: 12,
-    color: '#adb5bd'
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 2
   },
   memberJoined: {
-    fontSize: 11,
-    color: '#adb5bd'
+    fontSize: 12,
+    color: '#999'
   },
   memberActions: {
     flexDirection: 'row',
@@ -749,10 +954,12 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   roleButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#e7f5ff',
-    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#a5d8ff'
   },
@@ -760,43 +967,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff5f5',
     borderColor: '#ffc9c9'
   },
-  roleButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1864ab'
-  },
   removeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#fff5f5',
-    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ffc9c9'
   },
-  removeButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fa5252'
-  },
   protectedBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#fff3bf',
-    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ffd43b'
-  },
-  protectedText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#e67700'
   },
   currentUserBadge: {
     position: 'absolute',
     top: 8,
     right: 8,
     backgroundColor: '#e7f5ff',
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
@@ -808,30 +1004,29 @@ const styles = StyleSheet.create({
     color: '#1864ab'
   },
   emptyContainer: {
-    padding: 30,
-    alignItems: 'center'
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
-    opacity: 0.3
+    alignItems: 'center',
+    padding: 40
   },
   emptyText: {
     fontSize: 16,
-    color: '#6c757d'
+    color: '#6c757d',
+    marginTop: 8
   },
   leaveButton: {
-    marginHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 20,
     marginBottom: 30,
-    paddingVertical: 14,
+    paddingVertical: 16,
     backgroundColor: '#fff5f5',
     borderRadius: 12,
-    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ffc9c9'
   },
   disabledLeaveButton: {
-    backgroundColor: '#f1f3f5',
+    backgroundColor: '#f8f9fa',
     borderColor: '#e9ecef'
   },
   leaveButtonText: {
@@ -841,5 +1036,133 @@ const styles = StyleSheet.create({
   },
   disabledLeaveButtonText: {
     color: '#adb5bd'
+  },
+  // Modal Styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end'
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '90%'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0'
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000'
+  },
+  modalBody: {
+    padding: 20
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0'
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef'
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6c757d'
+  },
+  saveButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#007AFF',
+    alignItems: 'center'
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#c0c0c0'
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff'
+  },
+  avatarEditSection: {
+    alignItems: 'center',
+    marginBottom: 24
+  },
+  editAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  editAvatarText: {
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: 'bold'
+  },
+  avatarNote: {
+    fontSize: 14,
+    color: '#6c757d'
+  },
+  inputGroup: {
+    marginBottom: 20
+  },
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 8
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f8f9fa'
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top'
+  },
+  charCount: {
+    fontSize: 12,
+    color: '#6c757d',
+    textAlign: 'right',
+    marginTop: 4
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 20
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#6c757d',
+    flex: 1,
+    lineHeight: 20
   }
 });

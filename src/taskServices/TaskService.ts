@@ -1,32 +1,61 @@
-// src/services/TaskService.ts
+// src/services/TaskService.ts - FIXED VERSION
 import {API_BASE_URL} from '../config/api';
 
 const API_URL = `${API_BASE_URL}/api/tasks`;
 
-// Updated to match new backend schema with time slots
+// Better helper function to clean undefined and null values
+function cleanTaskData(obj: any): any {
+  if (obj === null || obj === undefined) {
+    return undefined;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj
+      .map(item => cleanTaskData(item))
+      .filter(item => item !== undefined);
+  }
+  
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      const cleanedValue = cleanTaskData(value);
+      if (cleanedValue !== undefined) {
+        cleaned[key] = cleanedValue;
+      }
+    }
+    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+  }
+  
+  return obj;
+}
+
 export interface CreateTaskData {
   title: string;
   description?: string;
   points?: number;
   category?: string;
   executionFrequency?: 'DAILY' | 'WEEKLY';
-  scheduledTime?: string; // Optional for backward compatibility
+  scheduledTime?: string;
   timeFormat?: '12h' | '24h';
-  selectedDays?: string[]; // For weekly tasks with multiple days
+  selectedDays?: string[];
   dayOfWeek?: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
   isRecurring?: boolean;
   rotationMemberIds?: string[];
   rotationOrder?: number;
-  timeSlots?: Array<{ startTime: string; endTime: string; label?: string }>; // NEW: Multiple time slots
+  timeSlots?: Array<{ startTime: string; endTime: string; label?: string }>;
+  initialAssigneeId?: string;
 }
 
 export type UpdateTaskData = Partial<CreateTaskData>;
 
 export class TaskService {
-  // Create a new task with time slots support
+  // Create a new task with time slots support and initial assignee option
   static async createTask(groupId: string, taskData: CreateTaskData) {
     try {
-      console.log(`TaskService: Creating task for group ${groupId}`, taskData);
+      // Deep clean the data - remove all undefined values
+      const cleanedData = cleanTaskData(taskData);
+      
+      console.log(`TaskService: Creating task for group ${groupId}`, cleanedData);
       
       const response = await fetch(`${API_URL}/group/${groupId}/create`, {
         method: 'POST',
@@ -34,7 +63,7 @@ export class TaskService {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: JSON.stringify(taskData),
+        body: JSON.stringify(cleanedData),
         credentials: 'include'
       });
 
@@ -68,7 +97,7 @@ export class TaskService {
     }
   }
 
-  // Get tasks for a group (updated to include time slots)
+  // ... rest of your methods remain the same
   static async getGroupTasks(groupId: string, week?: number) {
     try {
       const url = week !== undefined 
@@ -94,7 +123,6 @@ export class TaskService {
     }
   }
 
-  // Get tasks assigned to current user in a group
   static async getMyTasks(groupId: string, week?: number) {
     try {
       const url = week !== undefined 
@@ -118,7 +146,6 @@ export class TaskService {
     }
   }
 
-  // Get task details (updated to include time slots)
   static async getTaskDetails(taskId: string) {
     try {
       const response = await fetch(`${API_URL}/${taskId}`, {
@@ -138,7 +165,6 @@ export class TaskService {
     }
   }
 
-  // Delete a task
   static async deleteTask(taskId: string) {
     try {
       const response = await fetch(`${API_URL}/${taskId}`, {
@@ -158,15 +184,17 @@ export class TaskService {
     }
   }
 
-  // Update a task (updated for time slots)
   static async updateTask(taskId: string, taskData: UpdateTaskData) {
     try {
+      // Clean the data for updates too
+      const cleanedData = cleanTaskData(taskData);
+      
       const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(taskData),
+        body: JSON.stringify(cleanedData),
         credentials: 'include'
       });
 
@@ -182,7 +210,6 @@ export class TaskService {
     }
   }
 
-  // Get rotation schedule
   static async getRotationSchedule(groupId: string, weeks: number = 4) {
     try {
       const response = await fetch(`${API_URL}/group/${groupId}/schedule?weeks=${weeks}`, {
@@ -202,7 +229,6 @@ export class TaskService {
     }
   }
  
-  // Rotate tasks
   static async rotateTasks(groupId: string) {
     try {
       const response = await fetch(`${API_URL}/group/${groupId}/rotate`, {

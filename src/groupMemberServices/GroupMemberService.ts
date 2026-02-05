@@ -1,7 +1,7 @@
 // src/groupMemberServices/GroupMemberService.ts (React Native - FRONTEND)
 import {API_BASE_URL} from '../config/api';
 
-const API_URL = `${API_BASE_URL}/api/group`;
+const API_URL = `${API_BASE_URL}/api/group`; 
 
 export class GroupMembersService {
   // Get all members of a group with rotation info
@@ -315,4 +315,4 @@ static async updateGroup(groupId: string, groupData: { name?: string, descriptio
     };
   }
 }
-}
+} 

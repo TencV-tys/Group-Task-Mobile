@@ -14,14 +14,16 @@ export function useCreateTask() {
       description?: string;
       points?: number;
       category?: string;
-      frequency?: string; // Old 'frequency' field
-      executionFrequency?: 'DAILY' | 'WEEKLY'; // New 'executionFrequency' field
+      frequency?: string;
+      executionFrequency?: 'DAILY' | 'WEEKLY';
       scheduledTime?: string;
       timeFormat?: '12h' | '24h';
       selectedDays?: string[];
       dayOfWeek?: string;
       isRecurring?: boolean;
+      rotationMemberIds?: string[];
       timeSlots?: Array<{ startTime: string; endTime: string; label?: string }>;
+      initialAssigneeId?: string;
     } 
   ) => {
     setLoading(true);
@@ -38,7 +40,7 @@ export function useCreateTask() {
         throw new Error('Points must be at least 1');
       }
 
-      // Validate time slots
+      // Validate time slots if provided
       if (taskData.timeSlots && taskData.timeSlots.length > 0) {
         for (const slot of taskData.timeSlots) {
           if (!slot.startTime || !slot.endTime) {
@@ -48,7 +50,6 @@ export function useCreateTask() {
       }
 
       // Determine execution frequency
-      // First check if executionFrequency is provided directly
       let executionFrequency: 'DAILY' | 'WEEKLY' = 'WEEKLY'; // Default
       
       if (taskData.executionFrequency) {
@@ -81,9 +82,15 @@ export function useCreateTask() {
         timeFormat: taskData.timeFormat || '12h',
         isRecurring: taskData.isRecurring !== false,
         category: taskData.category || undefined,
-        timeSlots: taskData.timeSlots || undefined,
         scheduledTime: taskData.scheduledTime || undefined,
+        rotationMemberIds: taskData.rotationMemberIds || undefined,
+        initialAssigneeId: taskData.initialAssigneeId || undefined,
       };
+ 
+      // Only include timeSlots if they exist
+      if (taskData.timeSlots && taskData.timeSlots.length > 0) {
+        requestData.timeSlots = taskData.timeSlots;
+      }
 
       // Only include day selections for WEEKLY tasks
       if (executionFrequency === 'WEEKLY') {
@@ -133,7 +140,7 @@ export function useCreateTask() {
   return {
     loading,
     error,
-    success,
+    success, 
     createTask,
     reset
   };

@@ -1,4 +1,4 @@
-// src/screens/GroupTasksScreen.tsx
+// src/screens/GroupTasksScreen.tsx - UPDATED VERSION
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -9,9 +9,15 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
-  Alert
+  Alert,
+  Dimensions,
+  StatusBar,
+  Platform
 } from 'react-native';
 import { TaskService } from '../taskServices/TaskService';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function GroupTasksScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
@@ -19,6 +25,9 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [refreshing, setRefreshing] = useState(false);  
   const [error, setError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<any[]>([]);
+  const [selectedTab, setSelectedTab] = useState<'all' | 'my' | 'members'>('all');
+  const [myTasks, setMyTasks] = useState<any[]>([]);
+  const [isMembersScreenOpen, setIsMembersScreenOpen] = useState(false);
 
   const fetchTasks = async (isRefreshing = false) => {
     if (isRefreshing) {
@@ -35,6 +44,12 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       
       if (result.success) {
         setTasks(result.tasks || []);
+        
+        // Filter my tasks
+        const myTasksList = (result.tasks || []).filter((task: any) => 
+          task.userAssignment || task.assignments?.some((a: any) => a.userId)
+        );
+        setMyTasks(myTasksList);
       } else {
         setError(result.message || 'Failed to load tasks');
       }
@@ -53,41 +68,61 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     }
   }, [groupId]);
 
+  // Reset to all tasks tab when returning from members screen
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (isMembersScreenOpen) {
+        setSelectedTab('all');
+        setIsMembersScreenOpen(false);
+      }
+      // Refresh tasks when screen comes into focus
+      fetchTasks();
+    });
+
+    return unsubscribe;
+  }, [navigation, isMembersScreenOpen]);
+
   const handleCreateTask = () => {
     if (userRole !== 'ADMIN') {
-      alert('Only admins can create tasks');
+      Alert.alert('Restricted', 'Only admins can create tasks');
       return;
     }
     navigation.navigate('CreateTask', {
       groupId,
       groupName,
-      onTaskCreated: (newTask: any) => {
-        // Add new task to list
-        setTasks(prev => [newTask, ...prev]);
-      }
-    });
-  };
-
-  const handleEditTask = (task: any) => {
-    // Navigate to UpdateTask screen
-    navigation.navigate('UpdateTask', {
-      task,
-      groupId,
-      groupName,
-      onTaskUpdated: (updatedTask: any) => {
-        // Update the task in the list
-        setTasks(prev => prev.map(t => 
-          t.id === updatedTask.id ? { ...t, ...updatedTask } : t
-        ));
+      onTaskCreated: () => {
+        // Refresh tasks when returning from create task
+        fetchTasks();
       }
     });
   };
 
   const handleViewMembers = () => {
+    setIsMembersScreenOpen(true);
     navigation.navigate('GroupMembers', {
       groupId,
       groupName,
       userRole
+    });
+  };
+
+  const handleEditTask = (task: any) => {
+    navigation.navigate('UpdateTask', {
+      task,
+      groupId,
+      groupName,
+      onTaskUpdated: () => {
+        // Refresh tasks when returning from edit task
+        fetchTasks();
+      }
+    });
+  };
+
+  const handleViewTaskDetails = (taskId: string) => {
+    navigation.navigate('TaskDetails', { 
+      taskId,
+      groupId,
+      userRole 
     });
   };
 
@@ -109,8 +144,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
               const result = await TaskService.deleteTask(taskId);
               
               if (result.success) {
-                // Remove task from list
                 setTasks(prev => prev.filter(t => t.id !== taskId));
+                setMyTasks(prev => prev.filter(t => t.id !== taskId));
                 Alert.alert('Success', 'Task deleted successfully');
               } else {
                 Alert.alert('Error', result.message || 'Failed to delete task');
@@ -144,7 +179,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           },
           {
             text: 'View Details',
-            onPress: () => navigation.navigate('TaskDetails', { taskId: task.id })
+            onPress: () => handleViewTaskDetails(task.id)
           },
           {
             text: 'Cancel',
@@ -153,9 +188,74 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         ]
       );
     } else {
-      // For members, just navigate to details
-      navigation.navigate('TaskDetails', { taskId: task.id });
+      handleViewTaskDetails(task.id);
     }
+  };
+
+  const renderAssignmentInfo = (task: any) => {
+    const hasAssignment = task.userAssignment || task.assignments?.length > 0;
+    
+    if (!hasAssignment) {
+      return (
+        <View style={styles.unassignedInfo}>
+          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
+          <Text style={styles.unassignedText}>
+            Not assigned to anyone
+          </Text>
+        </View>
+      );
+    }
+
+    const currentAssignment = task.userAssignment || task.assignments?.[0];
+    const isCompleted = currentAssignment?.completed;
+    const assigneeName = currentAssignment?.user?.fullName || 'Unknown';
+    const dueDate = currentAssignment?.dueDate ? new Date(currentAssignment.dueDate) : null;
+    
+    return (
+      <View style={[
+        styles.assignmentInfo,
+        isCompleted ? styles.completedAssignment : styles.pendingAssignment
+      ]}>
+        <View style={styles.assignmentHeader}>
+          <MaterialCommunityIcons 
+            name={isCompleted ? "check-circle" : "account-clock"} 
+            size={16} 
+            color={isCompleted ? "#2b8a3e" : "#e67700"} 
+          />
+          <Text style={[
+            styles.assignmentStatus,
+            isCompleted ? { color: "#2b8a3e" } : { color: "#e67700" }
+          ]}>
+            {isCompleted ? 'Completed' : 'Assigned to'} {isCompleted ? '' : assigneeName}
+          </Text>
+        </View>
+        
+        <View style={styles.assignmentDetails}>
+          <Text style={styles.assignmentDetail}>
+            <Text style={styles.detailLabel}>Due:</Text> {dueDate ? dueDate.toLocaleDateString() : 'No date'}
+          </Text>
+          {task.executionFrequency && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Frequency:</Text> {task.executionFrequency}
+            </Text>
+          )}
+          {task.selectedDays?.length > 0 && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Days:</Text> {task.selectedDays.join(', ')}
+            </Text>
+          )}
+          {task.timeSlots?.length > 0 && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Time:</Text> {
+                task.timeSlots.map((slot: any) => 
+                  `${slot.startTime}-${slot.endTime}${slot.label ? ` (${slot.label})` : ''}`
+                ).join(', ')
+              }
+            </Text>
+          )}
+        </View>
+      </View>
+    );
   };
 
   const renderTask = ({ item }: any) => {
@@ -168,7 +268,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           styles.taskCard,
           isCompleted && styles.completedTaskCard
         ]}
-        onPress={() => showTaskOptions(item)}
+        onPress={() => handleViewTaskDetails(item.id)}
         onLongPress={() => isAdmin && showTaskOptions(item)}
       >
         <View style={styles.taskHeader}>
@@ -178,12 +278,11 @@ export default function GroupTasksScreen({ navigation, route }: any) {
               ? { backgroundColor: '#34c759' }
               : { backgroundColor: '#e7f5ff' }
           ]}>
-            <Text style={[
-              styles.taskIconText,
-              isCompleted && { color: 'white' }
-            ]}>
-              {isCompleted ? '✓' : '✓'}
-            </Text>
+            <MaterialCommunityIcons 
+              name={isCompleted ? "check" : "format-list-checks"} 
+              size={20} 
+              color={isCompleted ? 'white' : '#007AFF'} 
+            />
           </View>
           <View style={styles.taskInfo}>
             <View style={styles.taskTitleRow}>
@@ -201,7 +300,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
                     handleEditTask(item);
                   }}
                 >
-                  <Text style={styles.editButtonText}>✏️</Text>
+                  <MaterialCommunityIcons name="pencil" size={18} color="#6c757d" />
                 </TouchableOpacity>
               )}
             </View>
@@ -217,10 +316,9 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             
             <View style={styles.taskMeta}>
               <View style={styles.pointsBadge}>
+                <MaterialCommunityIcons name="star" size={12} color="#e67700" />
                 <Text style={styles.taskPoints}>{item.points} pts</Text>
               </View>
-              
-              <Text style={styles.taskFrequency}>{item.frequency}</Text>
               
               {item.category && (
                 <View style={styles.categoryBadge}>
@@ -231,30 +329,16 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           </View>
         </View>
         
+        {renderAssignmentInfo(item)}
+        
         <View style={styles.taskFooter}>
           <Text style={styles.taskCreator}>
-            Created by {item.creator?.fullName || 'Admin'}
+            <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
           </Text>
           <Text style={styles.taskDate}>
             {new Date(item.createdAt).toLocaleDateString()}
           </Text>
         </View>
-        
-        {item.userAssignment && (
-          <View style={[
-            styles.assignmentBadge,
-            isCompleted 
-              ? { backgroundColor: '#d3f9d8', borderColor: '#b2f2bb' }
-              : { backgroundColor: '#fff3bf', borderColor: '#ffd43b' }
-          ]}>
-            <Text style={[
-              styles.assignmentText,
-              isCompleted && { color: '#2b8a3e' }
-            ]}>
-              {isCompleted ? '✅ Completed' : '📝 Assigned'}
-            </Text>
-          </View>
-        )}
         
         {isAdmin && (
           <TouchableOpacity 
@@ -264,10 +348,69 @@ export default function GroupTasksScreen({ navigation, route }: any) {
               handleDeleteTask(item.id, item.title);
             }}
           >
-            <Text style={styles.deleteButtonText}>🗑️</Text>
+            <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
           </TouchableOpacity>
         )}
       </TouchableOpacity>
+    );
+  };
+
+  const renderContent = () => {
+    const currentTasks = selectedTab === 'my' ? myTasks : tasks;
+    const showEmpty = !loading && currentTasks.length === 0;
+    
+    if (selectedTab === 'members') {
+      // Navigate to members screen and reset tab
+      setTimeout(() => {
+        handleViewMembers();
+        setSelectedTab('all'); // Reset to all tasks tab
+      }, 100);
+      return null;
+    }
+
+    return (
+      <FlatList
+        data={currentTasks}
+        renderItem={renderTask}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => fetchTasks(true)}
+            colors={['#007AFF']}
+          />
+        }
+        ListEmptyComponent={
+          showEmpty ? (
+            <View style={styles.emptyContainer}>
+              <MaterialCommunityIcons 
+                name={selectedTab === 'my' ? "clipboard-text" : "clipboard-list"} 
+                size={64} 
+                color="#dee2e6" 
+              />
+              <Text style={styles.emptyText}>
+                {selectedTab === 'my' ? 'No tasks assigned to you' : 'No tasks yet'}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                {selectedTab === 'my' 
+                  ? 'You have no assigned tasks for this week'
+                  : userRole === 'ADMIN'
+                    ? 'Create the first task for your group'
+                    : 'No tasks have been created yet'}
+              </Text>
+              {userRole === 'ADMIN' && selectedTab === 'all' && (
+                <TouchableOpacity
+                  style={styles.emptyButton}
+                  onPress={handleCreateTask}
+                >
+                  <Text style={styles.emptyButtonText}>Create First Task</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          ) : null
+        }
+        contentContainerStyle={styles.listContainer}
+      />
     );
   };
 
@@ -284,31 +427,44 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      
+      {/* Header - Aligned with CreateTaskScreen */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>←</Text>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
+          style={styles.backButton}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
+          <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>
-          {groupName || 'Tasks'}
-        </Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity 
-            style={styles.membersButton}
-            onPress={handleViewMembers}
-          >
-            <Text style={styles.membersButtonText}>👥</Text>
-          </TouchableOpacity>
-          {userRole === 'ADMIN' && (
-            <TouchableOpacity onPress={handleCreateTask}>
-              <Text style={styles.createButton}>+</Text>
-            </TouchableOpacity>
-          )}
+        
+        <View style={styles.titleContainer}>
+          <Text style={styles.title} numberOfLines={1}>
+            {groupName || 'Tasks'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {selectedTab === 'all' ? 'All Tasks' : selectedTab === 'my' ? 'My Tasks' : 'Members'}
+          </Text>
         </View>
+        
+        {userRole === 'ADMIN' ? (
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={handleCreateTask}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          >
+            <MaterialCommunityIcons name="plus" size={24} color="#007AFF" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
+      {/* Content Area */}
       {error ? (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <MaterialCommunityIcons name="alert-circle" size={48} color="#dc3545" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
@@ -318,39 +474,62 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={tasks}
-          renderItem={renderTask}
-          keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => fetchTasks(true)}
-              colors={['#007AFF']}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>📋</Text>
-              <Text style={styles.emptyText}>No tasks yet</Text>
-              <Text style={styles.emptySubtext}>
-                {userRole === 'ADMIN'
-                  ? 'Create the first task for your group'
-                  : 'No tasks have been created yet'}
-              </Text>
-              {userRole === 'ADMIN' && (
-                <TouchableOpacity
-                  style={styles.emptyButton}
-                  onPress={handleCreateTask}
-                >
-                  <Text style={styles.emptyButtonText}>Create First Task</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          }
-          contentContainerStyle={styles.listContainer}
-        />
+        renderContent()
       )}
+
+      {/* Bottom Tab Navigation - Aligned with CreateTaskScreen padding */}
+      <View style={styles.bottomTab}>
+        <TouchableOpacity 
+          style={[styles.tabButton, selectedTab === 'all' && styles.activeTabButton]}
+          onPress={() => setSelectedTab('all')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.tabIconContainer}>
+            <MaterialCommunityIcons 
+              name="format-list-bulleted" 
+              size={24} 
+              color={selectedTab === 'all' ? '#007AFF' : '#8e8e93'} 
+            />
+          </View>
+          <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>
+            All Tasks
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.tabButton, selectedTab === 'my' && styles.activeTabButton]}
+          onPress={() => setSelectedTab('my')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.tabIconContainer}>
+            <MaterialCommunityIcons 
+              name="clipboard-check" 
+              size={24} 
+              color={selectedTab === 'my' ? '#007AFF' : '#8e8e93'} 
+            />
+          </View>
+          <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>
+            My Tasks
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.tabButton, selectedTab === 'members' && styles.activeTabButton]}
+          onPress={() => setSelectedTab('members')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.tabIconContainer}>
+            <MaterialCommunityIcons 
+              name="account-group" 
+              size={24} 
+              color={selectedTab === 'members' ? '#007AFF' : '#8e8e93'} 
+            />
+          </View>
+          <Text style={[styles.tabText, selectedTab === 'members' && styles.activeTabText]}>
+            Members
+          </Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -363,67 +542,79 @@ const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    paddingBottom: 80 // Account for bottom tab
   },
   loadingText: {
     marginTop: 12,
-    color: '#6c757d'
+    color: '#6c757d',
+    fontSize: 14
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 5,
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
+    borderBottomColor: '#e9ecef',
+    minHeight: 56,
   },
   backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20
+  },
+  backButtonText: {
     fontSize: 24,
     color: '#007AFF',
-    padding: 4
+    fontWeight: '400'
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
     color: '#212529',
-    flex: 1,
-    marginHorizontal: 12
+    textAlign: 'center'
   },
-  headerRight: {
-    flexDirection: 'row',
+  subtitle: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 2,
+    textAlign: 'center'
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 8
+    borderRadius: 20,
+    backgroundColor: '#f8f9fa'
   },
-  membersButton: {
-    padding: 4
-  },
-  membersButtonText: {
-    fontSize: 24,
-    color: '#007AFF'
-  },
-  createButton: {
-    fontSize: 28,
-    color: '#007AFF',
-    padding: 4
+  headerSpacer: {
+    width: 40
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20
-  },
-  errorIcon: {
-    fontSize: 48,
-    color: '#dc3545',
-    marginBottom: 16
+    padding: 20,
+    paddingBottom: 100 // Account for bottom tab
   },
   errorText: {
     color: '#dc3545',
     textAlign: 'center',
     marginBottom: 16,
-    fontSize: 16
+    fontSize: 16,
+    marginTop: 12
   },
   retryButton: {
     paddingHorizontal: 24,
@@ -433,10 +624,12 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: 'white',
-    fontWeight: '600'
+    fontWeight: '600',
+    fontSize: 16
   },
   listContainer: {
-    padding: 16
+    padding: 16,
+    paddingBottom: 100 // Account for bottom tab
   },
   taskCard: {
     backgroundColor: 'white',
@@ -452,7 +645,7 @@ const styles = StyleSheet.create({
   },
   completedTaskCard: {
     backgroundColor: '#f8f9fa',
-    opacity: 0.8
+    opacity: 0.9
   },
   taskHeader: {
     flexDirection: 'row',
@@ -466,13 +659,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12
   },
-  taskIconText: {
-    fontSize: 20,
-    color: '#007AFF'
-  },
   taskInfo: {
     flex: 1,
-    marginRight: 30 // Space for delete button
+    marginRight: 40
   },
   taskTitleRow: {
     flexDirection: 'row',
@@ -493,16 +682,12 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through'
   },
   editButton: {
-    padding: 2,
-    marginLeft: 4
-  },
-  editButtonText: {
-    fontSize: 16
+    padding: 4
   },
   deleteButton: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 16,
+    right: 16,
     width: 30,
     height: 30,
     borderRadius: 15,
@@ -511,10 +696,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ffc9c9'
-  },
-  deleteButtonText: {
-    fontSize: 16,
-    color: '#fa5252'
   },
   taskDescription: {
     fontSize: 14,
@@ -535,16 +716,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff3bf',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
   },
   taskPoints: {
     fontSize: 13,
     fontWeight: '600',
     color: '#e67700'
-  },
-  taskFrequency: {
-    fontSize: 12,
-    color: '#868e96'
   },
   categoryBadge: {
     backgroundColor: '#e7f5ff',
@@ -561,50 +741,91 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderTopWidth: 1,
     borderTopColor: '#f1f3f5',
-    paddingTop: 12
+    paddingTop: 12,
+    marginTop: 12
   },
   taskCreator: {
     fontSize: 12,
-    color: '#868e96'
+    color: '#868e96',
+    flexDirection: 'row',
+    alignItems: 'center'
   },
   taskDate: {
     fontSize: 12,
     color: '#868e96'
   },
-  assignmentBadge: {
-    position: 'absolute',
-    top: 16,
-    right: 50, // Moved left to accommodate delete button
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  assignmentInfo: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
     borderWidth: 1
   },
-  assignmentText: {
-    fontSize: 11,
+  unassignedInfo: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderStyle: 'dashed',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  unassignedText: {
+    fontSize: 13,
+    color: '#868e96',
+    fontStyle: 'italic'
+  },
+  completedAssignment: {
+    backgroundColor: '#d3f9d8',
+    borderColor: '#b2f2bb'
+  },
+  pendingAssignment: {
+    backgroundColor: '#fff3bf',
+    borderColor: '#ffd43b'
+  },
+  assignmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8
+  },
+  assignmentStatus: {
+    fontSize: 14,
+    fontWeight: '600'
+  },
+  assignmentDetails: {
+    gap: 4
+  },
+  assignmentDetail: {
+    fontSize: 12,
+    color: '#495057'
+  },
+  detailLabel: {
     fontWeight: '600',
-    color: '#e67700'
+    color: '#212529'
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 60
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-    opacity: 0.3
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+    marginTop: 40,
+    marginBottom: 100 // Account for bottom tab
   },
   emptyText: {
     fontSize: 18,
     color: '#6c757d',
-    marginBottom: 8
+    marginBottom: 8,
+    marginTop: 16,
+    textAlign: 'center'
   },
   emptySubtext: {
     fontSize: 14,
     color: '#adb5bd',
     textAlign: 'center',
     marginBottom: 24,
-    maxWidth: 300,
     lineHeight: 20
   },
   emptyButton: { 
@@ -615,6 +836,47 @@ const styles = StyleSheet.create({
   },
   emptyButtonText: {
     color: 'white',
+    fontWeight: '600',
+    fontSize: 16
+  },
+  bottomTab: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+    paddingTop: 8,
+    paddingBottom: 8,
+    paddingHorizontal: 16,
+    height: 70,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    justifyContent: 'space-around',
+    alignItems: 'center'
+  },
+  tabButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    minWidth: 80,
+    flex: 1,
+    height: '100%'
+  },
+  activeTabButton: {},
+  tabIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4
+  },
+  tabText: {
+    fontSize: 12,
+    color: '#8e8e93',
+    textAlign: 'center',
+    fontWeight: '500'
+  },
+  activeTabText: {
+    color: '#007AFF',
     fontWeight: '600'
   }
 });

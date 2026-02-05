@@ -1,6 +1,6 @@
 // src/hooks/useCreateTask.ts
 import { useState } from 'react';
-import { TaskService } from '../taskServices/TaskService';
+import { TaskService, type CreateTaskData } from '../taskServices/TaskService';
 
 export function useCreateTask() {
   const [loading, setLoading] = useState(false);
@@ -9,16 +9,10 @@ export function useCreateTask() {
 
   const createTask = async (
     groupId: string,
-    taskData: {
-      title: string;
-      description?: string;
-      points?: number;
-      frequency?: string;
-      category?: string;
-      timeOfDay?: string; // Will be converted to uppercase
-      dayOfWeek?: string; // Will be converted to uppercase
-      isRecurring?: boolean;
-    }
+    taskData: Omit<CreateTaskData, 'executionFrequency'> & {
+      frequency?: string; // Accept old 'frequency' for compatibility
+      timeSlots?: Array<{ startTime: string; endTime: string; label?: string }>;
+    } 
   ) => {
     setLoading(true);
     setError(null);
@@ -34,20 +28,39 @@ export function useCreateTask() {
         throw new Error('Points must be at least 1');
       }
 
-      // Convert enum values to uppercase to match backend
-      const requestData: any = {
-        ...taskData,
-        frequency: taskData.frequency || 'WEEKLY',
-        isRecurring: taskData.isRecurring !== false // Default to true if not specified
-      };
+      // Validate time slots
+      if (taskData.timeSlots && taskData.timeSlots.length > 0) {
+        for (const slot of taskData.timeSlots) {
+          if (!slot.startTime || !slot.endTime) {
+            throw new Error('Time slots must have both start and end times');
+          }
+        }
+      }
 
-      // Convert enum strings to uppercase
-      if (requestData.timeOfDay) {
-        requestData.timeOfDay = requestData.timeOfDay.toUpperCase();
+      // Convert frequency to executionFrequency for new API
+      const executionFrequency = (taskData.frequency === 'DAILY' ? 'DAILY' : 'WEEKLY') as 'DAILY' | 'WEEKLY';
+      
+      // For DAILY tasks, time slots are required
+      if (executionFrequency === 'DAILY' && (!taskData.timeSlots || taskData.timeSlots.length === 0)) {
+        throw new Error('Daily tasks require time slots');
       }
-      if (requestData.dayOfWeek) {
-        requestData.dayOfWeek = requestData.dayOfWeek.toUpperCase();
+
+      // For WEEKLY tasks, days are required
+      if (executionFrequency === 'WEEKLY' && 
+          !taskData.selectedDays?.length && 
+          !taskData.dayOfWeek) {
+        throw new Error('Weekly tasks require at least one day selection');
       }
+
+      const requestData: CreateTaskData = {
+        ...taskData,
+        executionFrequency,
+        scheduledTime: taskData.scheduledTime || undefined,
+        selectedDays: taskData.selectedDays || undefined,
+        dayOfWeek: taskData.dayOfWeek || undefined,
+        isRecurring: taskData.isRecurring !== false,
+        timeSlots: taskData.timeSlots || undefined
+      };
 
       console.log("useCreateTask: Creating task with data:", requestData);
 

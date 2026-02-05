@@ -1,6 +1,6 @@
 // src/hooks/useUpdateTask.ts
 import { useState } from 'react';
-import { TaskService } from '../taskServices/TaskService';
+import { TaskService, type UpdateTaskData } from '../taskServices/TaskService';
 
 export function useUpdateTask() {
   const [loading, setLoading] = useState(false);
@@ -9,16 +9,7 @@ export function useUpdateTask() {
 
   const updateTask = async (
     taskId: string,
-    taskData: {
-      title?: string;
-      description?: string;
-      points?: number;
-      frequency?: string;
-      category?: string;
-      timeOfDay?: string;
-      dayOfWeek?: string;
-      isRecurring?: boolean;
-    }
+    taskData: UpdateTaskData
   ) => {
     setLoading(true);
     setError(null);
@@ -34,19 +25,9 @@ export function useUpdateTask() {
         throw new Error('Points must be at least 1');
       }
 
-      // Prepare data - convert enum values to uppercase
-      const requestData: any = { ...taskData };
-      
-      if (requestData.timeOfDay) {
-        requestData.timeOfDay = requestData.timeOfDay.toUpperCase();
-      }
-      if (requestData.dayOfWeek) {
-        requestData.dayOfWeek = requestData.dayOfWeek.toUpperCase();
-      }
+      console.log("Updating task with data:", taskData);
 
-      console.log("Updating task with data:", requestData);
-
-      const result = await TaskService.updateTask(taskId, requestData);
+      const result = await TaskService.updateTask(taskId, taskData);
       
       if (result.success) {
         setSuccess(true);

@@ -3,23 +3,31 @@ import {API_BASE_URL} from '../config/api';
 
 const API_URL = `${API_BASE_URL}/api/tasks`;
 
+// Updated to match new backend schema with time slots
+export interface CreateTaskData {
+  title: string;
+  description?: string;
+  points?: number;
+  category?: string;
+  executionFrequency?: 'DAILY' | 'WEEKLY';
+  scheduledTime?: string; // Optional for backward compatibility
+  timeFormat?: '12h' | '24h';
+  selectedDays?: string[]; // For weekly tasks with multiple days
+  dayOfWeek?: 'MONDAY' | 'TUESDAY' | 'WEDNESDAY' | 'THURSDAY' | 'FRIDAY' | 'SATURDAY' | 'SUNDAY';
+  isRecurring?: boolean;
+  rotationMemberIds?: string[];
+  rotationOrder?: number;
+  timeSlots?: Array<{ startTime: string; endTime: string; label?: string }>; // NEW: Multiple time slots
+}
+
+export type UpdateTaskData = Partial<CreateTaskData>;
 
 export class TaskService {
-  // Create a new task with rotation support
-  static async createTask(groupId: string, taskData: {
-    title: string;
-    description?: string;
-    points?: number;
-    frequency?: string;
-    category?: string;
-    timeOfDay?: string; // Will be enum value like 'MORNING'
-    dayOfWeek?: string; // Will be enum value like 'MONDAY'
-    isRecurring?: boolean;
-  }) {
+  // Create a new task with time slots support
+  static async createTask(groupId: string, taskData: CreateTaskData) {
     try {
       console.log(`TaskService: Creating task for group ${groupId}`, taskData);
       
-      // IMPORTANT: Changed endpoint to match your backend router
       const response = await fetch(`${API_URL}/group/${groupId}/create`, {
         method: 'POST',
         headers: {
@@ -27,12 +35,11 @@ export class TaskService {
           'Accept': 'application/json',
         },
         body: JSON.stringify(taskData),
-        credentials: 'include' // Important for cookies/sessions
+        credentials: 'include'
       });
 
       console.log(`TaskService: Response status: ${response.status}`);
       
-      // Try to get response text first for debugging
       const responseText = await response.text();
       console.log(`TaskService: Response text:`, responseText);
       
@@ -43,7 +50,7 @@ export class TaskService {
         console.error('TaskService: Failed to parse JSON:', parseError);
         throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}`);
       }
-      
+       
       console.log(`TaskService: Parsed result:`, result);
       
       if (!response.ok) {
@@ -61,12 +68,16 @@ export class TaskService {
     }
   }
 
-  // Get tasks for a group
-  static async getGroupTasks(groupId: string) {
+  // Get tasks for a group (updated to include time slots)
+  static async getGroupTasks(groupId: string, week?: number) {
     try {
-      console.log(`TaskService: Fetching tasks for group ${groupId}`);
+      const url = week !== undefined 
+        ? `${API_URL}/group/${groupId}/tasks?week=${week}`
+        : `${API_URL}/group/${groupId}/tasks`;
       
-      const response = await fetch(`${API_URL}/group/${groupId}/tasks`, {
+      console.log(`TaskService: Fetching tasks for group ${groupId}`, week ? `week ${week}` : '');
+      
+      const response = await fetch(url, {
         method: 'GET',
         credentials: 'include'
       });
@@ -84,9 +95,13 @@ export class TaskService {
   }
 
   // Get tasks assigned to current user in a group
-  static async getMyTasks(groupId: string) {
+  static async getMyTasks(groupId: string, week?: number) {
     try {
-      const response = await fetch(`${API_URL}/group/${groupId}/my-tasks`, {
+      const url = week !== undefined 
+        ? `${API_URL}/group/${groupId}/my-tasks?week=${week}`
+        : `${API_URL}/group/${groupId}/my-tasks`;
+      
+      const response = await fetch(url, {
         method: 'GET',
         credentials: 'include'
       });
@@ -103,7 +118,7 @@ export class TaskService {
     }
   }
 
-  // Get task details
+  // Get task details (updated to include time slots)
   static async getTaskDetails(taskId: string) {
     try {
       const response = await fetch(`${API_URL}/${taskId}`, {
@@ -126,7 +141,7 @@ export class TaskService {
   // Delete a task
   static async deleteTask(taskId: string) {
     try {
-      const response = await fetch(`${API_URL}/tasks/${taskId}`, {
+      const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -143,17 +158,8 @@ export class TaskService {
     }
   }
 
-  // Update a task
-  static async updateTask(taskId: string, taskData: {
-    title?: string;
-    description?: string;
-    points?: number;
-    frequency?: string;
-    category?: string;
-    timeOfDay?: string;
-    dayOfWeek?: string;
-    isRecurring?: boolean;
-  }) {
+  // Update a task (updated for time slots)
+  static async updateTask(taskId: string, taskData: UpdateTaskData) {
     try {
       const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'PUT',
@@ -212,26 +218,6 @@ export class TaskService {
       return {
         success: false,
         message: error.message || 'Failed to rotate tasks'
-      };
-    }
-  }
-
-  // Get task assignments
-  static async getTaskAssignments(taskId: string) {
-    try {
-      const response = await fetch(`${API_URL}/${taskId}/assignments`, {
-        method: 'GET',
-        credentials: 'include'
-      });
-
-      const result = await response.json();
-      return result;
-
-    } catch (error: any) {
-      console.error('TaskService.getTaskAssignments error:', error);
-      return {
-        success: false,
-        message: error.message || 'Failed to load task assignments'
       };
     }
   }

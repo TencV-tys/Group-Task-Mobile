@@ -16,7 +16,7 @@ import { TaskService } from '../taskServices/TaskService';
 export default function GroupTasksScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);  
   const [error, setError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<any[]>([]);
 

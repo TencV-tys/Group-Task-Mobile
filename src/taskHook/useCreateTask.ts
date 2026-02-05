@@ -1,4 +1,4 @@
-// src/hooks/useCreateTask.ts
+// src/taskHook/useCreateTask.ts
 import { useState } from 'react';
 import { TaskService, type CreateTaskData } from '../taskServices/TaskService';
 
@@ -9,8 +9,18 @@ export function useCreateTask() {
 
   const createTask = async (
     groupId: string,
-    taskData: Omit<CreateTaskData, 'executionFrequency'> & {
-      frequency?: string; // Accept old 'frequency' for compatibility
+    taskData: {
+      title: string;
+      description?: string;
+      points?: number;
+      category?: string;
+      frequency?: string; // Old 'frequency' field
+      executionFrequency?: 'DAILY' | 'WEEKLY'; // New 'executionFrequency' field
+      scheduledTime?: string;
+      timeFormat?: '12h' | '24h';
+      selectedDays?: string[];
+      dayOfWeek?: string;
+      isRecurring?: boolean;
       timeSlots?: Array<{ startTime: string; endTime: string; label?: string }>;
     } 
   ) => {
@@ -37,8 +47,19 @@ export function useCreateTask() {
         }
       }
 
-      // Convert frequency to executionFrequency for new API
-      const executionFrequency = (taskData.frequency === 'DAILY' ? 'DAILY' : 'WEEKLY') as 'DAILY' | 'WEEKLY';
+      // Determine execution frequency
+      // First check if executionFrequency is provided directly
+      let executionFrequency: 'DAILY' | 'WEEKLY' = 'WEEKLY'; // Default
+      
+      if (taskData.executionFrequency) {
+        executionFrequency = taskData.executionFrequency;
+      } else if (taskData.frequency === 'DAILY') {
+        executionFrequency = 'DAILY';
+      } else if (taskData.frequency === 'WEEKLY') {
+        executionFrequency = 'WEEKLY';
+      }
+      
+      console.log("useCreateTask: Determined execution frequency:", executionFrequency);
       
       // For DAILY tasks, time slots are required
       if (executionFrequency === 'DAILY' && (!taskData.timeSlots || taskData.timeSlots.length === 0)) {
@@ -53,14 +74,25 @@ export function useCreateTask() {
       }
 
       const requestData: CreateTaskData = {
-        ...taskData,
+        title: taskData.title,
+        description: taskData.description || undefined,
+        points: taskData.points || 1,
         executionFrequency,
-        scheduledTime: taskData.scheduledTime || undefined,
-        selectedDays: taskData.selectedDays || undefined,
-        dayOfWeek: taskData.dayOfWeek || undefined,
+        timeFormat: taskData.timeFormat || '12h',
         isRecurring: taskData.isRecurring !== false,
-        timeSlots: taskData.timeSlots || undefined
+        category: taskData.category || undefined,
+        timeSlots: taskData.timeSlots || undefined,
+        scheduledTime: taskData.scheduledTime || undefined,
       };
+
+      // Only include day selections for WEEKLY tasks
+      if (executionFrequency === 'WEEKLY') {
+        if (taskData.selectedDays && taskData.selectedDays.length > 0) {
+          requestData.selectedDays = taskData.selectedDays;
+        } else if (taskData.dayOfWeek) {
+          requestData.dayOfWeek = taskData.dayOfWeek as any;
+        }
+      }
 
       console.log("useCreateTask: Creating task with data:", requestData);
 

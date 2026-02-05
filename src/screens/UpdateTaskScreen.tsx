@@ -515,7 +515,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                   </View>
                 ) : (
                   <View style={styles.timeSlotsList}>
-                    {form.timeSlots.map((slot, index) => (
+                    {form.timeSlots.map((slot:{startTime:string, endTime:string, label?:string}, index:number) => (
                       <View key={index} style={styles.timeSlotItem}>
                         <View style={styles.timeSlotInfo}>
                           <Text style={styles.timeSlotTime}>

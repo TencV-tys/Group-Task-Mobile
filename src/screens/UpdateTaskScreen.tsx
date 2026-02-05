@@ -13,17 +13,19 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  TouchableWithoutFeedback
+  TouchableWithoutFeedback,
+  Modal
 } from 'react-native';
 import { useUpdateTask } from '../taskHook/useUpdateTask';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-// Time options for scheduled time
-const TIME_OPTIONS = [
-  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00'
-];
+// Time options for time slots
+const TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => {
+  const hour = i.toString().padStart(2, '0');
+  return [`${hour}:00`, `${hour}:30`];
+}).flat();
 
-// Day of week options (for multiple selection)
+// Day of week options
 const DAY_OF_WEEK_OPTIONS = [
   { value: 'MONDAY', label: 'Mon' },
   { value: 'TUESDAY', label: 'Tue' },
@@ -39,6 +41,13 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
   const { loading, error, success, updateTask, reset } = useUpdateTask();
   
   const scrollViewRef = useRef<ScrollView>(null);
+  const [timeSlotModal, setTimeSlotModal] = useState(false);
+  const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
+  const [currentTimeSlot, setCurrentTimeSlot] = useState({
+    startTime: '08:00',
+    endTime: '09:00',
+    label: ''
+  });
 
   // Helper function to parse selectedDays from task data
   const parseSelectedDays = (taskData: any) => {
@@ -61,7 +70,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
   const parseExecutionFrequency = (taskData: any) => {
     if (!taskData) return 'WEEKLY';
     
-    // Check if executionFrequency exists (new field)
+    // Check if executionFrequency exists
     if (taskData.executionFrequency) {
       return taskData.executionFrequency;
     }
@@ -70,16 +79,39 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
     return taskData.frequency || 'WEEKLY';
   };
 
-  // Parse scheduledTime from task data
-  const parseScheduledTime = (taskData: any) => {
-    if (!taskData) return '';
+  // Parse time slots from task data
+  const parseTimeSlots = (taskData: any) => {
+    if (!taskData) return [];
     
-    // Check if scheduledTime exists (new field)
-    if (taskData.scheduledTime) {
-      return taskData.scheduledTime;
+    // Check if timeSlots exists in task data
+    if (taskData.timeSlots && Array.isArray(taskData.timeSlots)) {
+      return taskData.timeSlots;
     }
     
-    return '';
+    // Check if task has timeSlots relation loaded
+    if (taskData.timeSlots && Array.isArray(taskData.timeSlots)) {
+      return taskData.timeSlots.map((slot: any) => ({
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        label: slot.label
+      }));
+    }
+    
+    // If scheduledTime exists (legacy), create a single time slot
+    if (taskData.scheduledTime) {
+      return [{
+        startTime: taskData.scheduledTime,
+        endTime: (() => {
+          const timeParts = taskData.scheduledTime.split(':');
+          const hour = parseInt(timeParts[0]);
+          const nextHour = (hour + 1) % 24;
+          return `${nextHour.toString().padStart(2, '0')}:${timeParts[1] || '00'}`;
+        })(),
+        label: 'Default'
+      }];
+    }
+    
+    return [];
   };
 
   const [form, setForm] = useState({
@@ -87,11 +119,12 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
     description: task?.description || '',
     points: task?.points?.toString() || '1',
     executionFrequency: parseExecutionFrequency(task) as 'DAILY' | 'WEEKLY',
-    scheduledTime: parseScheduledTime(task),
     timeFormat: task?.timeFormat || '12h' as '12h' | '24h',
     selectedDays: parseSelectedDays(task),
+    dayOfWeek: task?.dayOfWeek || '',
     isRecurring: task?.isRecurring !== false,
     category: task?.category || '',
+    timeSlots: parseTimeSlots(task),
   });
 
   useEffect(() => {
@@ -120,14 +153,20 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
       return;
     }
 
-    if (form.executionFrequency === 'DAILY' && !form.scheduledTime) {
-      Alert.alert('Error', 'Daily tasks require a scheduled time');
-      return;
+    // Validation for DAILY tasks
+    if (form.executionFrequency === 'DAILY') {
+      if (form.timeSlots.length === 0) {
+        Alert.alert('Error', 'Daily tasks require at least one time slot');
+        return;
+      }
     }
 
-    if (form.executionFrequency === 'WEEKLY' && form.selectedDays.length === 0) {
-      Alert.alert('Error', 'Weekly tasks require at least one day selection');
-      return;
+    // Validation for WEEKLY tasks
+    if (form.executionFrequency === 'WEEKLY') {
+      if (form.selectedDays.length === 0 && !form.dayOfWeek) {
+        Alert.alert('Error', 'Weekly tasks require at least one day selection');
+        return;
+      }
     }
 
     // Prepare update data
@@ -136,17 +175,19 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
       description: form.description || undefined,
       points: points,
       executionFrequency: form.executionFrequency,
-      scheduledTime: form.scheduledTime || undefined,
       timeFormat: form.timeFormat,
       isRecurring: form.isRecurring,
       category: form.category || undefined,
+      timeSlots: form.timeSlots.length > 0 ? form.timeSlots : undefined,
     };
 
     // Add day selections for weekly tasks
-    if (form.executionFrequency === 'WEEKLY' && form.selectedDays.length > 0) {
-      updateData.selectedDays = form.selectedDays;
-      // Clear dayOfWeek if we're using selectedDays
-      updateData.dayOfWeek = undefined;
+    if (form.executionFrequency === 'WEEKLY') {
+      if (form.selectedDays.length > 0) {
+        updateData.selectedDays = form.selectedDays;
+      } else if (form.dayOfWeek) {
+        updateData.dayOfWeek = form.dayOfWeek;
+      }
     }
 
     const result = await updateTask(task.id, updateData);
@@ -197,18 +238,99 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
     setForm(prev => ({ 
       ...prev, 
       executionFrequency: frequency,
-      // Reset time selection when switching frequencies
-      scheduledTime: frequency === 'DAILY' ? prev.scheduledTime : '',
+      // Clear days if switching to DAILY
+      selectedDays: frequency === 'DAILY' ? [] : prev.selectedDays,
+      dayOfWeek: frequency === 'DAILY' ? '' : prev.dayOfWeek,
     }));
   };
 
-  const scrollToInput = (reactNode: any) => {
-    scrollViewRef.current?.scrollTo({ y: reactNode, animated: true });
+  // Time slot management
+  const addTimeSlot = () => {
+    if (!currentTimeSlot.startTime || !currentTimeSlot.endTime) {
+      Alert.alert('Error', 'Please select both start and end times');
+      return;
+    }
+
+    const newSlot = { 
+      startTime: currentTimeSlot.startTime,
+      endTime: currentTimeSlot.endTime,
+      label: currentTimeSlot.label || undefined
+    };
+    
+    if (editingSlotIndex !== null) {
+      // Edit existing slot
+      const updatedSlots = [...form.timeSlots];
+      updatedSlots[editingSlotIndex] = newSlot;
+      setForm(prev => ({ ...prev, timeSlots: updatedSlots }));
+    } else {
+      // Add new slot
+      setForm(prev => ({ 
+        ...prev, 
+        timeSlots: [...prev.timeSlots, newSlot]
+      }));
+    }
+    
+    // Reset form
+    setCurrentTimeSlot({
+      startTime: '08:00',
+      endTime: '09:00',
+      label: ''
+    });
+    setEditingSlotIndex(null);
+    setTimeSlotModal(false);
+  };
+
+  const editTimeSlot = (index: number) => {
+    const slot = form.timeSlots[index];
+    setCurrentTimeSlot({ 
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      label: slot.label || ''
+    });
+    setEditingSlotIndex(index);
+    setTimeSlotModal(true);
+  };
+
+  const removeTimeSlot = (index: number) => {
+    Alert.alert(
+      'Remove Time Slot',
+      'Are you sure you want to remove this time slot?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Remove', 
+          style: 'destructive',
+          onPress: () => {
+            const updatedSlots = [...form.timeSlots];
+            updatedSlots.splice(index, 1);
+            setForm(prev => ({ ...prev, timeSlots: updatedSlots }));
+          }
+        }
+      ]
+    );
+  };
+
+  // Helper to format time
+  const formatTime = (time: string) => {
+    if (form.timeFormat === '12h') {
+      const [hours, minutes] = time.split(':').map(Number);
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    }
+    return time;
   };
 
   if (!task) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <Text style={styles.backButton}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>Edit Task</Text>
+          <View style={styles.headerSpacer} />
+        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Loading task data...</Text>
@@ -218,21 +340,21 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
-              <Text style={styles.backButtonText}>✕</Text>
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Edit Task</Text>
-            <View style={styles.headerSpacer} />
-          </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleCancel}>
+          <Text style={styles.backButton}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Edit Task</Text>
+        <View style={styles.headerSpacer} />
+      </View>
 
+      <KeyboardAvoidingView 
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView 
             ref={scrollViewRef}
             style={styles.content}
@@ -357,35 +479,78 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                 </Text>
               </View>
 
-              {/* Scheduled Time for DAILY tasks */}
-              {form.executionFrequency === 'DAILY' && (
-                <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Time *</Text>
-                  <View style={styles.timeOptionsContainer}>
-                    {TIME_OPTIONS.map((time) => (
-                      <TouchableOpacity
-                        key={time}
-                        style={[
-                          styles.timeOptionButton,
-                          form.scheduledTime === time && styles.timeOptionButtonActive
-                        ]}
-                        onPress={() => setForm({ ...form, scheduledTime: time })}
-                        disabled={loading}
-                      >
-                        <Text style={[
-                          styles.timeOptionText,
-                          form.scheduledTime === time && styles.timeOptionTextActive
-                        ]}>
-                          {time}
-                        </Text>
-                      </TouchableOpacity>
+              {/* Time Slots Section */}
+              <View style={styles.inputGroup}>
+                <View style={styles.timeSlotsHeader}>
+                  <Text style={styles.label}>
+                    Time Slots {form.executionFrequency === 'DAILY' ? '*' : ''}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.addTimeSlotButton}
+                    onPress={() => {
+                      setCurrentTimeSlot({
+                        startTime: '08:00',
+                        endTime: '09:00',
+                        label: ''
+                      });
+                      setEditingSlotIndex(null);
+                      setTimeSlotModal(true);
+                    }}
+                    disabled={loading}
+                  >
+                    <MaterialCommunityIcons name="plus" size={20} color="#007AFF" />
+                    <Text style={styles.addTimeSlotText}>Add Slot</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {form.timeSlots.length === 0 ? (
+                  <View style={styles.emptyTimeSlots}>
+                    <MaterialCommunityIcons name="clock-outline" size={40} color="#dee2e6" />
+                    <Text style={styles.emptyTimeSlotsText}>
+                      No time slots added yet
+                    </Text>
+                    <Text style={styles.emptyTimeSlotsSubtext}>
+                      Click "Add Slot" to create time slots
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.timeSlotsList}>
+                    {form.timeSlots.map((slot, index) => (
+                      <View key={index} style={styles.timeSlotItem}>
+                        <View style={styles.timeSlotInfo}>
+                          <Text style={styles.timeSlotTime}>
+                            {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                          </Text>
+                          {slot.label ? (
+                            <Text style={styles.timeSlotLabel}>{slot.label}</Text>
+                          ) : null}
+                        </View>
+                        <View style={styles.timeSlotActions}>
+                          <TouchableOpacity
+                            style={styles.timeSlotActionButton}
+                            onPress={() => editTimeSlot(index)}
+                            disabled={loading}
+                          >
+                            <MaterialCommunityIcons name="pencil" size={18} color="#6c757d" />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.timeSlotActionButton}
+                            onPress={() => removeTimeSlot(index)}
+                            disabled={loading}
+                          >
+                            <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                     ))}
                   </View>
-                  <Text style={styles.helperText}>
-                    Select a time for daily tasks
-                  </Text>
-                </View>
-              )}
+                )}
+                <Text style={styles.helperText}>
+                  {form.executionFrequency === 'DAILY' 
+                    ? 'Time slots for daily tasks (e.g., 8-10 AM, 1-3 PM, 6-8 PM)'
+                    : 'Optional time slots for selected days'}
+                </Text>
+              </View>
 
               {/* Day Selection for WEEKLY tasks */}
               {form.executionFrequency === 'WEEKLY' && (
@@ -496,10 +661,18 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
               <TouchableOpacity
                 style={[
                   styles.submitButton,
-                  (!form.title.trim() || loading) && styles.buttonDisabled
+                  (!form.title.trim() || 
+                   (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
+                   (form.executionFrequency === 'WEEKLY' && form.selectedDays.length === 0 && !form.dayOfWeek) ||
+                   loading) && styles.buttonDisabled
                 ]}
                 onPress={handleSubmit}
-                disabled={!form.title.trim() || loading}
+                disabled={
+                  !form.title.trim() || 
+                  (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
+                  (form.executionFrequency === 'WEEKLY' && form.selectedDays.length === 0 && !form.dayOfWeek) ||
+                  loading
+                }
               >
                 {loading ? (
                   <ActivityIndicator color="white" size="small" />
@@ -522,7 +695,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                 <Text style={styles.infoValue}>
                   {task.creator?.fullName || 'Admin'}
                 </Text>
-              </View>
+              </View> 
               {task.rotationOrder && (
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Rotation Order:</Text>
@@ -550,9 +723,114 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
             {/* Bottom padding for keyboard */}
             <View style={styles.bottomPadding} />
           </ScrollView>
-        </SafeAreaView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+
+      {/* Time Slot Modal */}
+      <Modal
+        visible={timeSlotModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setTimeSlotModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingSlotIndex !== null ? 'Edit Time Slot' : 'Add Time Slot'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setTimeSlotModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <MaterialCommunityIcons name="close" size={24} color="#495057" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Start Time *</Text>
+                <View style={styles.timePickerContainer}>
+                  {TIME_OPTIONS.slice(0, 48).map((time) => (
+                    <TouchableOpacity
+                      key={`start-${time}`}
+                      style={[
+                        styles.timePickerButton,
+                        currentTimeSlot.startTime === time && styles.timePickerButtonActive
+                      ]}
+                      onPress={() => setCurrentTimeSlot({...currentTimeSlot, startTime: time})}
+                    >
+                      <Text style={[
+                        styles.timePickerText,
+                        currentTimeSlot.startTime === time && styles.timePickerTextActive
+                      ]}>
+                        {time}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>End Time *</Text>
+                <View style={styles.timePickerContainer}>
+                  {TIME_OPTIONS.slice(0, 48).map((time) => (
+                    <TouchableOpacity
+                      key={`end-${time}`}
+                      style={[
+                        styles.timePickerButton,
+                        currentTimeSlot.endTime === time && styles.timePickerButtonActive
+                      ]}
+                      onPress={() => setCurrentTimeSlot({...currentTimeSlot, endTime: time})}
+                    >
+                      <Text style={[
+                        styles.timePickerText,
+                        currentTimeSlot.endTime === time && styles.timePickerTextActive
+                      ]}>
+                        {time}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Label (Optional)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g., Morning, Lunch, Evening"
+                  value={currentTimeSlot.label}
+                  onChangeText={(text) => setCurrentTimeSlot({...currentTimeSlot, label: text})}
+                  maxLength={30}
+                />
+                <Text style={styles.modalHelperText}>
+                  Helps identify this time slot
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalCancelButton, loading && styles.buttonDisabled]}
+                onPress={() => setTimeSlotModal(false)}
+                disabled={loading}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveButton, loading && styles.buttonDisabled]}
+                onPress={addTimeSlot}
+                disabled={loading || !currentTimeSlot.startTime || !currentTimeSlot.endTime}
+              >
+                <Text style={styles.modalSaveButtonText}>
+                  {editingSlotIndex !== null ? 'Update' : 'Add'} Slot
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -560,12 +838,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa'
-  },
-  safeArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 30,
   },
   header: {
     flexDirection: 'row',
@@ -578,28 +850,26 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e9ecef'
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f1f3f5',
-    justifyContent: 'center',
-    alignItems: 'center'
+    fontSize: 24,
+    color: '#007AFF',
+    padding: 4
   },
-  backButtonText: {
-    fontSize: 20,
-    color: '#495057',
-    fontWeight: '300'
-  },
-  headerTitle: {
+  title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529'
+    color: '#212529',
+    flex: 1,
+    marginHorizontal: 12,
+    textAlign: 'center'
   },
   headerSpacer: {
     width: 36
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 30,
   },
   bottomPadding: {
     height: 100,
@@ -718,31 +988,88 @@ const styles = StyleSheet.create({
   frequencyButtonTextActive: {
     color: 'white'
   },
-  timeOptionsContainer: {
+  timeSlotsHeader: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12
   },
-  timeOptionButton: {
-    width: '23%',
-    paddingVertical: 10,
+  addTimeSlotButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#f1f3f5',
+    backgroundColor: '#e7f5ff',
+    borderWidth: 1,
+    borderColor: '#a5d8ff'
+  },
+  addTimeSlotText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#007AFF'
+  },
+  emptyTimeSlots: {
+    alignItems: 'center',
+    paddingVertical: 30,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#dee2e6',
-    alignItems: 'center'
+    borderStyle: 'dashed'
   },
-  timeOptionButtonActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF'
-  },
-  timeOptionText: {
-    fontSize: 12,
+  emptyTimeSlotsText: {
+    fontSize: 16,
     fontWeight: '500',
-    color: '#495057'
+    color: '#6c757d',
+    marginTop: 12,
+    marginBottom: 4
   },
-  timeOptionTextActive: {
-    color: 'white'
+  emptyTimeSlotsSubtext: {
+    fontSize: 12,
+    color: '#adb5bd',
+    textAlign: 'center'
+  },
+  timeSlotsList: {
+    gap: 8
+  },
+  timeSlotItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6'
+  },
+  timeSlotInfo: {
+    flex: 1
+  },
+  timeSlotTime: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#212529'
+  },
+  timeSlotLabel: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 2
+  },
+  timeSlotActions: {
+    flexDirection: 'row',
+    gap: 8
+  },
+  timeSlotActionButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef'
   },
   daysContainer: {
     flexDirection: 'row',
@@ -900,5 +1227,126 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#212529',
     fontWeight: '500'
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end'
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    width: '100%'
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef'
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#212529'
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f3f5',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  modalBody: {
+    padding: 20,
+    maxHeight: 400
+  },
+  modalInputGroup: {
+    marginBottom: 24
+  },
+  modalLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#495057',
+    marginBottom: 12
+  },
+  timePickerContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  timePickerButton: {
+    width: '23%',
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#f1f3f5',
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    alignItems: 'center'
+  },
+  timePickerButtonActive: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF'
+  },
+  timePickerText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#495057'
+  },
+  timePickerTextActive: {
+    color: 'white'
+  },
+  modalInput: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#212529'
+  },
+  modalHelperText: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 6,
+    marginLeft: 2
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef'
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#f1f3f5',
+    alignItems: 'center'
+  },
+  modalCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#495057'
+  },
+  modalSaveButton: {
+    flex: 2,
+    paddingVertical: 14,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+    alignItems: 'center'
+  },
+  modalSaveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white'
   }
 });

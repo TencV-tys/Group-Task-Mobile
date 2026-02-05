@@ -25,6 +25,27 @@ export function useUpdateTask() {
         throw new Error('Points must be at least 1');
       }
 
+      // Validate time slots
+      if (taskData.timeSlots && taskData.timeSlots.length > 0) {
+        for (const slot of taskData.timeSlots) {
+          if (!slot.startTime || !slot.endTime) {
+            throw new Error('Time slots must have both start and end times');
+          }
+        }
+      }
+
+      // Validate frequency and requirements
+      if (taskData.executionFrequency === 'DAILY' && 
+          (!taskData.timeSlots || taskData.timeSlots.length === 0)) {
+        throw new Error('Daily tasks require time slots');
+      }
+
+      if (taskData.executionFrequency === 'WEEKLY' && 
+          !taskData.selectedDays?.length && 
+          !taskData.dayOfWeek) {
+        throw new Error('Weekly tasks require at least one day selection');
+      }
+
       console.log("Updating task with data:", taskData);
 
       const result = await TaskService.updateTask(taskId, taskData);
@@ -43,7 +64,7 @@ export function useUpdateTask() {
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to update task';
       setError(errorMessage);
-      return {
+      return { 
         success: false,
         message: errorMessage
       };

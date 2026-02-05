@@ -14,8 +14,7 @@ import {
   Platform,
   Keyboard,
   TouchableWithoutFeedback,
-  Modal,
-  FlatList
+  Modal
 } from 'react-native';
 import { useCreateTask } from '../taskHook/useCreateTask';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -37,11 +36,6 @@ const DAY_OF_WEEK_OPTIONS = [
   { value: 'SUNDAY', label: 'Sun' }
 ];
 
-// Default time slot labels
-const TIME_SLOT_LABELS = [
-  'Morning', 'Breakfast', 'Lunch', 'Afternoon', 'Evening', 'Dinner', 'Night'
-];
-
 export default function CreateTaskScreen({ navigation, route }: any) {
   const { groupId, groupName } = route.params || {};
   const { loading, error, success, createTask, reset } = useCreateTask();
@@ -56,17 +50,17 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   });
 
   const [form, setForm] = useState({
-    title: '',
-    description: '',
-    points: '1',
-    executionFrequency: 'WEEKLY' as 'DAILY' | 'WEEKLY',
-    timeFormat: '12h' as '12h' | '24h',
-    selectedDays: [] as string[],
-    dayOfWeek: '',
-    isRecurring: true,
-    category: '',
-    timeSlots: [] as Array<{ startTime: string; endTime: string; label?: string }>,
-  });
+  title: '',
+  description: '',
+  points: '1',
+  executionFrequency: 'WEEKLY' as 'DAILY' | 'WEEKLY',
+  timeFormat: '12h' as '12h' | '24h',
+  selectedDays: [] as string[],
+  dayOfWeek: '',
+  isRecurring: true,
+  category: '',
+  timeSlots: [] as Array<{ startTime: string; endTime: string; label?: string }>,
+});
 
   const handleSubmit = async () => {
     Keyboard.dismiss(); // Dismiss keyboard first
@@ -127,39 +121,42 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     console.log("Creating task with data:", taskData);
 
     const result = await createTask(groupId, taskData);
-
-    if (result.success) {
-      Alert.alert(
-        'Success!',
-        'Task created successfully',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              reset();
-              setForm({
-                title: '',
-                description: '',
-                points: '1',
-                executionFrequency: 'WEEKLY',
-                timeFormat: '12h',
-                selectedDays: [],
-                dayOfWeek: '',
-                isRecurring: true,
-                category: '',
-                timeSlots: [],
-              });
-              if (route.params?.onTaskCreated) {
-                route.params.onTaskCreated(result.task);
-              }
-              navigation.goBack();
-            }
+     if (result.success) {
+    Alert.alert(
+    'Success!',
+    'Task created successfully',
+    [
+      {
+        text: 'OK',
+        onPress: () => {
+          reset();
+          setForm({
+            title: '',
+            description: '',
+            points: '1',
+            executionFrequency: 'WEEKLY',
+            timeFormat: '12h',
+            selectedDays: [],
+            dayOfWeek: '',
+            isRecurring: true,
+            category: '',
+            timeSlots: [],
+          });
+          setCurrentTimeSlot({
+            startTime: '08:00',
+            endTime: '09:00',
+            label: ''
+          });
+          if (route.params?.onTaskCreated) {
+            route.params.onTaskCreated(result.task);
           }
-        ]
-      );
-    } else {
-      Alert.alert('Error', result.message);
-    }
+          navigation.goBack();
+        }
+      }
+    ]
+  );
+}
+
   };
 
   const handleCancel = () => {
@@ -193,43 +190,50 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
   // Time slot management
   const addTimeSlot = () => {
-    if (!currentTimeSlot.startTime || !currentTimeSlot.endTime) {
-      Alert.alert('Error', 'Please select both start and end times');
-      return;
-    }
+  if (!currentTimeSlot.startTime || !currentTimeSlot.endTime) {
+    Alert.alert('Error', 'Please select both start and end times');
+    return;
+  }
 
-    const newSlot = { ...currentTimeSlot };
-    
-    if (editingSlotIndex !== null) {
-      // Edit existing slot
-      const updatedSlots = [...form.timeSlots];
-      updatedSlots[editingSlotIndex] = newSlot;
-      setForm(prev => ({ ...prev, timeSlots: updatedSlots }));
-    } else {
-      // Add new slot
-      setForm(prev => ({ 
-        ...prev, 
-        timeSlots: [...prev.timeSlots, newSlot]
-      }));
-    }
-    
-    // Reset form
-    setCurrentTimeSlot({
-      startTime: '08:00',
-      endTime: '09:00',
-      label: ''
-    });
-    setEditingSlotIndex(null);
-    setTimeSlotModal(false);
+  const newSlot = { 
+    startTime: currentTimeSlot.startTime,
+    endTime: currentTimeSlot.endTime,
+    label: currentTimeSlot.label || undefined // Convert empty string to undefined for backend
   };
+  
+  if (editingSlotIndex !== null) {
+    // Edit existing slot
+    const updatedSlots = [...form.timeSlots];
+    updatedSlots[editingSlotIndex] = newSlot;
+    setForm(prev => ({ ...prev, timeSlots: updatedSlots }));
+  } else {
+    // Add new slot
+    setForm(prev => ({ 
+      ...prev, 
+      timeSlots: [...prev.timeSlots, newSlot]
+    }));
+  }
+  
+  // Reset form
+  setCurrentTimeSlot({
+    startTime: '08:00',
+    endTime: '09:00',
+    label: '' // Reset to empty string
+  });
+  setEditingSlotIndex(null);
+  setTimeSlotModal(false);
+};
 
   const editTimeSlot = (index: number) => {
-    const slot = form.timeSlots[index];
-    setCurrentTimeSlot({ ...slot });
-    setEditingSlotIndex(index);
-    setTimeSlotModal(true);
-  };
-
+  const slot = form.timeSlots[index];
+  setCurrentTimeSlot({ 
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    label: slot.label || '' // Ensure label is always a string
+  });
+  setEditingSlotIndex(index);
+  setTimeSlotModal(true);
+};
   const removeTimeSlot = (index: number) => {
     Alert.alert(
       'Remove Time Slot',
@@ -261,21 +265,23 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
-              <Text style={styles.backButtonText}>✕</Text>
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Create Task</Text>
-            <View style={styles.headerSpacer} />
-          </View>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleCancel}>
+          <Text style={styles.backButton}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.title} numberOfLines={1}>
+          Create Task
+        </Text>
+        <View style={styles.headerSpacer} />
+      </View>
 
+      <KeyboardAvoidingView 
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView 
             ref={scrollViewRef}
             style={styles.content}
@@ -419,14 +425,14 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     }}
                     disabled={loading}
                   >
-                    <Icon name="add" size={20} color="#007AFF" />
+                    <MaterialCommunityIcons name="plus" size={20} color="#007AFF" />
                     <Text style={styles.addTimeSlotText}>Add Slot</Text>
                   </TouchableOpacity>
                 </View>
                 
                 {form.timeSlots.length === 0 ? (
                   <View style={styles.emptyTimeSlots}>
-                    <Icon name="schedule" size={40} color="#dee2e6" />
+                    <MaterialCommunityIcons name="clock-outline" size={40} color="#dee2e6" />
                     <Text style={styles.emptyTimeSlotsText}>
                       No time slots added yet
                     </Text>
@@ -452,14 +458,14 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                             onPress={() => editTimeSlot(index)}
                             disabled={loading}
                           >
-                            <Icon name="edit" size={18} color="#6c757d" />
+                            <MaterialCommunityIcons name="pencil" size={18} color="#6c757d" />
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.timeSlotActionButton}
                             onPress={() => removeTimeSlot(index)}
                             disabled={loading}
                           >
-                            <Icon name="delete" size={18} color="#fa5252" />
+                            <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -617,116 +623,114 @@ export default function CreateTaskScreen({ navigation, route }: any) {
             {/* Bottom padding for keyboard */}
             <View style={styles.bottomPadding} />
           </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
 
-          {/* Time Slot Modal */}
-          <Modal
-            visible={timeSlotModal}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setTimeSlotModal(false)}
-          >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={styles.modalOverlay}>
-                <View style={styles.modalContent}>
-                  <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>
-                      {editingSlotIndex !== null ? 'Edit Time Slot' : 'Add Time Slot'}
-                    </Text>
+      {/* Time Slot Modal */}
+      <Modal
+        visible={timeSlotModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setTimeSlotModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingSlotIndex !== null ? 'Edit Time Slot' : 'Add Time Slot'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setTimeSlotModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <MaterialCommunityIcons name="close" size={24} color="#495057" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Start Time *</Text>
+                <View style={styles.timePickerContainer}>
+                  {TIME_OPTIONS.slice(0, 48).map((time) => (
                     <TouchableOpacity
-                      onPress={() => setTimeSlotModal(false)}
-                      style={styles.modalCloseButton}
+                      key={`start-${time}`}
+                      style={[
+                        styles.timePickerButton,
+                        currentTimeSlot.startTime === time && styles.timePickerButtonActive
+                      ]}
+                      onPress={() => setCurrentTimeSlot({...currentTimeSlot, startTime: time})}
                     >
-                      <Icon name="close" size={24} color="#495057" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <ScrollView style={styles.modalBody}>
-                    <View style={styles.modalInputGroup}>
-                      <Text style={styles.modalLabel}>Start Time *</Text>
-                      <View style={styles.timePickerContainer}>
-                        {TIME_OPTIONS.map((time) => (
-                          <TouchableOpacity
-                            key={`start-${time}`}
-                            style={[
-                              styles.timePickerButton,
-                              currentTimeSlot.startTime === time && styles.timePickerButtonActive
-                            ]}
-                            onPress={() => setCurrentTimeSlot({...currentTimeSlot, startTime: time})}
-                          >
-                            <Text style={[
-                              styles.timePickerText,
-                              currentTimeSlot.startTime === time && styles.timePickerTextActive
-                            ]}>
-                              {time}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-
-                    <View style={styles.modalInputGroup}>
-                      <Text style={styles.modalLabel}>End Time *</Text>
-                      <View style={styles.timePickerContainer}>
-                        {TIME_OPTIONS.map((time) => (
-                          <TouchableOpacity
-                            key={`end-${time}`}
-                            style={[
-                              styles.timePickerButton,
-                              currentTimeSlot.endTime === time && styles.timePickerButtonActive
-                            ]}
-                            onPress={() => setCurrentTimeSlot({...currentTimeSlot, endTime: time})}
-                          >
-                            <Text style={[
-                              styles.timePickerText,
-                              currentTimeSlot.endTime === time && styles.timePickerTextActive
-                            ]}>
-                              {time}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-
-                    <View style={styles.modalInputGroup}>
-                      <Text style={styles.modalLabel}>Label (Optional)</Text>
-                      <TextInput
-                        style={styles.modalInput}
-                        placeholder="e.g., Morning, Lunch, Evening"
-                        value={currentTimeSlot.label}
-                        onChangeText={(text) => setCurrentTimeSlot({...currentTimeSlot, label: text})}
-                        maxLength={30}
-                      />
-                      <Text style={styles.modalHelperText}>
-                        Helps identify this time slot
-                      </Text>
-                    </View>
-                  </ScrollView>
-
-                  <View style={styles.modalActions}>
-                    <TouchableOpacity
-                      style={[styles.modalCancelButton, loading && styles.buttonDisabled]}
-                      onPress={() => setTimeSlotModal(false)}
-                      disabled={loading}
-                    >
-                      <Text style={styles.modalCancelButtonText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.modalSaveButton, loading && styles.buttonDisabled]}
-                      onPress={addTimeSlot}
-                      disabled={loading || !currentTimeSlot.startTime || !currentTimeSlot.endTime}
-                    >
-                      <Text style={styles.modalSaveButtonText}>
-                        {editingSlotIndex !== null ? 'Update' : 'Add'} Slot
+                      <Text style={[
+                        styles.timePickerText,
+                        currentTimeSlot.startTime === time && styles.timePickerTextActive
+                      ]}>
+                        {time}
                       </Text>
                     </TouchableOpacity>
-                  </View>
+                  ))}
                 </View>
               </View>
-            </TouchableWithoutFeedback>
-          </Modal>
-        </SafeAreaView>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>End Time *</Text>
+                <View style={styles.timePickerContainer}>
+                  {TIME_OPTIONS.slice(0, 48).map((time) => (
+                    <TouchableOpacity
+                      key={`end-${time}`}
+                      style={[
+                        styles.timePickerButton,
+                        currentTimeSlot.endTime === time && styles.timePickerButtonActive
+                      ]}
+                      onPress={() => setCurrentTimeSlot({...currentTimeSlot, endTime: time})}
+                    >
+                      <Text style={[
+                        styles.timePickerText,
+                        currentTimeSlot.endTime === time && styles.timePickerTextActive
+                      ]}>
+                        {time}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.modalInputGroup}>
+                <Text style={styles.modalLabel}>Label (Optional)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="e.g., Morning, Lunch, Evening"
+                  value={currentTimeSlot.label}
+                  onChangeText={(text) => setCurrentTimeSlot({...currentTimeSlot, label: text})}
+                  maxLength={30}
+                />
+                <Text style={styles.modalHelperText}>
+                  Helps identify this time slot
+                </Text>
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalCancelButton, loading && styles.buttonDisabled]}
+                onPress={() => setTimeSlotModal(false)}
+                disabled={loading}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSaveButton, loading && styles.buttonDisabled]}
+                onPress={addTimeSlot}
+                disabled={loading || !currentTimeSlot.startTime || !currentTimeSlot.endTime}
+              >
+                <Text style={styles.modalSaveButtonText}>
+                  {editingSlotIndex !== null ? 'Update' : 'Add'} Slot
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -734,12 +738,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa'
-  },
-  safeArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 30,
   },
   header: {
     flexDirection: 'row',
@@ -752,28 +750,26 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e9ecef'
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#f1f3f5',
-    justifyContent: 'center',
-    alignItems: 'center'
+    fontSize: 24,
+    color: '#007AFF',
+    padding: 4
   },
-  backButtonText: {
-    fontSize: 20,
-    color: '#495057',
-    fontWeight: '300'
-  },
-  headerTitle: {
+  title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529'
+    color: '#212529',
+    flex: 1,
+    marginHorizontal: 12,
+    textAlign: 'center'
   },
   headerSpacer: {
     width: 36
   },
   content: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 30,
   },
   bottomPadding: {
     height: 100,
@@ -1114,7 +1110,7 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     lineHeight: 20
   },
-  // Modal styles
+  // Modal styles - Fixed
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1124,7 +1120,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%'
+    maxHeight: '80%',
+    width: '100%'
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1149,7 +1146,8 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   modalBody: {
-    padding: 20
+    padding: 20,
+    maxHeight: 400
   },
   modalInputGroup: {
     marginBottom: 24

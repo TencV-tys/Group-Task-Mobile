@@ -9,7 +9,19 @@ export function useUpdateTask() {
 
   const updateTask = async (
     taskId: string,
-    taskData: UpdateTaskData
+    taskData: {
+      title?: string;
+      description?: string;
+      points?: number;
+      category?: string;
+      executionFrequency?: 'DAILY' | 'WEEKLY';
+      scheduledTime?: string;
+      timeFormat?: '12h' | '24h';
+      selectedDays?: string[];
+      dayOfWeek?: string;
+      isRecurring?: boolean;
+      timeSlots?: Array<{ startTime: string; endTime: string; label?: string }>;
+    }
   ) => {
     setLoading(true);
     setError(null);
@@ -34,21 +46,45 @@ export function useUpdateTask() {
         }
       }
 
+      // Get execution frequency
+      const executionFrequency = taskData.executionFrequency || 'WEEKLY';
+      
       // Validate frequency and requirements
-      if (taskData.executionFrequency === 'DAILY' && 
+      if (executionFrequency === 'DAILY' && 
           (!taskData.timeSlots || taskData.timeSlots.length === 0)) {
         throw new Error('Daily tasks require time slots');
       }
 
-      if (taskData.executionFrequency === 'WEEKLY' && 
+      if (executionFrequency === 'WEEKLY' && 
           !taskData.selectedDays?.length && 
           !taskData.dayOfWeek) {
         throw new Error('Weekly tasks require at least one day selection');
       }
 
-      console.log("Updating task with data:", taskData);
+      const requestData: UpdateTaskData = {
+        title: taskData.title,
+        description: taskData.description || undefined,
+        points: taskData.points || undefined,
+        executionFrequency,
+        timeFormat: taskData.timeFormat || '12h',
+        isRecurring: taskData.isRecurring !== false,
+        category: taskData.category || undefined,
+        timeSlots: taskData.timeSlots || undefined,
+        scheduledTime: taskData.scheduledTime || undefined,
+      };
 
-      const result = await TaskService.updateTask(taskId, taskData);
+      // Only include day selections for WEEKLY tasks
+      if (executionFrequency === 'WEEKLY') {
+        if (taskData.selectedDays && taskData.selectedDays.length > 0) {
+          requestData.selectedDays = taskData.selectedDays;
+        } else if (taskData.dayOfWeek) {
+          requestData.dayOfWeek = taskData.dayOfWeek as any;
+        }
+      }
+
+      console.log("Updating task with data:", requestData);
+
+      const result = await TaskService.updateTask(taskId, requestData);
       
       if (result.success) {
         setSuccess(true);

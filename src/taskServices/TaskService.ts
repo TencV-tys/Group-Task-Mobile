@@ -1,5 +1,5 @@
-// src/services/TaskService.ts - FIXED VERSION
-import {API_BASE_URL} from '../config/api';
+// src/services/TaskService.ts
+import { API_BASE_URL } from '../config/api';
 
 const API_URL = `${API_BASE_URL}/api/tasks`;
 
@@ -97,7 +97,6 @@ export class TaskService {
     }
   }
 
-  // ... rest of your methods remain the same
   static async getGroupTasks(groupId: string, week?: number) {
     try {
       const url = week !== undefined 

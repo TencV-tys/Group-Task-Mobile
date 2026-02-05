@@ -1,4 +1,5 @@
-// src/screens/UpdateTaskScreen.tsx
+
+//src/screens/UpdateTaskScreen.tsx - UPDATED VERSION
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -31,53 +32,20 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
     startTime: string;
     endTime: string;
     label?: string;
+    points?: string;
   } | null>(null);
 
-  // Helper function to parse selectedDays from task data
-  const parseSelectedDays = (taskData: any) => {
-    if (!taskData) return [];
-    
-    // Check if selectedDays exists and is an array
-    if (taskData.selectedDays && Array.isArray(taskData.selectedDays)) {
-      return taskData.selectedDays;
-    }
-    
-    // If dayOfWeek exists, use it as a single selected day
-    if (taskData.dayOfWeek) {
-      return [taskData.dayOfWeek];
-    }
-    
-    return [];
-  };
-
-  // Parse executionFrequency from task data
-  const parseExecutionFrequency = (taskData: any) => {
-    if (!taskData) return 'WEEKLY';
-    
-    // Check if executionFrequency exists
-    if (taskData.executionFrequency) {
-      return taskData.executionFrequency;
-    }
-    
-    // Fallback to frequency field (old field)
-    return taskData.frequency || 'WEEKLY';
-  };
-
-  // Parse time slots from task data
+  // Parse time slots from task data (updated to include points)
   const parseTimeSlots = (taskData: any) => {
     if (!taskData) return [];
     
     // Check if timeSlots exists in task data
     if (taskData.timeSlots && Array.isArray(taskData.timeSlots)) {
-      return taskData.timeSlots;
-    }
-    
-    // Check if task has timeSlots relation loaded
-    if (taskData.timeSlots && Array.isArray(taskData.timeSlots)) {
       return taskData.timeSlots.map((slot: any) => ({
         startTime: slot.startTime,
         endTime: slot.endTime,
-        label: slot.label
+        label: slot.label || undefined,
+        points: slot.points?.toString() || undefined
       }));
     }
     
@@ -91,7 +59,8 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
           const nextHour = (hour + 1) % 24;
           return `${nextHour.toString().padStart(2, '0')}:${timeParts[1] || '00'}`;
         })(),
-        label: 'Default'
+        label: 'Default',
+        points: taskData.points?.toString() || undefined
       }];
     }
     
@@ -102,14 +71,19 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
     title: task?.title || '',
     description: task?.description || '',
     points: task?.points?.toString() || '1',
-    executionFrequency: parseExecutionFrequency(task) as 'DAILY' | 'WEEKLY',
+    executionFrequency: task?.executionFrequency || 'WEEKLY' as 'DAILY' | 'WEEKLY',
     timeFormat: task?.timeFormat || '12h' as '12h' | '24h',
-    selectedDays: parseSelectedDays(task),
+    selectedDays: task?.selectedDays || [],
     dayOfWeek: task?.dayOfWeek || '',
     isRecurring: task?.isRecurring !== false,
     category: task?.category || '',
     timeSlots: parseTimeSlots(task),
   });
+
+  // Add total task points state
+  const [totalTaskPoints, setTotalTaskPoints] = useState(
+    task?.points ? task.points.toString() : '1'
+  );
 
   useEffect(() => {
     if (!task) {
@@ -117,6 +91,18 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
       navigation.goBack();
     }
   }, [task, navigation]);
+
+  // Calculate total points from time slots
+const calculateTimeSlotPoints = () => {
+  return form.timeSlots.reduce((total: number, slot: { startTime: string; endTime: string; label?: string; points?: string }) => {
+    const points = parseInt(slot.points || '0', 10);
+    return total + (isNaN(points) ? 0 : points);
+  }, 0);
+}
+
+  const totalTimeSlotPoints = calculateTimeSlotPoints();
+  const remainingPoints = parseInt(form.points, 10) - totalTimeSlotPoints;
+  const isPointsValid = remainingPoints >= 0;
 
   const handleSubmit = async () => {
     Keyboard.dismiss();
@@ -133,7 +119,12 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
 
     const points = parseInt(form.points, 10);
     if (isNaN(points) || points < 1) {
-      Alert.alert('Error', 'Points must be at least 1');
+      Alert.alert('Error', 'Total points must be at least 1');
+      return;
+    }
+
+    if (!isPointsValid) {
+      Alert.alert('Error', `Time slots points (${totalTimeSlotPoints}) exceed total task points (${points}). Please adjust the points.`);
       return;
     }
 
@@ -153,17 +144,21 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
       }
     }
 
-    // Prepare update data
     const updateData: any = {
-      title: form.title,
-      description: form.description || undefined,
-      points: points,
-      executionFrequency: form.executionFrequency,
-      timeFormat: '12h', // Always use 12h format
-      isRecurring: form.isRecurring,
-      category: form.category || undefined,
-      timeSlots: form.timeSlots.length > 0 ? form.timeSlots : undefined,
-    };
+  title: form.title,
+  description: form.description || undefined,
+  points: points,
+  executionFrequency: form.executionFrequency,
+  timeFormat: '12h',
+  isRecurring: form.isRecurring,
+  category: form.category || undefined,
+  timeSlots: form.timeSlots.length > 0 ? form.timeSlots.map((slot: { startTime: string; endTime: string; label?: string; points?: string }) => ({
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    label: slot.label || undefined,
+    points: slot.points ? parseInt(slot.points, 10) : undefined
+  })) : undefined,
+};
 
     // Add day selections for weekly tasks
     if (form.executionFrequency === 'WEEKLY') {
@@ -205,18 +200,18 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
   };
 
   const toggleDaySelection = (day: string) => {
-    if (form.selectedDays.includes(day)) {
-      setForm(prev => ({
-        ...prev,
-        selectedDays: prev.selectedDays.filter(d => d !== day)
-      }));
-    } else {
-      setForm(prev => ({
-        ...prev,
-        selectedDays: [...prev.selectedDays, day]
-      }));
-    }
-  };
+  if (form.selectedDays.includes(day)) {
+    setForm(prev => ({
+      ...prev,
+      selectedDays: prev.selectedDays.filter((d: string) => d !== day)
+    }));
+  } else {
+    setForm(prev => ({
+      ...prev,
+      selectedDays: [...prev.selectedDays, day]
+    }));
+  }
+};
 
   const handleFrequencyChange = (frequency: 'DAILY' | 'WEEKLY') => {
     setForm(prev => ({ 
@@ -226,6 +221,14 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
       selectedDays: frequency === 'DAILY' ? [] : prev.selectedDays,
       dayOfWeek: frequency === 'DAILY' ? '' : prev.dayOfWeek,
     }));
+  };
+
+  const handlePointsChange = (text: string) => {
+    const num = parseInt(text, 10);
+    if (text === '' || (!isNaN(num) && num >= 1)) {
+      setForm(prev => ({ ...prev, points: text }));
+      setTotalTaskPoints(text);
+    }
   };
 
   // Time slot management
@@ -261,7 +264,12 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
     );
   };
 
-  const handleSaveTimeSlot = (slot: { startTime: string; endTime: string; label?: string }) => {
+  const handleSaveTimeSlot = (slot: { 
+    startTime: string; 
+    endTime: string; 
+    label?: string;
+    points?: string;
+  }) => {
     if (editingSlotIndex !== null) {
       // Edit existing slot
       const updatedSlots = [...form.timeSlots];
@@ -367,33 +375,38 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                 </Text>
               </View>
 
-              <View style={styles.row}>
-                <View style={[styles.inputGroup, styles.halfWidth]}>
-                  <Text style={styles.label}>Points</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="1"
-                    value={form.points}
-                    onChangeText={(text) => setForm({ ...form, points: text })}
-                    keyboardType="number-pad"
-                    maxLength={3}
-                    editable={!loading}
-                  />
-                  <Text style={styles.helperText}>Reward points</Text>
-                </View>
+              {/* Total Points Input */}
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Total Task Points *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="1"
+                  value={form.points}
+                  onChangeText={handlePointsChange}
+                  keyboardType="number-pad"
+                  maxLength={3}
+                  editable={!loading}
+                />
+                <Text style={styles.helperText}>
+                  Total reward points for this task (minimum 1)
+                </Text>
+                <Text style={[styles.helperText, !isPointsValid && styles.pointsError]}>
+                  Time slots assigned: {totalTimeSlotPoints} points
+                  {!isPointsValid && ` (exceeds total by ${-remainingPoints})`}
+                </Text>
+              </View>
 
-                <View style={[styles.inputGroup, styles.halfWidth]}>
-                  <Text style={styles.label}>Category</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g., Chores, Work, Study"
-                    value={form.category}
-                    onChangeText={(text) => setForm({ ...form, category: text })}
-                    maxLength={50}
-                    editable={!loading}
-                  />
-                  <Text style={styles.helperText}>Optional</Text>
-                </View>
+              <View style={[styles.inputGroup, styles.halfWidth]}>
+                <Text style={styles.label}>Category</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., Chores, Work, Study"
+                  value={form.category}
+                  onChangeText={(text) => setForm({ ...form, category: text })}
+                  maxLength={50}
+                  editable={!loading}
+                />
+                <Text style={styles.helperText}>Optional</Text>
               </View>
 
               {/* Frequency Selection */}
@@ -439,9 +452,14 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
               {/* Time Slots Section */}
               <View style={styles.inputGroup}>
                 <View style={styles.timeSlotsHeader}>
-                  <Text style={styles.label}>
-                    Time Slots {form.executionFrequency === 'DAILY' ? '*' : ''}
-                  </Text>
+                  <View>
+                    <Text style={styles.label}>
+                      Time Slots {form.executionFrequency === 'DAILY' ? '*' : ''}
+                    </Text>
+                    <Text style={[styles.helperText, { marginTop: 2 }]}>
+                      Assign points to each time slot
+                    </Text>
+                  </View>
                   <TouchableOpacity
                     style={styles.addTimeSlotButton}
                     onPress={handleAddTimeSlot}
@@ -459,20 +477,32 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                       No time slots added yet
                     </Text>
                     <Text style={styles.emptyTimeSlotsSubtext}>
-                      Click "Add Slot" to create time slots
+                      Click "Add Slot" to create time slots with points
                     </Text>
                   </View>
                 ) : (
                   <View style={styles.timeSlotsList}>
-                    {form.timeSlots.map((slot:{startTime:string, endTime:string, label?:string}, index:number) => (
+                    {form.timeSlots.map((slot:{startTime:string, endTime:string, label?:string, points?:string}, index:number) => (
                       <View key={index} style={styles.timeSlotItem}>
                         <View style={styles.timeSlotInfo}>
-                          <Text style={styles.timeSlotTime}>
-                            {formatTimeDisplay(slot.startTime)} - {formatTimeDisplay(slot.endTime)}
-                          </Text>
+                          <View style={styles.timeSlotHeader}>
+                            <Text style={styles.timeSlotTime}>
+                              {formatTimeDisplay(slot.startTime)} - {formatTimeDisplay(slot.endTime)}
+                            </Text>
+                            {slot.points && parseInt(slot.points, 10) > 0 ? (
+                              <View style={styles.pointsBadge}>
+                                <Text style={styles.pointsBadgeText}>
+                                  {slot.points} pts
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
                           {slot.label ? (
                             <Text style={styles.timeSlotLabel}>{slot.label}</Text>
                           ) : null}
+                          <Text style={styles.timeSlotPoints}>
+                            Points: {slot.points || '0'} (use task default)
+                          </Text>
                         </View>
                         <View style={styles.timeSlotActions}>
                           <TouchableOpacity
@@ -492,12 +522,26 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                         </View>
                       </View>
                     ))}
+                    {/* Points Summary */}
+                    <View style={styles.pointsSummary}>
+                      <Text style={styles.pointsSummaryText}>
+                        Total Task Points: <Text style={styles.pointsHighlight}>{form.points}</Text>
+                      </Text>
+                      <Text style={styles.pointsSummaryText}>
+                        Time Slots Assigned: <Text style={styles.pointsHighlight}>{totalTimeSlotPoints}</Text>
+                      </Text>
+                      <Text style={[styles.pointsSummaryText, !isPointsValid && styles.pointsError]}>
+                        Remaining: <Text style={[styles.pointsHighlight, !isPointsValid && styles.pointsError]}>
+                          {remainingPoints}
+                        </Text>
+                      </Text>
+                    </View>
                   </View>
                 )}
                 <Text style={styles.helperText}>
                   {form.executionFrequency === 'DAILY' 
-                    ? 'Time slots for daily tasks (e.g., 8-10 AM, 1-3 PM, 6-8 PM)'
-                    : 'Optional time slots for selected days'}
+                    ? 'Daily tasks require time slots. Assign points to each slot.'
+                    : 'Optional time slots for selected days. You can assign points to each slot.'}
                 </Text>
               </View>
 
@@ -582,6 +626,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                 style={[
                   styles.submitButton,
                   (!form.title.trim() || 
+                   !isPointsValid ||
                    (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
                    (form.executionFrequency === 'WEEKLY' && form.selectedDays.length === 0 && !form.dayOfWeek) ||
                    loading) && styles.buttonDisabled
@@ -589,6 +634,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                 onPress={handleSubmit}
                 disabled={
                   !form.title.trim() || 
+                  !isPointsValid ||
                   (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
                   (form.executionFrequency === 'WEEKLY' && form.selectedDays.length === 0 && !form.dayOfWeek) ||
                   loading
@@ -645,7 +691,8 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
               <Text style={styles.infoText}>
                 • Daily tasks require time slots (e.g., 8-10 AM, 1-3 PM, 6-8 PM){'\n'}
                 • Weekly tasks need at least one day selected{'\n'}
-                • Select hours (1-12), minutes (00, 15, 30, 45), and AM/PM{'\n'}
+                • Maximum 10 points per time slot{'\n'}
+                • Time slot points cannot exceed total task points{'\n'}
                 • End time must be after start time{'\n'}
                 • Time slots can have labels (Morning, Lunch, etc.)
               </Text>
@@ -657,17 +704,18 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
-      {/* Time Slot Modal */}
+      {/* Time Slot Modal - UPDATED with props */}
       <TimeSlotModal
         visible={showTimeSlotModal}
         onClose={() => setShowTimeSlotModal(false)}
         onSave={handleSaveTimeSlot}
         editingSlot={editingSlot}
+        totalTaskPoints={parseInt(totalTaskPoints, 10)}
+        usedPoints={totalTimeSlotPoints}
       />
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -678,7 +726,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 5,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef'
@@ -701,6 +749,51 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  pointsError: {
+    color: '#fa5252',
+    fontWeight: '500'
+  },
+  timeSlotHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4
+  },
+  pointsBadge: {
+    backgroundColor: '#e7f5ff',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#a5d8ff'
+  },
+  pointsBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#007AFF'
+  },
+  timeSlotPoints: {
+    fontSize: 12,
+    color: '#495057',
+    fontStyle: 'italic'
+  },
+  pointsSummary: {
+    backgroundColor: '#f1f3f5',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    marginTop: 8
+  },
+  pointsSummaryText: {
+    fontSize: 13,
+    color: '#495057',
+    marginBottom: 4
+  },
+  pointsHighlight: {
+    fontWeight: '600',
+    color: '#212529'
   },
   scrollContent: {
     paddingBottom: 30,
@@ -1052,4 +1145,4 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     lineHeight: 20
   }
-});
+}); 

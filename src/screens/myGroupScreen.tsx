@@ -1,4 +1,4 @@
-// src/screens/MyGroupsScreen.tsx
+// src/screens/MyGroupsScreen.tsx - UPDATED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -8,9 +8,12 @@ import {
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Alert,
+  Share
 } from 'react-native';
 import { useMyGroups } from '../groupHook/useMyGroups';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function MyGroupsScreen({ navigation }: any) {
   const { 
@@ -23,7 +26,8 @@ export default function MyGroupsScreen({ navigation }: any) {
     addGroup 
   } = useMyGroups();
 
-  // Fetch groups when screen loads
+  const [searchQuery, setSearchQuery] = useState('');
+
   useEffect(() => {
     fetchGroups();
   }, []);
@@ -31,7 +35,6 @@ export default function MyGroupsScreen({ navigation }: any) {
   const handleCreateGroup = () => {
     navigation.navigate('CreateGroup', {
       onGroupCreated: (newGroup: any) => {
-        // Add the new group to our list
         addGroup({
           id: newGroup.id,
           name: newGroup.name,
@@ -39,10 +42,11 @@ export default function MyGroupsScreen({ navigation }: any) {
           inviteCode: newGroup.inviteCode,
           createdAt: newGroup.createdAt,
           createdById: newGroup.createdById,
-          userRole: 'ADMIN', // Creator is ADMIN
+          userRole: 'ADMIN',
           memberCount: 1,
           taskCount: 0
         });
+        Alert.alert('Success!', 'Group created successfully');
       }
     });
   };
@@ -50,7 +54,6 @@ export default function MyGroupsScreen({ navigation }: any) {
   const handleJoinGroup = () => {
     navigation.navigate('JoinGroup', {
       onGroupJoined: (newGroup: any) => {
-        // Add the joined group to our list
         addGroup({
           id: newGroup.id,
           name: newGroup.name,
@@ -58,16 +61,16 @@ export default function MyGroupsScreen({ navigation }: any) {
           inviteCode: newGroup.inviteCode,
           createdAt: newGroup.createdAt,
           createdById: newGroup.createdById,
-          userRole: 'MEMBER', // Joining makes you MEMBER
+          userRole: 'MEMBER',
           memberCount: newGroup.memberCount || 1,
           taskCount: newGroup.taskCount || 0
         });
+        Alert.alert('Success!', 'Joined group successfully');
       }
     });
   };
 
   const handleGroupPress = (group: any) => {
-    // UPDATED: Navigate to GroupTasksScreen instead of GroupDetails
     navigation.navigate('GroupTasks', { 
       groupId: group.id,
       groupName: group.name,
@@ -75,74 +78,146 @@ export default function MyGroupsScreen({ navigation }: any) {
     });
   };
 
+  // Updated: Manage button now goes to GroupMembersScreen
+  const handleManageGroup = (group: any) => {
+    navigation.navigate('GroupMembers', { 
+      groupId: group.id,
+      groupName: group.name,
+      userRole: group.userRole || group.role || 'MEMBER',
+      inviteCode: group.inviteCode
+    });
+  };
+
+  // Updated: Invite button shows invite code
+  const handleInviteGroup = (group: any) => {
+    Alert.alert(
+      'Invite Code',
+      `Share this code to invite members:\n\n📋 ${group.inviteCode || 'No invite code available'}`,
+      [
+        { text: 'Copy', onPress: () => {/* Copy to clipboard */} }, 
+        { text: 'Share', onPress: () => handleShareInvite(group) },
+        { text: 'OK' }
+      ]
+    );
+  };
+
+  const handleShareInvite = (group: any) => {
+    const code = group.inviteCode;
+    if (!code) {
+      Alert.alert('Error', 'No invite code available');
+      return;
+    }
+
+    Share.share({
+      message: `Join my group "${group.name}" on Group Task! Use invite code: ${code}`,
+      title: `Join ${group.name}`
+    }).catch((err:any) => console.error('Error sharing:', err));
+  };
+
+  const handleTasksGroup = (group: any) => {
+    navigation.navigate('GroupTasks', { 
+      groupId: group.id,
+      groupName: group.name,
+      userRole: group.userRole || group.role || 'MEMBER'
+    });
+  };
+
+  const filteredGroups = groups.filter(group => 
+    group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    group.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const renderGroup = ({ item }: any) => {
     const groupName = item.name || 'Unnamed Group';
     const userRole = item.userRole || item.role || 'MEMBER';
+    const isAdmin = userRole === 'ADMIN';
     
     return (
       <TouchableOpacity 
         style={styles.groupCard}
         onPress={() => handleGroupPress(item)}
+        activeOpacity={0.7}
       >
         <View style={styles.groupHeader}>
-          <View style={[
-            styles.groupIcon,
-            { 
-              backgroundColor: userRole === 'ADMIN' ? '#007AFF' : '#6c757d' 
-            }
-          ]}>
-            <Text style={styles.groupIconText}>{groupName.charAt(0).toUpperCase()}</Text>
-          </View>
-          <View style={styles.groupInfo}>
-            <Text style={styles.groupName}>{groupName}</Text>
-            <Text style={styles.groupRole}>
-              {userRole === 'ADMIN' ? '👑 Admin' : '👤 Member'}
-            </Text>
-            {item.description && (
-              <Text style={styles.groupDescription} numberOfLines={1}>
-                {item.description}
-              </Text>
+          <View style={styles.groupIconContainer}>
+            <View style={[
+              styles.groupIcon,
+              { backgroundColor: isAdmin ? '#007AFF' : '#6c757d' }
+            ]}>
+              <Text style={styles.groupIconText}>{groupName.charAt(0).toUpperCase()}</Text>
+            </View>
+            {isAdmin && (
+              <View style={styles.adminBadge}>
+                <MaterialCommunityIcons name="crown" size={12} color="#FFD700" />
+              </View>
             )}
           </View>
-          {item.inviteCode && (
-            <View style={styles.inviteBadge}>
-              <Text style={styles.inviteText}>{item.inviteCode}</Text>
-            </View>
-          )}
-        </View>
-        
-        <View style={styles.groupStats}>
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>
-              {item.memberCount || 1}
-            </Text>
-            <Text style={styles.statLabel}>members</Text>
-          </View>
-          <View style={styles.stat}>
-            <Text style={styles.statNumber}>
-              {item.taskCount || 0}
-            </Text>
-            <Text style={styles.statLabel}>tasks</Text>
-          </View>
-          {item.createdAt && (
-            <View style={styles.stat}>
-              <Text style={styles.statNumber}>
-                {new Date(item.createdAt).toLocaleDateString('en-US', { 
-                  month: 'short', 
-                  day: 'numeric' 
-                })}
+          
+          <View style={styles.groupMainInfo}>
+            <View style={styles.groupTitleRow}>
+              <Text style={styles.groupName} numberOfLines={1}>{groupName}</Text>
+              <Text style={[styles.groupRole, isAdmin && styles.adminRoleText]}>
+                {isAdmin ? 'Admin' : 'Member'}
               </Text>
-              <Text style={styles.statLabel}>created</Text>
             </View>
-          )}
+            
+            {item.description ? (
+              <Text style={styles.groupDescription} numberOfLines={2}>
+                {item.description}
+              </Text>
+            ) : (
+              <Text style={styles.groupNoDescription}>No description</Text>
+            )}
+            
+            <View style={styles.groupQuickStats}>
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons name="account-group" size={16} color="#6c757d" />
+                <Text style={styles.statText}>{item.memberCount || 1}</Text>
+              </View>
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons name="clipboard-check" size={16} color="#6c757d" />
+                <Text style={styles.statText}>{item.taskCount || 0}</Text>
+              </View>
+            </View>
+          </View>
         </View>
         
-        {/* Show admin badge if user is admin */}
-        {userRole === 'ADMIN' && (
-          <View style={styles.adminBadge}>
-            <Text style={styles.adminBadgeText}>Can Create Tasks</Text>
-          </View>
-        )}
+        <View style={styles.groupActions}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleInviteGroup(item);
+            }}
+          >
+            <MaterialCommunityIcons name="account-plus" size={18} color="#007AFF" />
+            <Text style={styles.actionButtonText}>Invite</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleTasksGroup(item);
+            }}
+          >
+            <MaterialCommunityIcons name="clipboard-text" size={18} color="#28a745" />
+            <Text style={styles.actionButtonText}>Tasks</Text>
+          </TouchableOpacity>
+          
+          {isAdmin && (
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleManageGroup(item);
+              }}
+            >
+              <MaterialCommunityIcons name="cog" size={18} color="#6c757d" />
+              <Text style={styles.actionButtonText}>Manage</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </TouchableOpacity>
     );
   };
@@ -159,22 +234,19 @@ export default function MyGroupsScreen({ navigation }: any) {
 
     if (error) {
       return (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
-          <Text style={styles.errorTitle}>Error Loading Groups</Text>
-          <Text style={styles.errorText}>{error}</Text>
-          <View style={styles.errorActions}>
+        <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconContainer}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={60} color="#fa5252" />
+          </View>
+          <Text style={styles.emptyTitle}>Error Loading Groups</Text>
+          <Text style={styles.emptySubtext}>{error}</Text>
+          <View style={styles.emptyActions}>
             <TouchableOpacity 
-              style={[styles.retryButton, styles.primaryButton]}
+              style={styles.primaryButton}
               onPress={() => fetchGroups()}
             >
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.retryButton, styles.secondaryButton]}
-              onPress={() => navigation.navigate('Home')}
-            >
-              <Text style={styles.secondaryButtonText}>Go Home</Text>
+              <MaterialCommunityIcons name="refresh" size={20} color="white" />
+              <Text style={styles.primaryButtonText}>Try Again</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -183,7 +255,7 @@ export default function MyGroupsScreen({ navigation }: any) {
 
     return (
       <FlatList
-        data={groups}
+        data={filteredGroups}
         renderItem={renderGroup}
         keyExtractor={(item) => item.id}
         refreshControl={
@@ -194,81 +266,101 @@ export default function MyGroupsScreen({ navigation }: any) {
             tintColor="#007AFF"
           />
         }
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <Text style={styles.listHeaderTitle}>
+              {groups.length} {groups.length === 1 ? 'Group' : 'Groups'}
+            </Text>
+            {searchQuery ? (
+              <Text style={styles.listHeaderSubtitle}>
+                Showing {filteredGroups.length} result{filteredGroups.length !== 1 ? 's' : ''}
+              </Text>
+            ) : null}
+          </View>
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>👥</Text>
-            <Text style={styles.emptyText}>No groups yet</Text>
+            <View style={styles.emptyIconContainer}>
+              <MaterialCommunityIcons name="account-group" size={60} color="#dee2e6" />
+            </View>
+            <Text style={styles.emptyTitle}>No Groups Yet</Text>
             <Text style={styles.emptySubtext}>
-              Create your first group or join an existing one to get started with tasks
+              Create your first group to organize tasks with friends or family
             </Text>
-            <View style={styles.emptyButtons}>
+            <View style={styles.emptyActions}>
               <TouchableOpacity 
-                style={[styles.emptyButton, styles.primaryEmptyButton]}
+                style={styles.primaryButton}
                 onPress={handleCreateGroup}
               >
-                <Text style={styles.emptyButtonText}>Create Group</Text>
+                <MaterialCommunityIcons name="plus" size={20} color="white" />
+                <Text style={styles.primaryButtonText}>Create Group</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.emptyButton, styles.secondaryEmptyButton]}
+                style={styles.secondaryButton}
                 onPress={handleJoinGroup}
               >
-                <Text style={styles.secondaryEmptyButtonText}>Join Group</Text>
+                <MaterialCommunityIcons name="login" size={20} color="#007AFF" />
+                <Text style={styles.secondaryButtonText}>Join Group</Text>
               </TouchableOpacity>
             </View>
           </View>
         }
-        contentContainerStyle={[
-          styles.listContainer,
-          groups.length === 0 && styles.emptyListContainer
-        ]}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
       />
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header - Consistent with CreateTaskScreen */}
       <View style={styles.header}>
-        <Text style={styles.title}>My Groups</Text>
-        <View style={styles.headerActions}>
-          <TouchableOpacity 
-            style={styles.createButton}
-            onPress={handleCreateGroup}
-          >
-            <Text style={styles.createButtonText}>+ Create</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            onPress={refreshGroups}
-            disabled={refreshing}
-            style={styles.refreshButtonContainer}
-          >
-            {refreshing ? (
-              <ActivityIndicator size="small" color="#007AFF" />
-            ) : (
-              <Text style={styles.refreshButton}>🔄</Text>
-            )}
-          </TouchableOpacity>
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
+          style={styles.backButton}
+        >
+          <Text style={styles.backButtonText}>←</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>My Groups</Text>
+          <Text style={styles.subtitle}>
+            {groups.length} {groups.length === 1 ? 'group' : 'groups'}
+          </Text>
         </View>
+        
+        <TouchableOpacity 
+          onPress={refreshGroups}
+          disabled={refreshing}
+          style={styles.refreshButton}
+        >
+          {refreshing ? (
+            <ActivityIndicator size="small" color="#007AFF" />
+          ) : (
+            <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Quick Actions Bar - Consistent with CreateTaskScreen */}
+      <View style={styles.quickActions}>
+        <TouchableOpacity 
+          style={[styles.quickAction, styles.createAction]}
+          onPress={handleCreateGroup}
+        >
+          <MaterialCommunityIcons name="plus-circle" size={20} color="white" />
+          <Text style={styles.quickActionText}>Create</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.quickAction, styles.joinAction]}
+          onPress={handleJoinGroup}
+        >
+          <MaterialCommunityIcons name="login" size={20} color="white" />
+          <Text style={styles.quickActionText}>Join</Text>
+        </TouchableOpacity>
       </View>
 
       {renderContent()}
-
-      {/* FAB for mobile */}
-      {groups.length > 0 && (
-        <View style={styles.fabContainer}>
-          <TouchableOpacity 
-            style={styles.fab} 
-            onPress={handleJoinGroup}
-          >
-            <Text style={styles.fabText}>🔗</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.fab, styles.primaryFab]} 
-            onPress={handleCreateGroup}
-          >
-            <Text style={styles.fabText}>+</Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -278,284 +370,296 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
+  // Header - Consistent with CreateTaskScreen
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 5,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
+    minHeight: 56,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+  },
+  backButtonText: {
+    fontSize: 24,
+    color: '#007AFF',
+    fontWeight: '400',
+  },
+  titleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#212529',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  createButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: '#007AFF',
-    borderRadius: 6,
-  },
-  createButtonText: {
-    color: 'white',
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: '600',
+    color: '#212529',
+    textAlign: 'center',
   },
-  refreshButtonContainer: {
-    padding: 4,
+  subtitle: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 2,
+    textAlign: 'center',
   },
   refreshButton: {
-    fontSize: 20,
-    color: '#007AFF',
-  },
-  loadingContainer: {
-    flex: 1,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 100,
+    borderRadius: 20,
+    backgroundColor: '#f1f3f5',
   },
-  loadingText: {
-    marginTop: 15,
-    fontSize: 16,
-    color: '#6c757d',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 16,
-    color: '#dc3545',
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#dc3545',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#495057',
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 22,
-  },
-  errorActions: {
+  // Quick Actions - Consistent with CreateTaskScreen
+  quickActions: {
     flexDirection: 'row',
-    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+    gap: 8,
   },
-  retryButton: {
-    paddingHorizontal: 20,
+  quickAction: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     paddingVertical: 10,
     borderRadius: 8,
   },
-  primaryButton: {
+  createAction: {
     backgroundColor: '#007AFF',
   },
-  secondaryButton: {
-    backgroundColor: '#6c757d',
+  joinAction: {
+    backgroundColor: '#28a745',
   },
-  retryButtonText: {
-    color: 'white',
+  quickActionText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  secondaryButtonText: {
     color: 'white',
-    fontSize: 14,
+  },
+  // Rest of the styles remain the same
+  listContent: {
+    padding: 16,
+  },
+  listHeader: {
+    marginBottom: 16,
+  },
+  listHeaderTitle: {
+    fontSize: 16,
     fontWeight: '600',
+    color: '#212529',
   },
-  listContainer: {
-    padding: 20,
-  },
-  emptyListContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  listHeaderSubtitle: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginTop: 4,
   },
   groupCard: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 4,
-    elevation: 3,
-    position: 'relative',
+    elevation: 2,
   },
   groupHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 16,
+  },
+  groupIconContainer: {
+    position: 'relative',
+    marginRight: 12,
   },
   groupIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
   },
   groupIconText: {
     fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
   },
-  groupInfo: {
+  adminBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  groupMainInfo: {
     flex: 1,
   },
+  groupTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   groupName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212529',
-    marginBottom: 3,
+    flex: 1,
+    marginRight: 8,
   },
   groupRole: {
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '500',
     color: '#6c757d',
-    marginBottom: 2,
+    backgroundColor: '#f1f3f5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  adminRoleText: {
+    color: '#1971c2',
+    backgroundColor: '#e7f5ff',
   },
   groupDescription: {
-    fontSize: 13,
+    fontSize: 14,
+    color: '#495057',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  groupNoDescription: {
+    fontSize: 14,
     color: '#adb5bd',
     fontStyle: 'italic',
+    marginBottom: 8,
   },
-  inviteBadge: {
-    backgroundColor: '#e9ecef',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  groupQuickStats: {
+    flexDirection: 'row',
+    gap: 16,
   },
-  inviteText: {
-    fontSize: 12,
-    fontWeight: '600',
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontSize: 14,
     color: '#495057',
+    fontWeight: '500',
   },
-  groupStats: {
+  groupActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: '#e9ecef',
-    paddingTop: 10,
+    paddingTop: 12,
+    gap: 8,
   },
-  stat: {
+  actionButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 6,
+    backgroundColor: '#f8f9fa',
+  },
+  actionButtonText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#495057',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  statNumber: {
+  loadingText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#212529',
-  },
-  statLabel: {
-    fontSize: 11,
     color: '#6c757d',
-    textTransform: 'uppercase',
-    marginTop: 2,
-  },
-  adminBadge: {
-    position: 'absolute',
-    top: 15,
-    right: 15,
-    backgroundColor: '#e7f5ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#a5d8ff',
-  },
-  adminBadgeText: {
-    fontSize: 10,
-    color: '#1971c2',
-    fontWeight: '600',
+    marginTop: 12,
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 50,
+    paddingHorizontal: 20,
+    paddingVertical: 60,
   },
-  emptyIcon: {
-    fontSize: 64,
+  emptyIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 20,
-    opacity: 0.5,
   },
-  emptyText: {
+  emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#212529',
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
     color: '#6c757d',
     textAlign: 'center',
-    marginBottom: 25,
-    maxWidth: 300,
+    marginBottom: 24,
     lineHeight: 20,
   },
-  emptyButtons: {
+  emptyActions: {
     flexDirection: 'row',
     gap: 12,
   },
-  emptyButton: {
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#007AFF',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
+    minWidth: 140,
   },
-  primaryEmptyButton: {
-    backgroundColor: '#007AFF',
-  },
-  secondaryEmptyButton: {
-    backgroundColor: '#f1f3f5',
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-  },
-  emptyButtonText: {
+  primaryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
   },
-  secondaryEmptyButtonText: {
-    color: '#495057',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  fabContainer: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    alignItems: 'flex-end',
-  },
-  fab: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6c757d',
-    justifyContent: 'center',
+  secondaryButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#f1f3f5',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    minWidth: 140,
   },
-  primaryFab: {
-    backgroundColor: '#007AFF',
-  },
-  fabText: {
-    fontSize: 24,
-    color: 'white',
+  secondaryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
   },
 });

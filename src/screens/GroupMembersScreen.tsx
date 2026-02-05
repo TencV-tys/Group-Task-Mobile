@@ -236,7 +236,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         }
       ]
     );
-  };
+  }; 
 
   const handleLeaveGroup = () => {
     // Check if user is the only admin

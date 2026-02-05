@@ -1,6 +1,7 @@
+import {API_BASE_URL} from '../config/api';
 
+const API_URL = `${API_BASE_URL}/api/auth/users`;
 
-const API_URL = 'http://10.219.65.2:5000/api/auth/users';
 
 export class AuthService{
 

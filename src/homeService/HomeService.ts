@@ -1,5 +1,7 @@
 // src/services/HomeService.ts
-const API_URL = "http://10.219.65.2:5000/api/home"; // Adjust your base URL
+import {API_BASE_URL} from '../config/api';
+
+const API_URL = `${API_BASE_URL}/api/home`; // Adjust your base URL
 
 export class HomeService {
   static async getHomeData() {

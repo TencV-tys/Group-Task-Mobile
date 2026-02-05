@@ -1,5 +1,8 @@
 // src/services/TaskService.ts
-const API_BASE_URL = "http://10.219.65.2:5000/api/tasks";
+import {API_BASE_URL} from '../config/api';
+
+const API_URL = `${API_BASE_URL}/api/tasks`;
+
 
 export class TaskService {
   // Create a new task with rotation support
@@ -17,7 +20,7 @@ export class TaskService {
       console.log(`TaskService: Creating task for group ${groupId}`, taskData);
       
       // IMPORTANT: Changed endpoint to match your backend router
-      const response = await fetch(`${API_BASE_URL}/group/${groupId}/create`, {
+      const response = await fetch(`${API_URL}/group/${groupId}/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -63,7 +66,7 @@ export class TaskService {
     try {
       console.log(`TaskService: Fetching tasks for group ${groupId}`);
       
-      const response = await fetch(`${API_BASE_URL}/group/${groupId}/tasks`, {
+      const response = await fetch(`${API_URL}/group/${groupId}/tasks`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -83,7 +86,7 @@ export class TaskService {
   // Get tasks assigned to current user in a group
   static async getMyTasks(groupId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/group/${groupId}/my-tasks`, {
+      const response = await fetch(`${API_URL}/group/${groupId}/my-tasks`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -103,7 +106,7 @@ export class TaskService {
   // Get task details
   static async getTaskDetails(taskId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/${taskId}`, {
+      const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -123,7 +126,7 @@ export class TaskService {
   // Delete a task
   static async deleteTask(taskId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+      const response = await fetch(`${API_URL}/tasks/${taskId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -152,7 +155,7 @@ export class TaskService {
     isRecurring?: boolean;
   }) {
     try {
-      const response = await fetch(`${API_BASE_URL}/${taskId}`, {
+      const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -176,7 +179,7 @@ export class TaskService {
   // Get rotation schedule
   static async getRotationSchedule(groupId: string, weeks: number = 4) {
     try {
-      const response = await fetch(`${API_BASE_URL}/group/${groupId}/schedule?weeks=${weeks}`, {
+      const response = await fetch(`${API_URL}/group/${groupId}/schedule?weeks=${weeks}`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -196,7 +199,7 @@ export class TaskService {
   // Rotate tasks
   static async rotateTasks(groupId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/group/${groupId}/rotate`, {
+      const response = await fetch(`${API_URL}/group/${groupId}/rotate`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -216,7 +219,7 @@ export class TaskService {
   // Get task assignments
   static async getTaskAssignments(taskId: string) {
     try {
-      const response = await fetch(`${API_BASE_URL}/${taskId}/assignments`, {
+      const response = await fetch(`${API_URL}/${taskId}/assignments`, {
         method: 'GET',
         credentials: 'include'
       });

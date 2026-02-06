@@ -344,12 +344,12 @@ static async uploadGroupAvatar(groupId: string, base64Image: string) {
   }
 }
 
-// Delete group avatar - use the upload service endpoint
+// Delete group avatar - CORRECTED
 static async deleteGroupAvatar(groupId: string) {
   try {
     console.log(`GroupMembersService: Deleting avatar for group ${groupId}`);
     
-    // Use the upload service endpoint
+    // CORRECT: Use the upload service endpoint
     const response = await fetch(`${API_BASE_URL}/api/uploads/group/${groupId}/avatar`, {
       method: 'DELETE',
       credentials: 'include'

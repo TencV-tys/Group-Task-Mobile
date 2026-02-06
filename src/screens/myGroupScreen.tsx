@@ -1,4 +1,4 @@
-// src/screens/MyGroupsScreen.tsx - UPDATED VERSION
+// src/screens/MyGroupsScreen.tsx - UPDATED WITH GROUP AVATARS
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Share
+  Share,
+  Image // Add Image import
 } from 'react-native';
 import { useMyGroups } from '../groupHook/useMyGroups';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,10 +21,11 @@ export default function MyGroupsScreen({ navigation }: any) {
     groups, 
     loading, 
     refreshing, 
-    error,
+    error, 
     fetchGroups, 
-    refreshGroups, 
-    addGroup 
+    refreshGroups,  
+    addGroup,
+    updateGroupAvatar // Add this if available in your hook
   } = useMyGroups();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -39,6 +41,7 @@ export default function MyGroupsScreen({ navigation }: any) {
           id: newGroup.id,
           name: newGroup.name,
           description: newGroup.description,
+          avatarUrl: newGroup.avatarUrl, // Add avatarUrl
           inviteCode: newGroup.inviteCode,
           createdAt: newGroup.createdAt,
           createdById: newGroup.createdById,
@@ -58,6 +61,7 @@ export default function MyGroupsScreen({ navigation }: any) {
           id: newGroup.id,
           name: newGroup.name,
           description: newGroup.description,
+          avatarUrl: newGroup.avatarUrl, // Add avatarUrl
           inviteCode: newGroup.inviteCode,
           createdAt: newGroup.createdAt,
           createdById: newGroup.createdById,
@@ -78,7 +82,6 @@ export default function MyGroupsScreen({ navigation }: any) {
     });
   };
 
-  // Updated: Manage button now goes to GroupMembersScreen
   const handleManageGroup = (group: any) => {
     navigation.navigate('GroupMembers', { 
       groupId: group.id,
@@ -88,7 +91,6 @@ export default function MyGroupsScreen({ navigation }: any) {
     });
   };
 
-  // Updated: Invite button shows invite code
   const handleInviteGroup = (group: any) => {
     Alert.alert(
       'Invite Code',
@@ -127,6 +129,47 @@ export default function MyGroupsScreen({ navigation }: any) {
     group.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const renderGroupIcon = (group: any, isAdmin: boolean) => {
+    if (group.avatarUrl) {
+      return (
+        <View style={styles.groupIconContainer}>
+          <Image
+            source={{ uri: group.avatarUrl }}
+            style={[
+              styles.groupIcon,
+              styles.groupAvatarImage,
+              { borderColor: isAdmin ? '#007AFF' : '#6c757d' }
+            ]}
+          />
+          {isAdmin && (
+            <View style={styles.adminBadge}>
+              <MaterialCommunityIcons name="crown" size={12} color="#FFD700" />
+            </View>
+          )}
+        </View>
+      );
+    } else {
+      const groupName = group.name || 'Unnamed Group';
+      return (
+        <View style={styles.groupIconContainer}>
+          <View style={[
+            styles.groupIcon,
+            { backgroundColor: isAdmin ? '#007AFF' : '#6c757d' }
+          ]}>
+            <Text style={styles.groupIconText}>
+              {groupName.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          {isAdmin && (
+            <View style={styles.adminBadge}>
+              <MaterialCommunityIcons name="crown" size={12} color="#FFD700" />
+            </View>
+          )}
+        </View>
+      );
+    }
+  };
+
   const renderGroup = ({ item }: any) => {
     const groupName = item.name || 'Unnamed Group';
     const userRole = item.userRole || item.role || 'MEMBER';
@@ -139,19 +182,7 @@ export default function MyGroupsScreen({ navigation }: any) {
         activeOpacity={0.7}
       >
         <View style={styles.groupHeader}>
-          <View style={styles.groupIconContainer}>
-            <View style={[
-              styles.groupIcon,
-              { backgroundColor: isAdmin ? '#007AFF' : '#6c757d' }
-            ]}>
-              <Text style={styles.groupIconText}>{groupName.charAt(0).toUpperCase()}</Text>
-            </View>
-            {isAdmin && (
-              <View style={styles.adminBadge}>
-                <MaterialCommunityIcons name="crown" size={12} color="#FFD700" />
-              </View>
-            )}
-          </View>
+          {renderGroupIcon(item, isAdmin)}
           
           <View style={styles.groupMainInfo}>
             <View style={styles.groupTitleRow}>
@@ -178,6 +209,12 @@ export default function MyGroupsScreen({ navigation }: any) {
                 <MaterialCommunityIcons name="clipboard-check" size={16} color="#6c757d" />
                 <Text style={styles.statText}>{item.taskCount || 0}</Text>
               </View>
+              {item.avatarUrl && (
+                <View style={styles.statItem}>
+                  <MaterialCommunityIcons name="image" size={16} color="#6c757d" />
+                  <Text style={styles.statText}>Avatar</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
@@ -313,7 +350,7 @@ export default function MyGroupsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header - Consistent with CreateTaskScreen */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()} 
@@ -342,7 +379,7 @@ export default function MyGroupsScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Quick Actions Bar - Consistent with CreateTaskScreen */}
+      {/* Quick Actions Bar */}
       <View style={styles.quickActions}>
         <TouchableOpacity 
           style={[styles.quickAction, styles.createAction]}
@@ -370,7 +407,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  // Header - Consistent with CreateTaskScreen
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -420,7 +457,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#f1f3f5',
   },
-  // Quick Actions - Consistent with CreateTaskScreen
+  // Quick Actions
   quickActions: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -450,7 +487,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'white',
   },
-  // Rest of the styles remain the same
+  // Group List
   listContent: {
     padding: 16,
   },
@@ -467,6 +504,7 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     marginTop: 4,
   },
+  // Group Card
   groupCard: {
     backgroundColor: 'white',
     borderRadius: 12,
@@ -492,6 +530,10 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+  },
+  groupAvatarImage: {
+    backgroundColor: 'transparent',
   },
   groupIconText: {
     fontSize: 20,
@@ -554,6 +596,7 @@ const styles = StyleSheet.create({
   },
   groupQuickStats: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 16,
   },
   statItem: {
@@ -588,6 +631,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#495057',
   },
+  // Loading & Empty States
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

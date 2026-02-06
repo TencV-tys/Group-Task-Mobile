@@ -36,7 +36,7 @@ export function useHomeData() {
           stats: result.data.stats || {
             groupsCount: 0,
             tasksDueThisWeek: 0,
-            overdueTasks: 0,
+            overdueTasks: 0, 
             completedTasks: 0,
             totalTasks: 0,
             swapRequests: 0,
@@ -88,7 +88,7 @@ export function useHomeData() {
 
   return {
     loading,
-    refreshing,
+    refreshing, 
     error,
     homeData,
     fetchHomeData,

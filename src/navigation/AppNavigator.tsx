@@ -8,13 +8,15 @@ import MyGroupScreen from '../screens/myGroupScreen';
 import JoinGroupScreen from '../screens/JoinGroupScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import ProfileScreen from '../screens/ProfileScreen';
-import GroupTasksScreen from '../screens/GroupTasksScreen'; // Add this import
-import CreateTaskScreen from '../screens/CreateTaskScreen'; // Add this import
+import GroupTasksScreen from '../screens/GroupTasksScreen'; 
+import CreateTaskScreen from '../screens/CreateTaskScreen'; 
 import UpdateTaskScreen from '../screens/UpdateTaskScreen';
 import GroupMembersScreen from '../screens/GroupMembersScreen';
 import TaskDetailsScreen from '../screens/TaskDetailsScreen';
 import TaskAssignmentScreen from '../screens/TaskAssignmentScreen';
 import RotationScheduleScreen from '../screens/RotationScheduleScreen';
+
+
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
@@ -85,13 +87,13 @@ export default function AppNavigator() {
   }}
 />
       
-      <Stack.Screen 
+     <Stack.Screen 
         name="Profile" 
         component={ProfileScreen}
         options={{ 
           headerShown: false
         }}
-      />
+      /> 
        
        <Stack.Screen 
   name="GroupMembers" 

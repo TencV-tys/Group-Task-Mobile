@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.tsx - UPDATED USER-FRIENDLY VERSION
+// In HomeScreen.tsx - UPDATED VERSION
 import React, { useEffect } from 'react';
 import { 
   View, 
@@ -20,11 +20,6 @@ const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
   const { loading, refreshing, error, homeData, refreshHomeData } = useHomeData();
-
-  // Add debug log to see actual data structure
-  useEffect(() => {
-    console.log("HomeScreen - homeData:", homeData);
-  }, [homeData]);
 
   // Extract data with proper fallbacks
   const user = homeData?.user || { 
@@ -55,27 +50,45 @@ export default function HomeScreen({ navigation }: any) {
 
   // Navigation handlers for clickable cards
   const handleViewGroups = () => {
+  console.log("🔍 Attempting to navigate to 'MyGroups' screen");
+  
+  try {
     navigation.navigate('MyGroups');
-  };
-
-  const handleViewTasks = () => {
-    navigation.navigate('GroupTasks'); // You might want to create a "MyTasks" screen
-  };
-
+    console.log("✅ Navigation to MyGroups successful");
+  } catch (error) {
+    console.error("❌ Navigation error:", error);
+    console.error("Available screens:", navigation.getState()?.routeNames);
+    Alert.alert('Navigation Error', `Screen 'MyGroups' not found. Available screens: ${navigation.getState()?.routeNames?.join(', ')}`);
+  }
+};
   const handleViewCompletedTasks = () => {
     Alert.alert('Coming Soon', 'Task history screen will show your completed tasks');
-    // navigation.navigate('TaskHistory');
   };
-
+ 
   const handleViewSwapRequests = () => {
     Alert.alert('Coming Soon', 'Swap requests will be implemented soon!');
-    // navigation.navigate('SwapRequests');
   };
 
   const handleViewLeaderboard = () => {
     Alert.alert('Coming Soon', 'Leaderboard will be implemented soon!');
-    // navigation.navigate('Leaderboard');
   };
+
+  const handleGroupPress = (group: any) => {
+  console.log("🔍 Attempting to navigate to 'GroupTasks' screen");
+  console.log("With group ID:", group?.id);
+  
+  try {
+    navigation.navigate('GroupTasks', { 
+      groupId: group.id,
+      groupName: group.name,
+      userRole: group.role || 'MEMBER'
+    });
+    console.log("✅ Navigation to GroupTasks successful");
+  } catch (error) {
+    console.error("❌ Navigation error:", error);
+    Alert.alert('Navigation Error', 'Could not navigate to group tasks');
+  }
+};
 
   // Show loading state
   if (loading && !refreshing) {
@@ -105,11 +118,11 @@ export default function HomeScreen({ navigation }: any) {
         </View>
       </SafeAreaView>
     );
-  }
+  } 
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Header */} 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Dashboard</Text>
@@ -185,40 +198,39 @@ export default function HomeScreen({ navigation }: any) {
               <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
             </TouchableOpacity>
             
-            {/* Tasks Due Card */}
-            <TouchableOpacity 
-              style={[
-                styles.statCard,
-                stats.tasksDue > 0 && styles.urgentCard
-              ]}
-              onPress={handleViewTasks}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.statIcon, { 
-                backgroundColor: stats.tasksDue > 0 ? '#FF9500' : '#007AFF' 
-              }]}>
-                <MaterialCommunityIcons name="clipboard-clock" size={22} color="white" />
-              </View>
-              <View style={styles.statContent}>
-                <Text style={[
-                  styles.statNumber,
-                  stats.tasksDue > 0 && styles.urgentNumber
-                ]}>
-                  {stats.tasksDue || 0}
-                </Text>
-                <Text style={styles.statLabel}>Due This Week</Text>
-                {stats.overdueTasks > 0 && (
-                  <Text style={styles.overdueBadge}>
-                    {stats.overdueTasks} overdue
+            {/* Tasks Due Card - ONLY SHOW IF YOU HAVE GROUPS */}
+            {stats.groupsCount > 0 && stats.tasksDue > 0 && (
+              <TouchableOpacity 
+                style={[styles.statCard, styles.urgentCard]}
+                onPress={() => {
+                  // Navigate to first group's tasks if you have tasks due
+                  if (groups.length > 0) {
+                    handleGroupPress(groups[0]);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.statIcon, { backgroundColor: '#FF9500' }]}>
+                  <MaterialCommunityIcons name="clipboard-clock" size={22} color="white" />
+                </View>
+                <View style={styles.statContent}>
+                  <Text style={[styles.statNumber, styles.urgentNumber]}>
+                    {stats.tasksDue || 0}
                   </Text>
-                )}
-              </View>
-              <MaterialCommunityIcons 
-                name={stats.tasksDue > 0 ? "alert-circle" : "chevron-right"} 
-                size={18} 
-                color={stats.tasksDue > 0 ? "#FF3B30" : "#adb5bd"} 
-              />
-            </TouchableOpacity>
+                  <Text style={styles.statLabel}>Due This Week</Text>
+                  {stats.overdueTasks > 0 && (
+                    <Text style={styles.overdueBadge}>
+                      {stats.overdueTasks} overdue
+                    </Text>
+                  )}
+                </View>
+                <MaterialCommunityIcons 
+                  name="alert-circle" 
+                  size={18} 
+                  color="#FF3B30" 
+                />
+              </TouchableOpacity>
+            )}
             
             {/* Completed Tasks Card */}
             <TouchableOpacity 
@@ -261,7 +273,7 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - REMOVED CREATE TASK */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           
@@ -290,78 +302,16 @@ export default function HomeScreen({ navigation }: any) {
 
             <TouchableOpacity 
               style={styles.quickActionCard}
-              onPress={() => navigation.navigate('MyGroups')}
+              onPress={handleViewGroups}
               activeOpacity={0.7}
-            >
+            > 
               <View style={[styles.actionIcon, { backgroundColor: '#FF9500' }]}>
                 <MaterialCommunityIcons name="account-multiple" size={28} color="white" />
               </View>
               <Text style={styles.actionTitle}>My Groups</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> 
           </View>
         </View>
-
-        {/* Tasks This Week */}
-        {currentWeekTasks.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>This Week's Tasks</Text>
-              <TouchableOpacity 
-                onPress={handleViewTasks}
-                activeOpacity={0.6}
-              >
-                <Text style={styles.seeAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.tasksContainer}>
-              {currentWeekTasks.slice(0, 3).map((task: any) => (
-                <TouchableOpacity 
-                  key={task.id}
-                  style={[
-                    styles.taskCard,
-                    task.completed && styles.completedTaskCard
-                  ]}
-                  onPress={() => navigation.navigate('TaskDetails', { 
-                    taskId: task.taskId,
-                    assignmentId: task.id
-                  })}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.taskLeft}>
-                    <View style={[
-                      styles.taskStatus,
-                      task.completed && styles.taskStatusCompleted
-                    ]}>
-                      {task.completed ? (
-                        <MaterialCommunityIcons name="check" size={14} color="white" />
-                      ) : (
-                        <MaterialCommunityIcons name="clock" size={14} color="#007AFF" />
-                      )}
-                    </View>
-                    <View style={styles.taskInfo}>
-                      <Text style={[
-                        styles.taskTitle,
-                        task.completed && styles.completedTaskTitle
-                      ]} numberOfLines={1}>
-                        {task.title}
-                      </Text>
-                      <Text style={styles.taskGroup}>{task.groupName}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.taskRight}>
-                    <Text style={styles.taskPoints}>+{task.points}</Text>
-                    <Text style={styles.taskDue}>
-                      {new Date(task.dueDate).toLocaleDateString('en-US', { 
-                        weekday: 'short' 
-                      })}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        )}
 
         {/* Your Groups */}
         {groups.length > 0 && (
@@ -385,11 +335,7 @@ export default function HomeScreen({ navigation }: any) {
                 <TouchableOpacity 
                   key={group.id}
                   style={styles.groupCard}
-                  onPress={() => navigation.navigate('GroupTasks', { 
-                    groupId: group.id,
-                    groupName: group.name,
-                    userRole: group.role || 'MEMBER'
-                  })}
+                  onPress={() => handleGroupPress(group)}
                   activeOpacity={0.7}
                 >
                   {group.avatarUrl ? (
@@ -419,66 +365,6 @@ export default function HomeScreen({ navigation }: any) {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
-        )}
-
-        {/* Leaderboard Preview */}
-        {leaderboard.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Top Performers</Text>
-              <TouchableOpacity 
-                onPress={handleViewLeaderboard}
-                activeOpacity={0.6}
-              >
-                <Text style={styles.seeAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.leaderboardCard}>
-              {leaderboard.slice(0, 3).map((item: any, index: number) => (
-                <View key={item.user.id} style={styles.leaderboardItem}>
-                  <View style={[
-                    styles.rankBadge,
-                    index === 0 && styles.firstRank,
-                    index === 1 && styles.secondRank,
-                    index === 2 && styles.thirdRank
-                  ]}>
-                    <Text style={styles.rankText}>
-                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.leaderboardAvatar}>
-                    {item.user.avatarUrl ? (
-                      <Image 
-                        source={{ uri: item.user.avatarUrl }} 
-                        style={styles.leaderboardAvatarImage} 
-                      />
-                    ) : (
-                      <Text style={styles.leaderboardAvatarText}>
-                        {item.user.fullName?.charAt(0) || 'U'}
-                      </Text>
-                    )}
-                  </View>
-                  
-                  <View style={styles.leaderboardInfo}>
-                    <Text style={styles.leaderboardName} numberOfLines={1}>
-                      {item.user.fullName || 'User'}
-                      {item.isCurrentUser && ' (You)'}
-                    </Text>
-                    <Text style={styles.leaderboardStats}>
-                      {item.completedTasks} tasks • {item.totalPoints} pts
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.leaderboardPoints}>
-                    <MaterialCommunityIcons name="star" size={14} color="#FFD700" />
-                    <Text style={styles.pointsValue}>{item.totalPoints}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
           </View>
         )}
 
@@ -534,7 +420,6 @@ export default function HomeScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

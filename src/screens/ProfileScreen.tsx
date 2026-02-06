@@ -1,4 +1,4 @@
-// src/screens/ProfileScreen.tsx - UPDATED FOR CONSISTENCY
+// src/screens/ProfileScreen.tsx - COMPLETE WITH AVATAR UPLOAD
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -9,15 +9,40 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  Image
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthService } from '../authServices/AuthService';
+import { useImageUpload } from '../uploadHook/useImageUpload';
 
 export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const {
+    uploading,
+    progress,
+    pickImageFromGallery,
+    takePhotoWithCamera,
+    uploadAvatarFromPicker,
+    deleteAvatar
+  } = useImageUpload({
+    onSuccess: (result) => {
+      if (result.data?.user) {
+        setUser(result.data.user);
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      } else if (result.success) {
+        loadUserData(); // Refresh user data
+        Alert.alert('Success', result.message);
+      }
+    },
+    onError: (error) => {
+      console.error('Upload error:', error);
+      Alert.alert('Error', 'Failed to update profile picture');
+    }
+  });
 
   const loadUserData = async () => {
     try {
@@ -77,24 +102,75 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
+  const handleAvatarPress = () => {
+    Alert.alert(
+      'Change Profile Picture',
+      'How would you like to update your profile picture?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Take Photo', onPress: handleTakePhoto },
+        { text: 'Choose from Gallery', onPress: handleChooseFromGallery },
+        user?.avatarUrl && { 
+          text: 'Remove Picture', 
+          style: 'destructive', 
+          onPress: handleRemoveAvatar 
+        },
+      ].filter(Boolean) as any
+    );
+  };
+
+  const handleTakePhoto = async () => {
+    const image = await takePhotoWithCamera();
+    if (image) {
+      await uploadAvatarFromPicker(image);
+    }
+  };
+
+  const handleChooseFromGallery = async () => {
+    const image = await pickImageFromGallery();
+    if (image) {
+      await uploadAvatarFromPicker(image);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    Alert.alert(
+      'Remove Profile Picture',
+      'Are you sure you want to remove your profile picture?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await deleteAvatar();
+            if (result.success) {
+              loadUserData(); // Refresh to show default avatar
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleAccountSettings = () => {
-    navigation.navigate('AccountSettings');
+    Alert.alert('Coming Soon', 'Account settings will be available soon!');
   };
 
   const handleNotifications = () => {
-    navigation.navigate('Notifications');
+    Alert.alert('Coming Soon', 'Notification settings coming soon!');
   };
 
   const handleHelpSupport = () => {
-    navigation.navigate('HelpSupport');
+    Alert.alert('Help & Support', 'Email us at: support@grouptask.com');
   };
 
   const handlePrivacyPolicy = () => {
-    navigation.navigate('PrivacyPolicy');
+    Alert.alert('Privacy Policy', 'Our privacy policy will be available soon.');
   };
 
   const handleTermsOfService = () => {
-    navigation.navigate('TermsOfService');
+    Alert.alert('Terms of Service', 'Our terms of service will be available soon.');
   };
 
   if (loading) {
@@ -150,7 +226,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header - Consistent with MyGroupsScreen */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()}
@@ -168,10 +244,10 @@ export default function ProfileScreen({ navigation }: any) {
         
         <TouchableOpacity 
           onPress={onRefresh}
-          disabled={refreshing}
+          disabled={refreshing || uploading}
           style={styles.refreshButton}
         >
-          {refreshing ? (
+          {(refreshing || uploading) ? (
             <ActivityIndicator size="small" color="#007AFF" />
           ) : (
             <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
@@ -181,23 +257,61 @@ export default function ProfileScreen({ navigation }: any) {
 
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            enabled={!uploading}
+          />
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {/* Profile Header Card */}
         <View style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {user.fullName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
-              </Text>
+          <TouchableOpacity 
+            onPress={handleAvatarPress}
+            disabled={uploading}
+            style={styles.avatarTouchable}
+          >
+            <View style={styles.avatarContainer}>
+              {uploading ? (
+                <View style={styles.avatarUploadingContainer}>
+                  <View style={styles.avatarPlaceholder}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                  </View>
+                  <View style={styles.uploadingOverlay}>
+                    <Text style={styles.uploadingText}>
+                      {Math.round(progress)}%
+                    </Text>
+                  </View>
+                </View>
+              ) : user.avatarUrl ? (
+                <>
+                  <Image
+                    source={{ uri: user.avatarUrl }}
+                    style={styles.avatarImage}
+                  />
+                  <View style={styles.avatarBadge}>
+                    <MaterialCommunityIcons name="check-decagram" size={16} color="#007AFF" />
+                  </View>
+                  <View style={styles.editIcon}>
+                    <MaterialCommunityIcons name="camera" size={16} color="white" />
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={styles.avatarPlaceholder}>
+                    <Text style={styles.avatarText}>
+                      {user.fullName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
+                    </Text>
+                  </View>
+                  <View style={styles.editIcon}>
+                    <MaterialCommunityIcons name="camera-plus" size={16} color="white" />
+                  </View>
+                </>
+              )}
             </View>
-            <View style={styles.avatarBadge}>
-              <MaterialCommunityIcons name="check-decagram" size={16} color="#007AFF" />
-            </View>
-          </View>
+          </TouchableOpacity>
           
           <Text style={styles.userName}>{user.fullName || 'User'}</Text>
           <Text style={styles.userEmail}>{user.email || 'No email'}</Text>
@@ -231,6 +345,31 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </View>
 
+        {/* Quick Stats Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Stats</Text>
+          
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <MaterialCommunityIcons name="account-group" size={24} color="#007AFF" />
+              <Text style={styles.statCardNumber}>0</Text>
+              <Text style={styles.statCardLabel}>Groups</Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <MaterialCommunityIcons name="clipboard-check" size={24} color="#34C759" />
+              <Text style={styles.statCardNumber}>0</Text>
+              <Text style={styles.statCardLabel}>Tasks Done</Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <MaterialCommunityIcons name="trophy" size={24} color="#FF9500" />
+              <Text style={styles.statCardNumber}>0</Text>
+              <Text style={styles.statCardLabel}>Points</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Account Settings Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Settings</Text>
@@ -240,10 +379,11 @@ export default function ProfileScreen({ navigation }: any) {
               style={styles.menuItem}
               onPress={handleAccountSettings}
               activeOpacity={0.7}
+              disabled={uploading}
             >
               <View style={styles.menuItemLeft}>
                 <MaterialCommunityIcons name="account-cog" size={22} color="#007AFF" />
-                <Text style={styles.menuText}>Account Settings</Text>
+                <Text style={[styles.menuText, uploading && styles.disabledText]}>Account Settings</Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
             </TouchableOpacity>
@@ -254,12 +394,36 @@ export default function ProfileScreen({ navigation }: any) {
               style={styles.menuItem}
               onPress={handleNotifications}
               activeOpacity={0.7}
+              disabled={uploading}
             >
               <View style={styles.menuItemLeft}>
                 <MaterialCommunityIcons name="bell" size={22} color="#FF9500" />
-                <Text style={styles.menuText}>Notifications</Text>
+                <Text style={[styles.menuText, uploading && styles.disabledText]}>Notifications</Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+            </TouchableOpacity>
+            
+            <View style={styles.divider} />
+            
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handleAvatarPress}
+              activeOpacity={0.7}
+              disabled={uploading}
+            >
+              <View style={styles.menuItemLeft}>
+                <MaterialCommunityIcons 
+                  name={uploading ? "image-sync" : "image-edit"} 
+                  size={22} 
+                  color={uploading ? "#6c757d" : "#AF52DE"} 
+                />
+                <Text style={[styles.menuText, uploading && styles.disabledText]}>
+                  {uploading ? 'Uploading Picture...' : 'Change Profile Picture'}
+                </Text>
+              </View>
+              {!uploading && (
+                <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -273,10 +437,11 @@ export default function ProfileScreen({ navigation }: any) {
               style={styles.menuItem}
               onPress={handleHelpSupport}
               activeOpacity={0.7}
+              disabled={uploading}
             >
               <View style={styles.menuItemLeft}>
                 <MaterialCommunityIcons name="help-circle" size={22} color="#FF3B30" />
-                <Text style={styles.menuText}>Help & Support</Text>
+                <Text style={[styles.menuText, uploading && styles.disabledText]}>Help & Support</Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
             </TouchableOpacity>
@@ -287,10 +452,11 @@ export default function ProfileScreen({ navigation }: any) {
               style={styles.menuItem}
               onPress={handlePrivacyPolicy}
               activeOpacity={0.7}
+              disabled={uploading}
             >
               <View style={styles.menuItemLeft}>
                 <MaterialCommunityIcons name="shield" size={22} color="#4CD964" />
-                <Text style={styles.menuText}>Privacy Policy</Text>
+                <Text style={[styles.menuText, uploading && styles.disabledText]}>Privacy Policy</Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
             </TouchableOpacity>
@@ -301,10 +467,11 @@ export default function ProfileScreen({ navigation }: any) {
               style={styles.menuItem}
               onPress={handleTermsOfService}
               activeOpacity={0.7}
+              disabled={uploading}
             >
               <View style={styles.menuItemLeft}>
                 <MaterialCommunityIcons name="file-document" size={22} color="#6c757d" />
-                <Text style={styles.menuText}>Terms of Service</Text>
+                <Text style={[styles.menuText, uploading && styles.disabledText]}>Terms of Service</Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
             </TouchableOpacity>
@@ -343,12 +510,15 @@ export default function ProfileScreen({ navigation }: any) {
 
         {/* Logout Button */}
         <TouchableOpacity 
-          style={styles.logoutButton}
+          style={[styles.logoutButton, uploading && styles.buttonDisabled]}
           onPress={handleLogout}
           activeOpacity={0.7}
+          disabled={uploading}
         >
           <MaterialCommunityIcons name="logout" size={20} color="#fff" />
-          <Text style={styles.logoutButtonText}>Logout</Text>
+          <Text style={styles.logoutButtonText}>
+            {uploading ? 'Please wait...' : 'Logout'}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -360,7 +530,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  // Header - Consistent with MyGroupsScreen
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -370,7 +540,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
-    minHeight: 96,
+    minHeight: 56,
   },
   backButton: {
     width: 40,
@@ -475,20 +645,32 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  avatarContainer: {
-    position: 'relative',
+  avatarTouchable: {
     marginBottom: 16,
   },
+  avatarContainer: {
+    position: 'relative',
+  },
+  avatarUploadingContainer: {
+    position: 'relative',
+  },
   avatarPlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#007AFF',
+  },
   avatarText: {
-    fontSize: 32,
+    fontSize: 40,
     fontWeight: 'bold',
     color: 'white',
   },
@@ -504,6 +686,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e9ecef',
+  },
+  editIcon: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: '#007AFF',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'white',
+  },
+  uploadingOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 122, 255, 0.9)',
+    paddingVertical: 4,
+    borderBottomLeftRadius: 50,
+    borderBottomRightRadius: 50,
+  },
+  uploadingText: {
+    fontSize: 12,
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: '600',
   },
   userName: {
     fontSize: 24,
@@ -544,6 +755,35 @@ const styles = StyleSheet.create({
     height: 12,
     backgroundColor: '#dee2e6',
   },
+  // Quick Stats
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  statCardNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#212529',
+    marginVertical: 4,
+  },
+  statCardLabel: {
+    fontSize: 12,
+    color: '#6c757d',
+    textAlign: 'center',
+  },
   // Sections
   section: {
     paddingHorizontal: 16,
@@ -582,6 +822,9 @@ const styles = StyleSheet.create({
   menuText: {
     fontSize: 16,
     color: '#212529',
+  },
+  disabledText: {
+    color: '#6c757d',
   },
   divider: {
     height: 1,
@@ -650,6 +893,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingVertical: 16,
     borderRadius: 12,
+  },
+  buttonDisabled: {
+    backgroundColor: '#adb5bd',
   },
   logoutButtonText: {
     color: 'white',

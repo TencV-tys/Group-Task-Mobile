@@ -56,7 +56,7 @@ export class AuthService {
         }
     }
 
-    static async signup(data: {fullName: string, email: string, password: string, confirmPassword: string, gender: string, avatarUrl?: string}) {
+    static async signup(data: {fullName: string, email: string, password: string, confirmPassword: string, gender: string, avatarBase64?: string}) {
         try {
             if (!data.email || !data.fullName || !data.password || !data.confirmPassword || !data.gender) {
                 return {

@@ -1,4 +1,4 @@
-// src/screens/GroupTasksScreen.tsx - COMPLETE UPDATED VERSION
+// src/screens/GroupTasksScreen.tsx - COMPLETE UPDATED VERSION WITH FLOATING BUTTON
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -457,6 +457,20 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         renderContent()
       )}
 
+      {/* Floating Create Task Button - Only show for ADMIN */}
+      {userRole === 'ADMIN' && (
+        <TouchableOpacity
+          style={styles.floatingButton}
+          onPress={handleCreateTask}
+          activeOpacity={0.8}
+        >
+          <View style={styles.floatingButtonInner}>
+            <MaterialCommunityIcons name="plus" size={24} color="white" />
+            <Text style={styles.floatingButtonText}>Create Task</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+
       {/* Bottom Tab Navigation */}
       <View style={styles.bottomTab}>
         <TouchableOpacity 
@@ -601,7 +615,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 80 // Account for bottom tab
+    paddingBottom: 100 // Extra padding for floating button
   },
   taskCard: {
     backgroundColor: 'white',
@@ -810,6 +824,34 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16
   },
+  // Floating Button Styles
+  floatingButton: {
+    position: 'absolute',
+    bottom: 90, // Above the bottom tab
+    right: 20,
+    backgroundColor: '#007AFF',
+    borderRadius: 30,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 100
+  },
+  floatingButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8
+  },
+  floatingButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16
+  },
+  // Bottom Tab Navigation
   bottomTab: {
     flexDirection: 'row',
     backgroundColor: 'white',
@@ -824,7 +866,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     justifyContent: 'space-around',
-    alignItems: 'center'
+    alignItems: 'center',
+    zIndex: 50
   },
   tabButton: {
     alignItems: 'center',

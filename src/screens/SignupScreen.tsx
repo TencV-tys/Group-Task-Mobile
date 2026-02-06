@@ -1,5 +1,5 @@
- // src/screens/SignupScreen.tsx
-import React, { useState } from 'react'; // Add useState
+// src/screens/SignupScreen.tsx
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -8,9 +8,12 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  ScrollView
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { useSignupForm } from '../authHook/useSignupForm';
+import { AvatarPicker } from '../components/AvatarPicker';
 
 // Gender options that match your backend enum
 const GENDER_OPTIONS = [
@@ -21,7 +24,7 @@ const GENDER_OPTIONS = [
 ];
 
 // Simple gender picker for React Native
-const GenderPicker = ({ selectedValue, onValueChange }: any) => {
+const GenderPicker = ({ selectedValue, onValueChange, disabled }: any) => {
   return (
     <View style={styles.pickerContainer}>
       <Text style={styles.label}>Gender *</Text>
@@ -31,11 +34,16 @@ const GenderPicker = ({ selectedValue, onValueChange }: any) => {
             key={gender.value}
             style={[
               styles.genderButton,
-              selectedValue === gender.value && styles.genderButtonSelected
+              selectedValue === gender.value && styles.genderButtonSelected,
+              disabled && styles.genderButtonDisabled
             ]}
-            onPress={() => onValueChange(gender.value)}
+            onPress={() => !disabled && onValueChange(gender.value)}
+            disabled={disabled}
           >
-            <Text style={selectedValue === gender.value ? styles.genderTextSelected : styles.genderText}>
+            <Text style={[
+              selectedValue === gender.value ? styles.genderTextSelected : styles.genderText,
+              disabled && styles.genderTextDisabled
+            ]}>
               {gender.label}
             </Text>
           </TouchableOpacity>
@@ -57,19 +65,26 @@ const PasswordInput = ({
   return (
     <View style={styles.passwordContainer}>
       <TextInput
-        style={styles.passwordInput}
+        style={[
+          styles.passwordInput,
+          !editable && styles.inputDisabled
+        ]}
         placeholder={placeholder}
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={!showPassword}
         editable={editable}
+        placeholderTextColor="#999"
       />
       <TouchableOpacity 
         style={styles.eyeButton}
         onPress={togglePasswordVisibility}
         disabled={!editable}
       >
-        <Text style={styles.eyeIcon}>
+        <Text style={[
+          styles.eyeIcon,
+          !editable && styles.eyeIconDisabled
+        ]}>
           {showPassword ? '👁️' : '👁️‍🗨️'}
         </Text>
       </TouchableOpacity>
@@ -82,8 +97,12 @@ export default function SignupScreen({ navigation }: any) {
     formData,
     loading,
     message,
+    avatarImage,
+    uploadingAvatar,
     handleChange,
-    handleSubmit,
+    handleAvatarSelect,
+    handleAvatarRemove,
+    handleSubmit, 
     resetForm
   } = useSignupForm();
 
@@ -96,7 +115,10 @@ export default function SignupScreen({ navigation }: any) {
     
     if (result.success) {
         // SUCCESS: Show success alert and navigate to Home
-        Alert.alert('Success', 'Account created successfully!', [
+        Alert.alert(
+          '🎉 Success!', 
+          'Your account has been created successfully!\n\nYou can update your profile picture anytime from your profile settings.',
+          [
             { 
                 text: 'Continue to Home', 
                 onPress: () => {
@@ -110,152 +132,240 @@ export default function SignupScreen({ navigation }: any) {
         ]);
     } else {
         // ERROR: Show error message
-        Alert.alert('Error', result.message || 'Signup failed');
+        Alert.alert('❌ Error', result.message || 'Signup failed. Please try again.');
     }
   };
 
   return (
-    <ScrollView 
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <Text style={styles.title}>Create Account</Text>
-      
-      {/* Message display */}
-      {message ? (
-        <View style={[
-          styles.messageBox,
-          message.includes('✅') ? styles.successBox : styles.errorBox
-        ]}>
-          <Text style={styles.messageText}>{message}</Text>
+      <ScrollView 
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>Create Account</Text>
+        <Text style={styles.subtitle}>Join GroupTask to manage tasks with your team</Text>
+        
+        {/* Profile Picture Section */}
+        <View style={styles.avatarSection}>
+          <AvatarPicker
+            avatarImage={avatarImage}
+            onAvatarSelect={handleAvatarSelect}
+            onAvatarRemove={handleAvatarRemove}
+            uploading={uploadingAvatar}
+            editable={!loading}
+            size={140}
+          />
         </View>
-      ) : null}
-      
-      {/* Full Name */}
-      <TextInput
-        style={styles.input}
-        placeholder="Full Name *"
-        value={formData.fullName}
-        onChangeText={(text) => handleChange('fullName', text)}
-        editable={!loading}
-      />
-      
-      {/* Email */}
-      <TextInput
-        style={styles.input}
-        placeholder="Email *"
-        value={formData.email}
-        onChangeText={(text) => handleChange('email', text)}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        editable={!loading}
-      />
-      
-      {/* Gender Picker */}
-      <GenderPicker
-        selectedValue={formData.gender}
-        onValueChange={(value: string) => handleChange('gender', value)}
-      />
-      
-      {/* Password with Eye Icon */}
-      <PasswordInput
-        placeholder="Password (min 6 characters) *"
-        value={formData.password}
-        onChangeText={(text) => handleChange('password', text)}
-        editable={!loading}
-        showPassword={showPassword}
-        togglePasswordVisibility={() => setShowPassword(!showPassword)}
-      />
-      
-      {/* Confirm Password with Eye Icon */}
-      <PasswordInput
-        placeholder="Confirm Password *"
-        value={formData.confirmPassword}
-        onChangeText={(text) => handleChange('confirmPassword', text)}
-        editable={!loading}
-        showPassword={showConfirmPassword}
-        togglePasswordVisibility={() => setShowConfirmPassword(!showConfirmPassword)}
-      />
-      
-      {/* Signup Button */}
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={onSignupPress}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.buttonText}>Create Account</Text>
-        )}
-      </TouchableOpacity>
-      
-      {/* Login Link */}
-      <TouchableOpacity
-        onPress={() => navigation.goBack()}
-        disabled={loading}
-      >
-        <Text style={styles.link}>Already have an account? Login</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        
+        {/* Message display */}
+        {message ? (
+          <View style={[
+            styles.messageBox,
+            message.includes('✅') || message.includes('📤') 
+              ? styles.successBox 
+              : styles.errorBox
+          ]}>
+            <Text style={styles.messageText}>{message}</Text>
+          </View>
+        ) : null}
+        
+        {/* Full Name */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Full Name *</Text>
+          <TextInput
+            style={[
+              styles.input,
+              !loading && styles.inputFocused
+            ]}
+            placeholder="John Doe"
+            value={formData.fullName}
+            onChangeText={(text) => handleChange('fullName', text)}
+            editable={!loading}
+            placeholderTextColor="#999"
+          />
+        </View>
+        
+        {/* Email */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Email Address *</Text>
+          <TextInput
+            style={[
+              styles.input,
+              !loading && styles.inputFocused
+            ]}
+            placeholder="john@example.com"
+            value={formData.email}
+            onChangeText={(text) => handleChange('email', text)}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            editable={!loading}
+            placeholderTextColor="#999"
+          />
+        </View>
+        
+        {/* Gender Picker */}
+        <GenderPicker
+          selectedValue={formData.gender}
+          onValueChange={(value: string) => handleChange('gender', value)}
+          disabled={loading}
+        />
+        
+        {/* Password with Eye Icon */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Password *</Text>
+          <PasswordInput
+            placeholder="Enter at least 6 characters"
+            value={formData.password}
+            onChangeText={(text:string) => handleChange('password', text)}
+            editable={!loading}
+            showPassword={showPassword}
+            togglePasswordVisibility={() => setShowPassword(!showPassword)}
+          />
+        </View>
+        
+        {/* Confirm Password with Eye Icon */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.inputLabel}>Confirm Password *</Text>
+          <PasswordInput
+            placeholder="Re-enter your password"
+            value={formData.confirmPassword}
+            onChangeText={(text:string) => handleChange('confirmPassword', text)}
+            editable={!loading}
+            showPassword={showConfirmPassword}
+            togglePasswordVisibility={() => setShowConfirmPassword(!showConfirmPassword)}
+          />
+        </View>
+        
+        {/* Signup Button */}
+        <TouchableOpacity
+          style={[
+            styles.button,
+            loading && styles.buttonDisabled,
+            styles.buttonWithIcon
+          ]}
+          onPress={onSignupPress}
+          disabled={loading}
+        >
+          {loading || uploadingAvatar ? (
+            <ActivityIndicator color="white" size="small" />
+          ) : (
+            <>
+              <Text style={styles.buttonText}>Create Account</Text>
+              <Text style={styles.buttonIcon}>→</Text>
+            </>
+          )}
+        </TouchableOpacity>
+        
+        {/* Terms & Privacy */}
+        <Text style={styles.termsText}>
+          By signing up, you agree to our{' '}
+          <Text style={styles.link}>Terms of Service</Text> and{' '}
+          <Text style={styles.link}>Privacy Policy</Text>
+        </Text>
+        
+        {/* Login Link */}
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          disabled={loading}
+          style={styles.loginLink}
+        >
+          <Text style={styles.loginLinkText}>
+            Already have an account? <Text style={styles.loginLinkBold}>Login</Text>
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#f5f5f5',
+    padding: 24,
+    backgroundColor: '#f8f9fa',
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 30,
+    fontSize: 32,
+    fontWeight: '800',
+    marginBottom: 8,
     textAlign: 'center',
-    color: '#333',
+    color: '#212529',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#6c757d',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#495057',
   },
   input: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    marginBottom: 15,
+    height: 56,
+    borderWidth: 1.5,
+    borderColor: '#e9ecef',
+    borderRadius: 12,
+    paddingHorizontal: 16,
     backgroundColor: 'white',
+    fontSize: 16,
+  },
+  inputFocused: {
+    borderColor: '#007AFF',
+  },
+  inputDisabled: {
+    backgroundColor: '#f8f9fa',
+    color: '#6c757d',
   },
   passwordContainer: {
     position: 'relative',
-    marginBottom: 15,
   },
   passwordInput: {
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingRight: 50, // Space for eye icon
+    height: 56,
+    borderWidth: 1.5,
+    borderColor: '#e9ecef',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingRight: 60,
     backgroundColor: 'white',
+    fontSize: 16,
   },
   eyeButton: {
     position: 'absolute',
     right: 0,
     top: 0,
-    height: 50,
-    width: 50,
+    height: 56,
+    width: 56,
     justifyContent: 'center',
     alignItems: 'center',
   },
   eyeIcon: {
-    fontSize: 20,
+    fontSize: 22,
+  },
+  eyeIconDisabled: {
+    opacity: 0.5,
   },
   pickerContainer: {
     marginBottom: 20,
   },
   label: {
-    fontSize: 16,
-    marginBottom: 8,
-    color: '#333',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#495057',
   },
   pickerRow: {
     flexDirection: 'row',
@@ -263,53 +373,91 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   genderButton: {
-    width: '48%', // Two per row
-    paddingVertical: 12,
-    marginBottom: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
+    width: '48%',
+    paddingVertical: 14,
+    marginBottom: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderWidth: 1.5,
+    borderColor: '#e9ecef',
   },
   genderButtonSelected: {
     backgroundColor: '#007AFF',
     borderColor: '#007AFF',
   },
+  genderButtonDisabled: {
+    opacity: 0.6,
+  },
   genderText: {
-    color: '#666',
+    color: '#495057',
+    fontWeight: '500',
   },
   genderTextSelected: {
     color: 'white',
     fontWeight: '600',
   },
+  genderTextDisabled: {
+    color: '#adb5bd',
+  },
   button: {
-    height: 50,
-    backgroundColor: '#34C759',
-    borderRadius: 8,
+    height: 58,
+    backgroundColor: '#007AFF',
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20,
+    marginTop: 8,
+    marginBottom: 24,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  buttonWithIcon: {
+    flexDirection: 'row',
+    gap: 8,
   },
   buttonDisabled: {
-    backgroundColor: '#CCCCCC',
+    backgroundColor: '#adb5bd',
+    shadowOpacity: 0,
   },
   buttonText: {
     color: 'white',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
+  },
+  buttonIcon: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  termsText: {
+    fontSize: 12,
+    color: '#6c757d',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 18,
   },
   link: {
-    marginTop: 10,
     color: '#007AFF',
-    textAlign: 'center',
-    fontSize: 16,
+    textDecorationLine: 'underline',
+  },
+  loginLink: {
+    alignItems: 'center',
+  },
+  loginLinkText: {
+    fontSize: 15,
+    color: '#6c757d',
+  },
+  loginLinkBold: {
+    color: '#007AFF',
+    fontWeight: '700',
   },
   messageBox: {
-    padding: 12,
-    borderRadius: 6,
-    marginBottom: 20,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
     borderWidth: 1,
   },
   successBox: {
@@ -323,5 +471,6 @@ const styles = StyleSheet.create({
   messageText: {
     textAlign: 'center',
     fontSize: 14,
+    color: '#155724',
   },
 });

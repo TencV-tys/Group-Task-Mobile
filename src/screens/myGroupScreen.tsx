@@ -1,336 +1,173 @@
-// src/screens/MyGroupsScreen.tsx - UPDATED VERSION
+// src/screens/ProfileScreen.tsx - UPDATED FOR CONSISTENCY
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   SafeAreaView,
-  ActivityIndicator,
-  RefreshControl,
+  ScrollView,
   Alert,
-  Share
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
-import { useMyGroups } from '../groupHook/useMyGroups';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { AuthService } from '../authServices/AuthService';
 
-export default function MyGroupsScreen({ navigation }: any) {
-  const { 
-    groups, 
-    loading, 
-    refreshing, 
-    error,
-    fetchGroups, 
-    refreshGroups, 
-    addGroup 
-  } = useMyGroups();
+export default function ProfileScreen({ navigation }: any) {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const loadUserData = async () => {
+    try {
+      const userData = await AuthService.getCurrentUser();
+      console.log('Loaded user data:', userData);
+      setUser(userData);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    fetchGroups();
+    loadUserData();
   }, []);
 
-  const handleCreateGroup = () => {
-    navigation.navigate('CreateGroup', {
-      onGroupCreated: (newGroup: any) => {
-        addGroup({
-          id: newGroup.id,
-          name: newGroup.name,
-          description: newGroup.description,
-          inviteCode: newGroup.inviteCode,
-          createdAt: newGroup.createdAt,
-          createdById: newGroup.createdById,
-          userRole: 'ADMIN',
-          memberCount: 1,
-          taskCount: 0
-        });
-        Alert.alert('Success!', 'Group created successfully');
-      }
-    });
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadUserData();
   };
 
-  const handleJoinGroup = () => {
-    navigation.navigate('JoinGroup', {
-      onGroupJoined: (newGroup: any) => {
-        addGroup({
-          id: newGroup.id,
-          name: newGroup.name,
-          description: newGroup.description,
-          inviteCode: newGroup.inviteCode,
-          createdAt: newGroup.createdAt,
-          createdById: newGroup.createdById,
-          userRole: 'MEMBER',
-          memberCount: newGroup.memberCount || 1,
-          taskCount: newGroup.taskCount || 0
-        });
-        Alert.alert('Success!', 'Joined group successfully');
-      }
-    });
-  };
-
-  const handleGroupPress = (group: any) => {
-    navigation.navigate('GroupTasks', { 
-      groupId: group.id,
-      groupName: group.name,
-      userRole: group.userRole || group.role || 'MEMBER'
-    });
-  };
-
-  // Updated: Manage button now goes to GroupMembersScreen
-  const handleManageGroup = (group: any) => {
-    navigation.navigate('GroupMembers', { 
-      groupId: group.id,
-      groupName: group.name,
-      userRole: group.userRole || group.role || 'MEMBER',
-      inviteCode: group.inviteCode
-    });
-  };
-
-  // Updated: Invite button shows invite code
-  const handleInviteGroup = (group: any) => {
+  const handleLogout = () => {
     Alert.alert(
-      'Invite Code',
-      `Share this code to invite members:\n\n📋 ${group.inviteCode || 'No invite code available'}`,
+      'Logout',
+      'Are you sure you want to logout?',
       [
-        { text: 'Copy', onPress: () => {/* Copy to clipboard */} }, 
-        { text: 'Share', onPress: () => handleShareInvite(group) },
-        { text: 'OK' }
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: performLogout
+        }
       ]
     );
   };
 
-  const handleShareInvite = (group: any) => {
-    const code = group.inviteCode;
-    if (!code) {
-      Alert.alert('Error', 'No invite code available');
-      return;
+  const performLogout = async () => {
+    try {
+      const result = await AuthService.logout();
+      
+      if (result.success) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      } else {
+        Alert.alert('Error', result.message || 'Logout failed');
+      }
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
     }
-
-    Share.share({
-      message: `Join my group "${group.name}" on Group Task! Use invite code: ${code}`,
-      title: `Join ${group.name}`
-    }).catch((err:any) => console.error('Error sharing:', err));
   };
 
-  const handleTasksGroup = (group: any) => {
-    navigation.navigate('GroupTasks', { 
-      groupId: group.id,
-      groupName: group.name,
-      userRole: group.userRole || group.role || 'MEMBER'
-    });
+  const handleAccountSettings = () => {
+    navigation.navigate('AccountSettings');
   };
 
-  const filteredGroups = groups.filter(group => 
-    group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    group.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleNotifications = () => {
+    navigation.navigate('Notifications');
+  };
 
-  const renderGroup = ({ item }: any) => {
-    const groupName = item.name || 'Unnamed Group';
-    const userRole = item.userRole || item.role || 'MEMBER';
-    const isAdmin = userRole === 'ADMIN';
-    
+  const handleHelpSupport = () => {
+    navigation.navigate('HelpSupport');
+  };
+
+  const handlePrivacyPolicy = () => {
+    navigation.navigate('PrivacyPolicy');
+  };
+
+  const handleTermsOfService = () => {
+    navigation.navigate('TermsOfService');
+  };
+
+  if (loading) {
     return (
-      <TouchableOpacity 
-        style={styles.groupCard}
-        onPress={() => handleGroupPress(item)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.groupHeader}>
-          <View style={styles.groupIconContainer}>
-            <View style={[
-              styles.groupIcon,
-              { backgroundColor: isAdmin ? '#007AFF' : '#6c757d' }
-            ]}>
-              <Text style={styles.groupIconText}>{groupName.charAt(0).toUpperCase()}</Text>
-            </View>
-            {isAdmin && (
-              <View style={styles.adminBadge}>
-                <MaterialCommunityIcons name="crown" size={12} color="#FFD700" />
-              </View>
-            )}
-          </View>
-          
-          <View style={styles.groupMainInfo}>
-            <View style={styles.groupTitleRow}>
-              <Text style={styles.groupName} numberOfLines={1}>{groupName}</Text>
-              <Text style={[styles.groupRole, isAdmin && styles.adminRoleText]}>
-                {isAdmin ? 'Admin' : 'Member'}
-              </Text>
-            </View>
-            
-            {item.description ? (
-              <Text style={styles.groupDescription} numberOfLines={2}>
-                {item.description}
-              </Text>
-            ) : (
-              <Text style={styles.groupNoDescription}>No description</Text>
-            )}
-            
-            <View style={styles.groupQuickStats}>
-              <View style={styles.statItem}>
-                <MaterialCommunityIcons name="account-group" size={16} color="#6c757d" />
-                <Text style={styles.statText}>{item.memberCount || 1}</Text>
-              </View>
-              <View style={styles.statItem}>
-                <MaterialCommunityIcons name="clipboard-check" size={16} color="#6c757d" />
-                <Text style={styles.statText}>{item.taskCount || 0}</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-        
-        <View style={styles.groupActions}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleInviteGroup(item);
-            }}
-          >
-            <MaterialCommunityIcons name="account-plus" size={18} color="#007AFF" />
-            <Text style={styles.actionButtonText}>Invite</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleTasksGroup(item);
-            }}
-          >
-            <MaterialCommunityIcons name="clipboard-text" size={18} color="#28a745" />
-            <Text style={styles.actionButtonText}>Tasks</Text>
-          </TouchableOpacity>
-          
-          {isAdmin && (
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleManageGroup(item);
-              }}
-            >
-              <MaterialCommunityIcons name="cog" size={18} color="#6c757d" />
-              <Text style={styles.actionButtonText}>Manage</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const renderContent = () => {
-    if (loading && !refreshing) {
-      return (
+      <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading your groups...</Text>
+          <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
-      );
-    }
-
-    if (error) {
-      return (
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={60} color="#fa5252" />
-          </View>
-          <Text style={styles.emptyTitle}>Error Loading Groups</Text>
-          <Text style={styles.emptySubtext}>{error}</Text>
-          <View style={styles.emptyActions}>
-            <TouchableOpacity 
-              style={styles.primaryButton}
-              onPress={() => fetchGroups()}
-            >
-              <MaterialCommunityIcons name="refresh" size={20} color="white" />
-              <Text style={styles.primaryButtonText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
-    }
-
-    return (
-      <FlatList
-        data={filteredGroups}
-        renderItem={renderGroup}
-        keyExtractor={(item) => item.id}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={refreshGroups}
-            colors={['#007AFF']}
-            tintColor="#007AFF"
-          />
-        }
-        ListHeaderComponent={
-          <View style={styles.listHeader}>
-            <Text style={styles.listHeaderTitle}>
-              {groups.length} {groups.length === 1 ? 'Group' : 'Groups'}
-            </Text>
-            {searchQuery ? (
-              <Text style={styles.listHeaderSubtitle}>
-                Showing {filteredGroups.length} result{filteredGroups.length !== 1 ? 's' : ''}
-              </Text>
-            ) : null}
-          </View>
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-              <MaterialCommunityIcons name="account-group" size={60} color="#dee2e6" />
-            </View>
-            <Text style={styles.emptyTitle}>No Groups Yet</Text>
-            <Text style={styles.emptySubtext}>
-              Create your first group to organize tasks with friends or family
-            </Text>
-            <View style={styles.emptyActions}>
-              <TouchableOpacity 
-                style={styles.primaryButton}
-                onPress={handleCreateGroup}
-              >
-                <MaterialCommunityIcons name="plus" size={20} color="white" />
-                <Text style={styles.primaryButtonText}>Create Group</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.secondaryButton}
-                onPress={handleJoinGroup}
-              >
-                <MaterialCommunityIcons name="login" size={20} color="#007AFF" />
-                <Text style={styles.secondaryButtonText}>Join Group</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        }
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
+      </SafeAreaView>
     );
-  };
+  }
+
+  if (!user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Profile</Text>
+            <Text style={styles.subtitle}>User information</Text>
+          </View>
+          
+          <View style={styles.refreshButton}>
+            <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
+          </View>
+        </View>
+
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons name="account-off" size={64} color="#FF3B30" />
+          <Text style={styles.errorText}>No user data found</Text>
+          <Text style={styles.errorSubText}>
+            Please login again to view your profile
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.primaryButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <MaterialCommunityIcons name="login" size={20} color="white" />
+            <Text style={styles.primaryButtonText}>Go to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header - Consistent with CreateTaskScreen */}
+      {/* Header - Consistent with MyGroupsScreen */}
       <View style={styles.header}>
         <TouchableOpacity 
-          onPress={() => navigation.goBack()} 
+          onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>My Groups</Text>
+          <Text style={styles.title}>Profile</Text>
           <Text style={styles.subtitle}>
-            {groups.length} {groups.length === 1 ? 'group' : 'groups'}
+            {user.fullName || 'User'}
           </Text>
         </View>
         
         <TouchableOpacity 
-          onPress={refreshGroups}
+          onPress={onRefresh}
           disabled={refreshing}
           style={styles.refreshButton}
         >
@@ -342,25 +179,178 @@ export default function MyGroupsScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Quick Actions Bar - Consistent with CreateTaskScreen */}
-      <View style={styles.quickActions}>
-        <TouchableOpacity 
-          style={[styles.quickAction, styles.createAction]}
-          onPress={handleCreateGroup}
-        >
-          <MaterialCommunityIcons name="plus-circle" size={20} color="white" />
-          <Text style={styles.quickActionText}>Create</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.quickAction, styles.joinAction]}
-          onPress={handleJoinGroup}
-        >
-          <MaterialCommunityIcons name="login" size={20} color="white" />
-          <Text style={styles.quickActionText}>Join</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Profile Header Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarText}>
+                {user.fullName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
+              </Text>
+            </View>
+            <View style={styles.avatarBadge}>
+              <MaterialCommunityIcons name="check-decagram" size={16} color="#007AFF" />
+            </View>
+          </View>
+          
+          <Text style={styles.userName}>{user.fullName || 'User'}</Text>
+          <Text style={styles.userEmail}>{user.email || 'No email'}</Text>
+          
+          <View style={styles.userStats}>
+            <View style={styles.statItem}>
+              <MaterialCommunityIcons name="account" size={16} color="#6c757d" />
+              <Text style={styles.statText}>
+                {user.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1).toLowerCase() : 'Not set'}
+              </Text>
+            </View>
+            
+            <View style={styles.statDivider} />
+            
+            <View style={styles.statItem}>
+              <MaterialCommunityIcons name="shield-account" size={16} color="#6c757d" />
+              <Text style={styles.statText}>{user.role || 'Member'}</Text>
+            </View>
+            
+            {user.createdAt && (
+              <>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <MaterialCommunityIcons name="calendar" size={16} color="#6c757d" />
+                  <Text style={styles.statText}>
+                    Joined {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
 
-      {renderContent()}
+        {/* Account Settings Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Account Settings</Text>
+          
+          <View style={styles.menuCard}>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handleAccountSettings}
+              activeOpacity={0.7}
+            >
+              <View style={styles.menuItemLeft}>
+                <MaterialCommunityIcons name="account-cog" size={22} color="#007AFF" />
+                <Text style={styles.menuText}>Account Settings</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+            </TouchableOpacity>
+            
+            <View style={styles.divider} />
+            
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handleNotifications}
+              activeOpacity={0.7}
+            >
+              <View style={styles.menuItemLeft}>
+                <MaterialCommunityIcons name="bell" size={22} color="#FF9500" />
+                <Text style={styles.menuText}>Notifications</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Support Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Support & Legal</Text>
+          
+          <View style={styles.menuCard}>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handleHelpSupport}
+              activeOpacity={0.7}
+            >
+              <View style={styles.menuItemLeft}>
+                <MaterialCommunityIcons name="help-circle" size={22} color="#FF3B30" />
+                <Text style={styles.menuText}>Help & Support</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+            </TouchableOpacity>
+            
+            <View style={styles.divider} />
+            
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handlePrivacyPolicy}
+              activeOpacity={0.7}
+            >
+              <View style={styles.menuItemLeft}>
+                <MaterialCommunityIcons name="shield" size={22} color="#4CD964" />
+                <Text style={styles.menuText}>Privacy Policy</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+            </TouchableOpacity>
+            
+            <View style={styles.divider} />
+            
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handleTermsOfService}
+              activeOpacity={0.7}
+            >
+              <View style={styles.menuItemLeft}>
+                <MaterialCommunityIcons name="file-document" size={22} color="#6c757d" />
+                <Text style={styles.menuText}>Terms of Service</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* App Info Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About</Text>
+          
+          <View style={styles.infoCard}>
+            <View style={styles.appInfo}>
+              <MaterialCommunityIcons name="checkbox-multiple-marked-circle" size={24} color="#007AFF" />
+              <View style={styles.appInfoText}>
+                <Text style={styles.appName}>Group Task</Text>
+                <Text style={styles.appDescription}>Flexible task management for any group</Text>
+              </View>
+            </View>
+            
+            <View style={styles.appDetails}>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Version</Text>
+                <Text style={styles.detailValue}>1.0.0</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Build</Text>
+                <Text style={styles.detailValue}>2024.01</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Platform</Text>
+                <Text style={styles.detailValue}>React Native</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Logout Button */}
+        <TouchableOpacity 
+          style={styles.logoutButton}
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
+          <MaterialCommunityIcons name="logout" size={20} color="#fff" />
+          <Text style={styles.logoutButtonText}>Logout</Text>
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -370,7 +360,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  // Header - Consistent with CreateTaskScreen
+  // Header - Consistent with MyGroupsScreen
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -420,215 +410,41 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#f1f3f5',
   },
-  // Quick Actions - Consistent with CreateTaskScreen
-  quickActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    gap: 8,
+  // Scroll Content
+  scrollContent: {
+    paddingBottom: 24,
   },
-  quickAction: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  createAction: {
-    backgroundColor: '#007AFF',
-  },
-  joinAction: {
-    backgroundColor: '#28a745',
-  },
-  quickActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
-  },
-  // Rest of the styles remain the same
-  listContent: {
-    padding: 16,
-  },
-  listHeader: {
-    marginBottom: 16,
-  },
-  listHeaderTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  listHeaderSubtitle: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginTop: 4,
-  },
-  groupCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  groupHeader: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  groupIconContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  groupIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  groupIconText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  adminBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  groupMainInfo: {
-    flex: 1,
-  },
-  groupTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  groupName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    flex: 1,
-    marginRight: 8,
-  },
-  groupRole: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6c757d',
-    backgroundColor: '#f1f3f5',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  adminRoleText: {
-    color: '#1971c2',
-    backgroundColor: '#e7f5ff',
-  },
-  groupDescription: {
-    fontSize: 14,
-    color: '#495057',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  groupNoDescription: {
-    fontSize: 14,
-    color: '#adb5bd',
-    fontStyle: 'italic',
-    marginBottom: 8,
-  },
-  groupQuickStats: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statText: {
-    fontSize: 14,
-    color: '#495057',
-    fontWeight: '500',
-  },
-  groupActions: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
-    paddingTop: 12,
-    gap: 8,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    borderRadius: 6,
-    backgroundColor: '#f8f9fa',
-  },
-  actionButtonText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#495057',
-  },
+  // Loading & Error States
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingBottom: 100,
   },
   loadingText: {
     fontSize: 16,
     color: '#6c757d',
-    marginTop: 12,
+    marginTop: 16,
   },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 60,
-  },
-  emptyIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#f8f9fa',
+  errorContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    padding: 40,
+    marginTop: 100,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 8,
+  errorText: {
+    fontSize: 18,
+    color: '#FF3B30',
     textAlign: 'center',
+    marginVertical: 10,
+    fontWeight: '600',
   },
-  emptySubtext: {
+  errorSubText: {
     fontSize: 14,
     color: '#6c757d',
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20,
-  },
-  emptyActions: {
-    flexDirection: 'row',
-    gap: 12,
+    marginBottom: 20,
   },
   primaryButton: {
     flexDirection: 'row',
@@ -646,20 +462,198 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'white',
   },
-  secondaryButton: {
+  // Profile Card
+  profileCard: {
+    backgroundColor: 'white',
+    margin: 16,
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  avatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  avatarBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  userName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#212529',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  userEmail: {
+    fontSize: 16,
+    color: '#6c757d',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  userStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 12,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  statText: {
+    fontSize: 12,
+    color: '#6c757d',
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#dee2e6',
+  },
+  // Sections
+  section: {
+    paddingHorizontal: 16,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 12,
+    paddingLeft: 4,
+  },
+  // Menu Cards
+  menuCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  menuText: {
+    fontSize: 16,
+    color: '#212529',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#f1f3f5',
+    marginLeft: 48,
+  },
+  // App Info Card
+  infoCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  appInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  appInfoText: {
+    flex: 1,
+  },
+  appName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 2,
+  },
+  appDescription: {
+    fontSize: 14,
+    color: '#6c757d',
+  },
+  appDetails: {
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+    paddingTop: 12,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  detailLabel: {
+    fontSize: 14,
+    color: '#6c757d',
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#212529',
+    fontWeight: '500',
+  },
+  // Logout Button
+  logoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#f1f3f5',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 140,
+    backgroundColor: '#FF3B30',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    paddingVertical: 16,
+    borderRadius: 12,
   },
-  secondaryButtonText: {
-    fontSize: 14,
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: '600',
-    color: '#007AFF',
   },
 });

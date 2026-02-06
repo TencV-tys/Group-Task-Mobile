@@ -14,7 +14,7 @@ import UpdateTaskScreen from '../screens/UpdateTaskScreen';
 import GroupMembersScreen from '../screens/GroupMembersScreen';
 import TaskDetailsScreen from '../screens/TaskDetailsScreen';
 import TaskAssignmentScreen from '../screens/TaskAssignmentScreen';
-
+import RotationScheduleScreen from '../screens/RotationScheduleScreen';
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
@@ -89,15 +89,7 @@ export default function AppNavigator() {
         name="Profile" 
         component={ProfileScreen}
         options={{ 
-          headerShown: true,
-          title: 'Profile',
-          headerStyle: {
-            backgroundColor: '#007AFF',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
+          headerShown: false
         }}
       />
        
@@ -113,14 +105,21 @@ export default function AppNavigator() {
   name="TaskDetails" 
   component={TaskDetailsScreen}
   options={{ headerShown: false }}
-/>
+/> 
 
 <Stack.Screen 
   name="TaskAssignment" 
   component={TaskAssignmentScreen}
   options={{ headerShown:false }}
 />
-
+<Stack.Screen 
+  name="RotationSchedule" 
+  component={RotationScheduleScreen}
+  options={{ 
+    headerShown: false,
+    title: 'Rotation Schedule'
+  }}
+/>
     </Stack.Navigator>
   );
 }

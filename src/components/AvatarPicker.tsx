@@ -221,13 +221,13 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     marginTop: 8,
   },
-  removeButton: {
-    position: 'absolute',
+  removeButton: { 
+    position: 'absolute', 
     top: -5,
     right: '35%',
     backgroundColor: 'white',
     width: 30,
-    height: 30,
+    height: 30,   
     borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',

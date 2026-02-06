@@ -184,4 +184,104 @@ export class UploadService {
       };
     }
   }
+
+  
+
+// Upload group avatar from base64
+static async uploadGroupAvatarBase64(groupId: string, base64Image: string): Promise<UploadResponse> {
+  try {
+    console.log('📤 Uploading group avatar from base64 for group:', groupId);
+    
+    let processedBase64 = base64Image;
+    if (!base64Image.startsWith('data:')) {
+      processedBase64 = `data:image/jpeg;base64,${base64Image}`;
+    }
+
+    const response = await fetch(`${API_URL}/group/${groupId}/avatar/base64`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ avatarBase64: processedBase64 }),
+      credentials: 'include',
+    });
+
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('❌ Base64 group avatar upload error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to upload group avatar'
+    };
+  }
+}
+
+static async uploadGroupAvatar(groupId: string, fileUri: string): Promise<UploadResponse> {
+  try {
+    console.log('📤 Uploading group avatar for group:', groupId);
+    
+    const formData = new FormData();
+    
+    const filename = fileUri.split('/').pop() || 'group-avatar.jpg';
+    
+    const getMimeType = (uri: string): string => {
+      const extension = uri.split('.').pop()?.toLowerCase();
+      return extension === 'png' ? 'image/png' : 'image/jpeg';
+    };
+
+    const mimeType = getMimeType(fileUri);
+    
+    formData.append('file', {
+      uri: fileUri,
+      type: mimeType,
+      name: filename,
+    } as any);
+
+    formData.append('uploadType', 'group_avatar'); // Changed from 'avatar'
+
+    const response = await fetch(`${API_URL}/group/${groupId}/avatar`, {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+    });
+
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('❌ Group avatar upload error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to upload group avatar'
+    };
+  }
+}
+
+// Add deleteGroupAvatar method
+static async deleteGroupAvatar(groupId: string): Promise<UploadResponse> {
+  try {
+    console.log('🗑️ Deleting group avatar for group:', groupId);
+    
+    const response = await fetch(`${API_URL}/group/${groupId}/avatar`, {
+      method: 'DELETE',
+      credentials: 'include',
+    });
+
+    const result = await response.json();
+    console.log('📥 Delete group avatar response:', result);
+    
+    return result;
+
+  } catch (error: any) {
+    console.error('❌ Delete group avatar error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to delete group avatar'
+    };
+  }
+}
+
+
 }

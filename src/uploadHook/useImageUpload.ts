@@ -13,7 +13,7 @@ export const useImageUpload = ({ onSuccess, onError }: UseImageUploadProps = {})
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
 
-  // Request permissions
+  // Request permissions 
   const requestPermissions = async (): Promise<boolean> => {
     if (Platform.OS === 'web') {
       return true;
@@ -171,6 +171,67 @@ export const useImageUpload = ({ onSuccess, onError }: UseImageUploadProps = {})
     }
   };
 
+  const uploadGroupAvatar = async (groupId: string, image: ImagePicker.ImagePickerAsset) => {
+  try {
+    setUploading(true);
+    setProgress(0);
+
+    let result;
+    
+    // Use base64 for smaller images or file upload for larger ones
+    if (image.base64 && image.base64.length < 2000000) {
+      console.log('📤 Using base64 upload for group avatar');
+      result = await UploadService.uploadGroupAvatarBase64(groupId, image.base64);
+    } else {
+      console.log('📤 Using file upload for group avatar');
+      result = await UploadService.uploadGroupAvatar(groupId, image.uri);
+    }
+
+    setProgress(100);
+
+    if (result.success) {
+      onSuccess?.(result);
+      return result;
+    } else {
+      throw new Error(result.message);
+    }
+  } catch (error: any) {
+    console.error('❌ Group avatar upload error:', error);
+    onError?.(error);
+    Alert.alert('Upload Failed', error.message || 'Failed to upload group avatar');
+    return { success: false, message: error.message };
+  } finally {
+    setUploading(false);
+  }
+};
+
+// Delete group avatar
+const deleteGroupAvatar = async (groupId: string) => {
+  try {
+    setUploading(true);
+    
+    const result = await UploadService.deleteGroupAvatar(groupId);
+
+    if (result.success) {
+      onSuccess?.(result);
+      return result;
+    } else {
+      throw new Error(result.message);
+    }
+  } catch (error: any) {
+    console.error('❌ Delete group avatar error:', error);
+    onError?.(error);
+    Alert.alert('Delete Failed', error.message || 'Failed to delete group avatar');
+    return { success: false, message: error.message };
+  } finally {
+    setUploading(false);
+  }
+};
+
+
+
+
+
   return {
     uploading,
     progress,
@@ -180,5 +241,7 @@ export const useImageUpload = ({ onSuccess, onError }: UseImageUploadProps = {})
     uploadTaskPhoto,
     deleteAvatar,
     requestPermissions,
+    uploadGroupAvatar,
+    deleteGroupAvatar
   };
 };

@@ -316,6 +316,55 @@ static async updateGroup(groupId: string, groupData: { name?: string, descriptio
   }
 }
 
+// Upload group avatar - use the upload service endpoint
+static async uploadGroupAvatar(groupId: string, base64Image: string) {
+  try {
+    console.log(`GroupMembersService: Uploading avatar for group ${groupId}`);
+    
+    // Use the upload service endpoint
+    const response = await fetch(`${API_BASE_URL}/api/uploads/group/${groupId}/avatar/base64`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ avatarBase64: base64Image }),
+      credentials: 'include'
+    });
 
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('GroupMembersService.uploadGroupAvatar error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to upload group avatar'
+    };
+  }
+}
+
+// Delete group avatar - use the upload service endpoint
+static async deleteGroupAvatar(groupId: string) {
+  try {
+    console.log(`GroupMembersService: Deleting avatar for group ${groupId}`);
+    
+    // Use the upload service endpoint
+    const response = await fetch(`${API_BASE_URL}/api/uploads/group/${groupId}/avatar`, {
+      method: 'DELETE',
+      credentials: 'include'
+    });
+
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) { 
+    console.error('GroupMembersService.deleteGroupAvatar error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to delete group avatar'
+    };
+  }
+}
 
 } 

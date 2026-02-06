@@ -14,19 +14,20 @@ import {
   ScrollView,
   Dimensions,
   Modal,
-  TextInput
+  TextInput,
+  Image
 } from 'react-native';
 import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useGroupMembers } from '../groupHook/useGroupMembers';
+import { useImageUpload } from '../uploadHook/useImageUpload';
 
 const { width } = Dimensions.get('window');
 
 export default function GroupMembersScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole, inviteCode } = route.params || {};
   
-  // Use the custom hook
   const {
     loading,
     refreshing,
@@ -34,6 +35,8 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     members,
     groupInfo,
     fetchGroupMembers,
+    updateGroupAvatar,
+    removeGroupAvatar,
     setMembers
   } = useGroupMembers();
 
@@ -45,6 +48,25 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     description: ''
   });
   const [savingGroup, setSavingGroup] = useState(false);
+  
+  // Avatar upload hook - for group avatars
+  const {
+    uploading: uploadingAvatar,
+    pickImageFromGallery,
+    takePhotoWithCamera,
+    uploadGroupAvatar,
+    deleteGroupAvatar: deleteGroupAvatarHook
+  } = useImageUpload({
+    onSuccess: (result) => {
+      if (result.success && result.data?.avatarUrl) {
+        updateGroupAvatar(result.data.avatarUrl);
+        Alert.alert('Success', 'Group avatar updated successfully');
+      }
+    },
+    onError: (error) => {
+      Alert.alert('Error', 'Failed to upload avatar: ' + error.message);
+    }
+  });
 
   // Get current user ID from AsyncStorage
   useEffect(() => {
@@ -149,6 +171,77 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     }
   };
 
+  // Handle group avatar selection
+  const handleGroupAvatarSelect = async () => {
+    if (currentUserRole !== 'ADMIN') return;
+    
+    Alert.alert(
+      'Group Avatar',
+      'Choose an option',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Take Photo', onPress: handleTakeGroupPhoto },
+        { text: 'Choose from Gallery', onPress: handleChooseGroupPhoto },
+        groupInfo?.avatarUrl && { 
+          text: 'Remove Avatar', 
+          style: 'destructive', 
+          onPress: handleRemoveGroupAvatar 
+        },
+      ].filter(Boolean) as any
+    );
+  };
+
+  const handleTakeGroupPhoto = async () => {
+    try {
+      const photo = await takePhotoWithCamera();
+      if (photo) {
+        // Upload the photo using uploadGroupAvatar
+        await uploadGroupAvatar(groupId, photo);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to take photo: ' + err.message);
+    }
+  };
+
+  const handleChooseGroupPhoto = async () => {
+    try {
+      const photo = await pickImageFromGallery();
+      if (photo) {
+        // Upload the photo using uploadGroupAvatar
+        await uploadGroupAvatar(groupId, photo);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', 'Failed to choose photo: ' + err.message);
+    }
+  };
+
+  const handleRemoveGroupAvatar = async () => {
+    Alert.alert(
+      'Remove Avatar',
+      'Are you sure you want to remove the group avatar?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Remove', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await GroupMembersService.deleteGroupAvatar(groupId);
+              if (result.success) {
+                removeGroupAvatar();
+                Alert.alert('Success', 'Avatar removed');
+              } else {
+                Alert.alert('Error', result.message);
+              }
+            } catch (err: any) {
+              Alert.alert('Error', 'Failed to remove avatar: ' + err.message);
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleRemoveMember = async (member: any) => {
     // Check if it's the current user
     if (member.userId === currentUserId) {
@@ -233,10 +326,10 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               Alert.alert('Error', err.message || 'Failed to update role');
             }
           }
-        }
+        } 
       ]
-    );
-  }; 
+    );   
+  };  
 
   const handleLeaveGroup = () => {
     // Check if user is the only admin
@@ -303,14 +396,35 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
     return (
       <View key={member.id} style={[styles.avatarContainer, { left: index * (avatarSize + overlap) }]}>
-        <View style={[
-          styles.avatar,
-          { backgroundColor: member.role === 'ADMIN' ? '#007AFF' : '#6c757d' }
-        ]}>
-          <Text style={styles.avatarText}>
-            {member.fullName?.charAt(0)?.toUpperCase() || 'U'}
-          </Text>
-        </View>
+        {member.avatarUrl ? (
+          <Image
+            source={{ uri: member.avatarUrl }}
+            style={[
+              styles.avatar,
+              styles.avatarImage,
+              { 
+                width: avatarSize, 
+                height: avatarSize, 
+                borderRadius: avatarSize / 2,
+                borderWidth: 2,
+                borderColor: member.role === 'ADMIN' ? '#FFD700' : '#fff'
+              }
+            ]}
+          />
+        ) : (
+          <View style={[
+            styles.avatar,
+            { 
+              backgroundColor: member.role === 'ADMIN' ? '#007AFF' : '#6c757d',
+              borderWidth: 2,
+              borderColor: member.role === 'ADMIN' ? '#FFD700' : '#fff'
+            }
+          ]}>
+            <Text style={styles.avatarText}>
+              {member.fullName?.charAt(0)?.toUpperCase() || 'U'}
+            </Text>
+          </View>
+        )}
         {member.role === 'ADMIN' && (
           <View style={styles.adminCrown}>
             <MaterialCommunityIcons name="crown" size={12} color="#FFD700" />
@@ -329,14 +443,28 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     return (
       <View style={styles.memberCard}>
         <View style={styles.memberInfo}>
-          <View style={[
-            styles.memberAvatar,
-            { backgroundColor: item.role === 'ADMIN' ? '#007AFF' : '#6c757d' }
-          ]}>
-            <Text style={styles.memberAvatarText}>
-              {item.fullName?.charAt(0)?.toUpperCase() || 'U'}
-            </Text>
-          </View>
+          {item.avatarUrl ? (
+            <Image
+              source={{ uri: item.avatarUrl }}
+              style={[
+                styles.memberAvatar,
+                styles.memberAvatarImage,
+                { 
+                  borderWidth: 2,
+                  borderColor: item.role === 'ADMIN' ? '#FFD700' : '#e9ecef'
+                }
+              ]}
+            />
+          ) : (
+            <View style={[
+              styles.memberAvatar,
+              { backgroundColor: item.role === 'ADMIN' ? '#007AFF' : '#6c757d' }
+            ]}>
+              <Text style={styles.memberAvatarText}>
+                {item.fullName?.charAt(0)?.toUpperCase() || 'U'}
+              </Text>
+            </View>
+          )}
           <View style={styles.memberDetails}>
             <View style={styles.memberHeader}>
               <Text style={styles.memberName}>
@@ -448,12 +576,39 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             {members.slice(0, 7).map((member, index) => renderAvatar(member, index))}
           </View>
           
-          {/* Group Info */}
-          <View style={styles.groupInfoContainer}>
-            <View style={styles.groupMainAvatar}>
-              <Text style={styles.groupAvatarText}>
-                {groupInfo?.name?.charAt(0) || groupName?.charAt(0) || 'G'}
-              </Text>
+          {/* Group Info with Editable Avatar */}
+          <TouchableOpacity 
+            onPress={() => currentUserRole === 'ADMIN' && handleGroupAvatarSelect()}
+            disabled={currentUserRole !== 'ADMIN'}
+            style={styles.groupInfoContainer}
+          >
+            <View style={styles.groupAvatarContainer}>
+              {uploadingAvatar ? (
+                <View style={[styles.groupMainAvatar, styles.uploadingAvatar]}>
+                  <ActivityIndicator size="small" color="#007AFF" />
+                </View>
+              ) : groupInfo?.avatarUrl ? (
+                <Image
+                  source={{ uri: groupInfo.avatarUrl }}
+                  style={[styles.groupMainAvatar, styles.groupAvatarImage]}
+                />
+              ) : (
+                <View style={styles.groupMainAvatar}>
+                  <Text style={styles.groupAvatarText}>
+                    {groupInfo?.name?.charAt(0) || groupName?.charAt(0) || 'G'}
+                  </Text>
+                </View>
+              )}
+              
+              {currentUserRole === 'ADMIN' && !uploadingAvatar && (
+                <View style={styles.editAvatarIcon}>
+                  <MaterialCommunityIcons 
+                    name="camera-plus" 
+                    size={18} 
+                    color="#fff" 
+                  />
+                </View>
+              )}
             </View>
             
             <View style={styles.groupTextInfo}>
@@ -472,7 +627,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 </View>
               </View>
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Admin Actions */}
           {currentUserRole === 'ADMIN' && (
@@ -606,14 +761,52 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             </View>
 
             <ScrollView style={styles.modalBody}>
-              {/* Group Initial */}
+              {/* Group Avatar Edit Section */}
               <View style={styles.avatarEditSection}>
-                <View style={styles.editAvatar}>
-                  <Text style={styles.editAvatarText}>
-                    {editingGroup.name?.charAt(0) || groupInfo?.name?.charAt(0) || 'G'}
-                  </Text>
-                </View>
-                <Text style={styles.avatarNote}>Group initial</Text>
+                <TouchableOpacity 
+                  onPress={() => {
+                    setShowEditModal(false);
+                    setTimeout(() => handleGroupAvatarSelect(), 300);
+                  }}
+                  disabled={uploadingAvatar}
+                >
+                  {uploadingAvatar ? (
+                    <View style={[styles.editAvatar, styles.uploadingAvatar]}>
+                      <ActivityIndicator size="small" color="#007AFF" />
+                    </View>
+                  ) : groupInfo?.avatarUrl ? (
+                    <Image
+                      source={{ uri: groupInfo.avatarUrl }}
+                      style={[styles.editAvatar, styles.editAvatarImage]}
+                    />
+                  ) : (
+                    <View style={styles.editAvatar}>
+                      <MaterialCommunityIcons name="camera-plus" size={32} color="#fff" />
+                    </View>
+                  )}
+                  
+                  {!uploadingAvatar && (
+                    <View style={styles.editAvatarOverlay}>
+                      <MaterialCommunityIcons name="pencil" size={16} color="#fff" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <Text style={styles.avatarNote}>
+                  Tap to change group avatar
+                </Text>
+                
+                {groupInfo?.avatarUrl && (
+                  <TouchableOpacity 
+                    style={styles.removeAvatarButton}
+                    onPress={() => {
+                      setShowEditModal(false);
+                      setTimeout(() => handleRemoveGroupAvatar(), 300);
+                    }}
+                  >
+                    <MaterialCommunityIcons name="trash-can" size={16} color="#fa5252" />
+                    <Text style={styles.removeAvatarText}>Remove Avatar</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Name Field */}
@@ -735,8 +928,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
-    backgroundColor: '#007AFF'
+    borderColor: '#fff'
+  },
+  avatarImage: {
+    backgroundColor: 'transparent',
   },
   moreAvatar: {
     backgroundColor: '#6c757d'
@@ -766,19 +961,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20
   },
+  groupAvatarContainer: {
+    position: 'relative',
+    marginRight: 16
+  },
   groupMainAvatar: {
     width: 80,
     height: 80,
     borderRadius: 40,
     backgroundColor: '#007AFF',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16
+    alignItems: 'center'
+  },
+  groupAvatarImage: {
+    backgroundColor: 'transparent',
+    borderWidth: 3,
+    borderColor: '#007AFF'
   },
   groupAvatarText: {
     color: '#fff',
     fontSize: 32,
     fontWeight: 'bold'
+  },
+  uploadingAvatar: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa'
+  },
+  editAvatarIcon: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    backgroundColor: '#007AFF',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff'
   },
   groupTextInfo: {
     flex: 1
@@ -937,6 +1158,9 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center'
+  },
+  memberAvatarImage: {
+    backgroundColor: 'transparent'
   },
   memberAvatarText: {
     color: '#fff',
@@ -1138,22 +1362,44 @@ const styles = StyleSheet.create({
     marginBottom: 24
   },
   editAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: '#007AFF',
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8
+    alignItems: 'center'
   },
-  editAvatarText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: 'bold'
+  editAvatarImage: {
+    backgroundColor: 'transparent',
+    borderWidth: 3,
+    borderColor: '#007AFF'
+  },
+  editAvatarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   avatarNote: {
     fontSize: 14,
-    color: '#6c757d'
+    color: '#6c757d',
+    marginTop: 8
+  },
+  removeAvatarButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    padding: 8
+  },
+  removeAvatarText: {
+    fontSize: 14,
+    color: '#fa5252'
   },
   inputGroup: {
     marginBottom: 20

@@ -1,4 +1,4 @@
-// src/screens/GroupTasksScreen.tsx - UPDATED VERSION
+// src/screens/GroupTasksScreen.tsx - COMPLETE UPDATED VERSION
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -11,13 +11,13 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
-  StatusBar,
-  Platform
+  StatusBar
 } from 'react-native';
 import { TaskService } from '../taskServices/TaskService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { SettingsModal } from '../components/SettingsModal';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function GroupTasksScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
@@ -25,9 +25,9 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [refreshing, setRefreshing] = useState(false);  
   const [error, setError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<any[]>([]);
-  const [selectedTab, setSelectedTab] = useState<'all' | 'my' | 'members'>('all');
+  const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
   const [myTasks, setMyTasks] = useState<any[]>([]);
-  const [isMembersScreenOpen, setIsMembersScreenOpen] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const fetchTasks = async (isRefreshing = false) => {
     if (isRefreshing) {
@@ -68,19 +68,14 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     }
   }, [groupId]);
 
-  // Reset to all tasks tab when returning from members screen
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
-      if (isMembersScreenOpen) {
-        setSelectedTab('all');
-        setIsMembersScreenOpen(false);
-      }
       // Refresh tasks when screen comes into focus
       fetchTasks();
     });
 
     return unsubscribe;
-  }, [navigation, isMembersScreenOpen]);
+  }, [navigation]);
 
   const handleCreateTask = () => {
     if (userRole !== 'ADMIN') {
@@ -91,18 +86,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       groupId,
       groupName,
       onTaskCreated: () => {
-        // Refresh tasks when returning from create task
         fetchTasks();
       }
-    });
-  };
-
-  const handleViewMembers = () => {
-    setIsMembersScreenOpen(true);
-    navigation.navigate('GroupMembers', {
-      groupId,
-      groupName,
-      userRole
     });
   };
 
@@ -112,7 +97,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       groupId,
       groupName,
       onTaskUpdated: () => {
-        // Refresh tasks when returning from edit task
         fetchTasks();
       }
     });
@@ -355,19 +339,18 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     );
   };
 
+  const handleNavigateToAssignment = () => {
+    navigation.navigate('TaskAssignment', {
+      groupId,
+      groupName,
+      userRole
+    });
+  };
+
   const renderContent = () => {
     const currentTasks = selectedTab === 'my' ? myTasks : tasks;
     const showEmpty = !loading && currentTasks.length === 0;
     
-    if (selectedTab === 'members') {
-      // Navigate to members screen and reset tab
-      setTimeout(() => {
-        handleViewMembers();
-        setSelectedTab('all'); // Reset to all tasks tab
-      }, 100);
-      return null;
-    }
-
     return (
       <FlatList
         data={currentTasks}
@@ -429,7 +412,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       
-      {/* Header - Aligned with CreateTaskScreen */}
+      {/* Header with Burger Icon */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()} 
@@ -444,21 +427,18 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             {groupName || 'Tasks'}
           </Text>
           <Text style={styles.subtitle}>
-            {selectedTab === 'all' ? 'All Tasks' : selectedTab === 'my' ? 'My Tasks' : 'Members'}
+            {selectedTab === 'all' ? 'All Tasks' : 'My Tasks'}
           </Text>
         </View>
         
-        {userRole === 'ADMIN' ? (
-          <TouchableOpacity 
-            style={styles.addButton}
-            onPress={handleCreateTask}
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-          >
-            <MaterialCommunityIcons name="plus" size={24} color="#007AFF" />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.headerSpacer} />
-        )}
+        {/* Settings/Burger Icon */}
+        <TouchableOpacity 
+          style={styles.settingsButton}
+          onPress={() => setShowSettingsModal(true)}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
+          <MaterialCommunityIcons name="dots-vertical" size={24} color="#007AFF" />
+        </TouchableOpacity>
       </View>
 
       {/* Content Area */}
@@ -477,7 +457,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         renderContent()
       )}
 
-      {/* Bottom Tab Navigation - Aligned with CreateTaskScreen padding */}
+      {/* Bottom Tab Navigation */}
       <View style={styles.bottomTab}>
         <TouchableOpacity 
           style={[styles.tabButton, selectedTab === 'all' && styles.activeTabButton]}
@@ -512,24 +492,19 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             My Tasks
           </Text>
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tabButton, selectedTab === 'members' && styles.activeTabButton]}
-          onPress={() => setSelectedTab('members')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.tabIconContainer}>
-            <MaterialCommunityIcons 
-              name="account-group" 
-              size={24} 
-              color={selectedTab === 'members' ? '#007AFF' : '#8e8e93'} 
-            />
-          </View>
-          <Text style={[styles.tabText, selectedTab === 'members' && styles.activeTabText]}>
-            Members
-          </Text>
-        </TouchableOpacity>
       </View>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        visible={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        groupId={groupId}
+        groupName={groupName}
+        userRole={userRole}
+        navigation={navigation}
+        onNavigateToAssignment={handleNavigateToAssignment}
+        onRefreshTasks={() => fetchTasks(true)}
+      />
     </SafeAreaView>
   );
 }
@@ -555,7 +530,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 5,
+    paddingVertical: 12,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
@@ -591,16 +566,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center'
   },
-  addButton: {
+  settingsButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 20,
     backgroundColor: '#f8f9fa'
-  },
-  headerSpacer: {
-    width: 40
   },
   errorContainer: {
     flex: 1,
@@ -629,7 +601,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 100 // Account for bottom tab
+    paddingBottom: 80 // Account for bottom tab
   },
   taskCard: {
     backgroundColor: 'white',
@@ -811,8 +783,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 60,
     paddingHorizontal: 20,
-    marginTop: 40,
-    marginBottom: 100 // Account for bottom tab
+    marginTop: 40
   },
   emptyText: {
     fontSize: 18,

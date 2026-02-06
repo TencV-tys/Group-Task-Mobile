@@ -13,6 +13,7 @@ import CreateTaskScreen from '../screens/CreateTaskScreen'; // Add this import
 import UpdateTaskScreen from '../screens/UpdateTaskScreen';
 import GroupMembersScreen from '../screens/GroupMembersScreen';
 import TaskDetailsScreen from '../screens/TaskDetailsScreen';
+import TaskAssignmentScreen from '../screens/TaskAssignmentScreen';
 
 const Stack = createStackNavigator();
 
@@ -112,6 +113,12 @@ export default function AppNavigator() {
   name="TaskDetails" 
   component={TaskDetailsScreen}
   options={{ headerShown: false }}
+/>
+
+<Stack.Screen 
+  name="TaskAssignment" 
+  component={TaskAssignmentScreen}
+  options={{ headerShown:false }}
 />
 
     </Stack.Navigator>

@@ -7,7 +7,7 @@ const API_URL = `${API_BASE_URL}/api/tasks`;
 function cleanTaskData(obj: any): any {
   if (obj === null || obj === undefined) {
     return undefined;
-  }
+  } 
   
   if (Array.isArray(obj)) {
     return obj
@@ -246,4 +246,53 @@ export class TaskService {
       };
     }
   }
+
+  static async reassignTask(taskId: string, targetUserId: string) {
+    try {
+      console.log(`TaskService: Reassigning task ${taskId} to user ${targetUserId}`);
+      
+      const response = await fetch(`${API_URL}/${taskId}/reassign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ targetUserId }),
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('TaskService.reassignTask error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to reassign task'
+      };
+    }
+  }
+
+ static async getTaskStatistics(groupId: string) {
+    try {
+      console.log(`TaskService: Getting statistics for group ${groupId}`);
+      
+      const response = await fetch(`${API_URL}/group/${groupId}/statistics`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('TaskService.getTaskStatistics error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load task statistics'
+      };
+    }
+  }
+
+
 }

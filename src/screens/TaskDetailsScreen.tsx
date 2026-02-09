@@ -1,4 +1,4 @@
-// src/screens/TaskDetailsScreen.tsx - COMPLETELY UPDATED with assignment features
+// src/screens/TaskDetailsScreen.tsx - FINAL FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -138,28 +138,28 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     if (!assignment?.completed) return { 
       status: 'pending', 
       color: '#e67700', 
-      icon: 'clock-outline',
-      text: 'Pending Completion'
+      icon: 'clock-outline' as any,
+      text: 'Pending'
     };
     
     if (assignment.verified === true) return { 
       status: 'verified', 
       color: '#2b8a3e', 
-      icon: 'check-circle',
+      icon: 'check-circle' as any,
       text: 'Verified'
     };
     
     if (assignment.verified === false) return { 
       status: 'rejected', 
       color: '#fa5252', 
-      icon: 'close-circle',
+      icon: 'close-circle' as any,
       text: 'Rejected'
     };
     
     return { 
       status: 'pending_verification', 
       color: '#e67700', 
-      icon: 'clock-check',
+      icon: 'clock-check' as any,
       text: 'Awaiting Verification'
     };
   };
@@ -181,6 +181,11 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   };
 
+  // Check if admin is assigned to this task
+  const isAdminAssignedToTask = () => {
+    return isAdmin && task?.userAssignment;
+  };
+
   const renderHeader = () => (
     <View style={styles.header}>
       <TouchableOpacity 
@@ -197,7 +202,8 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         </Text>
       </View>
       
-      {isAdmin && task ? (
+      {/* Show edit button only if admin AND not assigned to this task */}
+      {isAdmin && task && !isAdminAssignedToTask() ? (
         <TouchableOpacity 
           style={styles.editButton}
           onPress={handleEdit}
@@ -243,13 +249,26 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
               </View>
             </View>
             
-            <TouchableOpacity
-              style={styles.completeButton}
-              onPress={handleCompleteAssignment}
-            >
-              <MaterialCommunityIcons name="check-circle" size={20} color="white" />
-              <Text style={styles.completeButtonText}>Mark as Complete</Text>
-            </TouchableOpacity>
+            {/* ONLY SHOW COMPLETE BUTTON FOR NON-ADMIN MEMBERS */}
+            {!isAdmin && (
+              <TouchableOpacity
+                style={styles.completeButton}
+                onPress={handleCompleteAssignment}
+              >
+                <MaterialCommunityIcons name="check-circle" size={20} color="white" />
+                <Text style={styles.completeButtonText}>Mark as Complete</Text>
+              </TouchableOpacity>
+            )}
+            
+            {/* SHOW ADMIN MESSAGE IF ADMIN IS ASSIGNED */}
+            {isAdmin && (
+              <View style={styles.adminAssignedInfo}>
+                <MaterialCommunityIcons name="shield-account" size={20} color="#007AFF" />
+                <Text style={styles.adminAssignedText}>
+                  You're assigned as admin. Admins cannot complete their own tasks.
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       );
@@ -351,7 +370,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             </View>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: status.color + '20' }]}>
-            <MaterialCommunityIcons name={status.icon} size={14} color={status.color} />
+            <MaterialCommunityIcons name={status.icon} size={10} color={status.color} />
             <Text style={[styles.statusText, { color: status.color }]}>
               {status.text}
             </Text>
@@ -365,13 +384,13 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             </Text>
             {assignment.photoUrl && (
               <View style={styles.hasPhotoBadge}>
-                <MaterialCommunityIcons name="image" size={12} color="#007AFF" />
+                <MaterialCommunityIcons name="image" size={8} color="#007AFF" />
                 <Text style={styles.hasPhotoText}>Has Photo</Text>
               </View>
             )}
             {assignment.notes && (
               <View style={styles.hasNotesBadge}>
-                <MaterialCommunityIcons name="note-text" size={12} color="#e67700" />
+                <MaterialCommunityIcons name="note-text" size={8} color="#e67700" />
                 <Text style={styles.hasNotesText}>Has Notes</Text>
               </View>
             )}
@@ -479,8 +498,8 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             </View>
           </View>
 
-          {/* Member View: Show assignment status and completion options */}
-          {!isAdmin && renderMemberAssignmentSection()}
+          {/* Show assignment section for everyone (members see their assignment, admins see info) */}
+          {renderMemberAssignmentSection()}
 
           {task.executionFrequency === 'WEEKLY' && task.selectedDays?.length > 0 && (
             <View style={styles.section}>
@@ -590,8 +609,8 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             </View>
           )}
 
-          {/* Delete button - Only for admins */}
-          {isAdmin && (
+          {/* Delete button - Only for admins who are NOT assigned to this task */}
+          {isAdmin && !isAdminAssignedToTask() && (
             <TouchableOpacity 
               style={styles.deleteButton}
               onPress={handleDelete}
@@ -1010,6 +1029,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600'
   },
+  adminAssignedInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#e7f5ff',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8
+  },
+  adminAssignedText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1864ab',
+    lineHeight: 18
+  },
   completionCard: {
     backgroundColor: '#e7f5ff',
     borderRadius: 8,
@@ -1137,7 +1171,8 @@ const styles = StyleSheet.create({
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8
+    gap: 8,
+    flex: 1
   },
   userAvatar: {
     width: 36,
@@ -1173,14 +1208,17 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 4,
+    maxWidth: 100, // FIX: Prevent from going off-screen
+    flexShrink: 1
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '600'
+    fontSize: 10,
+    fontWeight: '600',
+    flexShrink: 1
   },
   adminAssignmentDetails: {
     flexDirection: 'row',
@@ -1197,26 +1235,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#e7f5ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
     gap: 4
   },
   hasPhotoText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#007AFF'
   },
   hasNotesBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff3bf',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
     gap: 4
   },
   hasNotesText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#e67700'
   },
   adminNotesPreview: {

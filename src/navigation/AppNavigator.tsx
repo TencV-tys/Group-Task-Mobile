@@ -15,7 +15,8 @@ import GroupMembersScreen from '../screens/GroupMembersScreen';
 import TaskDetailsScreen from '../screens/TaskDetailsScreen';
 import TaskAssignmentScreen from '../screens/TaskAssignmentScreen';
 import RotationScheduleScreen from '../screens/RotationScheduleScreen';
-
+import AssignmentDetailsScreen from '../screens/AssignmentDetailsScreen';
+import CompleteAssignmentScreen from '../screens/CompleteAssignmentScreen';
 
 const Stack = createStackNavigator();
 
@@ -122,6 +123,23 @@ export default function AppNavigator() {
     title: 'Rotation Schedule'
   }}
 />
+  
+    <Stack.Screen 
+    name="CompleteAssignment" 
+    component={CompleteAssignmentScreen} 
+    options={{ 
+     headerShown:false
+    }}
+  />
+  
+  <Stack.Screen 
+    name="AssignmentDetails" 
+    component={AssignmentDetailsScreen} 
+    options={{ 
+     headerShown:false
+    }}
+  />
+
     </Stack.Navigator>
   );
 }

@@ -1,4 +1,4 @@
-// src/screens/TaskAssignmentScreen.tsx - UPDATED
+// src/screens/TaskAssignmentScreen.tsx - UPDATED WITH NO DUPLICATE ASSIGNMENTS
 import React, { useState } from 'react';
 import {
   View,
@@ -33,6 +33,28 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [showAssigneeModal, setShowAssigneeModal] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
+
+  // Get members already assigned to tasks for current week
+  const getAssignedMembersForWeek = () => {
+    const assignedMemberIds = new Set<string>();
+    
+    tasks.forEach((task: any) => {
+      if (task.currentAssignee) {
+        assignedMemberIds.add(task.currentAssignee);
+      }
+      
+      // Also check assignments for current week
+      if (task.assignments && Array.isArray(task.assignments)) {
+        task.assignments.forEach((assignment: any) => {
+          if (assignment.user && assignment.user.id) {
+            assignedMemberIds.add(assignment.user.id);
+          }
+        });
+      }
+    });
+    
+    return assignedMemberIds;
+  };
 
   const handleOpenAssigneeModal = (task: any) => {
     setSelectedTask(task);
@@ -210,6 +232,9 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
           <Text style={styles.headerSubtitle}>
             {groupInfo?.currentRotationWeek ? `Week ${groupInfo.currentRotationWeek}` : ''}
           </Text>
+          <Text style={styles.headerSubtitle}>
+            {tasks.length} tasks • {members.length} members
+          </Text>
         </View>
         <TouchableOpacity 
           onPress={() => loadData(true)}
@@ -288,10 +313,39 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
               <Text style={styles.modalSubtitle}>
                 Select a member to assign this task to for the current week:
               </Text>
+              
+              {/* Assignment Rules Info */}
+              <View style={styles.infoBox}>
+                <MaterialCommunityIcons name="information-outline" size={16} color="#007AFF" />
+                <Text style={styles.infoText}>
+                  Each member can only be assigned to one task per week
+                </Text>
+              </View>
 
-              {members
-                .filter(member => member.isActive)
-                .map(member => {
+              {/* Available Members Section */}
+              <Text style={styles.sectionHeader}>Available Members</Text>
+              
+              {(() => {
+                const assignedMemberIds = getAssignedMembersForWeek();
+                const availableMembers = members.filter(member => 
+                  !assignedMemberIds.has(member.userId)
+                );
+                
+                if (availableMembers.length === 0) {
+                  return (
+                    <View style={styles.emptyMembers}>
+                      <MaterialCommunityIcons name="account-group" size={48} color="#ccc" />
+                      <Text style={styles.emptyMembersText}>
+                        No available members
+                      </Text>
+                      <Text style={styles.emptyMembersSubtext}>
+                        All members are already assigned to tasks this week
+                      </Text>
+                    </View>
+                  );
+                }
+                
+                return availableMembers.map(member => {
                   const isCurrentAssignee = selectedTask?.currentAssignee === member.userId;
                   
                   return (
@@ -359,7 +413,71 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                       )}
                     </TouchableOpacity>
                   );
-                })}
+                });
+              })()}
+
+              {/* Already Assigned Members Section (for reference) */}
+              {(() => {
+                const assignedMemberIds = getAssignedMembersForWeek();
+                const assignedMembers = members.filter(member => 
+                  assignedMemberIds.has(member.userId) && 
+                  selectedTask?.currentAssignee !== member.userId
+                );
+                
+                if (assignedMembers.length === 0) return null;
+                
+                return (
+                  <>
+                    <Text style={styles.sectionHeader}>Already Assigned (Cannot Select)</Text>
+                    {assignedMembers.map(member => {
+                      const assignedTask = tasks.find((task: any) => 
+                        task.currentAssignee === member.userId
+                      );
+                      
+                      return (
+                        <View
+                          key={member.userId}
+                          style={[styles.memberOption, styles.disabledOption]}
+                        >
+                          <View style={styles.memberInfo}>
+                            <View style={[
+                              styles.memberAvatar,
+                              member.role === 'ADMIN' && styles.adminMemberAvatar,
+                              styles.disabledAvatar
+                            ]}>
+                              <Text style={[
+                                styles.memberInitial,
+                                styles.disabledInitial
+                              ]}>
+                                {member.fullName?.charAt(0) || '?'}
+                              </Text>
+                            </View>
+                            <View style={styles.memberDetails}>
+                              <Text style={[styles.memberName, styles.disabledText]}>
+                                {member.fullName}
+                              </Text>
+                              <View style={styles.memberMeta}>
+                                <Text style={[styles.memberRole, styles.disabledText]}>
+                                  {member.role === 'ADMIN' ? 'Admin' : 'Member'}
+                                </Text>
+                                {assignedTask && (
+                                  <Text style={[styles.memberOrder, styles.disabledText]}>
+                                    Assigned to: {assignedTask.title}
+                                  </Text>
+                                )}
+                              </View>
+                            </View>
+                          </View>
+                          <View style={styles.alreadyAssignedBadge}>
+                            <MaterialCommunityIcons name="clock" size={20} color="#ff6b35" />
+                            <Text style={styles.alreadyAssignedText}>Busy</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </>
+                );
+              })()}
             </ScrollView>
 
             <View style={styles.modalFooter}>
@@ -648,7 +766,7 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 20,
+    marginBottom: 12,
     lineHeight: 20
   },
   modalBody: {
@@ -658,6 +776,52 @@ const styles = StyleSheet.create({
     padding: 20,
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0'
+  },
+  // New Styles for Filtering
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f5ff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 8
+  },
+  infoText: {
+    fontSize: 13,
+    color: '#1864ab',
+    flex: 1
+  },
+  sectionHeader: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#495057',
+    marginTop: 16,
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef'
+  },
+  emptyMembers: {
+    alignItems: 'center',
+    padding: 30,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    marginVertical: 16
+  },
+  emptyMembersText: {
+    fontSize: 16,
+    color: '#6c757d',
+    marginTop: 12,
+    marginBottom: 4,
+    fontWeight: '500'
+  },
+  emptyMembersSubtext: {
+    fontSize: 14,
+    color: '#adb5bd',
+    textAlign: 'center'
   },
   memberOption: {
     flexDirection: 'row',
@@ -676,7 +840,7 @@ const styles = StyleSheet.create({
     borderColor: '#dee2e6'
   },
   disabledOption: {
-    opacity: 0.7
+    opacity: 0.6
   },
   memberInfo: {
     flexDirection: 'row',
@@ -698,6 +862,9 @@ const styles = StyleSheet.create({
   currentAssigneeAvatar: {
     backgroundColor: '#28a745'
   },
+  disabledAvatar: {
+    backgroundColor: '#adb5bd'
+  },
   memberInitial: {
     color: '#fff',
     fontWeight: 'bold',
@@ -705,6 +872,9 @@ const styles = StyleSheet.create({
   },
   currentAssigneeInitial: {
     color: '#fff'
+  },
+  disabledInitial: {
+    color: '#e9ecef'
   },
   memberDetails: {
     flex: 1
@@ -717,6 +887,9 @@ const styles = StyleSheet.create({
   },
   currentAssigneeText: {
     color: '#6c757d'
+  },
+  disabledText: {
+    color: '#adb5bd'
   },
   memberMeta: {
     flexDirection: 'row',
@@ -747,6 +920,16 @@ const styles = StyleSheet.create({
   currentBadgeText: {
     fontSize: 12,
     color: '#28a745',
+    fontWeight: '600'
+  },
+  alreadyAssignedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  alreadyAssignedText: {
+    fontSize: 12,
+    color: '#ff6b35',
     fontWeight: '600'
   },
   cancelButton: {

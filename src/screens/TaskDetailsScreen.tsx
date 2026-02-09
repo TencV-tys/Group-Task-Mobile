@@ -1,4 +1,4 @@
-// src/screens/TaskDetailsScreen.tsx - UPDATED with admin-only controls
+// src/screens/TaskDetailsScreen.tsx - COMPLETELY UPDATED with assignment features
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -10,7 +10,9 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
-  Platform
+  Platform,
+  Image,
+  Linking
 } from 'react-native';
 import { TaskService } from '../taskServices/TaskService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -102,6 +104,83 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     );
   };
 
+  const handleCompleteAssignment = () => {
+    if (!task?.userAssignment) return;
+    
+    navigation.navigate('CompleteAssignment', {
+      assignmentId: task.userAssignment.id,
+      taskTitle: task.title,
+      dueDate: task.userAssignment.dueDate,
+      onCompleted: fetchTaskDetails
+    });
+  };
+
+  const handleViewAssignmentDetails = (assignment?: any) => {
+    const assignmentId = assignment?.id || task?.userAssignment?.id;
+    if (!assignmentId) return;
+    
+    navigation.navigate('AssignmentDetails', {
+      assignmentId,
+      isAdmin: isAdmin,
+      onVerified: fetchTaskDetails
+    });
+  };
+
+  const handleViewPhoto = (photoUrl: string) => {
+    if (photoUrl) {
+      Linking.openURL(photoUrl).catch(err => {
+        Alert.alert('Error', 'Could not open image');
+      });
+    }
+  };
+
+  const getVerificationStatus = (assignment: any) => {
+    if (!assignment?.completed) return { 
+      status: 'pending', 
+      color: '#e67700', 
+      icon: 'clock-outline',
+      text: 'Pending Completion'
+    };
+    
+    if (assignment.verified === true) return { 
+      status: 'verified', 
+      color: '#2b8a3e', 
+      icon: 'check-circle',
+      text: 'Verified'
+    };
+    
+    if (assignment.verified === false) return { 
+      status: 'rejected', 
+      color: '#fa5252', 
+      icon: 'close-circle',
+      text: 'Rejected'
+    };
+    
+    return { 
+      status: 'pending_verification', 
+      color: '#e67700', 
+      icon: 'clock-check',
+      text: 'Awaiting Verification'
+    };
+  };
+
+  const getCompletionTimeText = (assignment: any) => {
+    if (!assignment?.completed || !assignment?.completedAt) return '';
+    
+    const dueDate = new Date(assignment.dueDate);
+    const completedAt = new Date(assignment.completedAt);
+    const diffMs = completedAt.getTime() - dueDate.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    
+    if (diffHours < 0) {
+      return `${Math.abs(diffHours)} hours early`;
+    } else if (diffHours === 0) {
+      return "on time";
+    } else {
+      return `${diffHours} hours late`;
+    }
+  };
+
   const renderHeader = () => (
     <View style={styles.header}>
       <TouchableOpacity 
@@ -131,6 +210,184 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       )}
     </View>
   );
+
+  const renderMemberAssignmentSection = () => {
+    if (!task?.userAssignment) {
+      return (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My Assignment</Text>
+          <View style={styles.notAssignedCard}>
+            <MaterialCommunityIcons name="account-question" size={24} color="#868e96" />
+            <Text style={styles.notAssignedText}>
+              Not assigned to you this week
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
+    const status = getVerificationStatus(task.userAssignment);
+
+    if (!task.userAssignment.completed) {
+      return (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My Assignment</Text>
+          <View style={styles.assignmentCard}>
+            <View style={styles.assignmentHeader}>
+              <MaterialCommunityIcons name="account-clock" size={24} color="#e67700" />
+              <View style={styles.assignmentInfo}>
+                <Text style={styles.assignmentTitle}>Assigned to You</Text>
+                <Text style={styles.assignmentDate}>
+                  Due: {new Date(task.userAssignment.dueDate).toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+            
+            <TouchableOpacity
+              style={styles.completeButton}
+              onPress={handleCompleteAssignment}
+            >
+              <MaterialCommunityIcons name="check-circle" size={20} color="white" />
+              <Text style={styles.completeButtonText}>Mark as Complete</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>My Submission</Text>
+        <View style={styles.completionCard}>
+          <View style={styles.completionHeader}>
+            <MaterialCommunityIcons 
+              name={status.icon} 
+              size={24} 
+              color={status.color} 
+            />
+            <View style={styles.completionInfo}>
+              <Text style={[styles.completionTitle, { color: status.color }]}>
+                {status.text}
+              </Text>
+              <Text style={styles.completionDate}>
+                Completed: {new Date(task.userAssignment.completedAt).toLocaleDateString()}
+                {getCompletionTimeText(task.userAssignment) && ` • ${getCompletionTimeText(task.userAssignment)}`}
+              </Text>
+            </View>
+          </View>
+          
+          {task.userAssignment.photoUrl && (
+            <TouchableOpacity
+              style={styles.photoPreview}
+              onPress={() => handleViewPhoto(task.userAssignment.photoUrl)}
+            >
+              <View style={styles.photoPreviewContent}>
+                <MaterialCommunityIcons name="image" size={20} color="#007AFF" />
+                <Text style={styles.viewPhotoText}>View Submitted Photo</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          
+          {task.userAssignment.notes && (
+            <View style={styles.userNotesCard}>
+              <Text style={styles.notesTitle}>Your Notes:</Text>
+              <Text style={styles.notesText}>{task.userAssignment.notes}</Text>
+            </View>
+          )}
+          
+          {task.userAssignment.adminNotes && status.status === 'rejected' && (
+            <View style={styles.adminFeedbackCard}>
+              <Text style={styles.adminFeedbackTitle}>Admin Feedback:</Text>
+              <Text style={styles.adminFeedbackText}>{task.userAssignment.adminNotes}</Text>
+            </View>
+          )}
+          
+          {status.status === 'pending_verification' && (
+            <View style={styles.infoBox}>
+              <MaterialCommunityIcons name="information" size={16} color="#6c757d" />
+              <Text style={styles.infoText}>
+                Your submission is pending admin verification. Points will be awarded once verified.
+              </Text>
+            </View>
+          )}
+          
+          <TouchableOpacity
+            style={styles.viewDetailsButton}
+            onPress={() => handleViewAssignmentDetails(task.userAssignment)}
+          >
+            <MaterialCommunityIcons name="eye" size={16} color="#007AFF" />
+            <Text style={styles.viewDetailsText}>View Submission Details</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderAdminAssignmentView = (assignment: any) => {
+    const status = getVerificationStatus(assignment);
+    
+    return (
+      <TouchableOpacity
+        key={assignment.id}
+        style={styles.adminAssignmentCard}
+        onPress={() => handleViewAssignmentDetails(assignment)}
+      >
+        <View style={styles.adminAssignmentHeader}>
+          <View style={styles.userInfo}>
+            <View style={styles.userAvatar}>
+              {assignment.user?.avatarUrl ? (
+                <Image source={{ uri: assignment.user.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.userAvatarText}>
+                  {assignment.user?.fullName?.charAt(0) || 'U'}
+                </Text>
+              )}
+            </View>
+            <View style={styles.userDetails}>
+              <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
+              <Text style={styles.assignmentDateSmall}>
+                Due: {new Date(assignment.dueDate).toLocaleDateString()}
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: status.color + '20' }]}>
+            <MaterialCommunityIcons name={status.icon} size={14} color={status.color} />
+            <Text style={[styles.statusText, { color: status.color }]}>
+              {status.text}
+            </Text>
+          </View>
+        </View>
+        
+        {assignment.completed && (
+          <View style={styles.adminAssignmentDetails}>
+            <Text style={styles.completedText}>
+              Submitted: {new Date(assignment.completedAt).toLocaleDateString()}
+            </Text>
+            {assignment.photoUrl && (
+              <View style={styles.hasPhotoBadge}>
+                <MaterialCommunityIcons name="image" size={12} color="#007AFF" />
+                <Text style={styles.hasPhotoText}>Has Photo</Text>
+              </View>
+            )}
+            {assignment.notes && (
+              <View style={styles.hasNotesBadge}>
+                <MaterialCommunityIcons name="note-text" size={12} color="#e67700" />
+                <Text style={styles.hasNotesText}>Has Notes</Text>
+              </View>
+            )}
+          </View>
+        )}
+        
+        {assignment.adminNotes && (
+          <View style={styles.adminNotesPreview}>
+            <Text style={styles.adminNotesPreviewText} numberOfLines={1}>
+              {assignment.adminNotes}
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const renderContent = () => {
     if (loading) {
@@ -207,10 +464,10 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Status</Text>
               <View style={[
-                styles.statusBadge,
+                styles.taskStatusBadge,
                 task.userAssignment?.completed ? styles.completedStatus : styles.pendingStatus
               ]}>
-                <Text style={styles.statusText}>
+                <Text style={styles.taskStatusText}>
                   {task.userAssignment?.completed ? 'Completed' : 'Active'}
                 </Text>
               </View>
@@ -221,6 +478,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
               <Text style={styles.detailValue}>{task.isRecurring ? 'Yes' : 'No'}</Text>
             </View>
           </View>
+
+          {/* Member View: Show assignment status and completion options */}
+          {!isAdmin && renderMemberAssignmentSection()}
 
           {task.executionFrequency === 'WEEKLY' && task.selectedDays?.length > 0 && (
             <View style={styles.section}>
@@ -261,147 +521,74 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             </View>
           )}
 
-          {/* Assignment Information - Different view for admin vs member */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              {isAdmin ? 'Assignments & Rotation' : 'My Assignment'}
-            </Text>
-            
-            {isAdmin ? (
-              // Admin view: Show all assignments and rotation info
-              <>
-                <View style={styles.adminInfoBox}>
-                  <MaterialCommunityIcons name="shield-account" size={20} color="#007AFF" />
-                  <View style={styles.adminInfoContent}>
-                    <Text style={styles.adminInfoTitle}>Admin Information</Text>
-                    <Text style={styles.adminInfoText}>
-                      You have full control over this task. You can edit, delete, or reassign it.
-                    </Text>
-                  </View>
+          {/* Admin View: Show all assignments */}
+          {isAdmin && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Assignments & Rotation</Text>
+              
+              <View style={styles.adminInfoBox}>
+                <MaterialCommunityIcons name="shield-account" size={20} color="#007AFF" />
+                <View style={styles.adminInfoContent}>
+                  <Text style={styles.adminInfoTitle}>Admin Information</Text>
+                  <Text style={styles.adminInfoText}>
+                    You have full control over this task. You can edit, delete, or reassign it. Click on assignments to verify/reject submissions.
+                  </Text>
                 </View>
+              </View>
 
-                {task.currentAssignee && (
-                  <View style={styles.assigneeInfo}>
-                    <Text style={styles.assigneeLabel}>Current Assignee:</Text>
-                    <Text style={styles.assigneeValue}>
-                      {task.assignments?.[0]?.user?.fullName || 'Unknown'} (Week {task.group?.currentRotationWeek || 1})
-                    </Text>
-                  </View>
-                )}
+              {task.currentAssignee && (
+                <View style={styles.assigneeInfo}>
+                  <Text style={styles.assigneeLabel}>Current Assignee:</Text>
+                  <Text style={styles.assigneeValue}>
+                    {task.assignments?.[0]?.user?.fullName || 'Unknown'} (Week {task.group?.currentRotationWeek || 1})
+                  </Text>
+                </View>
+              )}
 
-                {task.rotationMembers && Array.isArray(task.rotationMembers) && (
-                  <View style={styles.rotationInfo}>
-                    <Text style={styles.rotationLabel}>Rotation Members:</Text>
-                    <View style={styles.rotationMembersList}>
-                      {task.rotationMembers.map((member: any, index: number) => (
-                        <View key={member.userId} style={styles.rotationMemberItem}>
-                          <View style={[
-                            styles.rotationMemberAvatar,
-                            member.userId === task.currentAssignee && styles.currentAssigneeAvatar
-                          ]}>
-                            <Text style={styles.rotationMemberInitial}>
-                              {member.fullName?.charAt(0) || '?'}
-                            </Text>
-                          </View>
-                          <Text style={[
-                            styles.rotationMemberName,
-                            member.userId === task.currentAssignee && styles.currentAssigneeName
-                          ]}>
-                            {member.fullName}
-                            {member.userId === task.currentAssignee && ' (Current)'}
+              {task.rotationMembers && Array.isArray(task.rotationMembers) && (
+                <View style={styles.rotationInfo}>
+                  <Text style={styles.rotationLabel}>Rotation Members:</Text>
+                  <View style={styles.rotationMembersList}>
+                    {task.rotationMembers.map((member: any, index: number) => (
+                      <View key={member.userId} style={styles.rotationMemberItem}>
+                        <View style={[
+                          styles.rotationMemberAvatar,
+                          member.userId === task.currentAssignee && styles.currentAssigneeAvatar
+                        ]}>
+                          <Text style={styles.rotationMemberInitial}>
+                            {member.fullName?.charAt(0) || '?'}
                           </Text>
                         </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-
-                {task.assignments?.length > 0 ? (
-                  <View style={styles.assignmentsContainer}>
-                    <Text style={styles.assignmentsSubtitle}>Recent Assignments:</Text>
-                    {task.assignments.slice(0, 3).map((assignment: any, index: number) => (
-                      <View key={index} style={styles.assignmentCard}>
-                        <View style={styles.assignmentHeader}>
-                          <MaterialCommunityIcons 
-                            name={assignment.completed ? "check-circle" : "account-clock"} 
-                            size={20} 
-                            color={assignment.completed ? "#2b8a3e" : "#e67700"} 
-                          />
-                          <Text style={styles.assignmentUser}>
-                            {assignment.user?.fullName || 'Unknown'}
-                          </Text>
-                        </View>
-                        <Text style={styles.assignmentDate}>
-                          Due: {new Date(assignment.dueDate).toLocaleDateString()} 
-                          {assignment.rotationWeek && ` (Week ${assignment.rotationWeek})`}
-                        </Text>
-                        <Text style={styles.assignmentStatus}>
-                          {assignment.completed ? 'Completed' : 'Pending'}
+                        <Text style={[
+                          styles.rotationMemberName,
+                          member.userId === task.currentAssignee && styles.currentAssigneeName
+                        ]}>
+                          {member.fullName}
+                          {member.userId === task.currentAssignee && ' (Current)'}
                         </Text>
                       </View>
                     ))}
-                    {task.assignments.length > 3 && (
-                      <Text style={styles.moreAssignments}>
-                        +{task.assignments.length - 3} more assignments
-                      </Text>
-                    )}
                   </View>
-                ) : (
-                  <Text style={styles.noAssignments}>No assignments yet</Text>
-                )}
-              </>
-            ) : (
-              // Member view: Show only their assignment
-              <>
-                {task.userAssignment ? (
-                  <View style={styles.myAssignmentCard}>
-                    <View style={styles.myAssignmentHeader}>
-                      <MaterialCommunityIcons 
-                        name={task.userAssignment.completed ? "check-circle" : "account-clock"} 
-                        size={24} 
-                        color={task.userAssignment.completed ? "#2b8a3e" : "#e67700"} 
-                      />
-                      <View style={styles.myAssignmentInfo}>
-                        <Text style={styles.myAssignmentTitle}>
-                          {task.userAssignment.completed ? 'Completed' : 'Assigned to You'}
-                        </Text>
-                        <Text style={styles.myAssignmentDate}>
-                          Due: {new Date(task.userAssignment.dueDate).toLocaleDateString()}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.myAssignmentDetails}>
-                      {task.timeSlots?.length > 0 && task.userAssignment.timeSlotId && (
-                        <Text style={styles.myAssignmentDetail}>
-                          Time Slot: {task.timeSlots.find((ts: any) => ts.id === task.userAssignment.timeSlotId)?.label || 'Default'}
-                        </Text>
-                      )}
-                      
-                      {task.userAssignment.points > 0 && (
-                        <Text style={styles.myAssignmentDetail}>
-                          Points: {task.userAssignment.points}
-                        </Text>
-                      )}
-                      
-                      {task.executionFrequency === 'DAILY' && task.userAssignment.assignmentDay && (
-                        <Text style={styles.myAssignmentDetail}>
-                          Day: {task.userAssignment.assignmentDay}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.notAssignedCard}>
-                    <MaterialCommunityIcons name="account-question" size={24} color="#868e96" />
-                    <Text style={styles.notAssignedText}>
-                      Not assigned to you this week
+                </View>
+              )}
+
+              {task.assignments?.length > 0 ? (
+                <View style={styles.assignmentsContainer}>
+                  <Text style={styles.assignmentsSubtitle}>Recent Assignments:</Text>
+                  {task.assignments.slice(0, 5).map((assignment: any, index: number) => 
+                    renderAdminAssignmentView(assignment)
+                  )}
+                  {task.assignments.length > 5 && (
+                    <Text style={styles.moreAssignments}>
+                      +{task.assignments.length - 5} more assignments
                     </Text>
-                  </View>
-                )}
-              </>
-            )}
-          </View>
+                  )}
+                </View>
+              ) : (
+                <Text style={styles.noAssignments}>No assignments yet</Text>
+              )}
+            </View>
+          )}
 
           {/* Delete button - Only for admins */}
           {isAdmin && (
@@ -620,7 +807,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#212529'
   },
-  statusBadge: {
+  taskStatusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -632,7 +819,7 @@ const styles = StyleSheet.create({
   pendingStatus: {
     backgroundColor: '#fff3bf'
   },
-  statusText: {
+  taskStatusText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#212529'
@@ -786,29 +973,262 @@ const styles = StyleSheet.create({
   assignmentCard: {
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
-    padding: 12,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#e9ecef'
   },
   assignmentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 4
+    gap: 12,
+    marginBottom: 16
   },
-  assignmentUser: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#212529'
+  assignmentInfo: {
+    flex: 1
+  },
+  assignmentTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1864ab',
+    marginBottom: 4
   },
   assignmentDate: {
     fontSize: 14,
-    color: '#6c757d',
+    color: '#495057'
+  },
+  completeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#2b8a3e',
+    padding: 16,
+    borderRadius: 8
+  },
+  completeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  completionCard: {
+    backgroundColor: '#e7f5ff',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#a5d8ff'
+  },
+  completionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16
+  },
+  completionInfo: {
+    flex: 1
+  },
+  completionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     marginBottom: 4
   },
-  assignmentStatus: {
+  completionDate: {
+    fontSize: 14,
+    color: '#495057'
+  },
+  photoPreview: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6'
+  },
+  photoPreviewContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8
+  },
+  viewPhotoText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500'
+  },
+  userNotesCard: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#dee2e6'
+  },
+  notesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 4
+  },
+  notesText: {
+    fontSize: 14,
+    color: '#6c757d',
+    lineHeight: 20
+  },
+  adminFeedbackCard: {
+    backgroundColor: '#fff5f5',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#ffc9c9'
+  },
+  adminFeedbackTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fa5252',
+    marginBottom: 4
+  },
+  adminFeedbackText: {
+    fontSize: 14,
+    color: '#495057',
+    lineHeight: 20
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 8
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#6c757d',
+    lineHeight: 18
+  },
+  viewDetailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 12,
+    marginTop: 12
+  },
+  viewDetailsText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500'
+  },
+  adminAssignmentCard: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    marginBottom: 8
+  },
+  adminAssignmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  userAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden'
+  },
+  avatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18
+  },
+  userAvatarText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold'
+  },
+  userDetails: {
+    flex: 1
+  },
+  userName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#212529'
+  },
+  assignmentDateSmall: {
     fontSize: 12,
     color: '#868e96'
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600'
+  },
+  adminAssignmentDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+    flexWrap: 'wrap'
+  },
+  completedText: {
+    fontSize: 12,
+    color: '#6c757d'
+  },
+  hasPhotoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f5ff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4
+  },
+  hasPhotoText: {
+    fontSize: 12,
+    color: '#007AFF'
+  },
+  hasNotesBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4
+  },
+  hasNotesText: {
+    fontSize: 12,
+    color: '#e67700'
+  },
+  adminNotesPreview: {
+    backgroundColor: '#f8f9fa',
+    padding: 6,
+    borderRadius: 6,
+    marginTop: 8
+  },
+  adminNotesPreviewText: {
+    fontSize: 11,
+    color: '#868e96',
+    fontStyle: 'italic'
   },
   moreAssignments: {
     fontSize: 14,

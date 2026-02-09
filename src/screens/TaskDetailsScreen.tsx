@@ -1,4 +1,4 @@
-// src/screens/TaskDetailsScreen.tsx
+// src/screens/TaskDetailsScreen.tsx - UPDATED with admin-only controls
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -20,6 +20,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [task, setTask] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Check if user is admin
+  const isAdmin = userRole === 'ADMIN';
 
   useEffect(() => {
     if (taskId) {
@@ -115,7 +118,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         </Text>
       </View>
       
-      {userRole === 'ADMIN' && task ? (
+      {isAdmin && task ? (
         <TouchableOpacity 
           style={styles.editButton}
           onPress={handleEdit}
@@ -247,48 +250,161 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                     {slot.label && (
                       <Text style={styles.timeSlotLabel}>{slot.label}</Text>
                     )}
+                    {slot.points !== undefined && slot.points > 0 && (
+                      <Text style={styles.timeSlotPoints}>
+                        Points: {slot.points}
+                      </Text>
+                    )}
                   </View>
                 ))}
               </View>
             </View>
           )}
 
+          {/* Assignment Information - Different view for admin vs member */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Assignments</Text>
-            {task.assignments?.length > 0 ? (
-              <View style={styles.assignmentsContainer}>
-                {task.assignments.slice(0, 3).map((assignment: any, index: number) => (
-                  <View key={index} style={styles.assignmentCard}>
-                    <View style={styles.assignmentHeader}>
-                      <MaterialCommunityIcons 
-                        name={assignment.completed ? "check-circle" : "account-clock"} 
-                        size={20} 
-                        color={assignment.completed ? "#2b8a3e" : "#e67700"} 
-                      />
-                      <Text style={styles.assignmentUser}>
-                        {assignment.user?.fullName || 'Unknown'}
-                      </Text>
-                    </View>
-                    <Text style={styles.assignmentDate}>
-                      Due: {new Date(assignment.dueDate).toLocaleDateString()}
-                    </Text>
-                    <Text style={styles.assignmentStatus}>
-                      {assignment.completed ? 'Completed' : 'Pending'}
+            <Text style={styles.sectionTitle}>
+              {isAdmin ? 'Assignments & Rotation' : 'My Assignment'}
+            </Text>
+            
+            {isAdmin ? (
+              // Admin view: Show all assignments and rotation info
+              <>
+                <View style={styles.adminInfoBox}>
+                  <MaterialCommunityIcons name="shield-account" size={20} color="#007AFF" />
+                  <View style={styles.adminInfoContent}>
+                    <Text style={styles.adminInfoTitle}>Admin Information</Text>
+                    <Text style={styles.adminInfoText}>
+                      You have full control over this task. You can edit, delete, or reassign it.
                     </Text>
                   </View>
-                ))}
-                {task.assignments.length > 3 && (
-                  <Text style={styles.moreAssignments}>
-                    +{task.assignments.length - 3} more assignments
-                  </Text>
+                </View>
+
+                {task.currentAssignee && (
+                  <View style={styles.assigneeInfo}>
+                    <Text style={styles.assigneeLabel}>Current Assignee:</Text>
+                    <Text style={styles.assigneeValue}>
+                      {task.assignments?.[0]?.user?.fullName || 'Unknown'} (Week {task.group?.currentRotationWeek || 1})
+                    </Text>
+                  </View>
                 )}
-              </View>
+
+                {task.rotationMembers && Array.isArray(task.rotationMembers) && (
+                  <View style={styles.rotationInfo}>
+                    <Text style={styles.rotationLabel}>Rotation Members:</Text>
+                    <View style={styles.rotationMembersList}>
+                      {task.rotationMembers.map((member: any, index: number) => (
+                        <View key={member.userId} style={styles.rotationMemberItem}>
+                          <View style={[
+                            styles.rotationMemberAvatar,
+                            member.userId === task.currentAssignee && styles.currentAssigneeAvatar
+                          ]}>
+                            <Text style={styles.rotationMemberInitial}>
+                              {member.fullName?.charAt(0) || '?'}
+                            </Text>
+                          </View>
+                          <Text style={[
+                            styles.rotationMemberName,
+                            member.userId === task.currentAssignee && styles.currentAssigneeName
+                          ]}>
+                            {member.fullName}
+                            {member.userId === task.currentAssignee && ' (Current)'}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {task.assignments?.length > 0 ? (
+                  <View style={styles.assignmentsContainer}>
+                    <Text style={styles.assignmentsSubtitle}>Recent Assignments:</Text>
+                    {task.assignments.slice(0, 3).map((assignment: any, index: number) => (
+                      <View key={index} style={styles.assignmentCard}>
+                        <View style={styles.assignmentHeader}>
+                          <MaterialCommunityIcons 
+                            name={assignment.completed ? "check-circle" : "account-clock"} 
+                            size={20} 
+                            color={assignment.completed ? "#2b8a3e" : "#e67700"} 
+                          />
+                          <Text style={styles.assignmentUser}>
+                            {assignment.user?.fullName || 'Unknown'}
+                          </Text>
+                        </View>
+                        <Text style={styles.assignmentDate}>
+                          Due: {new Date(assignment.dueDate).toLocaleDateString()} 
+                          {assignment.rotationWeek && ` (Week ${assignment.rotationWeek})`}
+                        </Text>
+                        <Text style={styles.assignmentStatus}>
+                          {assignment.completed ? 'Completed' : 'Pending'}
+                        </Text>
+                      </View>
+                    ))}
+                    {task.assignments.length > 3 && (
+                      <Text style={styles.moreAssignments}>
+                        +{task.assignments.length - 3} more assignments
+                      </Text>
+                    )}
+                  </View>
+                ) : (
+                  <Text style={styles.noAssignments}>No assignments yet</Text>
+                )}
+              </>
             ) : (
-              <Text style={styles.noAssignments}>No assignments yet</Text>
+              // Member view: Show only their assignment
+              <>
+                {task.userAssignment ? (
+                  <View style={styles.myAssignmentCard}>
+                    <View style={styles.myAssignmentHeader}>
+                      <MaterialCommunityIcons 
+                        name={task.userAssignment.completed ? "check-circle" : "account-clock"} 
+                        size={24} 
+                        color={task.userAssignment.completed ? "#2b8a3e" : "#e67700"} 
+                      />
+                      <View style={styles.myAssignmentInfo}>
+                        <Text style={styles.myAssignmentTitle}>
+                          {task.userAssignment.completed ? 'Completed' : 'Assigned to You'}
+                        </Text>
+                        <Text style={styles.myAssignmentDate}>
+                          Due: {new Date(task.userAssignment.dueDate).toLocaleDateString()}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.myAssignmentDetails}>
+                      {task.timeSlots?.length > 0 && task.userAssignment.timeSlotId && (
+                        <Text style={styles.myAssignmentDetail}>
+                          Time Slot: {task.timeSlots.find((ts: any) => ts.id === task.userAssignment.timeSlotId)?.label || 'Default'}
+                        </Text>
+                      )}
+                      
+                      {task.userAssignment.points > 0 && (
+                        <Text style={styles.myAssignmentDetail}>
+                          Points: {task.userAssignment.points}
+                        </Text>
+                      )}
+                      
+                      {task.executionFrequency === 'DAILY' && task.userAssignment.assignmentDay && (
+                        <Text style={styles.myAssignmentDetail}>
+                          Day: {task.userAssignment.assignmentDay}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.notAssignedCard}>
+                    <MaterialCommunityIcons name="account-question" size={24} color="#868e96" />
+                    <Text style={styles.notAssignedText}>
+                      Not assigned to you this week
+                    </Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
 
-          {userRole === 'ADMIN' && (
+          {/* Delete button - Only for admins */}
+          {isAdmin && (
             <TouchableOpacity 
               style={styles.deleteButton}
               onPress={handleDelete}
@@ -296,6 +412,16 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
               <MaterialCommunityIcons name="delete" size={20} color="#fa5252" />
               <Text style={styles.deleteButtonText}>Delete Task</Text>
             </TouchableOpacity>
+          )}
+
+          {/* Information for members about permissions */}
+          {!isAdmin && (
+            <View style={styles.memberInfoBox}>
+              <MaterialCommunityIcons name="information" size={20} color="#6c757d" />
+              <Text style={styles.memberInfoText}>
+                Only group administrators can edit or delete tasks.
+              </Text>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -551,10 +677,111 @@ const styles = StyleSheet.create({
   timeSlotLabel: {
     fontSize: 14,
     color: '#6c757d',
-    marginLeft: 28
+    marginLeft: 28,
+    marginBottom: 4
+  },
+  timeSlotPoints: {
+    fontSize: 12,
+    color: '#868e96',
+    marginLeft: 28,
+    fontStyle: 'italic'
+  },
+  // Admin-specific styles
+  adminInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f5ff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 12
+  },
+  adminInfoContent: {
+    flex: 1
+  },
+  adminInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1864ab',
+    marginBottom: 4
+  },
+  adminInfoText: {
+    fontSize: 13,
+    color: '#1864ab',
+    lineHeight: 18
+  },
+  assigneeInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
+  },
+  assigneeLabel: {
+    fontSize: 12,
+    color: '#868e96',
+    marginBottom: 4
+  },
+  assigneeValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#212529'
+  },
+  rotationInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
+  },
+  rotationLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 8
+  },
+  rotationMembersList: {
+    gap: 8
+  },
+  rotationMemberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  rotationMemberAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#6c757d',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  currentAssigneeAvatar: {
+    backgroundColor: '#007AFF'
+  },
+  rotationMemberInitial: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14
+  },
+  rotationMemberName: {
+    fontSize: 14,
+    color: '#495057'
+  },
+  currentAssigneeName: {
+    fontWeight: '600',
+    color: '#007AFF'
   },
   assignmentsContainer: {
     gap: 12
+  },
+  assignmentsSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 8
   },
   assignmentCard: {
     backgroundColor: '#f8f9fa',
@@ -595,6 +822,68 @@ const styles = StyleSheet.create({
     color: '#868e96',
     fontStyle: 'italic'
   },
+  // Member-specific styles
+  myAssignmentCard: {
+    backgroundColor: '#e7f5ff',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#a5d8ff'
+  },
+  myAssignmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12
+  },
+  myAssignmentInfo: {
+    flex: 1
+  },
+  myAssignmentTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1864ab',
+    marginBottom: 4
+  },
+  myAssignmentDate: {
+    fontSize: 14,
+    color: '#495057'
+  },
+  myAssignmentDetails: {
+    gap: 6
+  },
+  myAssignmentDetail: {
+    fontSize: 14,
+    color: '#495057'
+  },
+  notAssignedCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    alignItems: 'center',
+    gap: 12
+  },
+  notAssignedText: {
+    fontSize: 16,
+    color: '#868e96',
+    textAlign: 'center'
+  },
+  memberInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+    gap: 12
+  },
+  memberInfoText: {
+    fontSize: 14,
+    color: '#6c757d',
+    flex: 1
+  },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -604,7 +893,8 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ffc9c9'
+    borderColor: '#ffc9c9',
+    marginTop: 16
   },
   deleteButtonText: {
     fontSize: 16,

@@ -1,5 +1,4 @@
-// src/screens/RotationScheduleScreen.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -27,11 +26,9 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     weeks,
     selectedWeek,
     currentWeek,
-    viewType,
     error,
     selectedWeekData,
     setSelectedWeek,
-    setViewType,
     loadRotationSchedule,
     rotateTasks,
     refresh,
@@ -44,6 +41,13 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     groupId,
     initialWeeks: 4
   });
+
+  // Ensure selectedWeek is set when weeks are loaded
+  useEffect(() => {
+    if (weeks.length > 0 && !selectedWeek) {
+      setSelectedWeek(currentWeek);
+    }
+  }, [weeks, selectedWeek, currentWeek, setSelectedWeek]);
 
   const handleRotateTasks = () => {
     Alert.alert(
@@ -67,9 +71,11 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
   };
 
   const renderWeekTab = (week: any) => {
+    if (!week) return null;
+    
     const isSelected = selectedWeek === week.weekNumber;
     const isCurrentWeek = currentWeek === week.weekNumber;
-    const hasTasks = week.tasks.length > 0;
+    const hasTasks = week.tasks && week.tasks.length > 0;
 
     return (
       <TouchableOpacity
@@ -115,14 +121,9 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
       >
         <View style={styles.taskHeader}>
           <View style={styles.taskTitleContainer}>
-            <Text style={styles.taskTitle} numberOfLines={1}>
+            <Text style={styles.taskTitle} numberOfLines={2}>
               {item.taskTitle}
             </Text>
-            {item.category && (
-              <View style={styles.categoryBadge}>
-                <Text style={styles.categoryText}>{item.category}</Text>
-              </View>
-            )}
           </View>
           <View style={styles.pointsBadge}>
             <Text style={styles.pointsText}>{item.points} pts</Text>
@@ -133,7 +134,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
           <View style={styles.assigneeContainer}>
             <MaterialCommunityIcons name="account" size={16} color="#6c757d" />
             <Text style={styles.assigneeText} numberOfLines={1}>
-              {item.assigneeName}
+              {item.assigneeName || 'Unassigned'}
             </Text>
           </View>
           
@@ -149,6 +150,13 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             )}
           </View>
         </View>
+        
+        {item.category && (
+          <View style={styles.categoryContainer}>
+            <MaterialCommunityIcons name="tag" size={12} color="#868e96" />
+            <Text style={styles.categoryText}>{item.category}</Text>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -186,9 +194,10 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
   };
 
   const renderStatistics = () => {
-    if (!selectedWeekData) return null;
+    if (!selectedWeekData || selectedWeekData.tasks.length === 0) return null;
     
     const fairnessScore = calculateFairnessScore();
+    const weekPoints = selectedWeekData.tasks.reduce((sum: number, task: any) => sum + (task.points || 0), 0);
     
     return (
       <View style={styles.statsCard}>
@@ -199,11 +208,13 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             <Text style={styles.statLabel}>Tasks</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{selectedWeekData.totalPoints}</Text>
+            <Text style={styles.statNumber}>{weekPoints}</Text>
             <Text style={styles.statLabel}>Total Points</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{selectedWeekData.assignedTasksCount}</Text>
+            <Text style={styles.statNumber}>
+              {selectedWeekData.tasks.filter((t: any) => t.assigneeName && t.assigneeName !== 'Unassigned').length}
+            </Text>
             <Text style={styles.statLabel}>Assigned</Text>
           </View>
           <View style={styles.statItem}>
@@ -280,38 +291,6 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* View Toggle */}
-        <View style={styles.viewToggle}>
-          <TouchableOpacity
-            style={[
-              styles.viewToggleButton,
-              viewType === 'weekly' && styles.viewToggleButtonActive
-            ]}
-            onPress={() => setViewType('weekly')}
-          >
-            <Text style={[
-              styles.viewToggleText,
-              viewType === 'weekly' && styles.viewToggleTextActive
-            ]}>
-              Weekly View
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.viewToggleButton,
-              viewType === 'task' && styles.viewToggleButtonActive
-            ]}
-            onPress={() => setViewType('task')}
-          >
-            <Text style={[
-              styles.viewToggleText,
-              viewType === 'task' && styles.viewToggleTextActive
-            ]}>
-              Task View
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Week Tabs */}
         {weeks.length > 0 && (
           <ScrollView 
@@ -335,7 +314,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         )}
 
         {/* Statistics */}
-        {selectedWeekData && renderStatistics()}
+        {renderStatistics()}
 
         {/* Day Distribution */}
         {selectedWeekData && selectedWeekData.tasks.length > 0 && renderDayDistribution()}
@@ -355,7 +334,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             <FlatList
               data={getSelectedWeekTasks()}
               renderItem={renderTaskItem}
-              keyExtractor={(item) => `${item.taskId}-${item.week}`}
+              keyExtractor={(item, index) => `${item.taskId}-${item.week}-${index}`}
               scrollEnabled={false}
               contentContainerStyle={styles.tasksList}
             />
@@ -364,8 +343,18 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
               <MaterialCommunityIcons name="calendar-blank" size={48} color="#dee2e6" />
               <Text style={styles.emptyTasksText}>No tasks scheduled for this week</Text>
               <Text style={styles.emptyTasksSubtext}>
-                Tasks will appear here once they're assigned to this week
+                {selectedWeek === currentWeek 
+                  ? "Tasks will appear here once they're assigned to the current week"
+                  : "No tasks have been scheduled for this future week"}
               </Text>
+              {selectedWeek === currentWeek && (
+                <TouchableOpacity 
+                  style={styles.assignTasksButton}
+                  onPress={() => navigation.navigate('TaskAssignment', { groupId, groupName })}
+                >
+                  <Text style={styles.assignTasksButtonText}>Assign Tasks</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
         </View>
@@ -384,26 +373,15 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             
             <TouchableOpacity 
               style={[styles.adminButton, styles.manageButton]}
-              onPress={() => navigation.navigate('TaskAssignment', { groupId })}
+              onPress={() => navigation.navigate('TaskAssignment', { 
+                groupId, 
+                groupName,
+                fromRotation: true 
+              })}
             >
               <MaterialCommunityIcons name="account-switch" size={20} color="#28a745" />
               <Text style={styles.adminButtonText}>Manage Assignments</Text>
             </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Legend */}
-        <View style={styles.legendCard}>
-          <Text style={styles.legendTitle}>Legend</Text>
-          <View style={styles.legendItems}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendColor, { backgroundColor: '#e7f5ff' }]} />
-              <Text style={styles.legendText}>Current Week</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendColor, { backgroundColor: '#f8f9fa' }]} />
-              <Text style={styles.legendText}>Other Weeks</Text>
-            </View>
           </View>
         </View>
       </ScrollView>
@@ -512,41 +490,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // View Toggle
-  viewToggle: {
-    flexDirection: 'row',
-    backgroundColor: '#f1f3f5',
-    marginHorizontal: 16,
-    marginVertical: 12,
-    borderRadius: 12,
-    padding: 4,
-  },
-  viewToggleButton: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  viewToggleButtonActive: {
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  viewToggleText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6c757d',
-  },
-  viewToggleTextActive: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
   // Week Tabs
   weeksScroll: {
     marginHorizontal: 16,
+    marginTop: 12,
   },
   weeksContainer: {
     flexDirection: 'row',
@@ -765,17 +712,6 @@ const styles = StyleSheet.create({
     color: '#212529',
     flex: 1,
   },
-  categoryBadge: {
-    backgroundColor: '#f1f3f5',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  categoryText: {
-    fontSize: 11,
-    color: '#6c757d',
-    fontWeight: '500',
-  },
   pointsBadge: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 10,
@@ -862,43 +798,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#007AFF',
   },
-  // Legend
-  legendCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  legendTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 12,
-  },
-  legendItems: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  legendItem: {
+  categoryContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
+    marginTop: 8,
   },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
+  categoryText: {
+    fontSize: 12,
+    color: '#868e96',
   },
-  legendText: {
+  assignTasksButton: {
+    marginTop: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+  },
+  assignTasksButtonText: {
+    color: 'white',
+    fontWeight: '600',
     fontSize: 14,
-    color: '#6c757d',
   },
 });

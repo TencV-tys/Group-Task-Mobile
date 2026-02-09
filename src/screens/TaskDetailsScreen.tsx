@@ -9,7 +9,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
-  StatusBar,
+  StatusBar, 
   Platform,
   Image,
   Linking

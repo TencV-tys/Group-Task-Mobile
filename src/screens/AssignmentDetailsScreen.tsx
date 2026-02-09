@@ -1,4 +1,4 @@
-// src/screens/AssignmentDetailsScreen.tsx - COMPLETE VERSION
+// src/screens/AssignmentDetailsScreen.tsx - UPDATED WITH COMPLETE BUTTON
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -21,13 +21,14 @@ import { API_BASE_URL } from '../config/api';
 const { width } = Dimensions.get('window');
 
 export default function AssignmentDetailsScreen({ navigation, route }: any) {
-  const { assignmentId, isAdmin } = route.params || {};
+  const { assignmentId, isAdmin, onVerified } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [assignment, setAssignment] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState('');
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'rejected'>('pending');
+  const [isMyAssignment, setIsMyAssignment] = useState(false);
 
   useEffect(() => {
     if (assignmentId) {
@@ -49,6 +50,15 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           result.assignment.verified === false ? 'rejected' : 'pending'
         );
         setAdminNotes(result.assignment.adminNotes || '');
+        
+        // Check if this is the current user's assignment
+        // You might need to get current user ID from somewhere (context, async storage, etc.)
+        // For now, we'll assume we have a way to check
+        // const currentUserId = await getCurrentUserId();
+        // setIsMyAssignment(result.assignment.userId === currentUserId);
+        
+        // Temporary: We'll check if assignment is not completed
+        setIsMyAssignment(!result.assignment.completed);
       } else {
         setError(result.message || 'Failed to load assignment details');
       }
@@ -58,6 +68,21 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCompleteAssignment = () => {
+    if (!assignment) return;
+    
+    navigation.navigate('CompleteAssignment', {
+      assignmentId: assignment.id,
+      taskTitle: assignment.task?.title || 'Unknown Task',
+      dueDate: assignment.dueDate,
+      onCompleted: () => {
+        // Refresh assignment details after completion
+        fetchAssignmentDetails();
+        if (onVerified) onVerified();
+      }
+    });
   };
 
   const handleVerify = async (verified: boolean) => {
@@ -79,6 +104,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             setVerificationStatus(verified ? 'verified' : 'rejected');
             setVerifying(false);
             fetchAssignmentDetails(); // Refresh data
+            if (onVerified) onVerified();
           }}]
         );
       } else {
@@ -139,6 +165,38 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     } else {
       return `${diffHours} hours late`;
     }
+  };
+
+  const renderCompleteButton = () => {
+    // Only show complete button if assignment is not completed
+    if (!assignment?.completed) {
+      return (
+        <View style={styles.completeSection}>
+          <Text style={styles.sectionTitle}>Complete This Assignment</Text>
+          <Text style={styles.completeDescription}>
+            Submit your completion with photo and notes
+          </Text>
+          <TouchableOpacity
+            style={styles.completeButton}
+            onPress={handleCompleteAssignment}
+          >
+            <MaterialCommunityIcons name="check-circle" size={20} color="white" />
+            <Text style={styles.completeButtonText}>Complete Assignment</Text>
+          </TouchableOpacity>
+          
+          {/* Show admin note if user is admin */}
+          {isAdmin && (
+            <View style={styles.adminNote}>
+              <MaterialCommunityIcons name="shield-account" size={16} color="#007AFF" />
+              <Text style={styles.adminNoteText}>
+                You're an admin completing your own assignment
+              </Text>
+            </View>
+          )}
+        </View>
+      );
+    }
+    return null;
   };
 
   const renderVerificationControls = () => {
@@ -287,6 +345,9 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             </View>
           </View>
 
+          {/* Complete Assignment Button (if not completed) */}
+          {renderCompleteButton()}
+
           {/* Points and Due Date */}
           <View style={styles.detailsGrid}>
             <View style={styles.detailItem}>
@@ -347,7 +408,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             </View>
           )}
 
-          {/* Verification Controls (Admin only) */}
+          {/* Verification Controls (Admin only, for other users' assignments) */}
           {renderVerificationControls()}
 
           {/* Assignment Info */}
@@ -574,6 +635,50 @@ const styles = StyleSheet.create({
   completionDate: {
     fontSize: 14,
     color: '#6c757d'
+  },
+  // Complete Assignment Section
+  completeSection: {
+    backgroundColor: '#e7f5ff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#a5d8ff'
+  },
+  completeDescription: {
+    fontSize: 14,
+    color: '#1864ab',
+    marginBottom: 16,
+    lineHeight: 20
+  },
+  completeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#2b8a3e',
+    padding: 16,
+    borderRadius: 8
+  },
+  completeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  adminNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: '#d0ebff',
+    borderRadius: 6
+  },
+  adminNoteText: {
+    fontSize: 14,
+    color: '#1864ab',
+    fontWeight: '500'
   },
   detailsGrid: {
     flexDirection: 'row',

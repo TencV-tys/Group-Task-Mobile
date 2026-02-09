@@ -30,56 +30,77 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   const fetchTasks = async (isRefreshing = false) => {
-    if (isRefreshing) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
+  if (isRefreshing) {
+    setRefreshing(true);
+  } else {
+    setLoading(true);
+  }
+  setError(null);
 
-    try {
-      console.log('Fetching tasks for group:', groupId);
-      
-      // Get ALL tasks
-      const allTasksResult = await TaskService.getGroupTasks(groupId);
-      
-      if (allTasksResult.success) {
-        setTasks(allTasksResult.tasks || []);
-      } else {
-        setError(allTasksResult.message || 'Failed to load tasks');
-      }
-      
-      // Get MY tasks using the dedicated endpoint
-      const myTasksResult = await TaskService.getMyTasks(groupId);
-      
-      if (myTasksResult.success && myTasksResult.tasks) {
-        // Create a map to deduplicate by task id
-        const taskMap = new Map();
+  try {
+    console.log('Fetching tasks for group:', groupId);
+    
+    // Get ALL tasks
+    const allTasksResult = await TaskService.getGroupTasks(groupId);
+    
+    if (allTasksResult.success) {
+      // Process tasks to ensure assignment info is properly set
+      const processedTasks = (allTasksResult.tasks || []).map((task: any) => {
+        // Add isAssignedToUser flag for better UI rendering
+        const userAssignment = task.assignments?.find(
+          (a: any) => a.user && a.user.id // You might need to adjust this based on your user ID field
+        );
         
-        myTasksResult.tasks.forEach((task: any) => {
-          if (task && task.id) {
-            // Keep only one instance of each task
-            if (!taskMap.has(task.id)) {
-              taskMap.set(task.id, task);
-            }
-          }
-        });
-        
-        // Convert map back to array
-        const uniqueMyTasks = Array.from(taskMap.values());
-        setMyTasks(uniqueMyTasks);
-      } else {
-        setMyTasks([]);
-      }
+        return {
+          ...task,
+          isAssignedToUser: !!userAssignment || !!task.userAssignment,
+          // Ensure we have assignment info even if it's not in the expected format
+          userAssignment: userAssignment || task.userAssignment
+        };
+      });
       
-    } catch (err: any) {
-      console.error('Error fetching tasks:', err);
-      setError(err.message || 'Network error');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setTasks(processedTasks);
+    } else {
+      setError(allTasksResult.message || 'Failed to load tasks');
     }
-  }; 
+    
+    // Get MY tasks using the dedicated endpoint
+    const myTasksResult = await TaskService.getMyTasks(groupId);
+    
+    if (myTasksResult.success && myTasksResult.tasks) {
+      // Create a map to deduplicate by task id
+      const taskMap = new Map();
+      
+      myTasksResult.tasks.forEach((task: any) => {
+        if (task && task.id) {
+          // Add isAssignedToUser flag for my tasks
+          const enhancedTask = {
+            ...task,
+            isAssignedToUser: true,
+            userAssignment: task.assignment || task.userAssignment
+          };
+          
+          if (!taskMap.has(task.id)) {
+            taskMap.set(task.id, enhancedTask);
+          }
+        }
+      });
+      
+      // Convert map back to array
+      const uniqueMyTasks = Array.from(taskMap.values());
+      setMyTasks(uniqueMyTasks);
+    } else {
+      setMyTasks([]);
+    }
+    
+  } catch (err: any) {
+    console.error('Error fetching tasks:', err);
+    setError(err.message || 'Network error');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+}; 
 
   useEffect(() => {
     if (groupId) {
@@ -221,76 +242,126 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       handleViewTaskDetails(task.id);
     }
   };
-
-  const renderAssignmentInfo = (task: any) => {
-    const hasAssignment = task.userAssignment || task.assignments?.length > 0;
-    
-    if (!hasAssignment) {
-      return (
-        <View style={styles.unassignedInfo}>
-          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
-          <Text style={styles.unassignedText}>
-            Not assigned to anyone
-          </Text>
-        </View>
-      );
-    }
-
-    // Find assignment - for My Tasks, use the assignment that's returned
-    const currentAssignment = task.assignment || task.userAssignment || task.assignments?.[0];
-    
-    const isCompleted = currentAssignment?.completed;
-    const assigneeName = currentAssignment?.user?.fullName || 'Unknown';
-    const dueDate = currentAssignment?.dueDate ? new Date(currentAssignment.dueDate) : null;
-    
+const renderAssignmentInfo = (task: any) => {
+  const hasAssignment = task.userAssignment || task.assignments?.length > 0;
+  
+  if (!hasAssignment) {
     return (
-      <View style={[
-        styles.assignmentInfo,
-        isCompleted ? styles.completedAssignment : styles.pendingAssignment
-      ]}>
-        <View style={styles.assignmentHeader}>
-          <MaterialCommunityIcons 
-            name={isCompleted ? "check-circle" : "account-clock"} 
-            size={16} 
-            color={isCompleted ? "#2b8a3e" : "#e67700"} 
-          />
-          <Text style={[
-            styles.assignmentStatus,
-            isCompleted ? { color: "#2b8a3e" } : { color: "#e67700" }
-          ]}>
-            {isCompleted ? 'Completed' : 'Assigned to'} {isCompleted ? '' : assigneeName}
-          </Text>
-        </View>
-        
-        <View style={styles.assignmentDetails}>
-          {dueDate && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Due:</Text> {dueDate.toLocaleDateString()}
-            </Text>
-          )}
-          {task.executionFrequency && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Frequency:</Text> {task.executionFrequency}
-            </Text>
-          )}
-          {task.selectedDays?.length > 0 && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Days:</Text> {task.selectedDays.join(', ')}
-            </Text>
-          )}
-          {task.timeSlots?.length > 0 && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Time:</Text> {
-                task.timeSlots.map((slot: any) => 
-                  `${slot.startTime}-${slot.endTime}${slot.label ? ` (${slot.label})` : ''}`
-                ).join(', ')
-              }
-            </Text>
-          )}
-        </View>
+      <View style={styles.unassignedInfo}>
+        <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
+        <Text style={styles.unassignedText}>
+          Not assigned to anyone
+        </Text>
       </View>
     );
-  };
+  }
+
+  // Try to find assignment in multiple ways
+  let currentAssignment = null;
+  
+  // 1. First check if there's a direct user assignment
+  if (task.userAssignment) {
+    currentAssignment = task.userAssignment;
+  } 
+  // 2. Check assignments array
+  else if (task.assignments && task.assignments.length > 0) {
+    // For "My Tasks" tab, we should see our own assignment
+    if (selectedTab === 'my') {
+      // In "My Tasks", the task itself should have assignment info
+      currentAssignment = task.assignment || task.assignments[0];
+    } 
+    // For "All Tasks" tab as admin, show the main assignee
+    else {
+      // Find the current assignee based on task.currentAssignee
+      if (task.currentAssignee) {
+        currentAssignment = task.assignments.find(
+          (a: any) => a.userId === task.currentAssignee
+        );
+      }
+      // If no currentAssignee found, show the first assignment
+      if (!currentAssignment && task.assignments.length > 0) {
+        currentAssignment = task.assignments[0];
+      }
+    }
+  }
+  
+  if (!currentAssignment) {
+    return (
+      <View style={styles.unassignedInfo}>
+        <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
+        <Text style={styles.unassignedText}>
+          Not assigned to anyone
+        </Text>
+      </View>
+    );
+  }
+
+  const isCompleted = currentAssignment?.completed;
+  const assigneeName = currentAssignment?.user?.fullName || 'Unknown';
+  const dueDate = currentAssignment?.dueDate ? new Date(currentAssignment.dueDate) : null;
+  
+  // Check if this task is assigned to the current user
+  const isAssignedToMe = task.isAssignedToUser || task.userAssignment;
+  
+  return (
+    <View style={[
+      styles.assignmentInfo,
+      isCompleted ? styles.completedAssignment : styles.pendingAssignment,
+      isAssignedToMe && styles.myAssignment
+    ]}>
+      <View style={styles.assignmentHeader}>
+        <MaterialCommunityIcons 
+          name={isCompleted ? "check-circle" : isAssignedToMe ? "account" : "account-clock"} 
+          size={16} 
+          color={isCompleted ? "#2b8a3e" : isAssignedToMe ? "#007AFF" : "#e67700"} 
+        />
+        <Text style={[
+          styles.assignmentStatus,
+          isCompleted ? { color: "#2b8a3e" } : 
+          isAssignedToMe ? { color: "#007AFF" } : 
+          { color: "#e67700" }
+        ]}>
+          {isCompleted ? 'Completed' : 
+           isAssignedToMe ? 'Assigned to you' : 
+           `Assigned to ${assigneeName}`}
+        </Text>
+      </View>
+      
+      <View style={styles.assignmentDetails}>
+        {dueDate && (
+          <Text style={styles.assignmentDetail}>
+            <Text style={styles.detailLabel}>Due:</Text> {dueDate.toLocaleDateString()}
+          </Text>
+        )}
+        {task.executionFrequency && (
+          <Text style={styles.assignmentDetail}>
+            <Text style={styles.detailLabel}>Frequency:</Text> {task.executionFrequency.toLowerCase()}
+          </Text>
+        )}
+        {task.selectedDays?.length > 0 && (
+          <Text style={styles.assignmentDetail}>
+            <Text style={styles.detailLabel}>Days:</Text> {task.selectedDays.join(', ')}
+          </Text>
+        )}
+        {task.timeSlots?.length > 0 && (
+          <Text style={styles.assignmentDetail}>
+            <Text style={styles.detailLabel}>Time:</Text> {
+              task.timeSlots.slice(0, 2).map((slot: any) => 
+                `${slot.startTime}-${slot.endTime}${slot.label ? ` (${slot.label})` : ''}`
+              ).join(', ')
+            }
+            {task.timeSlots.length > 2 && `... +${task.timeSlots.length - 2} more`}
+          </Text>
+        )}
+        {currentAssignment?.points !== undefined && currentAssignment.points > 0 && (
+          <Text style={styles.assignmentDetail}>
+            <Text style={styles.detailLabel}>Points:</Text> {currentAssignment.points}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+};
 
   const renderTask = ({ item }: any) => {
     const isAdmin = userRole === 'ADMIN';
@@ -603,6 +674,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 80
   },
+  myAssignment: {
+  backgroundColor: '#e7f5ff',
+  borderColor: '#a5d8ff'
+},
   loadingText: {
     marginTop: 12,
     color: '#6c757d',

@@ -941,7 +941,7 @@ const styles = StyleSheet.create({
     borderColor: '#e9ecef'
   },
   disabledButton: {
-    opacity: 0.5
+    opacity: 0.5 
   },
   cancelButtonText: {
     fontSize: 16,

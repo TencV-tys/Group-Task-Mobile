@@ -1,4 +1,4 @@
-// src/screens/GroupTasksScreen.tsx - COMPLETE UPDATED VERSION WITH FLOATING BUTTON
+// src/screens/GroupTasksScreen.tsx - FINAL FIXED VERSION
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -39,20 +39,39 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
     try {
       console.log('Fetching tasks for group:', groupId);
-      const result = await TaskService.getGroupTasks(groupId);
-      console.log('Tasks result:', result);
       
-      if (result.success) {
-        setTasks(result.tasks || []);
-        
-        // Filter my tasks
-        const myTasksList = (result.tasks || []).filter((task: any) => 
-          task.userAssignment || task.assignments?.some((a: any) => a.userId)
-        );
-        setMyTasks(myTasksList);
+      // Get ALL tasks
+      const allTasksResult = await TaskService.getGroupTasks(groupId);
+      
+      if (allTasksResult.success) {
+        setTasks(allTasksResult.tasks || []);
       } else {
-        setError(result.message || 'Failed to load tasks');
+        setError(allTasksResult.message || 'Failed to load tasks');
       }
+      
+      // Get MY tasks using the dedicated endpoint
+      const myTasksResult = await TaskService.getMyTasks(groupId);
+      
+      if (myTasksResult.success && myTasksResult.tasks) {
+        // Create a map to deduplicate by task id
+        const taskMap = new Map();
+        
+        myTasksResult.tasks.forEach((task: any) => {
+          if (task && task.id) {
+            // Keep only one instance of each task
+            if (!taskMap.has(task.id)) {
+              taskMap.set(task.id, task);
+            }
+          }
+        });
+        
+        // Convert map back to array
+        const uniqueMyTasks = Array.from(taskMap.values());
+        setMyTasks(uniqueMyTasks);
+      } else {
+        setMyTasks([]);
+      }
+      
     } catch (err: any) {
       console.error('Error fetching tasks:', err);
       setError(err.message || 'Network error');
@@ -60,7 +79,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }; 
 
   useEffect(() => {
     if (groupId) {
@@ -92,6 +111,16 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   };
 
   const handleEditTask = (task: any) => {
+    // Only allow editing from All Tasks tab
+    if (selectedTab === 'my') {
+      return; // No editing in My Tasks
+    }
+    
+    if (userRole !== 'ADMIN') {
+      Alert.alert('Restricted', 'Only admins can edit tasks');
+      return;
+    }
+    
     navigation.navigate('UpdateTask', {
       task,
       groupId,
@@ -106,11 +135,22 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     navigation.navigate('TaskDetails', { 
       taskId,
       groupId,
-      userRole 
+      userRole
     });
   };
 
   const handleDeleteTask = async (taskId: string, taskTitle: string) => {
+    // Only allow deleting from All Tasks tab
+    if (selectedTab === 'my') {
+      Alert.alert('Not Allowed', 'Cannot delete tasks from My Tasks view. Go to All Tasks tab.');
+      return;
+    }
+    
+    if (userRole !== 'ADMIN') {
+      Alert.alert('Restricted', 'Only admins can delete tasks');
+      return;
+    }
+    
     Alert.alert(
       'Delete Task',
       `Are you sure you want to delete "${taskTitle}"?`,
@@ -124,7 +164,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('Deleting task:', taskId);
               const result = await TaskService.deleteTask(taskId);
               
               if (result.success) {
@@ -145,6 +184,13 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   };
 
   const showTaskOptions = (task: any) => {
+    // In My Tasks tab, only show View Details option
+    if (selectedTab === 'my') {
+      handleViewTaskDetails(task.id);
+      return;
+    }
+    
+    // In All Tasks tab, show full options for admins
     const isAdmin = userRole === 'ADMIN';
     
     if (isAdmin) {
@@ -190,7 +236,9 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       );
     }
 
-    const currentAssignment = task.userAssignment || task.assignments?.[0];
+    // Find assignment - for My Tasks, use the assignment that's returned
+    const currentAssignment = task.assignment || task.userAssignment || task.assignments?.[0];
+    
     const isCompleted = currentAssignment?.completed;
     const assigneeName = currentAssignment?.user?.fullName || 'Unknown';
     const dueDate = currentAssignment?.dueDate ? new Date(currentAssignment.dueDate) : null;
@@ -215,9 +263,11 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         </View>
         
         <View style={styles.assignmentDetails}>
-          <Text style={styles.assignmentDetail}>
-            <Text style={styles.detailLabel}>Due:</Text> {dueDate ? dueDate.toLocaleDateString() : 'No date'}
-          </Text>
+          {dueDate && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Due:</Text> {dueDate.toLocaleDateString()}
+            </Text>
+          )}
           {task.executionFrequency && (
             <Text style={styles.assignmentDetail}>
               <Text style={styles.detailLabel}>Frequency:</Text> {task.executionFrequency}
@@ -244,7 +294,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
   const renderTask = ({ item }: any) => {
     const isAdmin = userRole === 'ADMIN';
-    const isCompleted = item.userAssignment?.completed;
+    const isCompleted = item.assignment?.completed || item.userAssignment?.completed;
+    const isMyTasksView = selectedTab === 'my';
     
     return (
       <TouchableOpacity
@@ -253,7 +304,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           isCompleted && styles.completedTaskCard
         ]}
         onPress={() => handleViewTaskDetails(item.id)}
-        onLongPress={() => isAdmin && showTaskOptions(item)}
+        onLongPress={() => !isMyTasksView && isAdmin && showTaskOptions(item)}
       >
         <View style={styles.taskHeader}>
           <View style={[
@@ -276,7 +327,9 @@ export default function GroupTasksScreen({ navigation, route }: any) {
               ]} numberOfLines={2}>
                 {item.title}
               </Text>
-              {isAdmin && (
+              
+              {/* Show edit button only in All Tasks tab for admins */}
+              {!isMyTasksView && isAdmin && (
                 <TouchableOpacity 
                   style={styles.editButton}
                   onPress={(e) => {
@@ -324,7 +377,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           </Text>
         </View>
         
-        {isAdmin && (
+        {/* Show delete button only in All Tasks tab for admins */}
+        {!isMyTasksView && isAdmin && (
           <TouchableOpacity 
             style={styles.deleteButton}
             onPress={(e) => {
@@ -355,7 +409,10 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       <FlatList
         data={currentTasks}
         renderItem={renderTask}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => {
+          // Use task.id if available, otherwise use index as fallback
+          return item?.id || `task-${index}`;
+        }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -457,18 +514,30 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         renderContent()
       )}
 
-      {/* Floating Create Task Button - Only show for ADMIN */}
-      {userRole === 'ADMIN' && (
-        <TouchableOpacity
-          style={styles.floatingButton}
-          onPress={handleCreateTask}
-          activeOpacity={0.8}
-        >
-          <View style={styles.floatingButtonInner}>
-            <MaterialCommunityIcons name="plus" size={24} color="white" />
-            <Text style={styles.floatingButtonText}>Create Task</Text>
-          </View>
-        </TouchableOpacity>
+      {/* Floating Action Buttons Container - Only show for ADMIN in All Tasks tab */}
+      {userRole === 'ADMIN' && selectedTab === 'all' && (
+        <View style={styles.floatingButtonsContainer}>
+          {/* Quick Assignment Button */}
+          <TouchableOpacity
+            style={[styles.floatingButton, styles.assignButton]}
+            onPress={handleNavigateToAssignment}
+            activeOpacity={0.8}
+          >
+            <View style={styles.floatingButtonInner}>
+              <MaterialCommunityIcons name="account-switch" size={22} color="white" />
+              <Text style={styles.floatingButtonText}>Assign</Text>
+            </View>
+          </TouchableOpacity>
+          
+          {/* Create Task Button - Plus Icon Only */}
+          <TouchableOpacity
+            style={[styles.floatingButton, styles.createButton]}
+            onPress={handleCreateTask}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="plus" size={28} color="white" />
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Bottom Tab Navigation */}
@@ -532,7 +601,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 80 // Account for bottom tab
+    paddingBottom: 80
   },
   loadingText: {
     marginTop: 12,
@@ -593,7 +662,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    paddingBottom: 100 // Account for bottom tab
+    paddingBottom: 100
   },
   errorText: {
     color: '#dc3545',
@@ -615,7 +684,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 100 // Extra padding for floating button
+    paddingBottom: 100
   },
   taskCard: {
     backgroundColor: 'white',
@@ -824,32 +893,46 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16
   },
-  // Floating Button Styles
-  floatingButton: {
+  // Floating Buttons Container
+  floatingButtonsContainer: {
     position: 'absolute',
-    bottom: 90, // Above the bottom tab
+    bottom: 90,
     right: 20,
-    backgroundColor: '#007AFF',
+    alignItems: 'flex-end',
+    gap: 12,
+    zIndex: 100
+  },
+  floatingButton: {
     borderRadius: 30,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
-    zIndex: 100
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  assignButton: {
+    backgroundColor: '#28a745',
+    paddingHorizontal: 16,
+    paddingVertical: 10
+  },
+  createButton: {
+    backgroundColor: '#007AFF',
+    width: 56,
+    height: 56,
+    borderRadius: 28
   },
   floatingButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8
+    gap: 6
   },
   floatingButtonText: {
     color: 'white',
     fontWeight: '600',
-    fontSize: 16
+    fontSize: 14
   },
   // Bottom Tab Navigation
   bottomTab: {
@@ -890,7 +973,7 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   },
   activeTabText: {
-    color: '#007AFF',
+    color: '#007AFF', 
     fontWeight: '600'
   }
 });

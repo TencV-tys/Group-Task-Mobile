@@ -101,7 +101,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 Alert.alert('Success', `Tasks rotated to week ${result.newWeek}`);
                 onRefreshTasks?.();
                 loadGroupData();
-              } else {
+              } else { 
                 Alert.alert('Error', result.message || 'Failed to rotate tasks');
               }
             } catch (error: any) {

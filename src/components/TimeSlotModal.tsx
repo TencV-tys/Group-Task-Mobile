@@ -1,4 +1,4 @@
-// src/components/TimeSlotModal.tsx - UPDATED WITH POINTS AVAILABILITY CHECK
+// src/components/TimeSlotModal.tsx - UPDATED WITH MAX POINTS LIMIT
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -36,15 +36,17 @@ interface TimeSlotModalProps {
   editingSlot: TimeSlot | null;
   totalTaskPoints: number;
   usedPoints: number;
+  maxPointsPerSlot?: number; // ADDED: Maximum points per slot
 }
 
 export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   visible,
   onClose,
   onSave,
-  editingSlot,
+  editingSlot, 
   totalTaskPoints,
-  usedPoints
+  usedPoints,
+  maxPointsPerSlot = 10 // DEFAULT to 10 if not provided
 }) => {
   const [currentStep, setCurrentStep] = useState<'time' | 'details'>('time');
   const [startTime, setStartTime] = useState({
@@ -77,6 +79,7 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   
   const availablePoints = getAvailablePoints();
   const hasAvailablePoints = availablePoints > 0;
+  const maxAllowedPoints = Math.min(availablePoints, maxPointsPerSlot);
 
   // Initialize with editing slot data
   useEffect(() => {
@@ -118,15 +121,19 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     if (points) {
       const pointsNum = parseInt(points, 10);
       if (isNaN(pointsNum) || pointsNum < 0) {
-        setError('Points must be a positive number (0-10)');
+        setError('Points must be a positive number');
         return;
       }
-      if (pointsNum > 10) {
-        setError('Maximum 10 points per time slot');
+      
+      // Check against max points per slot
+      if (pointsNum > maxPointsPerSlot) {
+        setError(`Maximum ${maxPointsPerSlot} points per time slot`);
         return;
       }
-      if (pointsNum > availablePoints) {
-        setError(`Only ${availablePoints} points available. Please reduce the points for this slot.`);
+      
+      // Check against available points
+      if (pointsNum > maxAllowedPoints) {
+        setError(`Only ${maxAllowedPoints} points available. Please reduce the points for this slot.`);
         return;
       }
     }
@@ -270,6 +277,7 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   const renderDetailsStep = () => {
     const pointsNum = parseInt(points, 10) || 0;
     const canAddSlot = hasAvailablePoints || editingSlot || pointsNum === 0;
+    const maxQuickSelect = Math.min(10, maxAllowedPoints);
     
     return (
       <View style={styles.stepContainer}>
@@ -322,18 +330,19 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
               !hasAvailablePoints && !editingSlot && styles.availablePointsZero
             ]}>
               Available: {availablePoints} points
+              {maxPointsPerSlot < 10 && ` • Max: ${maxPointsPerSlot} per slot`}
             </Text>
           </View>
           
           <View style={styles.pointsInputContainer}>
             <TextInput
               style={styles.pointsInput}
-              placeholder="0-10"
+              placeholder={`0-${maxPointsPerSlot}`}
               value={points}
               onChangeText={(text) => {
                 // Only allow numbers and limit to 2 digits
                 const num = text.replace(/[^0-9]/g, '');
-                if (num === '' || (parseInt(num, 10) >= 0 && parseInt(num, 10) <= 10)) {
+                if (num === '' || (parseInt(num, 10) >= 0 && parseInt(num, 10) <= maxPointsPerSlot)) {
                   setPoints(num);
                 }
               }}
@@ -343,24 +352,24 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
             <Text style={styles.pointsLabel}>points</Text>
           </View>
           
-          {/* Points Quick Select */}
+          {/* Points Quick Select - UPDATED to respect maxPointsPerSlot */}
           <Text style={styles.quickSelectLabel}>Quick select:</Text>
           <View style={styles.pointsGrid}>
-            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+            {Array.from({ length: maxPointsPerSlot + 1 }, (_, i) => i).map((num) => (
               <TouchableOpacity
                 key={`points-${num}`}
                 style={[
                   styles.pointsButton,
                   points === num.toString() && styles.pointsButtonActive,
-                  num > availablePoints && styles.pointsButtonDisabled
+                  num > maxAllowedPoints && styles.pointsButtonDisabled
                 ]}
                 onPress={() => setPoints(num.toString())}
-                disabled={num > availablePoints}
+                disabled={num > maxAllowedPoints}
               >
                 <Text style={[
                   styles.pointsButtonText,
                   points === num.toString() && styles.pointsButtonTextActive,
-                  num > availablePoints && styles.pointsButtonTextDisabled
+                  num > maxAllowedPoints && styles.pointsButtonTextDisabled
                 ]}>
                   {num}
                 </Text>
@@ -374,6 +383,7 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
               ? `This slot awards ${pointsNum} point${pointsNum === 1 ? '' : 's'}`
               : 'Uses task default points if left at 0'
             }
+            {maxPointsPerSlot < 10 && ` • Maximum ${maxPointsPerSlot} points per slot`}
           </Text>
           
           {/* Special warning when no points available */}
@@ -382,6 +392,16 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
               <MaterialCommunityIcons name="information-outline" size={16} color="#1864ab" />
               <Text style={styles.infoText}>
                 All points are assigned. This slot will use task default points.
+              </Text>
+            </View>
+          )}
+          
+          {/* Warning when max points per slot is less than 10 */}
+          {maxPointsPerSlot < 10 && (
+            <View style={styles.limitInfoBox}>
+              <MaterialCommunityIcons name="information-outline" size={16} color="#ff6b35" />
+              <Text style={styles.limitInfoText}>
+                Note: Maximum {maxPointsPerSlot} points per time slot
               </Text>
             </View>
           )}
@@ -821,6 +841,22 @@ const styles = StyleSheet.create({
   infoText: {
     fontSize: 12,
     color: '#1864ab'
+  },
+  limitInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#fff3e0',
+    borderWidth: 1,
+    borderColor: '#ffcc80',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 8
+  },
+  limitInfoText: {
+    fontSize: 12,
+    color: '#e65100',
+    fontWeight: '500'
   },
   errorBox: {
     flexDirection: 'row',

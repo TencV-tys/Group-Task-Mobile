@@ -1,4 +1,4 @@
-// src/screens/CreateTaskScreen.tsx - UPDATED VERSION WITH TIME SLOT POINTS
+// src/screens/CreateTaskScreen.tsx - UPDATED with 10-point max
 import React, { useState, useRef } from 'react';
 import {
   View,
@@ -65,8 +65,15 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     }
 
     const points = parseInt(form.points, 10);
+    
+    // VALIDATION: Points must be between 1 and 10
     if (isNaN(points) || points < 1) {
       Alert.alert('Error', 'Total points must be at least 1');
+      return;
+    }
+    
+    if (points > 10) {
+      Alert.alert('Error', 'Total points cannot exceed 10');
       return;
     }
 
@@ -75,6 +82,11 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     if (form.timeSlots.length > 0) {
       for (const slot of form.timeSlots) {
         const slotPoints = parseInt(slot.points || '0', 10);
+        // Check individual time slot limit
+        if (slotPoints > 10) {
+          Alert.alert('Error', `Time slot "${slot.label || 'Untitled'}" has ${slotPoints} points. Maximum is 10 points per time slot.`);
+          return;
+        }
         if (!isNaN(slotPoints) && slotPoints > 0) {
           totalTimeSlotPoints += slotPoints;
         }
@@ -190,6 +202,13 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     }));
   };
 
+  const handlePointsChange = (text: string) => {
+    const num = parseInt(text, 10);
+    if (text === '' || (!isNaN(num) && num >= 1 && num <= 10)) {
+      setForm({ ...form, points: text });
+    }
+  };
+
   // Time slot management
   const handleAddTimeSlot = () => {
     setEditingSlot(null);
@@ -255,9 +274,39 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     }, 0);
   };
 
+  // Check if any time slot exceeds 10 points
+  const hasTimeSlotExceedingLimit = () => {
+    return form.timeSlots.some(slot => {
+      const points = parseInt(slot.points || '0', 10);
+      return points > 10;
+    });
+  };
+
   const totalTimeSlotPoints = calculateTimeSlotPoints();
   const remainingPoints = parseInt(form.points, 10) - totalTimeSlotPoints;
   const isPointsValid = remainingPoints >= 0;
+  
+  // Check if total points are within 1-10 range
+  const isPointsWithinLimit = () => {
+    const points = parseInt(form.points, 10);
+    return !isNaN(points) && points >= 1 && points <= 10;
+  };
+
+  // Check if submit button should be disabled
+  const isSubmitDisabled = () => {
+    const points = parseInt(form.points, 10);
+    const isPointsInvalid = isNaN(points) || points < 1 || points > 10;
+    
+    return (
+      !form.title.trim() ||
+      isPointsInvalid ||
+      !isPointsValid ||
+      hasTimeSlotExceedingLimit() ||
+      (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
+      (form.executionFrequency === 'WEEKLY' && form.selectedDays.length === 0 && !form.dayOfWeek) ||
+      loading
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -332,28 +381,39 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
               {/* Total Points Input */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Total Task Points *</Text>
+                <View style={styles.labelContainer}>
+                  <Text style={styles.label}>Total Task Points *</Text>
+                  <Text style={styles.pointsLimitText}>Max: 10 points</Text>
+                </View>
                 <TextInput
-                  style={styles.input}
-                  placeholder="1"
+                  style={[
+                    styles.input,
+                    !isPointsWithinLimit() && styles.inputError
+                  ]}
+                  placeholder="1-10"
                   value={form.points}
-                  onChangeText={(text) => {
-                    const num = parseInt(text, 10);
-                    if (text === '' || (!isNaN(num) && num >= 1)) {
-                      setForm({ ...form, points: text });
-                    }
-                  }}
+                  onChangeText={handlePointsChange}
                   keyboardType="number-pad"
-                  maxLength={3}
+                  maxLength={2}
                   editable={!loading}
                 />
                 <Text style={styles.helperText}>
-                  Total reward points for this task (minimum 1)
+                  Total reward points for this task (1-10)
                 </Text>
-                <Text style={[styles.helperText, !isPointsValid && styles.pointsError]}>
+                {!isPointsWithinLimit() && (
+                  <Text style={styles.errorText}>
+                    Points must be between 1 and 10
+                  </Text>
+                )}
+                <Text style={[styles.helperText, !isPointsValid && styles.errorText]}>
                   Time slots assigned: {totalTimeSlotPoints} points
                   {!isPointsValid && ` (exceeds total by ${-remainingPoints})`}
                 </Text>
+                {hasTimeSlotExceedingLimit() && (
+                  <Text style={styles.errorText}>
+                    Some time slots exceed 10 points limit
+                  </Text>
+                )}
               </View>
 
               <View style={[styles.inputGroup, styles.halfWidth]}>
@@ -417,7 +477,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                       Time Slots {form.executionFrequency === 'DAILY' ? '*' : ''}
                     </Text>
                     <Text style={[styles.helperText, { marginTop: 2 }]}>
-                      Assign points to each time slot
+                      Assign points to each time slot (max 10 per slot)
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -442,66 +502,90 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   </View>
                 ) : (
                   <View style={styles.timeSlotsList}>
-                    {form.timeSlots.map((slot, index) => (
-                      <View key={index} style={styles.timeSlotItem}>
-                        <View style={styles.timeSlotInfo}>
-                          <View style={styles.timeSlotHeader}>
-                            <Text style={styles.timeSlotTime}>
-                              {formatTimeDisplay(slot.startTime)} - {formatTimeDisplay(slot.endTime)}
-                            </Text>
-                            {slot.points && parseInt(slot.points, 10) > 0 ? (
-                              <View style={styles.pointsBadge}>
-                                <Text style={styles.pointsBadgeText}>
-                                  {slot.points} pts
-                                </Text>
-                              </View>
+                    {form.timeSlots.map((slot, index) => {
+                      const slotPoints = parseInt(slot.points || '0', 10);
+                      const exceedsLimit = slotPoints > 10;
+                      
+                      return (
+                        <View 
+                          key={index} 
+                          style={[
+                            styles.timeSlotItem,
+                            exceedsLimit && styles.timeSlotItemError
+                          ]}
+                        >
+                          <View style={styles.timeSlotInfo}>
+                            <View style={styles.timeSlotHeader}>
+                              <Text style={styles.timeSlotTime}>
+                                {formatTimeDisplay(slot.startTime)} - {formatTimeDisplay(slot.endTime)}
+                              </Text>
+                              {slot.points && slotPoints > 0 ? (
+                                <View style={[
+                                  styles.pointsBadge,
+                                  exceedsLimit && styles.pointsBadgeError
+                                ]}>
+                                  <Text style={styles.pointsBadgeText}>
+                                    {slot.points} pts
+                                    {exceedsLimit && ' ⚠️'}
+                                  </Text>
+                                </View>
+                              ) : null}
+                            </View>
+                            {slot.label ? (
+                              <Text style={styles.timeSlotLabel}>{slot.label}</Text>
                             ) : null}
+                            <Text style={[
+                              styles.timeSlotPoints,
+                              exceedsLimit && styles.errorText
+                            ]}>
+                              Points: {slot.points || '0'} 
+                              {exceedsLimit && ' (exceeds 10 point limit)'}
+                            </Text>
                           </View>
-                          {slot.label ? (
-                            <Text style={styles.timeSlotLabel}>{slot.label}</Text>
-                          ) : null}
-                          <Text style={styles.timeSlotPoints}>
-                            Points: {slot.points || '0'} (use task default)
-                          </Text>
+                          <View style={styles.timeSlotActions}>
+                            <TouchableOpacity
+                              style={styles.timeSlotActionButton}
+                              onPress={() => handleEditTimeSlot(index)}
+                              disabled={loading}
+                            >
+                              <MaterialCommunityIcons name="pencil" size={18} color="#6c757d" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.timeSlotActionButton}
+                              onPress={() => handleRemoveTimeSlot(index)}
+                              disabled={loading}
+                            >
+                              <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
+                            </TouchableOpacity>
+                          </View>
                         </View>
-                        <View style={styles.timeSlotActions}>
-                          <TouchableOpacity
-                            style={styles.timeSlotActionButton}
-                            onPress={() => handleEditTimeSlot(index)}
-                            disabled={loading}
-                          >
-                            <MaterialCommunityIcons name="pencil" size={18} color="#6c757d" />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.timeSlotActionButton}
-                            onPress={() => handleRemoveTimeSlot(index)}
-                            disabled={loading}
-                          >
-                            <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    ))}
+                      );
+                    })}
                     {/* Points Summary */}
                     <View style={styles.pointsSummary}>
                       <Text style={styles.pointsSummaryText}>
-                        Total Task Points: <Text style={styles.pointsHighlight}>{form.points}</Text>
+                        Total Task Points: <Text style={styles.pointsHighlight}>{form.points}/10</Text>
                       </Text>
                       <Text style={styles.pointsSummaryText}>
                         Time Slots Assigned: <Text style={styles.pointsHighlight}>{totalTimeSlotPoints}</Text>
                       </Text>
-                      <Text style={[styles.pointsSummaryText, !isPointsValid && styles.pointsError]}>
-                        Remaining: <Text style={[styles.pointsHighlight, !isPointsValid && styles.pointsError]}>
+                      <Text style={[styles.pointsSummaryText, !isPointsValid && styles.errorText]}>
+                        Remaining: <Text style={[styles.pointsHighlight, !isPointsValid && styles.errorText]}>
                           {remainingPoints}
                         </Text>
                       </Text>
+                      {hasTimeSlotExceedingLimit() && (
+                        <Text style={styles.errorText}>
+                          ⚠️ Some time slots exceed 10 point limit
+                        </Text>
+                      )}
                     </View>
                   </View>
                 )}
                 <Text style={styles.helperText}>
                   {form.executionFrequency === 'DAILY'
-                    ? 'Daily tasks require time slots. Assign points to each slot.'
-                    : 'Optional time slots for selected days. You can assign points to each slot.'}
+                    ? 'Daily tasks require time slots. Assign points to each slot (max 10).'
+                    : 'Optional time slots for selected days. You can assign points to each slot (max 10).'}
                 </Text>
               </View>
 
@@ -577,20 +661,10 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               <TouchableOpacity
                 style={[
                   styles.submitButton,
-                  (!form.title.trim() ||
-                    !isPointsValid ||
-                    (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
-                    (form.executionFrequency === 'WEEKLY' && form.selectedDays.length === 0 && !form.dayOfWeek) ||
-                    loading) && styles.buttonDisabled
+                  isSubmitDisabled() && styles.buttonDisabled
                 ]}
                 onPress={handleSubmit}
-                disabled={
-                  !form.title.trim() ||
-                  !isPointsValid ||
-                  (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
-                  (form.executionFrequency === 'WEEKLY' && form.selectedDays.length === 0 && !form.dayOfWeek) ||
-                  loading
-                }
+                disabled={isSubmitDisabled()}
               >
                 {loading ? (
                   <ActivityIndicator color="white" size="small" />
@@ -601,18 +675,15 @@ export default function CreateTaskScreen({ navigation, route }: any) {
             </View>
 
             <View style={styles.infoBox}>
-              <Text style={styles.infoTitle}>💡 Task Creation Tips</Text>
+              <Text style={styles.infoTitle}>💡 Important Rules</Text>
               <Text style={styles.infoText}>
-                • Daily tasks require time slots (e.g., 8-10 AM, 1-3 PM, 6-8 PM){'\n'}
+                • Total task points: 1-10 only{'\n'}
+                • Time slot points: Max 10 per slot{'\n'}
+                • Daily tasks require time slots{'\n'}
                 • Weekly tasks need at least one day selected{'\n'}
-                • Assign points to each time slot (optional){'\n'}
                 • Time slot points cannot exceed total task points{'\n'}
-                • If time slot has no points, it uses task default points{'\n'}
-                • Select hours (1-12), minutes (00, 15, 30, 45), and AM/PM{'\n'}
                 • End time must be after start time{'\n'}
-                • Time slots can have labels (Morning, Lunch, etc.){'\n'}
-                • Recurring tasks rotate among members automatically{'\n'}
-                • Points motivate participation and track progress
+                • Maximum 5 time slots per task
               </Text>
             </View>
 
@@ -629,6 +700,8 @@ export default function CreateTaskScreen({ navigation, route }: any) {
         editingSlot={editingSlot}
         totalTaskPoints={parseInt(form.points, 10)}
         usedPoints={totalTimeSlotPoints}
+        // ADD THIS PROP to enforce 10-point limit in modal too
+        maxPointsPerSlot={10}
       />
     </SafeAreaView>
   );
@@ -726,6 +799,16 @@ const styles = StyleSheet.create({
     color: '#495057',
     marginBottom: 8
   },
+  labelContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pointsLimitText: {
+    fontSize: 12,
+    color: '#fa5252',
+    fontWeight: '600',
+  },
   input: {
     backgroundColor: '#f8f9fa',
     borderWidth: 1,
@@ -735,6 +818,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#212529'
+  },
+  inputError: {
+    borderColor: '#fa5252',
+    backgroundColor: '#fff5f5',
   },
   textArea: {
     minHeight: 100,
@@ -747,9 +834,10 @@ const styles = StyleSheet.create({
     marginTop: 6,
     marginLeft: 2
   },
-  pointsError: {
+  errorText: {
     color: '#fa5252',
-    fontWeight: '500'
+    fontSize: 12,
+    marginTop: 2,
   },
   row: {
     flexDirection: 'row',
@@ -839,6 +927,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#dee2e6'
   },
+  timeSlotItemError: {
+    borderColor: '#fa5252',
+    backgroundColor: '#fff5f5',
+  },
   timeSlotInfo: {
     flex: 1
   },
@@ -870,6 +962,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#a5d8ff'
+  },
+  pointsBadgeError: {
+    backgroundColor: '#ffebee',
+    borderColor: '#fa5252',
   },
   pointsBadgeText: {
     fontSize: 12,

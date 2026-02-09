@@ -1,4 +1,4 @@
-// src/screens/TaskAssignmentScreen.tsx
+// src/screens/TaskAssignmentScreen.tsx - UPDATED
 import React, { useState } from 'react';
 import {
   View,
@@ -42,6 +42,12 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   const handleAssignToMember = async (memberId: string, memberName: string) => {
     if (!selectedTask) return;
 
+    // Check if trying to assign to same user
+    if (selectedTask.currentAssignee === memberId) {
+      Alert.alert('Already Assigned', `This task is already assigned to ${memberName}`);
+      return;
+    }
+
     Alert.alert(
       'Assign Task',
       `Assign "${selectedTask.title}" to ${memberName} for this week?`,
@@ -57,7 +63,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
               const result = await reassignTask(selectedTask.id, memberId);
               
               if (result.success) {
-                Alert.alert('Success', 'Task reassigned successfully');
+                Alert.alert('Success', `Task reassigned to ${memberName}`);
                 
                 // Refresh the data to show updated assignments
                 await loadData(true);
@@ -285,48 +291,75 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
 
               {members
                 .filter(member => member.isActive)
-                .map(member => (
-                  <TouchableOpacity
-                    key={member.userId}
-                    style={[
-                      styles.memberOption,
-                      selectedTask?.currentAssignee === member.userId && 
-                      styles.selectedMember
-                    ]}
-                    onPress={() => handleAssignToMember(member.userId, member.fullName)}
-                    disabled={isReassigning}
-                  >
-                    <View style={styles.memberInfo}>
-                      <View style={[
-                        styles.memberAvatar,
-                        member.role === 'ADMIN' && styles.adminMemberAvatar
-                      ]}>
-                        <Text style={styles.memberInitial}>
-                          {member.fullName?.charAt(0) || '?'}
-                        </Text>
-                      </View>
-                      <View style={styles.memberDetails}>
-                        <Text style={styles.memberName}>{member.fullName}</Text>
-                        <View style={styles.memberMeta}>
+                .map(member => {
+                  const isCurrentAssignee = selectedTask?.currentAssignee === member.userId;
+                  
+                  return (
+                    <TouchableOpacity
+                      key={member.userId}
+                      style={[
+                        styles.memberOption,
+                        isCurrentAssignee && styles.currentAssigneeOption,
+                        isCurrentAssignee && styles.disabledOption
+                      ]}
+                      onPress={() => {
+                        if (!isCurrentAssignee) {
+                          handleAssignToMember(member.userId, member.fullName);
+                        }
+                      }}
+                      disabled={isReassigning || isCurrentAssignee}
+                    >
+                      <View style={styles.memberInfo}>
+                        <View style={[
+                          styles.memberAvatar,
+                          member.role === 'ADMIN' && styles.adminMemberAvatar,
+                          isCurrentAssignee && styles.currentAssigneeAvatar
+                        ]}>
                           <Text style={[
-                            styles.memberRole,
-                            member.role === 'ADMIN' && styles.adminRoleText
+                            styles.memberInitial,
+                            isCurrentAssignee && styles.currentAssigneeInitial
                           ]}>
-                            {member.role === 'ADMIN' ? 'Admin' : 'Member'}
+                            {member.fullName?.charAt(0) || '?'}
                           </Text>
-                          {member.rotationOrder && (
-                            <Text style={styles.memberOrder}>
-                              Rotation #{member.rotationOrder}
+                        </View>
+                        <View style={styles.memberDetails}>
+                          <Text style={[
+                            styles.memberName,
+                            isCurrentAssignee && styles.currentAssigneeText
+                          ]}>
+                            {member.fullName}
+                            {isCurrentAssignee && ' (Current)'}
+                          </Text>
+                          <View style={styles.memberMeta}>
+                            <Text style={[
+                              styles.memberRole,
+                              member.role === 'ADMIN' && styles.adminRoleText,
+                              isCurrentAssignee && styles.currentAssigneeText
+                            ]}>
+                              {member.role === 'ADMIN' ? 'Admin' : 'Member'}
                             </Text>
-                          )}
+                            {member.rotationOrder && (
+                              <Text style={[
+                                styles.memberOrder,
+                                isCurrentAssignee && styles.currentAssigneeText
+                              ]}>
+                                Rotation #{member.rotationOrder}
+                              </Text>
+                            )}
+                          </View>
                         </View>
                       </View>
-                    </View>
-                    {selectedTask?.currentAssignee === member.userId && (
-                      <MaterialCommunityIcons name="check" size={20} color="#007AFF" />
-                    )}
-                  </TouchableOpacity>
-                ))}
+                      {isCurrentAssignee ? (
+                        <View style={styles.currentBadge}>
+                          <MaterialCommunityIcons name="check-circle" size={20} color="#28a745" />
+                          <Text style={styles.currentBadgeText}>Current</Text>
+                        </View>
+                      ) : (
+                        <MaterialCommunityIcons name="chevron-right" size={20} color="#6c757d" />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
             </ScrollView>
 
             <View style={styles.modalFooter}>
@@ -638,9 +671,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e9ecef'
   },
-  selectedMember: {
-    backgroundColor: '#e7f5ff',
-    borderColor: '#a5d8ff'
+  currentAssigneeOption: {
+    backgroundColor: '#f1f3f5',
+    borderColor: '#dee2e6'
+  },
+  disabledOption: {
+    opacity: 0.7
   },
   memberInfo: {
     flexDirection: 'row',
@@ -659,10 +695,16 @@ const styles = StyleSheet.create({
   adminMemberAvatar: {
     backgroundColor: '#007AFF'
   },
+  currentAssigneeAvatar: {
+    backgroundColor: '#28a745'
+  },
   memberInitial: {
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16
+  },
+  currentAssigneeInitial: {
+    color: '#fff'
   },
   memberDetails: {
     flex: 1
@@ -672,6 +714,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#000',
     marginBottom: 2
+  },
+  currentAssigneeText: {
+    color: '#6c757d'
   },
   memberMeta: {
     flexDirection: 'row',
@@ -693,6 +738,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 4
+  },
+  currentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4
+  },
+  currentBadgeText: {
+    fontSize: 12,
+    color: '#28a745',
+    fontWeight: '600'
   },
   cancelButton: {
     backgroundColor: '#f8f9fa',

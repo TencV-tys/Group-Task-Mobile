@@ -1,5 +1,6 @@
-// src/services/AssignmentService.ts - COMPLETE VERSION WITH TIME VALIDATION
+// src/services/AssignmentService.ts - FIXED VERSION
 import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = `${API_BASE_URL}/api/assignments`;
 
@@ -143,62 +144,137 @@ export interface UpcomingAssignment {
 
 export class AssignmentService {
   
-  // Complete an assignment
-  static async completeAssignment(assignmentId: string, data: {
-    photoUrl?: string;
-    notes?: string;
-  }) {
+  // Get authentication token
+  private static async getAuthToken(): Promise<string | null> {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  // Get request headers with auth
+  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
+    const token = await this.getAuthToken();
+    const headers: HeadersInit = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    if (withJsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
+  // Complete an assignment WITH PHOTO UPLOAD
+  static async completeAssignment(
+    assignmentId: string, 
+    data: {
+      photoUri?: string;
+      notes?: string;
+    },
+    photoFile?: File
+  ) {
     try {
       console.log('AssignmentService: Completing assignment', assignmentId, data);
       
-      const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-        credentials: 'include'
-      });
+      // If we have a photo file, use FormData
+      if (photoFile) {
+        const formData = new FormData();
+        formData.append('notes', data.notes || '');
+        
+        if (photoFile) {
+          formData.append('photo', photoFile);
+        }
+        
+        const token = await this.getAuthToken();
+        const headers: HeadersInit = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        // Don't set Content-Type for FormData
+        
+        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
 
-      const result = await response.json();
-      console.log('AssignmentService: Complete response', result);
-      return result;
+        const result = await response.json();
+        console.log('AssignmentService: Complete response (with photo)', result);
+        return result;
+      } else {
+        // No photo, use JSON
+        const headers = await this.getHeaders();
+        
+        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            photoUrl: data.photoUri, // If you have a URL instead of file
+            notes: data.notes
+          }),
+        });
+
+        const result = await response.json();
+        console.log('AssignmentService: Complete response', result);
+        
+        if (!response.ok) {
+          throw new Error(result.message || `Failed to complete assignment: ${response.status}`);
+        }
+        
+        return result;
+      }
 
     } catch (error: any) {
       console.error('AssignmentService.completeAssignment error:', error);
       return {
         success: false,
-        message: error.message || 'Failed to complete assignment'
+        message: error.message || 'Failed to complete assignment. Please check your connection.',
+        error: error.message 
       };
     }
   }
 
   // Verify an assignment (admin only)
-  static async verifyAssignment(assignmentId: string, data: {
-    verified: boolean;
-    adminNotes?: string;
-  }) {
+  static async verifyAssignment(
+    assignmentId: string, 
+    data: { 
+      verified: boolean; 
+      adminNotes?: string;
+    }
+  ) {
     try {
       console.log('AssignmentService: Verifying assignment', assignmentId, data);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${assignmentId}/verify`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(data),
-        credentials: 'include'
       });
 
       const result = await response.json();
       console.log('AssignmentService: Verify response', result);
+      
+      if (!response.ok) {
+        throw new Error(result.message || `Failed to verify assignment: ${response.status}`);
+      }
+      
       return result;
 
     } catch (error: any) {
       console.error('AssignmentService.verifyAssignment error:', error);
       return {
         success: false,
-        message: error.message || 'Failed to verify assignment'
+        message: error.message || 'Failed to verify assignment',
+        error: error.message
       };
     }
   }
@@ -208,31 +284,42 @@ export class AssignmentService {
     try {
       console.log('AssignmentService: Getting assignment details', assignmentId);
       
+      const headers = await this.getHeaders(false); // No content type for GET
+      
       const response = await fetch(`${API_URL}/${assignmentId}`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to load assignment: ${response.status}`);
+      }
+      
       const result = await response.json();
       console.log('AssignmentService: Details response', result);
+      
       return result;
 
     } catch (error: any) {
       console.error('AssignmentService.getAssignmentDetails error:', error);
       return {
         success: false,
-        message: error.message || 'Failed to load assignment details'
+        message: error.message || 'Failed to load assignment details. Please check your connection.',
+        error: error.message
       };
     }
   }
 
   // Get user's assignments
-  static async getUserAssignments(userId: string, filters?: {
-    status?: string;
-    week?: number;
-    limit?: number;
-    offset?: number;
-  }) {
+  static async getUserAssignments(
+    userId: string, 
+    filters?: {
+      status?: string;
+      week?: number;
+      limit?: number;
+      offset?: number;
+    }
+  ) {
     try {
       let url = `${API_URL}/user/${userId}/assignments`;
       const params = new URLSearchParams();
@@ -247,11 +334,17 @@ export class AssignmentService {
 
       console.log('AssignmentService: Getting user assignments', url);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include'
+        headers,
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to load assignments: ${response.status}`);
+      }
+      
       const result = await response.json();
       return result;
 
@@ -259,19 +352,23 @@ export class AssignmentService {
       console.error('AssignmentService.getUserAssignments error:', error);
       return {
         success: false,
-        message: error.message || 'Failed to load user assignments'
+        message: error.message || 'Failed to load assignments',
+        error: error.message
       };
     }
   }
 
   // Get group assignments (admin only)
-  static async getGroupAssignments(groupId: string, filters?: {
-    status?: string;
-    week?: number;
-    userId?: string;
-    limit?: number;
-    offset?: number;
-  }) {
+  static async getGroupAssignments(
+    groupId: string, 
+    filters?: {
+      status?: string;
+      week?: number;
+      userId?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ) {
     try {
       let url = `${API_URL}/group/${groupId}/assignments`;
       const params = new URLSearchParams();
@@ -287,11 +384,17 @@ export class AssignmentService {
 
       console.log('AssignmentService: Getting group assignments', url);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include'
+        headers,
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to load group assignments: ${response.status}`);
+      }
+      
       const result = await response.json();
       return result;
 
@@ -299,7 +402,8 @@ export class AssignmentService {
       console.error('AssignmentService.getGroupAssignments error:', error);
       return {
         success: false,
-        message: error.message || 'Failed to load group assignments'
+        message: error.message || 'Failed to load group assignments',
+        error: error.message
       };
     }
   }
@@ -310,11 +414,17 @@ export class AssignmentService {
       const url = `${API_URL}/group/${groupId}/stats`;
       console.log('AssignmentService: Getting assignment stats', url);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include'
+        headers,
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to load assignment stats: ${response.status}`);
+      }
+      
       const result = await response.json();
       return result;
 
@@ -322,7 +432,8 @@ export class AssignmentService {
       console.error('AssignmentService.getAssignmentStats error:', error);
       return {
         success: false,
-        message: error.message || 'Failed to load assignment stats'
+        message: error.message || 'Failed to load assignment statistics',
+        error: error.message
       };
     }
   }
@@ -334,36 +445,43 @@ export class AssignmentService {
     try {
       console.log('AssignmentService: Checking submission time for', assignmentId);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${assignmentId}/check-time`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
       });
 
-      const result = await response.json();
-      
       if (!response.ok) {
-        console.error('AssignmentService.checkSubmissionTime error:', result.message);
+        const errorText = await response.text();
+        console.error('AssignmentService.checkSubmissionTime HTTP error:', response.status, errorText);
         return {
           success: false,
-          message: result.message || 'Failed to check submission time',
+          message: `Server error: ${response.status}`,
           data: {
             assignmentId,
             dueDate: '',
             canSubmit: false,
             currentTime: new Date().toISOString(),
-            reason: result.message || 'Error checking time'
+            reason: `Server error: ${response.status}`
           }
         };
       }
-
+      
+      const result = await response.json();
       console.log('AssignmentService: Time check response', result);
+      
+      if (!result.success) {
+        console.error('AssignmentService.checkSubmissionTime API error:', result.message);
+      }
+      
       return result;
 
     } catch (error: any) {
       console.error('AssignmentService.checkSubmissionTime error:', error);
       return {
         success: false,
-        message: error.message || 'Network error',
+        message: error.message || 'Network error. Please check your connection.',
         data: {
           assignmentId,
           dueDate: '',
@@ -393,40 +511,37 @@ export class AssignmentService {
       const params = new URLSearchParams();
       
       if (options?.groupId) params.append('groupId', options.groupId);
-      if (options?.limit) params.append('limit', options.limit.toString());
+      if (options?.limit) params.append('limit', options.limit?.toString() || '10');
       
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
 
       console.log('AssignmentService: Getting upcoming assignments', url);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include'
+        headers,
       });
 
+      if (!response.ok) {
+        throw new Error(`Failed to load upcoming assignments: ${response.status}`);
+      }
+      
       const result = await response.json();
       
-      if (!response.ok) {
-        console.error('AssignmentService.getUpcomingAssignments error:', result.message);
-        return {
-          success: false,
-          message: result.message || 'Failed to load upcoming assignments',
-          data: {
-            assignments: [],
-            currentTime: new Date().toISOString(),
-            total: 0
-          }
-        };
+      if (!result.success) {
+        console.error('AssignmentService.getUpcomingAssignments API error:', result.message);
       }
-
+      
       return result;
 
     } catch (error: any) {
       console.error('AssignmentService.getUpcomingAssignments error:', error);
       return {
         success: false,
-        message: error.message || 'Network error',
+        message: error.message || 'Failed to load upcoming assignments',
         data: {
           assignments: [],
           currentTime: new Date().toISOString(),
@@ -448,22 +563,28 @@ export class AssignmentService {
     timeLeftText?: string;
     submissionStart?: Date;
     gracePeriodEnd?: Date;
+    isToday?: boolean;
   } {
     const due = new Date(dueDate);
     const current = currentTime;
+    const isToday = due.toDateString() === current.toDateString();
     
     // Check if it's the due date
-    if (due.toDateString() !== current.toDateString()) {
+    if (!isToday) {
       return {
         canSubmit: false,
         reason: 'Not due date',
-        timeLeft: 0
+        timeLeft: 0,
+        isToday: false
       };
     }
     
     // If no time slot, allow any time on due date
     if (!timeSlot) {
-      return { canSubmit: true };
+      return { 
+        canSubmit: true,
+        isToday: true
+      };
     }
     
     // Parse time slot end time
@@ -484,7 +605,8 @@ export class AssignmentService {
         reason: 'Submission not open yet',
         timeLeft: 0,
         submissionStart,
-        gracePeriodEnd
+        gracePeriodEnd,
+        isToday: true
       };
     }
     
@@ -495,7 +617,8 @@ export class AssignmentService {
         timeLeft: Math.ceil(timeLeft / 1000), // seconds
         timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
         submissionStart,
-        gracePeriodEnd
+        gracePeriodEnd,
+        isToday: true
       };
     }
     
@@ -503,7 +626,8 @@ export class AssignmentService {
       canSubmit: false,
       reason: 'Submission window closed',
       timeLeft: 0,
-      gracePeriodEnd
+      gracePeriodEnd,
+      isToday: true
     };
   }
 
@@ -524,97 +648,104 @@ export class AssignmentService {
     }
   }
 
-  // Get current time slot information for a task
-  static async getCurrentTimeSlotInfo(taskId: string): Promise<{
-    success: boolean;
-    message: string;
-    data?: {
-      hasAssignmentToday: boolean;
-      assignment?: Assignment;
-      currentTimeSlot?: {
-        id: string;
-        startTime: string;
-        endTime: string;
-        label?: string;
-        points?: number;
-      };
-      nextTimeSlot?: {
-        id: string;
-        startTime: string;
-        endTime: string;
-        label?: string;
-        points?: number;
-      };
-      isSubmittable: boolean;
-      timeLeft?: number;
-      timeLeftText?: string;
-      submissionInfo?: any;
-      currentTime: string;
+// FIXED getCurrentTimeSlotInfo method
+static async getCurrentTimeSlotInfo(taskId: string): Promise<{
+  success: boolean;
+  message: string;
+  data?: {
+    hasAssignmentToday: boolean;
+    assignment?: Assignment;
+    currentTimeSlot?: {
+      id: string;
+      startTime: string;
+      endTime: string;
+      label?: string;
+      points?: number;
     };
-  }> {
-    try {
-      // Since we don't have a direct API endpoint for this yet,
-      // we'll use a combination of existing endpoints
-      // You should create this endpoint on the backend
-      
-      // For now, let's get the task details and check locally
-      const taskResponse = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
-        method: 'GET',
-        credentials: 'include'
-      });
+    nextTimeSlot?: {
+      id: string;
+      startTime: string;
+      endTime: string;
+      label?: string;
+      points?: number;
+    };
+    isSubmittable: boolean;
+    timeLeft?: number;
+    timeLeftText?: string;
+    submissionInfo?: any;
+    currentTime: string;
+  };
+}> {
+  try {
+    const headers = await this.getHeaders(false);
+    
+    // Try to use the task details endpoint
+    const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
+      method: 'GET',
+      headers,
+    });
 
-      const taskData = await taskResponse.json();
-      
-      if (!taskData.success) {
-        return {
-          success: false,
-          message: taskData.message || 'Failed to load task info'
-        };
-      }
-
-      const task = taskData.task;
-      const now = new Date();
-      const today = now.toDateString();
-      
-      // Find today's assignment
-      const todaysAssignment = task.assignments?.find((assignment: Assignment) => {
-        const dueDate = new Date(assignment.dueDate);
-        return dueDate.toDateString() === today;
-      });
-
-      // Local validation
-      const validation = todaysAssignment 
-        ? this.validateLocalSubmissionTime(
-            todaysAssignment.dueDate,
-            todaysAssignment.timeSlot,
-            now
-          )
-        : { canSubmit: false, reason: 'No assignment today' };
-
-      return {
-        success: true,
-        message: 'Time slot info retrieved',
-        data: {
-          hasAssignmentToday: !!todaysAssignment,
-          assignment: todaysAssignment,
-          currentTimeSlot: todaysAssignment?.timeSlot,
-          nextTimeSlot: null, // Would need backend support
-          isSubmittable: validation.canSubmit,
-          timeLeft: validation.timeLeft,
-          timeLeftText: validation.timeLeftText,
-          submissionInfo: validation,
-          currentTime: now.toISOString()
-        }
-      };
-
-    } catch (error: any) {
-      console.error('AssignmentService.getCurrentTimeSlotInfo error:', error);
+    if (!response.ok) {
+      throw new Error(`Failed to load task: ${response.status}`);
+    }
+    
+    const taskData = await response.json();
+    
+    if (!taskData.success) {
+      // FIXED: Return proper error structure
       return {
         success: false,
-        message: error.message || 'Failed to get time slot info'
+        message: taskData.message || 'Failed to load task info'
       };
     }
+
+    const task = taskData.task;
+    const now = new Date();
+    const today = now.toDateString();
+    
+    // Find today's assignment
+    const todaysAssignment = task.assignments?.find((assignment: any) => {
+      const dueDate = new Date(assignment.dueDate);
+      return dueDate.toDateString() === today;
+    });
+
+    // Local validation
+    const validation = todaysAssignment 
+      ? this.validateLocalSubmissionTime(
+          todaysAssignment.dueDate,
+          todaysAssignment.timeSlot,
+          now
+        )
+      : { canSubmit: false, reason: 'No assignment today' };
+
+    // FIXED: Proper type for nextTimeSlot
+    const nextTimeSlot = undefined; // Or calculate next slot logic
+
+    return {
+      success: true,
+      message: 'Time slot info retrieved',
+      data: {
+        hasAssignmentToday: !!todaysAssignment,
+        assignment: todaysAssignment,
+        currentTimeSlot: todaysAssignment?.timeSlot,
+        nextTimeSlot: nextTimeSlot, // Use undefined instead of null
+        isSubmittable: validation.canSubmit,
+        timeLeft: validation.timeLeft,
+        timeLeftText: validation.timeLeftText,
+        submissionInfo: validation,
+        currentTime: now.toISOString()
+      }
+    };
+
+  } catch (error: any) {
+    console.error('AssignmentService.getCurrentTimeSlotInfo error:', error);
+    // FIXED: Return proper error structure
+    return {
+      success: false,
+      message: error.message || 'Failed to get time slot info'
+    };
   }
+}
 
   // Batch check multiple assignments
   static async batchCheckSubmissionTimes(assignmentIds: string[]): Promise<{
@@ -628,12 +759,9 @@ export class AssignmentService {
     }>;
   }> {
     try {
-      // Since we don't have a batch endpoint yet,
-      // we'll check them individually
-      // You should create a batch endpoint on the backend
-      
       const results: Record<string, any> = {};
       
+      // Check each assignment individually (for now)
       for (const assignmentId of assignmentIds) {
         try {
           const check = await this.checkSubmissionTime(assignmentId);
@@ -650,10 +778,10 @@ export class AssignmentService {
               reason: check.message || 'Error checking'
             };
           }
-        } catch (error) {
+        } catch (error: any) {
           results[assignmentId] = {
             canSubmit: false,
-            reason: 'Network error'
+            reason: error.message || 'Network error'
           };
         }
       }
@@ -670,6 +798,53 @@ export class AssignmentService {
         success: false,
         message: error.message || 'Failed to batch check submission times',
         data: {}
+      };
+    }
+  }
+
+  // Helper: Create File from image URI (for React Native)
+  static async createFileFromUri(uri: string, fileName: string = 'photo.jpg'): Promise<File> {
+    try {
+      // For React Native, you might need a different approach
+      // This is a simplified version
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      // Create a File from Blob
+      const file = new File([blob], fileName, { type: blob.type });
+      return file;
+    } catch (error) {
+      console.error('Error creating file from URI:', error);
+      throw error;
+    }
+  }
+
+  // Helper: Upload photo and get URL (if your backend supports separate upload)
+  static async uploadPhoto(photoUri: string): Promise<{ success: boolean; photoUrl?: string; message?: string }> {
+    try {
+      const file = await this.createFileFromUri(photoUri);
+      const formData = new FormData();
+      formData.append('photo', file);
+      
+      const token = await this.getAuthToken();
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`${API_BASE_URL}/api/upload/photo`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
+      
+      const result = await response.json();
+      return result;
+    } catch (error: any) {
+      console.error('AssignmentService.uploadPhoto error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to upload photo'
       };
     }
   }

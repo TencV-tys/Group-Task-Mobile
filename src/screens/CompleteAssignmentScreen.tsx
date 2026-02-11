@@ -1,5 +1,4 @@
-// src/screens/CompleteAssignmentScreen.tsx - UPDATED WITH YOUR UPLOAD SYSTEM
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,33 +8,79 @@ import {
   SafeAreaView,
   TextInput,
   Image,
-  ActivityIndicator,
   Alert,
-  Platform
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Dimensions
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { UploadService } from '../uploadService/UploadService'; // Your upload service
-import { AssignmentService } from '../AssignmentServices/AssignmentService'; // New assignment service
+import { AssignmentService } from '../AssignmentServices/AssignmentService';
+
+const { width } = Dimensions.get('window');
 
 export default function CompleteAssignmentScreen({ navigation, route }: any) {
-  const { assignmentId, taskTitle, dueDate } = route.params || {};
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null); // Store uploaded URL
+  const { assignmentId, taskTitle, dueDate, timeSlot, onCompleted } = route.params || {};
+  
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isSubmittable, setIsSubmittable] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
-  const [errors, setErrors] = useState<{notes?: string}>({});
+  const [errors, setErrors] = useState<{ photo?: string; notes?: string }>({});
+
+  useEffect(() => {
+    if (timeSlot) {
+      startCountdownTimer();
+    }
+  }, [timeSlot]);
+
+  const startCountdownTimer = () => {
+    const calculateTimeLeft = () => {
+      const now = new Date();
+      const today = now.toISOString().split('T')[0];
+      const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
+      
+      const endTime = new Date(today);
+      endTime.setHours(endHour, endMinute, 0, 0);
+      
+      // 30 minute grace period after end time
+      const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
+      
+      const diff = gracePeriodEnd.getTime() - now.getTime();
+      
+      if (diff <= 0) {
+        setIsSubmittable(false);
+        setTimeLeft(0);
+        return;
+      }
+      
+      setTimeLeft(Math.floor(diff / 1000));
+      setIsSubmittable(true);
+    };
+    
+    calculateTimeLeft();
+    const timer = setInterval(calculateTimeLeft, 1000);
+    
+    return () => clearInterval(timer);
+  };
+
+  const formatTime = (seconds: number) => {
+    if (seconds >= 3600) {
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      const secs = seconds % 60;
+      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+  };
 
   const pickImage = async () => {
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Please allow access to your photos to upload proof.');
-        return;
-      }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -43,22 +88,21 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         quality: 0.8,
       });
 
-      if (!result.canceled) {
-        setPhotoUri(result.assets[0].uri);
-        setPhotoUrl(null); // Reset uploaded URL when new photo is selected
+      if (!result.canceled && result.assets[0]) {
+        setPhoto(result.assets[0].uri);
+        setErrors(prev => ({ ...prev, photo: undefined }));
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image. Please try again.');
+      Alert.alert('Error', 'Failed to pick image');
     }
   };
 
   const takePhoto = async () => {
     try {
-      const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-      
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Please allow camera access to take a photo.');
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Camera permission is required to take photos');
         return;
       }
 
@@ -68,251 +112,330 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         quality: 0.8,
       });
 
-      if (!result.canceled) {
-        setPhotoUri(result.assets[0].uri);
-        setPhotoUrl(null); // Reset uploaded URL when new photo is selected
+      if (!result.canceled && result.assets[0]) {
+        setPhoto(result.assets[0].uri);
+        setErrors(prev => ({ ...prev, photo: undefined }));
       }
     } catch (error) {
       console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      Alert.alert('Error', 'Failed to take photo');
     }
   };
 
-  const uploadImage = async (uri: string): Promise<string | null> => {
-    try {
-      setUploading(true);
-      
-      // Use your existing UploadService
-      const result = await UploadService.uploadTaskPhoto(assignmentId, uri); // Use assignmentId as taskId
-      
-      if (result.success && result.data?.photoUrl) {
-        return result.data.photoUrl;
-      } else {
-        throw new Error(result.message || 'Failed to upload photo');
-      }
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      throw error;
-    } finally {
-      setUploading(false);
+  const validateSubmission = () => {
+    const newErrors: { photo?: string; notes?: string } = {};
+    
+    if (!photo) {
+      newErrors.photo = 'Photo is required as proof of completion';
     }
-  };
-
-  const validateForm = () => {
-    const newErrors: {notes?: string} = {};
     
     if (notes.length > 500) {
-      newErrors.notes = 'Notes must be less than 500 characters';
+      newErrors.notes = 'Notes cannot exceed 500 characters';
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
+  const submitCompletion = async () => {
+    if (!isSubmittable) {
+      Alert.alert(
+        'Time Expired',
+        'Submission time has passed. Please contact an administrator if this is an error.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
 
-    setLoading(true);
+    if (!validateSubmission()) return;
+
+    setSubmitting(true);
     
     try {
-      let finalPhotoUrl = photoUrl;
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('assignmentId', assignmentId);
+      formData.append('notes', notes);
       
-      // If we have a new photo URI but no uploaded URL yet, upload it
-      if (photoUri && !photoUrl) {
-        finalPhotoUrl = await uploadImage(photoUri);
-        if (!finalPhotoUrl) {
-          throw new Error('Failed to upload photo');
-        }
-        setPhotoUrl(finalPhotoUrl);
+      if (photo) {
+        const filename = photo.split('/').pop();
+        const match = /\.(\w+)$/.exec(filename || '');
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        
+        formData.append('photo', {
+          uri: photo,
+          name: filename || 'photo.jpg',
+          type,
+        } as any);
       }
 
-      // Call AssignmentService to complete the assignment
-      const result = await AssignmentService.completeAssignment(assignmentId, {
-        photoUrl: finalPhotoUrl || undefined,
-        notes: notes.trim() || undefined
-      });
-
+      const result = await AssignmentService.completeAssignment(formData);
+      
       if (result.success) {
         Alert.alert(
-          'Success',
-          'Task completed successfully! Waiting for admin verification.',
+          'Success!',
+          'Assignment submitted successfully. Waiting for admin verification.',
           [
             {
               text: 'OK',
               onPress: () => {
+                if (onCompleted) onCompleted();
                 navigation.goBack();
-                if (route.params?.onCompleted) {
-                  route.params.onCompleted();
-                }
               }
             }
           ]
         );
       } else {
-        Alert.alert('Error', result.message || 'Failed to complete task');
+        Alert.alert('Error', result.message || 'Failed to submit assignment');
       }
     } catch (error: any) {
-      console.error('Error completing assignment:', error);
+      console.error('Error submitting assignment:', error);
       Alert.alert('Error', error.message || 'Network error');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  // Remove photo handler
-  const removePhoto = () => {
-    Alert.alert(
-      'Remove Photo',
-      'Are you sure you want to remove this photo?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            setPhotoUri(null);
-            setPhotoUrl(null);
-          }
-        }
-      ]
+  const renderTimeInfo = () => {
+    if (!timeSlot || timeLeft === null) return null;
+
+    const isWarning = timeLeft < 300; // Less than 5 minutes
+    const isCritical = timeLeft < 60; // Less than 1 minute
+    
+    return (
+      <View style={[
+        styles.timeInfoContainer,
+        isCritical && styles.timeCritical,
+        isWarning && styles.timeWarning
+      ]}>
+        <View style={styles.timeInfoHeader}>
+          <MaterialCommunityIcons 
+            name={isSubmittable ? "timer" : "timer-off"} 
+            size={20} 
+            color={isSubmittable ? (isWarning ? "#e67700" : "#2b8a3e") : "#fa5252"} 
+          />
+          <Text style={[
+            styles.timeInfoTitle,
+            isCritical && styles.timeCriticalText,
+            isWarning && styles.timeWarningText
+          ]}>
+            {isSubmittable ? 'Time Remaining' : 'Time Expired'}
+          </Text>
+        </View>
+        
+        {isSubmittable ? (
+          <>
+            <Text style={[
+              styles.timerText,
+              isCritical && styles.timeCriticalText,
+              isWarning && styles.timeWarningText
+            ]}>
+              {formatTime(timeLeft)}
+            </Text>
+            <Text style={styles.timeInstructions}>
+              Submit before the timer runs out to receive full points
+            </Text>
+            
+            {isWarning && (
+              <View style={styles.warningMessage}>
+                <MaterialCommunityIcons name="alert-circle" size={16} color="#e67700" />
+                <Text style={styles.warningText}>
+                  Hurry! Submission closing soon
+                </Text>
+              </View>
+            )}
+          </>
+        ) : (
+          <Text style={styles.expiredText}>
+            The submission window has closed. Please contact an administrator.
+          </Text>
+        )}
+      </View>
     );
   };
 
-  // Preview existing photo (if already uploaded)
-  const previewPhoto = async () => {
-    if (photoUrl) {
-      // You can use Linking to open the URL or show in a modal
-      Alert.alert('Photo URL', photoUrl);
-    }
-  };
+  const renderPhotoSection = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Proof Photo *</Text>
+      <Text style={styles.sectionDescription}>
+        Take or upload a photo as proof of completion
+      </Text>
+      
+      {photo ? (
+        <View style={styles.photoPreviewContainer}>
+          <Image source={{ uri: photo }} style={styles.photoPreview} resizeMode="cover" />
+          <View style={styles.photoActions}>
+            <TouchableOpacity style={styles.photoActionButton} onPress={pickImage}>
+              <MaterialCommunityIcons name="image-edit" size={16} color="#007AFF" />
+              <Text style={styles.photoActionText}>Change</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.photoActionButton} onPress={takePhoto}>
+              <MaterialCommunityIcons name="camera" size={16} color="#007AFF" />
+              <Text style={styles.photoActionText}>Retake</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.photoActionButton, styles.removeButton]} 
+              onPress={() => setPhoto(null)}
+            >
+              <MaterialCommunityIcons name="delete" size={16} color="#fa5252" />
+              <Text style={[styles.photoActionText, styles.removeText]}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.photoUploadOptions}>
+          <TouchableOpacity style={styles.photoOption} onPress={takePhoto}>
+            <MaterialCommunityIcons name="camera" size={32} color="#007AFF" />
+            <Text style={styles.photoOptionText}>Take Photo</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity style={styles.photoOption} onPress={pickImage}>
+            <MaterialCommunityIcons name="image" size={32} color="#007AFF" />
+            <Text style={styles.photoOptionText}>Choose from Gallery</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
+      {errors.photo && (
+        <Text style={styles.errorText}>{errors.photo}</Text>
+      )}
+    </View>
+  );
+
+  const renderNotesSection = () => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Notes (Optional)</Text>
+      <Text style={styles.sectionDescription}>
+        Add any additional information about your completion
+      </Text>
+      
+      <TextInput
+        style={[styles.notesInput, errors.notes && styles.inputError]}
+        value={notes}
+        onChangeText={(text) => {
+          setNotes(text);
+          if (errors.notes) setErrors(prev => ({ ...prev, notes: undefined }));
+        }}
+        placeholder="Describe what you did, any issues encountered, or additional details..."
+        multiline
+        numberOfLines={4}
+        maxLength={500}
+        textAlignVertical="top"
+      />
+      
+      <View style={styles.notesFooter}>
+        <Text style={styles.charCount}>
+          {notes.length}/500 characters
+        </Text>
+        {errors.notes && (
+          <Text style={styles.errorText}>{errors.notes}</Text>
+        )}
+      </View>
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>Complete Task</Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardView}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity 
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+          >
+            <Text style={styles.backButtonText}>←</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.titleContainer}>
+            <Text style={styles.title} numberOfLines={1}>
+              Complete Assignment
+            </Text>
+          </View>
+          
+          <View style={styles.headerSpacer} />
         </View>
-        
-        <View style={styles.headerSpacer} />
-      </View>
 
-      <ScrollView style={styles.content}>
-        <View style={styles.card}>
-          <Text style={styles.taskTitle}>{taskTitle}</Text>
-          {dueDate && (
-            <Text style={styles.dueDate}>
-              Due: {new Date(dueDate).toLocaleDateString()}
-            </Text>
-          )}
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Upload Proof (Optional)
-            </Text>
-            <Text style={styles.sectionSubtitle}>
-              Take a photo or upload from gallery to show task completion
-            </Text>
-
-            {(photoUri || photoUrl) ? (
-              <View style={styles.photoPreview}>
-                <TouchableOpacity onPress={previewPhoto}>
-                  <Image 
-                    source={{ uri: photoUri || photoUrl || '' }} 
-                    style={styles.photo} 
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.removePhotoButton}
-                  onPress={removePhoto}
-                >
-                  <MaterialCommunityIcons name="close-circle" size={24} color="#fa5252" />
-                </TouchableOpacity>
-                {photoUrl && (
-                  <Text style={styles.uploadedText}>✓ Photo uploaded successfully</Text>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={styles.card}>
+            {/* Task Info */}
+            <View style={styles.taskInfoSection}>
+              <Text style={styles.taskTitle}>{taskTitle}</Text>
+              
+              <View style={styles.taskDetails}>
+                <View style={styles.taskDetailRow}>
+                  <MaterialCommunityIcons name="calendar" size={16} color="#6c757d" />
+                  <Text style={styles.taskDetailText}>
+                    Due: {new Date(dueDate).toLocaleDateString()}
+                  </Text>
+                </View>
+                
+                {timeSlot && (
+                  <View style={styles.taskDetailRow}>
+                    <MaterialCommunityIcons name="clock" size={16} color="#6c757d" />
+                    <Text style={styles.taskDetailText}>
+                      Time: {timeSlot.startTime} - {timeSlot.endTime}
+                    </Text>
+                  </View>
                 )}
               </View>
-            ) : (
-              <View style={styles.photoOptions}>
-                <TouchableOpacity
-                  style={styles.photoOption}
-                  onPress={takePhoto}
-                >
-                  <MaterialCommunityIcons name="camera" size={32} color="#007AFF" />
-                  <Text style={styles.photoOptionText}>Take Photo</Text>
-                </TouchableOpacity>
+            </View>
 
-                <TouchableOpacity
-                  style={styles.photoOption}
-                  onPress={pickImage}
-                >
-                  <MaterialCommunityIcons name="image" size={32} color="#007AFF" />
-                  <Text style={styles.photoOptionText}>Choose from Gallery</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
+            {/* Time Info */}
+            {renderTimeInfo()}
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>
-              Notes (Optional)
-            </Text>
-            <Text style={styles.sectionSubtitle}>
-              Add any additional information about task completion
-            </Text>
+            {/* Photo Upload */}
+            {renderPhotoSection()}
 
-            <TextInput
-              style={[styles.notesInput, errors.notes && styles.inputError]}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder="Enter any notes about the task completion..."
-              multiline
-              numberOfLines={4}
-              maxLength={500}
-            />
-            {errors.notes && (
-              <Text style={styles.errorText}>{errors.notes}</Text>
-            )}
-            <Text style={styles.charCount}>
-              {notes.length}/500 characters
-            </Text>
-          </View>
+            {/* Notes */}
+            {renderNotesSection()}
 
-          <View style={styles.infoBox}>
-            <MaterialCommunityIcons name="information" size={20} color="#6c757d" />
-            <Text style={styles.infoText}>
-              After submission, an admin will verify your completion before points are awarded.
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.submitButton, (loading || uploading) && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={loading || uploading}
-          >
-            {(loading || uploading) ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="check-circle" size={20} color="white" />
-                <Text style={styles.submitButtonText}>
-                  Mark as Complete
+            {/* Submission Info */}
+            <View style={styles.infoBox}>
+              <MaterialCommunityIcons name="information" size={20} color="#6c757d" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>Submission Information</Text>
+                <Text style={styles.infoText}>
+                  • Photo is required as proof{'\n'}
+                  • Submit within the allowed time window{'\n'}
+                  • Your submission will be reviewed by an administrator{'\n'}
+                  • Points will be awarded after verification
                 </Text>
-              </>
-            )}
-          </TouchableOpacity>
+              </View>
+            </View>
 
-          {uploading && (
-            <Text style={styles.uploadingText}>Uploading photo...</Text>
-          )}
-        </View>
-      </ScrollView>
+            {/* Submit Button */}
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                (!isSubmittable || submitting) && styles.submitButtonDisabled
+              ]}
+              onPress={submitCompletion}
+              disabled={!isSubmittable || submitting}
+              activeOpacity={0.8}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <View style={styles.submitButtonContent}>
+                  <MaterialCommunityIcons name="check-circle" size={22} color="white" />
+                  <Text style={styles.submitButtonText}>
+                    {isSubmittable ? 'Submit Completion' : 'Submission Closed'}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            
+            {!isSubmittable && (
+              <Text style={styles.disabledText}>
+                The submission window has ended. Please contact an administrator.
+              </Text>
+            )}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -322,6 +445,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa'
   },
+  keyboardView: {
+    flex: 1
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -330,7 +456,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
+    borderBottomColor: '#e9ecef',
+    minHeight: 56,
   },
   backButton: {
     width: 40,
@@ -340,16 +467,20 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 24,
-    color: '#007AFF'
+    color: '#007AFF',
+    fontWeight: '400'
   },
   titleContainer: {
     flex: 1,
-    alignItems: 'center'
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529'
+    color: '#212529',
+    textAlign: 'center'
   },
   headerSpacer: {
     width: 40
@@ -362,73 +493,168 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 20,
-    marginBottom: 20
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1
+  },
+  taskInfoSection: {
+    marginBottom: 24
   },
   taskTitle: {
     fontSize: 22,
     fontWeight: '600',
     color: '#212529',
+    marginBottom: 12
+  },
+  taskDetails: {
+    gap: 8
+  },
+  taskDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  taskDetailText: {
+    fontSize: 15,
+    color: '#6c757d'
+  },
+  timeInfoContainer: {
+    backgroundColor: '#d3f9d8',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#8ce99a'
+  },
+  timeWarning: {
+    backgroundColor: '#fff3bf',
+    borderColor: '#ffd43b'
+  },
+  timeCritical: {
+    backgroundColor: '#ffc9c9',
+    borderColor: '#fa5252'
+  },
+  timeInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 8
   },
-  dueDate: {
+  timeInfoTitle: {
     fontSize: 16,
-    color: '#6c757d',
-    marginBottom: 24
+    fontWeight: '600',
+    color: '#2b8a3e'
+  },
+  timeWarningText: {
+    color: '#e67700'
+  },
+  timeCriticalText: {
+    color: '#fa5252'
+  },
+  timerText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#2b8a3e',
+    marginBottom: 8
+  },
+  timeInstructions: {
+    fontSize: 14,
+    color: '#495057',
+    textAlign: 'center',
+    marginBottom: 8
+  },
+  warningMessage: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#e67700',
+    fontWeight: '500'
+  },
+  expiredText: {
+    fontSize: 14,
+    color: '#495057',
+    textAlign: 'center',
+    lineHeight: 20
   },
   section: {
     marginBottom: 24
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#495057',
-    marginBottom: 8
+    marginBottom: 6
   },
-  sectionSubtitle: {
+  sectionDescription: {
     fontSize: 14,
     color: '#6c757d',
-    marginBottom: 16
+    marginBottom: 12,
+    lineHeight: 18
   },
-  photoOptions: {
+  photoUploadOptions: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginVertical: 16
+    gap: 16
   },
   photoOption: {
-    alignItems: 'center',
-    padding: 16,
+    flex: 1,
     backgroundColor: '#e7f5ff',
-    borderRadius: 12,
-    width: '45%'
+    borderRadius: 8,
+    padding: 20,
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#a5d8ff'
   },
   photoOptionText: {
-    marginTop: 8,
     fontSize: 14,
     color: '#1864ab',
+    fontWeight: '500',
     textAlign: 'center'
   },
-  photoPreview: {
-    position: 'relative',
-    marginVertical: 16,
+  photoPreviewContainer: {
     alignItems: 'center'
   },
-  photo: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12
+  photoPreview: {
+    width: width - 72,
+    height: (width - 72) * 0.75,
+    borderRadius: 8,
+    marginBottom: 12
   },
-  removePhotoButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 4
+  photoActions: {
+    flexDirection: 'row',
+    gap: 12
   },
-  uploadedText: {
-    marginTop: 8,
-    color: '#2b8a3e',
-    fontSize: 14
+  photoActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#dee2e6'
+  },
+  removeButton: {
+    backgroundColor: '#fff5f5',
+    borderColor: '#ffc9c9'
+  },
+  photoActionText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500'
+  },
+  removeText: {
+    color: '#fa5252'
   },
   notesInput: {
     borderWidth: 1,
@@ -436,58 +662,74 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    minHeight: 100,
+    minHeight: 120,
     textAlignVertical: 'top'
   },
   inputError: {
     borderColor: '#fa5252'
   },
-  errorText: {
-    color: '#fa5252',
-    fontSize: 14,
-    marginTop: 4
+  notesFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8
   },
   charCount: {
-    textAlign: 'right',
-    color: '#868e96',
     fontSize: 12,
+    color: '#868e96'
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#fa5252',
     marginTop: 4
   },
   infoBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#f8f9fa',
-    padding: 12,
+    padding: 16,
     borderRadius: 8,
     marginBottom: 24,
     gap: 12
   },
-  infoText: {
-    flex: 1,
+  infoContent: {
+    flex: 1
+  },
+  infoTitle: {
     fontSize: 14,
-    color: '#6c757d', 
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 6
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#6c757d',
     lineHeight: 20
   },
   submitButton: {
+    backgroundColor: '#2b8a3e',
+    borderRadius: 8,
+    padding: 18
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#868e96'
+  },
+  submitButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#2b8a3e',
-    padding: 16,
-    borderRadius: 8
-  },
-  submitButtonDisabled: {
-    opacity: 0.6
+    gap: 8
   },
   submitButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600'
   },
-  uploadingText: {
-    textAlign: 'center', 
+  disabledText: {
+    fontSize: 14,
     color: '#868e96',
-    marginTop: 8
+    textAlign: 'center',
+    marginTop: 12,
+    fontStyle: 'italic'
   }
 });

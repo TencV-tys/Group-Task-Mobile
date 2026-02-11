@@ -1,4 +1,3 @@
-// src/screens/AssignmentDetailsScreen.tsx - UPDATED WITH COMPLETE BUTTON
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -16,7 +15,6 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../AssignmentServices/AssignmentService';
-import { API_BASE_URL } from '../config/api';
 
 const { width } = Dimensions.get('window');
 
@@ -28,13 +26,20 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
   const [error, setError] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState('');
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'rejected'>('pending');
-  const [isMyAssignment, setIsMyAssignment] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isSubmittable, setIsSubmittable] = useState(false);
 
   useEffect(() => {
     if (assignmentId) {
       fetchAssignmentDetails();
     }
   }, [assignmentId]);
+
+  useEffect(() => {
+    if (assignment && !assignment.completed) {
+      checkTimeValidity();
+    }
+  }, [assignment]);
 
   const fetchAssignmentDetails = async () => {
     setLoading(true);
@@ -50,15 +55,6 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           result.assignment.verified === false ? 'rejected' : 'pending'
         );
         setAdminNotes(result.assignment.adminNotes || '');
-        
-        // Check if this is the current user's assignment
-        // You might need to get current user ID from somewhere (context, async storage, etc.)
-        // For now, we'll assume we have a way to check
-        // const currentUserId = await getCurrentUserId();
-        // setIsMyAssignment(result.assignment.userId === currentUserId);
-        
-        // Temporary: We'll check if assignment is not completed
-        setIsMyAssignment(!result.assignment.completed);
       } else {
         setError(result.message || 'Failed to load assignment details');
       }
@@ -70,15 +66,56 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  const handleCompleteAssignment = () => {
+  const checkTimeValidity = () => {
     if (!assignment) return;
+
+    const now = new Date();
+    const assignmentDate = new Date(assignment.dueDate);
+    const today = now.toDateString();
+    const assignmentDay = assignmentDate.toDateString();
+    
+    if (today !== assignmentDay) {
+      setIsSubmittable(false);
+      return;
+    }
+
+    if (assignment.timeSlot) {
+      const [startHour, startMinute] = assignment.timeSlot.startTime.split(':').map(Number);
+      const [endHour, endMinute] = assignment.timeSlot.endTime.split(':').map(Number);
+      
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentInMinutes = currentHour * 60 + currentMinute;
+      const endInMinutes = endHour * 60 + endMinute;
+      
+      // Can submit 30 minutes before end time until 30 minutes after end time
+      const canSubmitStart = endInMinutes - 30;
+      const canSubmitEnd = endInMinutes + 30;
+      
+      setIsSubmittable(currentInMinutes >= canSubmitStart && currentInMinutes <= canSubmitEnd);
+      
+      // Calculate time left for submission
+      if (currentInMinutes <= canSubmitEnd) {
+        const endTime = new Date();
+        endTime.setHours(endHour, endMinute, 0, 0);
+        const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
+        const timeLeftMs = gracePeriodEnd.getTime() - now.getTime();
+        setTimeLeft(Math.max(0, Math.floor(timeLeftMs / 1000)));
+      }
+    } else {
+      setIsSubmittable(true);
+    }
+  };
+
+  const handleCompleteAssignment = () => {
+    if (!assignment || !isSubmittable) return;
     
     navigation.navigate('CompleteAssignment', {
       assignmentId: assignment.id,
       taskTitle: assignment.task?.title || 'Unknown Task',
       dueDate: assignment.dueDate,
+      timeSlot: assignment.timeSlot,
       onCompleted: () => {
-        // Refresh assignment details after completion
         fetchAssignmentDetails();
         if (onVerified) onVerified();
       }
@@ -103,7 +140,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           [{ text: 'OK', onPress: () => {
             setVerificationStatus(verified ? 'verified' : 'rejected');
             setVerifying(false);
-            fetchAssignmentDetails(); // Refresh data
+            fetchAssignmentDetails();
             if (onVerified) onVerified();
           }}]
         );
@@ -167,29 +204,85 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     }
   };
 
+  const formatTimeLeft = (seconds: number) => {
+    if (seconds >= 3600) {
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${mins}m`;
+    } else if (seconds >= 60) {
+      const mins = Math.floor(seconds / 60);
+      return `${mins}m`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
   const renderCompleteButton = () => {
-    // Only show complete button if assignment is not completed
     if (!assignment?.completed) {
+      const isToday = new Date().toDateString() === new Date(assignment.dueDate).toDateString();
+      
       return (
         <View style={styles.completeSection}>
           <Text style={styles.sectionTitle}>Complete This Assignment</Text>
-          <Text style={styles.completeDescription}>
-            Submit your completion with photo and notes
-          </Text>
-          <TouchableOpacity
-            style={styles.completeButton}
-            onPress={handleCompleteAssignment}
-          >
-            <MaterialCommunityIcons name="check-circle" size={20} color="white" />
-            <Text style={styles.completeButtonText}>Complete Assignment</Text>
-          </TouchableOpacity>
           
-          {/* Show admin note if user is admin */}
-          {isAdmin && (
-            <View style={styles.adminNote}>
-              <MaterialCommunityIcons name="shield-account" size={16} color="#007AFF" />
-              <Text style={styles.adminNoteText}>
-                You're an admin completing your own assignment
+          {isToday && assignment.timeSlot && (
+            <View style={styles.timeInfoBox}>
+              <MaterialCommunityIcons name="clock-alert" size={16} color="#e67700" />
+              <View style={styles.timeInfoContent}>
+                <Text style={styles.timeInfoTitle}>Submission Window</Text>
+                <Text style={styles.timeInfoText}>
+                  {assignment.timeSlot.startTime} - {assignment.timeSlot.endTime}
+                </Text>
+                <Text style={styles.timeInfoNote}>
+                  Submit within 30 minutes of end time
+                </Text>
+                
+                {timeLeft !== null && timeLeft > 0 && (
+                  <View style={[
+                    styles.timerBadge,
+                    timeLeft < 300 && styles.timerWarning
+                  ]}>
+                    <MaterialCommunityIcons 
+                      name="timer" 
+                      size={14} 
+                      color={timeLeft < 300 ? "#fa5252" : "#2b8a3e"} 
+                    />
+                    <Text style={[
+                      styles.timerText,
+                      timeLeft < 300 && styles.timerWarningText
+                    ]}>
+                      {formatTimeLeft(timeLeft)} left
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          )}
+          
+          {isSubmittable ? (
+            <TouchableOpacity
+              style={styles.completeButton}
+              onPress={handleCompleteAssignment}
+              activeOpacity={0.8}
+            >
+              <MaterialCommunityIcons name="check-circle" size={20} color="white" />
+              <Text style={styles.completeButtonText}>Complete Assignment</Text>
+            </TouchableOpacity>
+          ) : isToday ? (
+            <View style={styles.disabledCard}>
+              <MaterialCommunityIcons name="clock-alert" size={20} color="#868e96" />
+              <Text style={styles.disabledText}>
+                {assignment.timeSlot 
+                  ? 'Submit during allowed time window'
+                  : 'Cannot submit at this time'
+                }
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.futureCard}>
+              <MaterialCommunityIcons name="calendar" size={20} color="#1864ab" />
+              <Text style={styles.futureText}>
+                Available on due date: {new Date(assignment.dueDate).toLocaleDateString()}
               </Text>
             </View>
           )}
@@ -345,10 +438,10 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             </View>
           </View>
 
-          {/* Complete Assignment Button (if not completed) */}
+          {/* Complete Assignment Button */}
           {renderCompleteButton()}
 
-          {/* Points and Due Date */}
+          {/* Points and Details */}
           <View style={styles.detailsGrid}>
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Points</Text>
@@ -408,7 +501,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             </View>
           )}
 
-          {/* Verification Controls (Admin only, for other users' assignments) */}
+          {/* Verification Controls */}
           {renderVerificationControls()}
 
           {/* Assignment Info */}
@@ -638,18 +731,57 @@ const styles = StyleSheet.create({
   },
   // Complete Assignment Section
   completeSection: {
-    backgroundColor: '#e7f5ff',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#a5d8ff'
+    marginBottom: 24
   },
-  completeDescription: {
-    fontSize: 14,
-    color: '#1864ab',
+  timeInfoBox: {
+    flexDirection: 'row',
+    backgroundColor: '#fff3bf',
+    padding: 12,
+    borderRadius: 8,
     marginBottom: 16,
-    lineHeight: 20
+    borderWidth: 1,
+    borderColor: '#ffd43b',
+    gap: 12
+  },
+  timeInfoContent: {
+    flex: 1
+  },
+  timeInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#e67700',
+    marginBottom: 4
+  },
+  timeInfoText: {
+    fontSize: 14,
+    color: '#e67700',
+    marginBottom: 4
+  },
+  timeInfoNote: {
+    fontSize: 13,
+    color: '#e67700',
+    marginBottom: 8
+  },
+  timerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#d3f9d8',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    gap: 6
+  },
+  timerWarning: {
+    backgroundColor: '#ffc9c9'
+  },
+  timerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2b8a3e'
+  },
+  timerWarningText: {
+    color: '#fa5252'
   },
   completeButton: {
     flexDirection: 'row',
@@ -665,20 +797,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600'
   },
-  adminNote: {
+  disabledCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 12,
-    padding: 8,
-    backgroundColor: '#d0ebff',
-    borderRadius: 6
+    backgroundColor: '#f1f3f5',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6'
   },
-  adminNoteText: {
-    fontSize: 14,
+  disabledText: {
+    color: '#868e96',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  futureCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#e7f5ff',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#a5d8ff'
+  },
+  futureText: {
     color: '#1864ab',
-    fontWeight: '500'
+    fontSize: 16,
+    fontWeight: '600'
   },
   detailsGrid: {
     flexDirection: 'row',

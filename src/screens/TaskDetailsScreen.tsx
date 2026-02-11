@@ -1,4 +1,3 @@
-// src/screens/TaskDetailsScreen.tsx - FINAL FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -9,7 +8,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Alert,
-  StatusBar, 
+  StatusBar,
   Platform,
   Image,
   Linking
@@ -22,26 +21,31 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const [loading, setLoading] = useState(true);
   const [task, setTask] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isSubmittable, setIsSubmittable] = useState(false);
+  const [currentTimeSlot, setCurrentTimeSlot] = useState<any>(null);
   
-  // Check if user is admin
   const isAdmin = userRole === 'ADMIN';
 
   useEffect(() => {
-    if (taskId) {
-      fetchTaskDetails();
-    }
+    if (taskId) fetchTaskDetails();
   }, [taskId]);
+
+  useEffect(() => {
+    if (task?.userAssignment && !task.userAssignment.completed) {
+      startCountdownTimer();
+    }
+  }, [task]);
 
   const fetchTaskDetails = async () => {
     setLoading(true);
     setError(null);
-
     try {
-      console.log('Fetching task details for:', taskId);
       const result = await TaskService.getTaskDetails(taskId);
-      
       if (result.success) {
-        setTask(result.task);
+        const processedTask = processTaskData(result.task);
+        setTask(processedTask);
+        checkTimeValidity(processedTask);
       } else {
         setError(result.message || 'Failed to load task details');
       }
@@ -53,9 +57,147 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  const handleBack = () => {
-    navigation.goBack();
+  const processTaskData = (taskData: any) => {
+    // Sort time slots by start time
+    if (taskData.timeSlots && taskData.timeSlots.length > 0) {
+      taskData.timeSlots.sort((a: any, b: any) => {
+        const timeA = convertTimeToMinutes(a.startTime);
+        const timeB = convertTimeToMinutes(b.startTime);
+        return timeA - timeB;
+      });
+    }
+    
+    // Sort selected days
+    if (taskData.selectedDays && taskData.selectedDays.length > 0) {
+      const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      taskData.selectedDays.sort((a: string, b: string) => 
+        dayOrder.indexOf(a) - dayOrder.indexOf(b)
+      );
+    }
+    
+    // Sort assignments by due date (newest first)
+    if (taskData.assignments && taskData.assignments.length > 0) {
+      taskData.assignments.sort((a: any, b: any) => 
+        new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
+      );
+    }
+    
+    return taskData;
   };
+
+  const convertTimeToMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const checkTimeValidity = (taskData: any) => {
+    if (!taskData?.userAssignment || taskData.userAssignment.completed) {
+      setIsSubmittable(false);
+      setCurrentTimeSlot(null);
+      return;
+    }
+
+    const now = new Date();
+    const assignmentDate = new Date(taskData.userAssignment.dueDate);
+    const today = now.toDateString();
+    const assignmentDay = assignmentDate.toDateString();
+    
+    if (today !== assignmentDay) {
+      setIsSubmittable(false);
+      setCurrentTimeSlot(null);
+      return;
+    }
+
+    if (taskData.userAssignment.timeSlot) {
+      const [startHour, startMinute] = taskData.userAssignment.timeSlot.startTime.split(':').map(Number);
+      const [endHour, endMinute] = taskData.userAssignment.timeSlot.endTime.split(':').map(Number);
+      
+      const currentHour = now.getHours();
+      const currentMinute = now.getMinutes();
+      const currentInMinutes = currentHour * 60 + currentMinute;
+      const startInMinutes = startHour * 60 + startMinute;
+      const endInMinutes = endHour * 60 + endMinute;
+      
+      // Check current time against all time slots
+      let activeSlot = null;
+      if (taskData.timeSlots) {
+        for (const slot of taskData.timeSlots) {
+          const slotStart = convertTimeToMinutes(slot.startTime);
+          const slotEnd = convertTimeToMinutes(slot.endTime);
+          const graceEnd = slotEnd + 30; // 30 minutes grace period
+          
+          if (currentInMinutes >= slotStart && currentInMinutes <= graceEnd) {
+            activeSlot = slot;
+            const timeLeftMs = (graceEnd - currentInMinutes) * 60000;
+            setTimeLeft(Math.max(0, Math.floor(timeLeftMs / 1000)));
+            
+            // Can submit from 30 minutes before end time until grace period ends
+            const canSubmitStart = slotEnd - 30;
+            setIsSubmittable(currentInMinutes >= canSubmitStart && currentInMinutes <= graceEnd);
+            break;
+          }
+        }
+      }
+      
+      setCurrentTimeSlot(activeSlot || taskData.userAssignment.timeSlot);
+      
+      if (!activeSlot) {
+        setIsSubmittable(false);
+        // Check if we're before first slot or after last slot
+        if (taskData.timeSlots && taskData.timeSlots.length > 0) {
+          const firstSlotStart = convertTimeToMinutes(taskData.timeSlots[0].startTime);
+          const lastSlotEnd = convertTimeToMinutes(taskData.timeSlots[taskData.timeSlots.length - 1].endTime) + 30;
+          
+          if (currentInMinutes < firstSlotStart) {
+            const timeUntilFirstSlot = (firstSlotStart - currentInMinutes) * 60000;
+            setTimeLeft(Math.floor(timeUntilFirstSlot / 1000));
+          } else if (currentInMinutes > lastSlotEnd) {
+            setTimeLeft(0);
+          }
+        }
+      }
+    } else {
+      setIsSubmittable(true);
+      setCurrentTimeSlot(null);
+    }
+  };
+
+  const startCountdownTimer = () => {
+    const timer = setInterval(() => {
+      if (timeLeft !== null && timeLeft > 0) {
+        setTimeLeft(prev => (prev !== null ? prev - 1 : null));
+      } else if (timeLeft === 0) {
+        setIsSubmittable(false);
+        clearInterval(timer);
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  };
+
+  const formatTimeLeft = (seconds: number) => {
+    if (seconds >= 3600) {
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${mins}m`;
+    } else if (seconds >= 60) {
+      const mins = Math.floor(seconds / 60);
+      return `${mins}m`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
+  const getTimeStatus = () => {
+    if (timeLeft === null) return null;
+    
+    if (timeLeft === 0) return { text: 'Time expired', color: '#fa5252', icon: 'timer-off' };
+    if (timeLeft < 300) return { text: `${formatTimeLeft(timeLeft)} left`, color: '#fa5252', icon: 'timer-alert' };
+    if (timeLeft < 1800) return { text: `${formatTimeLeft(timeLeft)} left`, color: '#e67700', icon: 'timer' };
+    return { text: `${formatTimeLeft(timeLeft)} left`, color: '#2b8a3e', icon: 'timer' };
+  };
+
+  const handleBack = () => navigation.goBack();
 
   const handleEdit = () => {
     if (task) {
@@ -63,9 +205,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         task,
         groupId: task.groupId || groupId,
         groupName: task.group?.name,
-        onTaskUpdated: () => {
-          fetchTaskDetails();
-        }
+        onTaskUpdated: fetchTaskDetails
       });
     }
   };
@@ -77,17 +217,13 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       'Delete Task',
       `Are you sure you want to delete "${task.title}"?`,
       [
-        { 
-          text: 'Cancel', 
-          style: 'cancel' 
-        },
+        { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Delete', 
           style: 'destructive',
           onPress: async () => {
             try {
               const result = await TaskService.deleteTask(task.id);
-              
               if (result.success) {
                 Alert.alert('Success', 'Task deleted successfully');
                 navigation.goBack();
@@ -105,12 +241,13 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   };
 
   const handleCompleteAssignment = () => {
-    if (!task?.userAssignment) return;
+    if (!task?.userAssignment || !isSubmittable) return;
     
     navigation.navigate('CompleteAssignment', {
       assignmentId: task.userAssignment.id,
       taskTitle: task.title,
       dueDate: task.userAssignment.dueDate,
+      timeSlot: currentTimeSlot || task.userAssignment.timeSlot,
       onCompleted: fetchTaskDetails
     });
   };
@@ -138,28 +275,28 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     if (!assignment?.completed) return { 
       status: 'pending', 
       color: '#e67700', 
-      icon: 'clock-outline' as any,
+      icon: 'clock-outline',
       text: 'Pending'
     };
     
     if (assignment.verified === true) return { 
       status: 'verified', 
       color: '#2b8a3e', 
-      icon: 'check-circle' as any,
+      icon: 'check-circle',
       text: 'Verified'
     };
     
     if (assignment.verified === false) return { 
       status: 'rejected', 
       color: '#fa5252', 
-      icon: 'close-circle' as any,
+      icon: 'close-circle',
       text: 'Rejected'
     };
     
     return { 
       status: 'pending_verification', 
       color: '#e67700', 
-      icon: 'clock-check' as any,
+      icon: 'clock-check',
       text: 'Awaiting Verification'
     };
   };
@@ -181,10 +318,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  // Check if admin is assigned to this task
-  const isAdminAssignedToTask = () => {
-    return isAdmin && task?.userAssignment;
-  };
+  const isAdminAssignedToTask = () => isAdmin && task?.userAssignment;
 
   const renderHeader = () => (
     <View style={styles.header}>
@@ -202,7 +336,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         </Text>
       </View>
       
-      {/* Show edit button only if admin AND not assigned to this task */}
       {isAdmin && task && !isAdminAssignedToTask() ? (
         <TouchableOpacity 
           style={styles.editButton}
@@ -235,6 +368,10 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     const status = getVerificationStatus(task.userAssignment);
 
     if (!task.userAssignment.completed) {
+      const timeStatus = getTimeStatus();
+      const isToday = new Date().toDateString() === new Date(task.userAssignment.dueDate).toDateString();
+      const hasTimeSlot = task.userAssignment.timeSlot || (task.timeSlots && task.timeSlots.length > 0);
+      
       return (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Assignment</Text>
@@ -245,27 +382,97 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                 <Text style={styles.assignmentTitle}>Assigned to You</Text>
                 <Text style={styles.assignmentDate}>
                   Due: {new Date(task.userAssignment.dueDate).toLocaleDateString()}
+                  {task.userAssignment.timeSlot && ` • ${task.userAssignment.timeSlot.startTime} - ${task.userAssignment.timeSlot.endTime}`}
                 </Text>
               </View>
             </View>
             
-            {/* ONLY SHOW COMPLETE BUTTON FOR NON-ADMIN MEMBERS */}
-            {!isAdmin && (
+            {/* Time Information */}
+            {isToday && hasTimeSlot && (
+              <View style={styles.timeInfoSection}>
+                <View style={styles.timeInfoHeader}>
+                  <MaterialCommunityIcons name="clock-alert" size={16} color="#e67700" />
+                  <Text style={styles.timeInfoTitle}>Submission Window</Text>
+                </View>
+                <Text style={styles.timeInfoText}>
+                  Submit within 30 minutes of time slot end
+                </Text>
+                
+                {timeStatus && (
+                  <View style={[
+                    styles.timerContainer,
+                    { backgroundColor: `${timeStatus.color}15` }
+                  ]}>
+                    <MaterialCommunityIcons 
+                      name={timeStatus.icon as any} 
+                      size={14} 
+                      color={timeStatus.color} 
+                    />
+                    <Text style={[styles.timerText, { color: timeStatus.color }]}>
+                      {timeStatus.text}
+                    </Text>
+                  </View>
+                )}
+                
+                {currentTimeSlot && (
+                  <View style={styles.currentSlotInfo}>
+                    <Text style={styles.currentSlotLabel}>Current Slot:</Text>
+                    <Text style={styles.currentSlotTime}>
+                      {currentTimeSlot.startTime} - {currentTimeSlot.endTime}
+                      {currentTimeSlot.label && ` (${currentTimeSlot.label})`}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+            
+            {/* Complete Button */}
+            {isSubmittable ? (
               <TouchableOpacity
                 style={styles.completeButton}
                 onPress={handleCompleteAssignment}
+                activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name="check-circle" size={20} color="white" />
-                <Text style={styles.completeButtonText}>Mark as Complete</Text>
+                <View style={styles.completeButtonContent}>
+                  <MaterialCommunityIcons name="check-circle" size={22} color="white" />
+                  <Text style={styles.completeButtonText}>Mark as Complete</Text>
+                </View>
+                {timeStatus && timeLeft && timeLeft < 600 && (
+                  <Text style={styles.completeButtonSubtext}>
+                    Submit before time runs out!
+                  </Text>
+                )}
               </TouchableOpacity>
+            ) : isToday ? (
+              <View style={styles.disabledCard}>
+                <MaterialCommunityIcons name="clock-alert" size={24} color="#868e96" />
+                <View style={styles.disabledInfo}>
+                  <Text style={styles.disabledTitle}>Submission Closed</Text>
+                  <Text style={styles.disabledText}>
+                    {hasTimeSlot 
+                      ? 'Submit during allowed time window (30 min before/after slot)'
+                      : 'Cannot submit at this time'
+                    }
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.futureCard}>
+                <MaterialCommunityIcons name="calendar-clock" size={24} color="#1864ab" />
+                <View style={styles.futureInfo}>
+                  <Text style={styles.futureTitle}>Available Soon</Text>
+                  <Text style={styles.futureText}>
+                    This assignment will be available on the due date
+                  </Text>
+                </View>
+              </View>
             )}
             
-            {/* SHOW ADMIN MESSAGE IF ADMIN IS ASSIGNED */}
             {isAdmin && (
-              <View style={styles.adminAssignedInfo}>
-                <MaterialCommunityIcons name="shield-account" size={20} color="#007AFF" />
-                <Text style={styles.adminAssignedText}>
-                  You're assigned as admin. Admins cannot complete their own tasks.
+              <View style={styles.adminNote}>
+                <MaterialCommunityIcons name="shield-account" size={16} color="#007AFF" />
+                <Text style={styles.adminNoteText}>
+                  You're completing this as an admin
                 </Text>
               </View>
             )}
@@ -350,6 +557,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         key={assignment.id}
         style={styles.adminAssignmentCard}
         onPress={() => handleViewAssignmentDetails(assignment)}
+        activeOpacity={0.7}
       >
         <View style={styles.adminAssignmentHeader}>
           <View style={styles.userInfo}>
@@ -498,15 +706,15 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             </View>
           </View>
 
-          {/* Show assignment section for everyone (members see their assignment, admins see info) */}
           {renderMemberAssignmentSection()}
 
           {task.executionFrequency === 'WEEKLY' && task.selectedDays?.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Days</Text>
+              <Text style={styles.sectionTitle}>Scheduled Days</Text>
               <View style={styles.daysContainer}>
                 {task.selectedDays.map((day: string, index: number) => (
                   <View key={index} style={styles.dayChip}>
+                    <MaterialCommunityIcons name="calendar" size={14} color="#1864ab" />
                     <Text style={styles.dayText}>{day}</Text>
                   </View>
                 ))}
@@ -518,29 +726,56 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Time Slots</Text>
               <View style={styles.timeSlotsContainer}>
-                {task.timeSlots.map((slot: any, index: number) => (
-                  <View key={index} style={styles.timeSlotCard}>
-                    <View style={styles.timeSlotHeader}>
-                      <MaterialCommunityIcons name="clock" size={20} color="#007AFF" />
-                      <Text style={styles.timeSlotTime}>
-                        {slot.startTime} - {slot.endTime}
-                      </Text>
+                {task.timeSlots.map((slot: any, index: number) => {
+                  const isCurrent = currentTimeSlot && 
+                    slot.startTime === currentTimeSlot.startTime && 
+                    slot.endTime === currentTimeSlot.endTime;
+                  
+                  return (
+                    <View 
+                      key={index} 
+                      style={[
+                        styles.timeSlotCard,
+                        isCurrent && styles.currentTimeSlotCard
+                      ]}
+                    >
+                      <View style={styles.timeSlotHeader}>
+                        <MaterialCommunityIcons 
+                          name={isCurrent ? "clock-check" : "clock"} 
+                          size={20} 
+                          color={isCurrent ? "#2b8a3e" : "#007AFF"} 
+                        />
+                        <Text style={[
+                          styles.timeSlotTime,
+                          isCurrent && styles.currentTimeSlotTime
+                        ]}>
+                          {slot.startTime} - {slot.endTime}
+                        </Text>
+                        {slot.points !== undefined && slot.points > 0 && (
+                          <View style={styles.slotPointsBadge}>
+                            <Text style={styles.slotPointsText}>{slot.points} pts</Text>
+                          </View>
+                        )}
+                      </View>
+                      {slot.label && (
+                        <Text style={styles.timeSlotLabel}>{slot.label}</Text>
+                      )}
+                      {isCurrent && isSubmittable && (
+                        <View style={styles.activeSlotIndicator}>
+                          <MaterialCommunityIcons name="check-circle" size={12} color="#2b8a3e" />
+                          <Text style={styles.activeSlotText}>Active - Can Submit</Text>
+                        </View>
+                      )}
                     </View>
-                    {slot.label && (
-                      <Text style={styles.timeSlotLabel}>{slot.label}</Text>
-                    )}
-                    {slot.points !== undefined && slot.points > 0 && (
-                      <Text style={styles.timeSlotPoints}>
-                        Points: {slot.points}
-                      </Text>
-                    )}
-                  </View>
-                ))}
+                  );
+                })}
               </View>
+              <Text style={styles.timeSlotNote}>
+                ⓘ Submit within 30 minutes before/after time slot end
+              </Text>
             </View>
           )}
 
-          {/* Admin View: Show all assignments */}
           {isAdmin && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Assignments & Rotation</Text>
@@ -609,7 +844,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             </View>
           )}
 
-          {/* Delete button - Only for admins who are NOT assigned to this task */}
           {isAdmin && !isAdminAssignedToTask() && (
             <TouchableOpacity 
               style={styles.deleteButton}
@@ -620,7 +854,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             </TouchableOpacity>
           )}
 
-          {/* Information for members about permissions */}
           {!isAdmin && (
             <View style={styles.memberInfoBox}>
               <MaterialCommunityIcons name="information" size={20} color="#6c757d" />
@@ -849,10 +1082,13 @@ const styles = StyleSheet.create({
     gap: 8
   },
   dayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#e7f5ff',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 6
   },
   dayText: {
     fontSize: 14,
@@ -869,6 +1105,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e9ecef'
   },
+  currentTimeSlotCard: {
+    backgroundColor: '#e7f5ff',
+    borderColor: '#a5d8ff',
+    borderWidth: 2
+  },
   timeSlotHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -878,7 +1119,23 @@ const styles = StyleSheet.create({
   timeSlotTime: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#212529'
+    color: '#212529',
+    flex: 1
+  },
+  currentTimeSlotTime: {
+    color: '#1864ab',
+    fontWeight: '600'
+  },
+  slotPointsBadge: {
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12
+  },
+  slotPointsText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#e67700'
   },
   timeSlotLabel: {
     fontSize: 14,
@@ -886,109 +1143,29 @@ const styles = StyleSheet.create({
     marginLeft: 28,
     marginBottom: 4
   },
-  timeSlotPoints: {
-    fontSize: 12,
-    color: '#868e96',
-    marginLeft: 28,
-    fontStyle: 'italic'
-  },
-  // Admin-specific styles
-  adminInfoBox: {
+  activeSlotIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e7f5ff',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    gap: 12
+    backgroundColor: '#d3f9d8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    gap: 4,
+    marginTop: 4
   },
-  adminInfoContent: {
-    flex: 1
+  activeSlotText: {
+    fontSize: 12,
+    color: '#2b8a3e',
+    fontWeight: '500'
   },
-  adminInfoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1864ab',
-    marginBottom: 4
-  },
-  adminInfoText: {
-    fontSize: 13,
-    color: '#1864ab',
-    lineHeight: 18
-  },
-  assigneeInfo: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  assigneeLabel: {
+  timeSlotNote: {
     fontSize: 12,
     color: '#868e96',
-    marginBottom: 4
+    fontStyle: 'italic',
+    marginTop: 8
   },
-  assigneeValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#212529'
-  },
-  rotationInfo: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  rotationLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#495057',
-    marginBottom: 8
-  },
-  rotationMembersList: {
-    gap: 8
-  },
-  rotationMemberItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
-  },
-  rotationMemberAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#6c757d',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  currentAssigneeAvatar: {
-    backgroundColor: '#007AFF'
-  },
-  rotationMemberInitial: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 14
-  },
-  rotationMemberName: {
-    fontSize: 14,
-    color: '#495057'
-  },
-  currentAssigneeName: {
-    fontWeight: '600',
-    color: '#007AFF'
-  },
-  assignmentsContainer: {
-    gap: 12
-  },
-  assignmentsSubtitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#495057',
-    marginBottom: 8
-  },
+  // Assignment Section
   assignmentCard: {
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
@@ -1015,35 +1192,163 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#495057'
   },
+  timeInfoSection: {
+    backgroundColor: '#fff3bf',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ffd43b'
+  },
+  timeInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4
+  },
+  timeInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#e67700'
+  },
+  timeInfoText: {
+    fontSize: 13,
+    color: '#e67700',
+    marginBottom: 8,
+    lineHeight: 18
+  },
+  timerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginBottom: 8
+  },
+  timerText: {
+    fontSize: 13,
+    fontWeight: '600'
+  },
+  currentSlotInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4
+  },
+  currentSlotLabel: {
+    fontSize: 13,
+    color: '#495057',
+    fontWeight: '500'
+  },
+  currentSlotTime: {
+    fontSize: 13,
+    color: '#1864ab',
+    fontWeight: '600'
+  },
   completeButton: {
+    backgroundColor: '#2b8a3e',
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  completeButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#2b8a3e',
-    padding: 16,
-    borderRadius: 8
+    padding: 16
   },
   completeButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600'
   },
-  adminAssignedInfo: {
+  completeButtonSubtext: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 12,
+    textAlign: 'center',
+    paddingBottom: 8,
+    fontStyle: 'italic'
+  },
+  disabledCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#e7f5ff',
-    padding: 12,
+    backgroundColor: '#f1f3f5',
+    padding: 16,
     borderRadius: 8,
-    marginTop: 8
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    gap: 12
   },
-  adminAssignedText: {
-    flex: 1,
+  disabledInfo: {
+    flex: 1
+  },
+  disabledTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#868e96',
+    marginBottom: 4
+  },
+  disabledText: {
+    fontSize: 14,
+    color: '#868e96',
+    lineHeight: 18
+  },
+  futureCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f5ff',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#a5d8ff',
+    gap: 12
+  },
+  futureInfo: {
+    flex: 1
+  },
+  futureTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1864ab',
+    marginBottom: 4
+  },
+  futureText: {
     fontSize: 14,
     color: '#1864ab',
     lineHeight: 18
   },
+  adminNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: '#d0ebff',
+    borderRadius: 6
+  },
+  adminNoteText: {
+    fontSize: 14,
+    color: '#1864ab',
+    fontWeight: '500'
+  },
+  notAssignedCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    alignItems: 'center',
+    gap: 12
+  },
+  notAssignedText: {
+    fontSize: 16,
+    color: '#868e96',
+    textAlign: 'center'
+  },
+  // Completion Card
   completionCard: {
     backgroundColor: '#e7f5ff',
     borderRadius: 8,
@@ -1154,6 +1459,103 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500'
   },
+  // Admin View
+  adminInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f5ff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 12
+  },
+  adminInfoContent: {
+    flex: 1
+  },
+  adminInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1864ab',
+    marginBottom: 4
+  },
+  adminInfoText: {
+    fontSize: 13,
+    color: '#1864ab',
+    lineHeight: 18
+  },
+  assigneeInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
+  },
+  assigneeLabel: {
+    fontSize: 12,
+    color: '#868e96',
+    marginBottom: 4
+  },
+  assigneeValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#212529'
+  },
+  rotationInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
+  },
+  rotationLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 8
+  },
+  rotationMembersList: {
+    gap: 8
+  },
+  rotationMemberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  rotationMemberAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#6c757d',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  currentAssigneeAvatar: {
+    backgroundColor: '#007AFF'
+  },
+  rotationMemberInitial: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 14
+  },
+  rotationMemberName: {
+    fontSize: 14,
+    color: '#495057'
+  },
+  currentAssigneeName: {
+    fontWeight: '600',
+    color: '#007AFF'
+  },
+  assignmentsContainer: {
+    gap: 12
+  },
+  assignmentsSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 8
+  },
   adminAssignmentCard: {
     backgroundColor: 'white',
     borderRadius: 8,
@@ -1212,7 +1614,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: 10,
     gap: 4,
-    maxWidth: 100, // FIX: Prevent from going off-screen
+    maxWidth: 100,
     flexShrink: 1
   },
   statusText: {
@@ -1279,54 +1681,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#868e96',
     fontStyle: 'italic'
-  },
-  // Member-specific styles
-  myAssignmentCard: {
-    backgroundColor: '#e7f5ff',
-    borderRadius: 8,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#a5d8ff'
-  },
-  myAssignmentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12
-  },
-  myAssignmentInfo: {
-    flex: 1
-  },
-  myAssignmentTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1864ab',
-    marginBottom: 4
-  },
-  myAssignmentDate: {
-    fontSize: 14,
-    color: '#495057'
-  },
-  myAssignmentDetails: {
-    gap: 6
-  },
-  myAssignmentDetail: {
-    fontSize: 14,
-    color: '#495057'
-  },
-  notAssignedCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    alignItems: 'center',
-    gap: 12
-  },
-  notAssignedText: {
-    fontSize: 16,
-    color: '#868e96',
-    textAlign: 'center'
   },
   memberInfoBox: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-// src/services/AssignmentService.ts - FIXED VERSION
+// services/AssignmentService.ts - FIXED AND COMPLETE VERSION
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -142,6 +142,12 @@ export interface UpcomingAssignment {
   verified: boolean | null;
 }
 
+export interface CompleteAssignmentParams {
+  photoUri?: string;
+  notes?: string;
+  photoFile?: File;
+}
+
 export class AssignmentService {
   
   // Get authentication token
@@ -172,75 +178,76 @@ export class AssignmentService {
   }
 
   // Complete an assignment WITH PHOTO UPLOAD
-  static async completeAssignment(
-    assignmentId: string, 
-    data: {
-      photoUri?: string;
-      notes?: string;
-    },
-    photoFile?: File
-  ) {
-    try {
-      console.log('AssignmentService: Completing assignment', assignmentId, data);
-      
-      // If we have a photo file, use FormData
-      if (photoFile) {
-        const formData = new FormData();
-        formData.append('notes', data.notes || '');
-        
-        if (photoFile) {
-          formData.append('photo', photoFile);
-        }
-        
-        const token = await this.getAuthToken();
-        const headers: HeadersInit = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        // Don't set Content-Type for FormData
-        
-        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
-          method: 'POST',
-          headers,
-          body: formData,
-        });
-
-        const result = await response.json();
-        console.log('AssignmentService: Complete response (with photo)', result);
-        return result;
-      } else {
-        // No photo, use JSON
-        const headers = await this.getHeaders();
-        
-        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            photoUrl: data.photoUri, // If you have a URL instead of file
-            notes: data.notes
-          }),
-        });
-
-        const result = await response.json();
-        console.log('AssignmentService: Complete response', result);
-        
-        if (!response.ok) {
-          throw new Error(result.message || `Failed to complete assignment: ${response.status}`);
-        }
-        
-        return result;
+  
+static async completeAssignment(
+  assignmentId: string, 
+  data: CompleteAssignmentParams
+) {
+  try {
+    console.log('AssignmentService: Completing assignment', assignmentId, data);
+    
+    const token = await this.getAuthToken();
+    
+    // If we have a photo file, use FormData
+    if (data.photoFile) {
+      const formData = new FormData();
+      if (data.notes) {
+        formData.append('notes', data.notes);
       }
+      formData.append('photo', data.photoFile);
+      
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      // Don't set Content-Type for FormData
+      
+      const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
 
-    } catch (error: any) {
-      console.error('AssignmentService.completeAssignment error:', error);
-      return {
-        success: false,
-        message: error.message || 'Failed to complete assignment. Please check your connection.',
-        error: error.message 
-      };
+      const result = await response.json();
+      console.log('AssignmentService: Complete response (with photo)', result);
+      
+      if (!response.ok) {
+        throw new Error(result.message || `Failed to complete assignment: ${response.status}`);
+      }
+      
+      return result;
+    } else {
+      // No photo, use JSON
+      const headers = await this.getHeaders();
+      
+      const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          photoUrl: data.photoUri,
+          notes: data.notes
+        }),
+      });
+
+      const result = await response.json();
+      console.log('AssignmentService: Complete response', result);
+      
+      if (!response.ok) {
+        throw new Error(result.message || `Failed to complete assignment: ${response.status}`);
+      }
+      
+      return result;
     }
-  }
 
+  } catch (error: any) {
+    console.error('AssignmentService.completeAssignment error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to complete assignment. Please check your connection.',
+      error: error.message 
+    };
+  }
+}
   // Verify an assignment (admin only)
   static async verifyAssignment(
     assignmentId: string, 
@@ -284,7 +291,7 @@ export class AssignmentService {
     try {
       console.log('AssignmentService: Getting assignment details', assignmentId);
       
-      const headers = await this.getHeaders(false); // No content type for GET
+      const headers = await this.getHeaders(false);
       
       const response = await fetch(`${API_URL}/${assignmentId}`, {
         method: 'GET',
@@ -321,13 +328,13 @@ export class AssignmentService {
     }
   ) {
     try {
-      let url = `${API_URL}/user/${userId}/assignments`;
+      let url = `${API_URL}/user/${userId}`;
       const params = new URLSearchParams();
       
       if (filters?.status) params.append('status', filters.status);
-      if (filters?.week) params.append('week', filters.week.toString());
-      if (filters?.limit) params.append('limit', filters.limit.toString());
-      if (filters?.offset) params.append('offset', filters.offset.toString());
+      if (filters?.week) params.append('week', filters.week?.toString());
+      if (filters?.limit) params.append('limit', filters.limit?.toString());
+      if (filters?.offset) params.append('offset', filters.offset?.toString());
       
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
@@ -358,6 +365,40 @@ export class AssignmentService {
     }
   }
 
+  // Get today's assignments
+  static async getTodayAssignments(groupId?: string) {
+    try {
+      let url = `${API_URL}/today`;
+      if (groupId) {
+        url += `?groupId=${groupId}`;
+      }
+      
+      console.log('AssignmentService: Getting today assignments', url);
+      
+      const headers = await this.getHeaders(false);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load today assignments: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('AssignmentService.getTodayAssignments error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load today assignments',
+        error: error.message
+      };
+    }
+  }
+
   // Get group assignments (admin only)
   static async getGroupAssignments(
     groupId: string, 
@@ -370,14 +411,14 @@ export class AssignmentService {
     }
   ) {
     try {
-      let url = `${API_URL}/group/${groupId}/assignments`;
+      let url = `${API_URL}/group/${groupId}`;
       const params = new URLSearchParams();
       
       if (filters?.status) params.append('status', filters.status);
-      if (filters?.week) params.append('week', filters.week.toString());
+      if (filters?.week) params.append('week', filters.week?.toString());
       if (filters?.userId) params.append('userId', filters.userId);
-      if (filters?.limit) params.append('limit', filters.limit.toString());
-      if (filters?.offset) params.append('offset', filters.offset.toString());
+      if (filters?.limit) params.append('limit', filters.limit?.toString());
+      if (filters?.offset) params.append('offset', filters.offset?.toString());
       
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
@@ -507,7 +548,7 @@ export class AssignmentService {
     };
   }> {
     try {
-      let url = `${API_URL}/upcoming/assignments`;
+      let url = `${API_URL}/upcoming`;
       const params = new URLSearchParams();
       
       if (options?.groupId) params.append('groupId', options.groupId);
@@ -648,165 +689,10 @@ export class AssignmentService {
     }
   }
 
-// FIXED getCurrentTimeSlotInfo method
-static async getCurrentTimeSlotInfo(taskId: string): Promise<{
-  success: boolean;
-  message: string;
-  data?: {
-    hasAssignmentToday: boolean;
-    assignment?: Assignment;
-    currentTimeSlot?: {
-      id: string;
-      startTime: string;
-      endTime: string;
-      label?: string;
-      points?: number;
-    };
-    nextTimeSlot?: {
-      id: string;
-      startTime: string;
-      endTime: string;
-      label?: string;
-      points?: number;
-    };
-    isSubmittable: boolean;
-    timeLeft?: number;
-    timeLeftText?: string;
-    submissionInfo?: any;
-    currentTime: string;
-  };
-}> {
-  try {
-    const headers = await this.getHeaders(false);
-    
-    // Try to use the task details endpoint
-    const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}`, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to load task: ${response.status}`);
-    }
-    
-    const taskData = await response.json();
-    
-    if (!taskData.success) {
-      // FIXED: Return proper error structure
-      return {
-        success: false,
-        message: taskData.message || 'Failed to load task info'
-      };
-    }
-
-    const task = taskData.task;
-    const now = new Date();
-    const today = now.toDateString();
-    
-    // Find today's assignment
-    const todaysAssignment = task.assignments?.find((assignment: any) => {
-      const dueDate = new Date(assignment.dueDate);
-      return dueDate.toDateString() === today;
-    });
-
-    // Local validation
-    const validation = todaysAssignment 
-      ? this.validateLocalSubmissionTime(
-          todaysAssignment.dueDate,
-          todaysAssignment.timeSlot,
-          now
-        )
-      : { canSubmit: false, reason: 'No assignment today' };
-
-    // FIXED: Proper type for nextTimeSlot
-    const nextTimeSlot = undefined; // Or calculate next slot logic
-
-    return {
-      success: true,
-      message: 'Time slot info retrieved',
-      data: {
-        hasAssignmentToday: !!todaysAssignment,
-        assignment: todaysAssignment,
-        currentTimeSlot: todaysAssignment?.timeSlot,
-        nextTimeSlot: nextTimeSlot, // Use undefined instead of null
-        isSubmittable: validation.canSubmit,
-        timeLeft: validation.timeLeft,
-        timeLeftText: validation.timeLeftText,
-        submissionInfo: validation,
-        currentTime: now.toISOString()
-      }
-    };
-
-  } catch (error: any) {
-    console.error('AssignmentService.getCurrentTimeSlotInfo error:', error);
-    // FIXED: Return proper error structure
-    return {
-      success: false,
-      message: error.message || 'Failed to get time slot info'
-    };
-  }
-}
-
-  // Batch check multiple assignments
-  static async batchCheckSubmissionTimes(assignmentIds: string[]): Promise<{
-    success: boolean;
-    message: string;
-    data: Record<string, {
-      canSubmit: boolean;
-      reason?: string;
-      timeLeft?: number;
-      timeLeftText?: string;
-    }>;
-  }> {
-    try {
-      const results: Record<string, any> = {};
-      
-      // Check each assignment individually (for now)
-      for (const assignmentId of assignmentIds) {
-        try {
-          const check = await this.checkSubmissionTime(assignmentId);
-          if (check.success) {
-            results[assignmentId] = {
-              canSubmit: check.data.canSubmit,
-              reason: check.data.reason,
-              timeLeft: check.data.timeLeft,
-              timeLeftText: check.data.timeLeftText
-            };
-          } else {
-            results[assignmentId] = {
-              canSubmit: false,
-              reason: check.message || 'Error checking'
-            };
-          }
-        } catch (error: any) {
-          results[assignmentId] = {
-            canSubmit: false,
-            reason: error.message || 'Network error'
-          };
-        }
-      }
-
-      return {
-        success: true,
-        message: 'Batch check completed',
-        data: results
-      };
-
-    } catch (error: any) {
-      console.error('AssignmentService.batchCheckSubmissionTimes error:', error);
-      return {
-        success: false,
-        message: error.message || 'Failed to batch check submission times',
-        data: {}
-      };
-    }
-  }
-
   // Helper: Create File from image URI (for React Native)
   static async createFileFromUri(uri: string, fileName: string = 'photo.jpg'): Promise<File> {
     try {
       // For React Native, you might need a different approach
-      // This is a simplified version
       const response = await fetch(uri);
       const blob = await response.blob();
       
@@ -845,6 +731,60 @@ static async getCurrentTimeSlotInfo(taskId: string): Promise<{
       return {
         success: false,
         message: error.message || 'Failed to upload photo'
+      };
+    }
+  }
+
+  // Get current time slot info for a task
+  static async getCurrentTimeSlotInfo(taskId: string): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      hasAssignmentToday: boolean;
+      assignment?: Assignment;
+      currentTimeSlot?: {
+        id: string;
+        startTime: string;
+        endTime: string;
+        label?: string;
+        points?: number;
+      };
+      nextTimeSlot?: {
+        id: string;
+        startTime: string;
+        endTime: string;
+        label?: string;
+        points?: number;
+      };
+      isSubmittable: boolean;
+      timeLeft?: number;
+      timeLeftText?: string;
+      submissionInfo?: any;
+      currentTime: string;
+    };
+  }> {
+    try {
+      const headers = await this.getHeaders(false);
+      
+      // Use task endpoint to get time slot info
+      const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/time-slot-info`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load time slot info: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      return result;
+
+    } catch (error: any) {
+      console.error('AssignmentService.getCurrentTimeSlotInfo error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to get time slot info'
       };
     }
   }

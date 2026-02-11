@@ -138,63 +138,66 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   };
 
   const submitCompletion = async () => {
-    if (!isSubmittable) {
-      Alert.alert(
-        'Time Expired',
-        'Submission time has passed. Please contact an administrator if this is an error.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+  if (!isSubmittable) {
+    Alert.alert(
+      'Time Expired',
+      'Submission time has passed. Please contact an administrator if this is an error.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
 
-    if (!validateSubmission()) return;
+  if (!validateSubmission()) return;
 
-    setSubmitting(true);
+  setSubmitting(true);
+  
+  try {
+    // Create a File from the photo URI for upload
+    let photoFile: File | undefined = undefined;
     
-    try {
-      // Create FormData for file upload
-      const formData = new FormData();
-      formData.append('assignmentId', assignmentId);
-      formData.append('notes', notes);
+    if (photo) {
+      const filename = photo.split('/').pop();
+      const match = /\.(\w+)$/.exec(filename || '');
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
       
-      if (photo) {
-        const filename = photo.split('/').pop();
-        const match = /\.(\w+)$/.exec(filename || '');
-        const type = match ? `image/${match[1]}` : 'image/jpeg';
-        
-        formData.append('photo', {
-          uri: photo,
-          name: filename || 'photo.jpg',
-          type,
-        } as any);
-      }
-
-      const result = await AssignmentService.completeAssignment(formData);
+      // Fetch the image and create a blob
+      const response = await fetch(photo);
+      const blob = await response.blob();
       
-      if (result.success) {
-        Alert.alert(
-          'Success!',
-          'Assignment submitted successfully. Waiting for admin verification.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                if (onCompleted) onCompleted();
-                navigation.goBack();
-              }
-            }
-          ]
-        );
-      } else {
-        Alert.alert('Error', result.message || 'Failed to submit assignment');
-      }
-    } catch (error: any) {
-      console.error('Error submitting assignment:', error);
-      Alert.alert('Error', error.message || 'Network error');
-    } finally {
-      setSubmitting(false);
+      photoFile = new File([blob], filename || 'photo.jpg', { type });
     }
-  };
+
+    // Call the AssignmentService with correct parameters
+    const result = await AssignmentService.completeAssignment(assignmentId, {
+      notes,
+      photoUri: photo || undefined, // Convert null to undefined
+      photoFile: photoFile // Pass the File object (already undefined if no photo)
+    });
+    
+    if (result.success) {
+      Alert.alert(
+        'Success!',
+        'Assignment submitted successfully. Waiting for admin verification.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              if (onCompleted) onCompleted();
+              navigation.goBack();
+            }
+          }
+        ]
+      );
+    } else {
+      Alert.alert('Error', result.message || 'Failed to submit assignment');
+    }
+  } catch (error: any) {
+    console.error('Error submitting assignment:', error);
+    Alert.alert('Error', error.message || 'Network error');
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const renderTimeInfo = () => {
     if (!timeSlot || timeLeft === null) return null;

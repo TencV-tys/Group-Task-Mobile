@@ -487,7 +487,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         <View style={styles.completionCard}>
           <View style={styles.completionHeader}>
             <MaterialCommunityIcons 
-              name={status.icon} 
+              name={status.icon as any} 
               size={24} 
               color={status.color} 
             />
@@ -578,7 +578,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             </View>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: status.color + '20' }]}>
-            <MaterialCommunityIcons name={status.icon} size={10} color={status.color} />
+            <MaterialCommunityIcons name={status.icon as any} size={10} color={status.color} />
             <Text style={[styles.statusText, { color: status.color }]}>
               {status.text}
             </Text>
@@ -925,7 +925,7 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40
-  },
+  }, 
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

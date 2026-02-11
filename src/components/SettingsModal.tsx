@@ -1,4 +1,3 @@
-// src/components/SettingsModal.tsx
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -23,6 +22,7 @@ interface SettingsModalProps {
   navigation: any;
   onNavigateToAssignment?: () => void;
   onRefreshTasks?: () => void;
+  onCreateTask?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -33,7 +33,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   userRole,
   navigation,
   onNavigateToAssignment,
-  onRefreshTasks
+  onRefreshTasks,
+  onCreateTask
 }) => {
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
@@ -43,25 +44,21 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const isAdmin = userRole === 'ADMIN';
 
-  // Load statistics and leaderboard
   const loadGroupData = async () => {
     if (!visible) return;
 
     try {
-      // Load group statistics
       setLoadingStats(true);
       const statsResult = await TaskService.getTaskStatistics(groupId);
       if (statsResult.success) {
         setGroupStats(statsResult.statistics); 
       }
 
-      // Load rotation info 
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
         setRotationWeek(groupResult.group?.currentRotationWeek || 1);
       }
 
-      // Load leaderboard (you'll need to create this endpoint)
       setLoadingLeaderboard(true);
       const leaderboardResult = await getLeaderboardData(groupId);
       setLeaderboard(leaderboardResult);
@@ -74,9 +71,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // Mock leaderboard data - you'll need to create a real endpoint
   const getLeaderboardData = async (groupId: string) => {
-    // This is a placeholder - implement your own leaderboard logic
     return [
       { userId: '1', userName: 'John Doe', points: 45, completedTasks: 12 },
       { userId: '2', userName: 'Jane Smith', points: 38, completedTasks: 10 },
@@ -129,12 +124,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleTaskStatistics = () => {
-    // Navigate to detailed statistics screen
     onClose();
   };
 
   const handleGroupSettings = () => {
     navigation.navigate('GroupSettings', { groupId, groupName, userRole });
+    onClose();
+  };
+
+  const handleCreateTask = () => {
+    if (!isAdmin) {
+      Alert.alert('Restricted', 'Only admins can create tasks');
+      onClose();
+      return;
+    }
+    
+    onCreateTask?.();
     onClose();
   };
 
@@ -200,7 +205,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     >
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
-          {/* Modal Header */}
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
               {groupName} Settings
@@ -211,7 +215,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </View>
 
           <ScrollView style={styles.modalBody}>
-            {/* Rotation Info */}
+            {isAdmin && (
+              <View style={styles.section}>
+                <TouchableOpacity 
+                  style={styles.createTaskButton}
+                  onPress={handleCreateTask}
+                >
+                  <MaterialCommunityIcons name="plus-circle" size={24} color="#fff" />
+                  <Text style={styles.createTaskButtonText}>Create New Task</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="calendar-sync" size={20} color="#007AFF" />
@@ -245,7 +260,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Admin Actions Section */}
             {isAdmin && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -282,7 +296,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </View>
             )}
 
-            {/* Statistics Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="chart-bar" size={20} color="#007AFF" />
@@ -335,7 +348,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Leaderboard Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="podium" size={20} color="#007AFF" />
@@ -357,36 +369,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <TouchableOpacity style={styles.viewAllButton}>
                 <Text style={styles.viewAllText}>View Full Leaderboard</Text>
               </TouchableOpacity>
-            </View>
-
-            {/* Quick Actions for All Users */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <MaterialCommunityIcons name="lightning-bolt" size={20} color="#007AFF" />
-                <Text style={styles.sectionTitle}>Quick Actions</Text>
-              </View>
-
-              <View style={styles.quickActionsGrid}>
-                <TouchableOpacity style={styles.quickActionButton}>
-                  <MaterialCommunityIcons name="clipboard-check" size={24} color="#007AFF" />
-                  <Text style={styles.quickActionText}>My Tasks</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.quickActionButton}>
-                  <MaterialCommunityIcons name="swap-horizontal" size={24} color="#007AFF" />
-                  <Text style={styles.quickActionText}>Swap Tasks</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.quickActionButton}>
-                  <MaterialCommunityIcons name="bell" size={24} color="#007AFF" />
-                  <Text style={styles.quickActionText}>Notifications</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.quickActionButton}>
-                  <MaterialCommunityIcons name="help-circle" size={24} color="#007AFF" />
-                  <Text style={styles.quickActionText}>Help</Text>
-                </TouchableOpacity>
-              </View>
             </View>
           </ScrollView>
 
@@ -452,6 +434,21 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24
+  },
+  createTaskButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 12,
+    gap: 10,
+    marginBottom: 16
+  },
+  createTaskButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold'
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -608,7 +605,7 @@ const styles = StyleSheet.create({
     fontSize: 14
   },
   userInfo: {
-    flex: 1
+    flex: 1 
   },
   userName: {
     fontSize: 14,
@@ -643,26 +640,5 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '600',
     fontSize: 14
-  },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12
-  },
-  quickActionButton: {
-    flex: 1,
-    minWidth: '45%',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  quickActionText: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 8,
-    textAlign: 'center'
   }
 });

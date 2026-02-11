@@ -177,8 +177,7 @@ export class AssignmentService {
     return headers;
   }
 
-  // Complete an assignment WITH PHOTO UPLOAD
-  
+ // Complete an assignment WITH PHOTO UPLOAD (Simplified for React Native)
 static async completeAssignment(
   assignmentId: string, 
   data: CompleteAssignmentParams
@@ -188,19 +187,33 @@ static async completeAssignment(
     
     const token = await this.getAuthToken();
     
-    // If we have a photo file, use FormData
-    if (data.photoFile) {
+    // Always use FormData for React Native when we have a photo
+    if (data.photoUri) {
       const formData = new FormData();
+      
+      // Add notes if provided
       if (data.notes) {
         formData.append('notes', data.notes);
       }
-      formData.append('photo', data.photoFile);
+      
+      // Add photo - React Native FormData format
+      const filename = data.photoUri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const type = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      formData.append('photo', {
+        uri: data.photoUri,
+        name: filename,
+        type,
+      } as any);
       
       const headers: HeadersInit = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
       // Don't set Content-Type for FormData
+      
+      console.log('Sending FormData with photo to:', `${API_URL}/${assignmentId}/complete`);
       
       const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
         method: 'POST',
@@ -224,7 +237,6 @@ static async completeAssignment(
         method: 'POST',
         headers,
         body: JSON.stringify({
-          photoUrl: data.photoUri,
           notes: data.notes
         }),
       });
@@ -248,6 +260,7 @@ static async completeAssignment(
     };
   }
 }
+  
   // Verify an assignment (admin only)
   static async verifyAssignment(
     assignmentId: string, 

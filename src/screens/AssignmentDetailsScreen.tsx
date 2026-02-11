@@ -963,7 +963,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fa5252'
   },
   approveButton: {
-    backgroundColor: '#2b8a3e'
+    backgroundColor: '#2b8a3e' 
   },
   verifyButtonText: {
     color: 'white',

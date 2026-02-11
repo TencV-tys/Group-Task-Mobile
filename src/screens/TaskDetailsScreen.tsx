@@ -480,7 +480,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         </View>
       );
     }
-
+ 
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>My Submission</Text>

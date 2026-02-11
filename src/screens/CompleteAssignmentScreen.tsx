@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -24,40 +24,70 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   const { assignmentId, taskTitle, dueDate, timeSlot, onCompleted } = route.params || {};
   
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [isSubmittable, setIsSubmittable] = useState(true);
+  const [isSubmittable, setIsSubmittable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<{ photo?: string; notes?: string }>({});
+  const [timeStatus, setTimeStatus] = useState<'waiting' | 'submission_open' | 'expired' | 'wrong_day'>('waiting');
 
   useEffect(() => {
-    if (timeSlot) {
+    if (timeSlot && dueDate) {
       startCountdownTimer();
     }
-  }, [timeSlot]);
+  }, [timeSlot, dueDate]);
 
   const startCountdownTimer = () => {
     const calculateTimeLeft = () => {
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
-      const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
+      const due = new Date(dueDate);
       
-      const endTime = new Date(today);
-      endTime.setHours(endHour, endMinute, 0, 0);
+      // Check if it's the due date
+      const isToday = now.toDateString() === due.toDateString();
       
-      // 30 minute grace period after end time
-      const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
-      
-      const diff = gracePeriodEnd.getTime() - now.getTime();
-      
-      if (diff <= 0) {
+      if (!isToday) {
+        setTimeStatus('wrong_day');
         setIsSubmittable(false);
-        setTimeLeft(0);
+        setTimeLeft(null);
         return;
       }
       
-      setTimeLeft(Math.floor(diff / 1000));
-      setIsSubmittable(true);
+      // Parse end time
+      const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
+      
+      // Create end time object for today
+      const endTime = new Date(now);
+      endTime.setHours(endHour, endMinute, 0, 0);
+      
+      // Grace period: 30 minutes after end time
+      const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000); // 30 min after end
+      
+      // Check current time against schedule
+      if (now < endTime) {
+        // Before end time - waiting
+        setTimeStatus('waiting');
+        setIsSubmittable(false);
+        const timeUntilEnd = endTime.getTime() - now.getTime();
+        setTimeLeft(Math.floor(timeUntilEnd / 1000));
+      } else if (now >= endTime && now <= gracePeriodEnd) {
+        // Within grace period - can submit
+        setTimeStatus('submission_open');
+        const timeUntilGraceEnd = gracePeriodEnd.getTime() - now.getTime();
+        
+        if (timeUntilGraceEnd <= 0) {
+          setTimeStatus('expired');
+          setIsSubmittable(false);
+          setTimeLeft(0);
+        } else {
+          setIsSubmittable(true);
+          setTimeLeft(Math.floor(timeUntilGraceEnd / 1000));
+        }
+      } else {
+        // After grace period
+        setTimeStatus('expired');
+        setIsSubmittable(false);
+        setTimeLeft(0);
+      }
     };
     
     calculateTimeLeft();
@@ -76,6 +106,46 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
       return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+  };
+
+  const getTimeStatusMessage = () => {
+    switch (timeStatus) {
+      case 'wrong_day':
+        return {
+          title: 'Wrong Day',
+          message: `This assignment is due on ${new Date(dueDate).toLocaleDateString()}. Please come back then.`,
+          color: '#6c757d',
+          icon: 'calendar-clock'
+        };
+      case 'waiting':
+        return {
+          title: 'Waiting for Time Slot',
+          message: 'Submit after the time slot ends',
+          color: '#e67700',
+          icon: 'clock-alert'
+        };
+      case 'submission_open':
+        return {
+          title: 'Submission Open',
+          message: 'Submit your completion now',
+          color: '#2b8a3e',
+          icon: 'check-circle'
+        };
+      case 'expired':
+        return {
+          title: 'Submission Closed',
+          message: 'The 30-minute grace period has ended',
+          color: '#fa5252',
+          icon: 'timer-off'
+        };
+      default:
+        return {
+          title: 'Checking...',
+          message: 'Checking submission status',
+          color: '#6c757d',
+          icon: 'clock'
+        };
     }
   };
 
@@ -138,121 +208,141 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   };
 
   const submitCompletion = async () => {
-  if (!isSubmittable) {
-    Alert.alert(
-      'Time Expired',
-      'Submission time has passed. Please contact an administrator if this is an error.',
-      [{ text: 'OK' }]
-    );
-    return;
-  }
-
-  if (!validateSubmission()) return;
-
-  setSubmitting(true);
-  
-  try {
-    // Create a File from the photo URI for upload
-    let photoFile: File | undefined = undefined;
-    
-    if (photo) {
-      const filename = photo.split('/').pop();
-      const match = /\.(\w+)$/.exec(filename || '');
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-      
-      // Fetch the image and create a blob
-      const response = await fetch(photo);
-      const blob = await response.blob();
-      
-      photoFile = new File([blob], filename || 'photo.jpg', { type });
-    }
-
-    // Call the AssignmentService with correct parameters
-    const result = await AssignmentService.completeAssignment(assignmentId, {
-      notes,
-      photoUri: photo || undefined, // Convert null to undefined
-      photoFile: photoFile // Pass the File object (already undefined if no photo)
-    });
-    
-    if (result.success) {
+    if (!isSubmittable) {
       Alert.alert(
-        'Success!',
-        'Assignment submitted successfully. Waiting for admin verification.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              if (onCompleted) onCompleted();
-              navigation.goBack();
-            }
-          }
-        ]
+        'Cannot Submit',
+        timeStatus === 'waiting' ? 
+          `Submit after ${timeSlot?.endTime} on the due date` :
+          'Submission time has passed. Please contact an administrator if this is an error.',
+        [{ text: 'OK' }]
       );
-    } else {
-      Alert.alert('Error', result.message || 'Failed to submit assignment');
+      return;
     }
-  } catch (error: any) {
-    console.error('Error submitting assignment:', error);
-    Alert.alert('Error', error.message || 'Network error');
-  } finally {
-    setSubmitting(false);
-  }
-};
+
+    if (!validateSubmission()) return;
+
+    setSubmitting(true);
+    
+    try {
+      const result = await AssignmentService.completeAssignment(assignmentId, {
+        notes,
+        photoUri: photo || undefined,
+      });
+      
+      if (result.success) {
+        Alert.alert(
+          'Success!',
+          'Assignment submitted successfully. Waiting for admin verification.',
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                if (onCompleted) onCompleted();
+                navigation.goBack();
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', result.message || 'Failed to submit assignment');
+      }
+    } catch (error: any) {
+      console.error('Error submitting assignment:', error);
+      Alert.alert('Error', error.message || 'Network error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const renderTimeInfo = () => {
-    if (!timeSlot || timeLeft === null) return null;
+    if (!timeSlot) return null;
 
-    const isWarning = timeLeft < 300; // Less than 5 minutes
-    const isCritical = timeLeft < 60; // Less than 1 minute
+    const timeStatusMsg = getTimeStatusMessage();
+    const isCritical = timeLeft !== null && timeLeft < 300; // Less than 5 minutes
+    const isWarning = timeLeft !== null && timeLeft < 600; // Less than 10 minutes
     
     return (
       <View style={[
         styles.timeInfoContainer,
-        isCritical && styles.timeCritical,
-        isWarning && styles.timeWarning
+        timeStatus === 'expired' && styles.timeCritical,
+        timeStatus === 'waiting' && styles.timeWarning,
+        timeStatus === 'submission_open' && styles.timeOpen,
+        timeStatus === 'wrong_day' && styles.timeWrongDay
       ]}>
         <View style={styles.timeInfoHeader}>
           <MaterialCommunityIcons 
-            name={isSubmittable ? "timer" : "timer-off"} 
+            name={timeStatusMsg.icon as any} 
             size={20} 
-            color={isSubmittable ? (isWarning ? "#e67700" : "#2b8a3e") : "#fa5252"} 
+            color={timeStatusMsg.color} 
           />
           <Text style={[
             styles.timeInfoTitle,
-            isCritical && styles.timeCriticalText,
-            isWarning && styles.timeWarningText
+            { color: timeStatusMsg.color }
           ]}>
-            {isSubmittable ? 'Time Remaining' : 'Time Expired'}
+            {timeStatusMsg.title}
           </Text>
         </View>
         
-        {isSubmittable ? (
+        {timeStatus === 'submission_open' && timeLeft !== null ? (
           <>
             <Text style={[
               styles.timerText,
               isCritical && styles.timeCriticalText,
-              isWarning && styles.timeWarningText
+              isWarning && styles.timeWarningText,
+              { color: timeStatusMsg.color }
             ]}>
               {formatTime(timeLeft)}
             </Text>
             <Text style={styles.timeInstructions}>
-              Submit before the timer runs out to receive full points
+              Grace period ends in {formatTime(timeLeft)}
             </Text>
             
             {isWarning && (
               <View style={styles.warningMessage}>
                 <MaterialCommunityIcons name="alert-circle" size={16} color="#e67700" />
                 <Text style={styles.warningText}>
-                  Hurry! Submission closing soon
+                  {isCritical ? 'Hurry! Grace period almost over!' : 'Grace period ending soon'}
                 </Text>
               </View>
             )}
           </>
+        ) : timeStatus === 'waiting' && timeLeft !== null ? (
+          <>
+            <Text style={[styles.timerText, { color: timeStatusMsg.color }]}>
+              {formatTime(timeLeft)}
+            </Text>
+            <Text style={styles.timeInstructions}>
+              Time slot ends in {formatTime(timeLeft)}
+            </Text>
+            <Text style={styles.scheduleInfo}>
+              Submit between {timeSlot.endTime} - {(() => {
+                const [hour, minute] = timeSlot.endTime.split(':').map(Number);
+                const graceEnd = new Date();
+                graceEnd.setHours(hour, minute + 30, 0, 0);
+                return graceEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              })()}
+            </Text>
+          </>
         ) : (
-          <Text style={styles.expiredText}>
-            The submission window has closed. Please contact an administrator.
+          <Text style={styles.timeMessage}>
+            {timeStatusMsg.message}
           </Text>
         )}
+        
+        <View style={styles.timeSlotInfo}>
+          <Text style={styles.timeSlotLabel}>Time Slot:</Text>
+          <Text style={styles.timeSlotValue}>
+            {timeSlot.startTime} - {timeSlot.endTime}
+            {timeSlot.label && ` (${timeSlot.label})`}
+          </Text>
+        </View>
+        
+        <View style={styles.submissionWindowInfo}>
+          <MaterialCommunityIcons name="information" size={14} color="#6c757d" />
+          <Text style={styles.submissionWindowText}>
+            Submit within 30 minutes after {timeSlot.endTime}
+          </Text>
+        </View>
       </View>
     );
   };
@@ -379,7 +469,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
                   <View style={styles.taskDetailRow}>
                     <MaterialCommunityIcons name="clock" size={16} color="#6c757d" />
                     <Text style={styles.taskDetailText}>
-                      Time: {timeSlot.startTime} - {timeSlot.endTime}
+                      Time Slot: {timeSlot.startTime} - {timeSlot.endTime}
                     </Text>
                   </View>
                 )}
@@ -395,25 +485,12 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             {/* Notes */}
             {renderNotesSection()}
 
-            {/* Submission Info */}
-            <View style={styles.infoBox}>
-              <MaterialCommunityIcons name="information" size={20} color="#6c757d" />
-              <View style={styles.infoContent}>
-                <Text style={styles.infoTitle}>Submission Information</Text>
-                <Text style={styles.infoText}>
-                  • Photo is required as proof{'\n'}
-                  • Submit within the allowed time window{'\n'}
-                  • Your submission will be reviewed by an administrator{'\n'}
-                  • Points will be awarded after verification
-                </Text>
-              </View>
-            </View>
-
             {/* Submit Button */}
             <TouchableOpacity
               style={[
                 styles.submitButton,
-                (!isSubmittable || submitting) && styles.submitButtonDisabled
+                (!isSubmittable || submitting) && styles.submitButtonDisabled,
+                timeStatus === 'wrong_day' && styles.submitButtonWrongDay
               ]}
               onPress={submitCompletion}
               disabled={!isSubmittable || submitting}
@@ -423,17 +500,36 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
                 <ActivityIndicator size="small" color="white" />
               ) : (
                 <View style={styles.submitButtonContent}>
-                  <MaterialCommunityIcons name="check-circle" size={22} color="white" />
+                  <MaterialCommunityIcons 
+                    name={timeStatus === 'submission_open' ? "check-circle" : "clock"} 
+                    size={22} 
+                    color="white" 
+                  />
                   <Text style={styles.submitButtonText}>
-                    {isSubmittable ? 'Submit Completion' : 'Submission Closed'}
+                    {timeStatus === 'submission_open' ? 'Submit Completion' : 
+                     timeStatus === 'waiting' ? `Wait Until ${timeSlot?.endTime}` :
+                     timeStatus === 'wrong_day' ? 'Wrong Day - Cannot Submit' :
+                     'Submission Closed'}
                   </Text>
                 </View>
               )}
             </TouchableOpacity>
             
-            {!isSubmittable && (
+            {timeStatus === 'wrong_day' && (
               <Text style={styles.disabledText}>
-                The submission window has ended. Please contact an administrator.
+                This assignment can only be submitted on the due date: {new Date(dueDate).toLocaleDateString()}
+              </Text>
+            )}
+            
+            {timeStatus === 'waiting' && timeLeft !== null && (
+              <Text style={styles.waitingText}>
+                Submit after {timeSlot?.endTime} (in {formatTime(timeLeft)})
+              </Text>
+            )}
+            
+            {timeStatus === 'expired' && (
+              <Text style={styles.expiredMessage}>
+                The 30-minute grace period has ended. Please contact an administrator.
               </Text>
             )}
           </View>
@@ -525,11 +621,13 @@ const styles = StyleSheet.create({
     color: '#6c757d'
   },
   timeInfoContainer: {
-    backgroundColor: '#d3f9d8',
     borderRadius: 8,
     padding: 16,
     marginBottom: 24,
-    borderWidth: 1,
+    borderWidth: 1
+  },
+  timeOpen: {
+    backgroundColor: '#d3f9d8',
     borderColor: '#8ce99a'
   },
   timeWarning: {
@@ -540,6 +638,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffc9c9',
     borderColor: '#fa5252'
   },
+  timeWrongDay: {
+    backgroundColor: '#f1f3f5',
+    borderColor: '#dee2e6'
+  },
   timeInfoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -548,8 +650,7 @@ const styles = StyleSheet.create({
   },
   timeInfoTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#2b8a3e'
+    fontWeight: '600'
   },
   timeWarningText: {
     color: '#e67700'
@@ -561,7 +662,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
-    color: '#2b8a3e',
     marginBottom: 8
   },
   timeInstructions: {
@@ -569,6 +669,13 @@ const styles = StyleSheet.create({
     color: '#495057',
     textAlign: 'center',
     marginBottom: 8
+  },
+  timeMessage: {
+    fontSize: 14,
+    color: '#495057',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginVertical: 8
   },
   warningMessage: {
     flexDirection: 'row',
@@ -582,11 +689,45 @@ const styles = StyleSheet.create({
     color: '#e67700',
     fontWeight: '500'
   },
-  expiredText: {
-    fontSize: 14,
-    color: '#495057',
+  scheduleInfo: {
+    fontSize: 12,
+    color: '#6c757d',
     textAlign: 'center',
-    lineHeight: 20
+    marginTop: 4
+  },
+  timeSlotInfo: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)'
+  },
+  timeSlotLabel: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginRight: 4
+  },
+  timeSlotValue: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#495057'
+  },
+  submissionWindowInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: 'rgba(108, 117, 125, 0.1)',
+    padding: 8,
+    borderRadius: 6
+  },
+  submissionWindowText: {
+    fontSize: 12,
+    color: '#6c757d',
+    fontStyle: 'italic'
   },
   section: {
     marginBottom: 24
@@ -686,35 +827,15 @@ const styles = StyleSheet.create({
     color: '#fa5252',
     marginTop: 4
   },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 24,
-    gap: 12
-  },
-  infoContent: {
-    flex: 1
-  },
-  infoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#495057',
-    marginBottom: 6
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#6c757d',
-    lineHeight: 20
-  },
   submitButton: {
     backgroundColor: '#2b8a3e',
     borderRadius: 8,
     padding: 18
   },
   submitButtonDisabled: {
+    backgroundColor: '#868e96'
+  },
+  submitButtonWrongDay: {
     backgroundColor: '#868e96'
   },
   submitButtonContent: {
@@ -731,6 +852,20 @@ const styles = StyleSheet.create({
   disabledText: {
     fontSize: 14,
     color: '#868e96',
+    textAlign: 'center',
+    marginTop: 12,
+    fontStyle: 'italic'
+  },
+  waitingText: {
+    fontSize: 14,
+    color: '#e67700',
+    textAlign: 'center',
+    marginTop: 12,
+    fontStyle: 'italic'
+  },
+  expiredMessage: {
+    fontSize: 14,
+    color: '#fa5252',
     textAlign: 'center',
     marginTop: 12,
     fontStyle: 'italic'

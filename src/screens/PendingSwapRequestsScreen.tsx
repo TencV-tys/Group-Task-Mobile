@@ -44,10 +44,14 @@ export const PendingSwapRequestsScreen = () => {
     setRefreshing(false);
   };
 
-  const handleAccept = (requestId: string) => {
+  const handleAccept = (requestId: string, scope?: string, selectedDay?: string) => {
+    const swapDescription = scope === 'day' 
+      ? `this swap for ${selectedDay || 'specific day'}`
+      : 'this entire week swap';
+    
     Alert.alert(
       'Accept Swap Request',
-      'Are you sure you want to accept this swap? This assignment will be transferred to you.',
+      `Are you sure you want to accept ${swapDescription}? This assignment will be transferred to you.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -82,6 +86,11 @@ export const PendingSwapRequestsScreen = () => {
     );
   };
 
+  const handleViewDetails = (requestId: string) => {
+    // @ts-ignore
+    navigation.navigate('SwapRequestDetails', { requestId });
+  };
+
   const renderSwapRequest = ({ item }: { item: any }) => {
     const statusColor = SwapRequestService.getStatusColor(item.status);
     const statusLabel = SwapRequestService.getStatusLabel(item.status);
@@ -94,9 +103,16 @@ export const PendingSwapRequestsScreen = () => {
     const requesterAvatar = item.requester?.avatarUrl;
     const timeSlot = item.assignment?.timeSlot?.startTime;
     const points = item.assignment?.points || 0;
+    const scope = item.scope || 'week';
+    const selectedDay = item.selectedDay;
+    const selectedTimeSlot = item.selectedTimeSlot;
 
     return (
-      <View style={styles.requestCard}>
+      <TouchableOpacity
+        style={styles.requestCard}
+        onPress={() => handleViewDetails(item.id)}
+        activeOpacity={0.7}
+      >
         <View style={styles.cardHeader}>
           <View style={styles.requesterInfo}>
             <View style={styles.avatar}>
@@ -124,7 +140,40 @@ export const PendingSwapRequestsScreen = () => {
         </View>
 
         <View style={styles.taskContainer}>
-          <Text style={styles.taskTitle}>{taskTitle}</Text>
+          <Text style={styles.taskTitle} numberOfLines={2}>
+            {taskTitle}
+          </Text>
+          
+          {/* ✅ NEW: Scope Badge */}
+          <View style={[
+            styles.scopeBadge,
+            scope === 'day' ? styles.dayScopeBadge : styles.weekScopeBadge
+          ]}>
+            <Ionicons 
+              name={scope === 'day' ? 'today' : 'calendar'} 
+              size={14} 
+              color={scope === 'day' ? '#4F46E5' : '#6B7280'} 
+            />
+            <Text style={[
+              styles.scopeBadgeText,
+              scope === 'day' && styles.dayScopeBadgeText
+            ]}>
+              {scope === 'day' 
+                ? `Swap for ${selectedDay || 'specific day'}`
+                : 'Swap for entire week'}
+            </Text>
+          </View>
+          
+          {/* ✅ NEW: Time Slot Info for Day Swaps */}
+          {scope === 'day' && selectedTimeSlot && (
+            <View style={styles.timeSlotBadge}>
+              <Ionicons name="time" size={12} color="#6B7280" />
+              <Text style={styles.timeSlotText}>
+                {selectedTimeSlot.startTime} - {selectedTimeSlot.endTime}
+                {selectedTimeSlot.label ? ` (${selectedTimeSlot.label})` : ''}
+              </Text>
+            </View>
+          )}
           
           <View style={styles.detailsGrid}>
             <View style={styles.detailItem}>
@@ -134,7 +183,7 @@ export const PendingSwapRequestsScreen = () => {
               </Text>
             </View>
             
-            {timeSlot && (
+            {timeSlot && scope !== 'day' && (
               <View style={styles.detailItem}>
                 <Ionicons name="time-outline" size={16} color="#6B7280" />
                 <Text style={styles.detailText}>{timeSlot}</Text>
@@ -150,7 +199,9 @@ export const PendingSwapRequestsScreen = () => {
           {item.reason && (
             <View style={styles.reasonContainer}>
               <Text style={styles.reasonLabel}>Reason:</Text>
-              <Text style={styles.reasonText}>{item.reason}</Text>
+              <Text style={styles.reasonText} numberOfLines={2}>
+                {item.reason}
+              </Text>
             </View>
           )}
 
@@ -168,7 +219,7 @@ export const PendingSwapRequestsScreen = () => {
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[styles.actionButton, styles.acceptButton]}
-              onPress={() => handleAccept(item.id)}
+              onPress={() => handleAccept(item.id, item.scope, item.selectedDay)}
               disabled={isProcessing}
             >
               {isProcessing ? (
@@ -197,7 +248,7 @@ export const PendingSwapRequestsScreen = () => {
             </TouchableOpacity>
           </View>
         )}
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -216,7 +267,7 @@ export const PendingSwapRequestsScreen = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <View>
+        <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>Swap Requests</Text>
           {totalPendingForMe > 0 && (
             <View style={styles.badge}>
@@ -284,6 +335,9 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+  },
+  headerTitleContainer: {
+    position: 'relative',
   },
   headerTitle: {
     fontSize: 18,
@@ -386,6 +440,49 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#111827',
     marginBottom: 12,
+  },
+  // ✅ NEW: Scope Badge Styles
+  scopeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginBottom: 12,
+  },
+  dayScopeBadge: {
+    backgroundColor: '#EEF2FF',
+  },
+  weekScopeBadge: {
+    backgroundColor: '#F3F4F6',
+  },
+  scopeBadgeText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  dayScopeBadgeText: {
+    color: '#4F46E5',
+  },
+  // ✅ NEW: Time Slot Badge
+  timeSlotBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  timeSlotText: {
+    fontSize: 12,
+    color: '#4B5563',
   },
   detailsGrid: {
     flexDirection: 'row',

@@ -8,6 +8,10 @@ export interface CreateSwapRequestData {
   reason?: string;
   targetUserId?: string;
   expiresAt?: string;
+  // ✅ NEW: Scope fields
+  scope?: 'week' | 'day';
+  selectedDay?: string;
+  selectedTimeSlotId?: string;
 }
 
 export interface SwapRequest {
@@ -20,6 +24,11 @@ export interface SwapRequest {
   expiresAt?: string;
   createdAt: string;
   updatedAt: string;
+  // ✅ NEW: Scope fields
+  scope?: 'week' | 'day';
+  selectedDay?: string;
+  selectedTimeSlotId?: string;
+  
   assignment?: {
     id: string;
     dueDate: string;
@@ -33,6 +42,12 @@ export interface SwapRequest {
         id: string;
         name: string;
       };
+      timeSlots?: Array<{
+        id: string;
+        startTime: string;
+        endTime: string;
+        label?: string;
+      }>;
     };
     timeSlot?: {
       id: string;
@@ -55,6 +70,13 @@ export interface SwapRequest {
     id: string;
     fullName: string;
     avatarUrl?: string;
+  };
+  // ✅ NEW: Selected time slot details
+  selectedTimeSlot?: {
+    id: string;
+    startTime: string;
+    endTime: string;
+    label?: string;
   };
 }
 
@@ -124,7 +146,7 @@ export class SwapRequestService {
     }
   }
 
-  // GET: Get my swap requests (requests I created)
+  // GET: Get my swap requests
   static async getMySwapRequests(filters?: SwapRequestFilters) {
     try {
       let url = `${API_URL}/my-requests`;
@@ -153,8 +175,6 @@ export class SwapRequestService {
       }
       
       const result = await response.json();
-      console.log('SwapRequestService: My requests response', result);
-      
       return result;
 
     } catch (error: any) {
@@ -168,7 +188,7 @@ export class SwapRequestService {
     }
   }
 
-  // GET: Get pending swap requests for me (to accept/reject)
+  // GET: Get pending swap requests for me
   static async getPendingForMe(filters?: { groupId?: string; limit?: number; offset?: number }) {
     try {
       let url = `${API_URL}/pending-for-me`;
@@ -196,8 +216,6 @@ export class SwapRequestService {
       }
       
       const result = await response.json();
-      console.log('SwapRequestService: Pending for me response', result);
-      
       return result;
 
     } catch (error: any) {
@@ -211,7 +229,7 @@ export class SwapRequestService {
     }
   }
 
-  // GET: Get swap requests for a group (admin only)
+  // GET: Get group swap requests
   static async getGroupSwapRequests(groupId: string, filters?: { status?: string; limit?: number; offset?: number }) {
     try {
       let url = `${API_URL}/group/${groupId}`;
@@ -252,7 +270,7 @@ export class SwapRequestService {
     }
   }
 
-  // GET: Get single swap request details
+  // GET: Get swap request details
   static async getSwapRequestDetails(requestId: string) {
     try {
       console.log('SwapRequestService: Getting swap request details', requestId);
@@ -282,7 +300,7 @@ export class SwapRequestService {
     }
   }
 
-  // GET: Check if assignment can be swapped
+  // CHECK: Check if assignment can be swapped
   static async checkCanSwap(assignmentId: string) {
     try {
       console.log('SwapRequestService: Checking if assignment can be swapped', assignmentId);
@@ -312,7 +330,7 @@ export class SwapRequestService {
     }
   }
 
-  // UPDATE: Accept a swap request
+  // ACCEPT: Accept a swap request
   static async acceptSwapRequest(requestId: string) {
     try {
       console.log('SwapRequestService: Accepting swap request', requestId);
@@ -344,7 +362,7 @@ export class SwapRequestService {
     }
   }
 
-  // UPDATE: Reject a swap request
+  // REJECT: Reject a swap request
   static async rejectSwapRequest(requestId: string, reason?: string) {
     try {
       console.log('SwapRequestService: Rejecting swap request', requestId);
@@ -377,7 +395,7 @@ export class SwapRequestService {
     }
   }
 
-  // UPDATE: Cancel a swap request (only by requester)
+  // CANCEL: Cancel a swap request
   static async cancelSwapRequest(requestId: string) {
     try {
       console.log('SwapRequestService: Cancelling swap request', requestId);
@@ -409,49 +427,38 @@ export class SwapRequestService {
     }
   }
 
-  // Helper: Check if user can swap (time constraints)
-  static canRequestSwap(dueDate: string): { canSwap: boolean; reason?: string } {
-    const now = new Date();
-    const due = new Date(dueDate);
-    
-    // Cannot swap for past assignments
-    if (due < now) {
-      return { canSwap: false, reason: 'Assignment is already overdue' };
+  // ============= HELPER METHODS =============
+
+  // Get swap description text
+  static getSwapDescription(swapRequest: SwapRequest): string {
+    if (swapRequest.scope === 'day') {
+      if (swapRequest.selectedTimeSlotId && swapRequest.selectedTimeSlot) {
+        return `${swapRequest.selectedDay} at ${swapRequest.selectedTimeSlot.startTime}`;
+      }
+      return swapRequest.selectedDay || 'specific day';
     }
-    
-    // Calculate 24 hours before due date
-    const twentyFourHoursBefore = new Date(due);
-    twentyFourHoursBefore.setHours(twentyFourHoursBefore.getHours() - 24);
-    
-    if (now > twentyFourHoursBefore) {
-      return { 
-        canSwap: false, 
-        reason: 'Cannot swap assignments less than 24 hours before due date' 
-      };
-    }
-    
-    return { canSwap: true };
+    return 'entire week';
   }
 
-  // Helper: Get status badge color
+  // Get status color
   static getStatusColor(status: string): string {
     switch (status) {
       case 'PENDING':
-        return '#F59E0B'; // Orange
+        return '#F59E0B';
       case 'ACCEPTED':
-        return '#10B981'; // Green
+        return '#10B981';
       case 'REJECTED':
-        return '#EF4444'; // Red
+        return '#EF4444';
       case 'CANCELLED':
-        return '#6B7280'; // Gray
+        return '#6B7280';
       case 'EXPIRED':
-        return '#9CA3AF'; // Light Gray
+        return '#9CA3AF';
       default:
         return '#6B7280';
     }
   }
 
-  // Helper: Get status label
+  // Get status label
   static getStatusLabel(status: string): string {
     switch (status) {
       case 'PENDING':
@@ -469,7 +476,7 @@ export class SwapRequestService {
     }
   }
 
-  // Helper: Get status icon
+  // Get status icon
   static getStatusIcon(status: string): string {
     switch (status) {
       case 'PENDING':
@@ -485,5 +492,27 @@ export class SwapRequestService {
       default:
         return 'help-circle';
     }
+  }
+
+  // Check if user can swap (time constraints)
+  static canRequestSwap(dueDate: string): { canSwap: boolean; reason?: string } {
+    const now = new Date();
+    const due = new Date(dueDate);
+    
+    if (due < now) {
+      return { canSwap: false, reason: 'Assignment is already overdue' };
+    }
+    
+    const twentyFourHoursBefore = new Date(due);
+    twentyFourHoursBefore.setHours(twentyFourHoursBefore.getHours() - 24);
+    
+    if (now > twentyFourHoursBefore) {
+      return { 
+        canSwap: false, 
+        reason: 'Cannot swap assignments less than 24 hours before due date' 
+      };
+    }
+    
+    return { canSwap: true };
   }
 }

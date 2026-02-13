@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SwapRequest,SwapRequestFilters,SwapRequestService } from '../SwapRequestServices.ts/SwapRequestService';
-import { Alert } from 'react-native';
+import { SwapRequestFilters,SwapRequest,SwapRequestService } from '../SwapRequestServices.ts/SwapRequestService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
+import { Alert } from 'react-native';
 export const useSwapRequests = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [myRequests, setMyRequests] = useState<SwapRequest[]>([]);
@@ -16,34 +15,21 @@ export const useSwapRequests = () => {
   useEffect(() => {
     const loadUserId = async () => {
       try {
-        // Try to get user from AsyncStorage - adjust key based on your storage
         const userStr = await AsyncStorage.getItem('user');
         if (userStr) {
           const user = JSON.parse(userStr);
           setUserId(user.id);
-        } else {
-          // Try alternative keys
-          const token = await AsyncStorage.getItem('userToken');
-          const userData = await AsyncStorage.getItem('userData');
-          if (userData) {
-            const user = JSON.parse(userData);
-            setUserId(user.id);
-          }
         }
       } catch (error) {
         console.error('Error loading user ID:', error);
       }
     };
-    
     loadUserId();
   }, []);
 
   // Load my swap requests
   const loadMyRequests = useCallback(async (filters?: SwapRequestFilters) => {
-    if (!userId) {
-      console.log('No user ID available, skipping loadMyRequests');
-      return;
-    }
+    if (!userId) return;
     
     setLoading(true);
     setError(null);
@@ -58,7 +44,6 @@ export const useSwapRequests = () => {
         setError(response.message || 'Failed to load swap requests');
       }
     } catch (err: any) {
-      console.error('Error loading my requests:', err);
       setError(err.message || 'Failed to load swap requests');
     } finally {
       setLoading(false);
@@ -67,10 +52,7 @@ export const useSwapRequests = () => {
 
   // Load pending requests for current user
   const loadPendingForMe = useCallback(async (groupId?: string) => {
-    if (!userId) {
-      console.log('No user ID available, skipping loadPendingForMe');
-      return;
-    }
+    if (!userId) return;
     
     setLoading(true);
     setError(null);
@@ -85,7 +67,6 @@ export const useSwapRequests = () => {
         setError(response.message || 'Failed to load pending requests');
       }
     } catch (err: any) {
-      console.error('Error loading pending for me:', err);
       setError(err.message || 'Failed to load pending requests');
     } finally {
       setLoading(false);
@@ -94,14 +75,14 @@ export const useSwapRequests = () => {
 
   // Create swap request
   const createSwapRequest = useCallback(async (data: {
-  assignmentId: string;
-  reason?: string;
-  targetUserId?: string;
-  expiresAt?: string;
-  scope?: 'week' | 'day';  // ✅ NEW
-  selectedDay?: string;     // ✅ NEW
-  selectedTimeSlotId?: string; // ✅ NEW
-}) => {
+    assignmentId: string;
+    reason?: string;
+    targetUserId?: string;
+    expiresAt?: string;
+    scope?: 'week' | 'day';
+    selectedDay?: string;
+    selectedTimeSlotId?: string;
+  }) => {
     if (!userId) {
       return { success: false, message: 'User not authenticated' };
     }
@@ -110,7 +91,6 @@ export const useSwapRequests = () => {
     setError(null);
     
     try {
-      // First check if swap is allowed
       const checkResult = await SwapRequestService.checkCanSwap(data.assignmentId);
       
       if (!checkResult.success) {
@@ -130,7 +110,6 @@ export const useSwapRequests = () => {
       const response = await SwapRequestService.createSwapRequest(data);
       
       if (response.success) {
-        // Refresh both lists
         await loadMyRequests();
         await loadPendingForMe();
       }
@@ -144,7 +123,7 @@ export const useSwapRequests = () => {
     }
   }, [userId, loadMyRequests, loadPendingForMe]);
 
-  // Accept swap request
+  // Accept swap request - UPDATED with better success message
   const acceptSwapRequest = useCallback(async (requestId: string) => {
     if (!userId) {
       return { success: false, message: 'User not authenticated' };
@@ -157,15 +136,27 @@ export const useSwapRequests = () => {
       const response = await SwapRequestService.acceptSwapRequest(requestId);
       
       if (response.success) {
-        // Refresh both lists
         await loadMyRequests();
         await loadPendingForMe();
         
-        Alert.alert(
-          'Success',
-          'Swap request accepted successfully! The assignment has been transferred to you.',
-          [{ text: 'OK' }]
-        );
+        // Get swap details for better message
+        const swapRequest = response.data?.swapRequest;
+        const scope = response.data?.scope;
+        const selectedDay = response.data?.selectedDay;
+        const transferredCount = response.data?.transferredCount;
+        
+        let successMessage = 'Swap request accepted successfully!';
+        if (scope === 'day') {
+          if (transferredCount && transferredCount > 1) {
+            successMessage = `Swap accepted! You've taken over ${transferredCount} assignments for ${selectedDay}.`;
+          } else {
+            successMessage = `Swap accepted! You've taken over ${selectedDay}'s assignment.`;
+          }
+        } else {
+          successMessage = 'Swap accepted! The entire week\'s assignment has been transferred to you.';
+        }
+        
+        Alert.alert('Success', successMessage);
       }
       
       return response;
@@ -190,15 +181,9 @@ export const useSwapRequests = () => {
       const response = await SwapRequestService.rejectSwapRequest(requestId, reason);
       
       if (response.success) {
-        // Refresh both lists
         await loadMyRequests();
         await loadPendingForMe();
-        
-        Alert.alert(
-          'Success',
-          'Swap request rejected successfully.',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Success', 'Swap request rejected successfully.');
       }
       
       return response;
@@ -223,15 +208,9 @@ export const useSwapRequests = () => {
       const response = await SwapRequestService.cancelSwapRequest(requestId);
       
       if (response.success) {
-        // Refresh both lists
         await loadMyRequests();
         await loadPendingForMe();
-        
-        Alert.alert(
-          'Success',
-          'Swap request cancelled successfully.',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Success', 'Swap request cancelled successfully.');
       }
       
       return response;
@@ -257,6 +236,11 @@ export const useSwapRequests = () => {
     );
   }, [myRequests]);
 
+  // Get swap description
+  const getSwapDescription = useCallback((swapRequest: SwapRequest) => {
+    return SwapRequestService.getSwapDescription(swapRequest);
+  }, []);
+
   // Refresh all data
   const refreshAll = useCallback(async (groupId?: string) => {
     await Promise.all([
@@ -281,6 +265,7 @@ export const useSwapRequests = () => {
     cancelSwapRequest,
     hasPendingRequest,
     getPendingRequestForAssignment,
+    getSwapDescription,
     refreshAll,
   };
 };

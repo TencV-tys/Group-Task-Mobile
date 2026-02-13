@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../SwapRequestServices.ts/SwapRequestService';
+
 type SwapRequestDetailsRouteParams = {
   requestId: string;
 };
@@ -55,9 +56,13 @@ export const SwapRequestDetailsScreen = () => {
   };
 
   const handleAccept = () => {
+    const swapDescription = request?.scope === 'day' 
+      ? `this swap for ${request.selectedDay}${request.selectedTimeSlot ? ` at ${request.selectedTimeSlot.startTime}` : ''}`
+      : 'this entire week swap';
+    
     Alert.alert(
       'Accept Swap Request',
-      'Are you sure you want to accept this swap? This assignment will be transferred to you and your current assignment will be swapped.',
+      `Are you sure you want to accept ${swapDescription}? This assignment will be transferred to you.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -176,6 +181,72 @@ export const SwapRequestDetailsScreen = () => {
           </View>
         </View>
 
+        {/* ✅ NEW: Swap Scope Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Swap Details</Text>
+          <View style={styles.scopeCard}>
+            <View style={styles.scopeHeader}>
+              <View style={[styles.scopeIcon, { backgroundColor: request.scope === 'day' ? '#EEF2FF' : '#F3F4F6' }]}>
+                <Ionicons 
+                  name={request.scope === 'day' ? 'today' : 'calendar'} 
+                  size={22} 
+                  color={request.scope === 'day' ? '#4F46E5' : '#6B7280'} 
+                />
+              </View>
+              <View style={styles.scopeTitleContainer}>
+                <Text style={styles.scopeTitle}>
+                  {request.scope === 'day' ? 'Specific Day Swap' : 'Full Week Swap'}
+                </Text>
+                <Text style={styles.scopeBadge}>
+                  {request.scope === 'day' ? '📅 One day only' : '📆 Entire week'}
+                </Text>
+              </View>
+            </View>
+            
+            {request.scope === 'day' && request.selectedDay && (
+              <View style={styles.scopeDetails}>
+                <View style={styles.scopeDetailRow}>
+                  <Ionicons name="calendar" size={16} color="#4F46E5" />
+                  <Text style={styles.scopeDetailLabel}>Day:</Text>
+                  <Text style={styles.scopeDetailValue}>{request.selectedDay}</Text>
+                </View>
+                
+                {request.selectedTimeSlot && (
+                  <View style={styles.scopeDetailRow}>
+                    <Ionicons name="time" size={16} color="#4F46E5" />
+                    <Text style={styles.scopeDetailLabel}>Time Slot:</Text>
+                    <Text style={styles.scopeDetailValue}>
+                      {request.selectedTimeSlot.startTime} - {request.selectedTimeSlot.endTime}
+                      {request.selectedTimeSlot.label ? ` (${request.selectedTimeSlot.label})` : ''}
+                    </Text>
+                  </View>
+                )}
+                
+                <View style={styles.scopeNote}>
+                  <Ionicons name="information-circle" size={16} color="#10B981" />
+                  <Text style={styles.scopeNoteText}>
+                    After {request.selectedDay}, assignments will automatically return to the original assignee.
+                  </Text>
+                </View>
+              </View>
+            )}
+            
+            {request.scope === 'week' && (
+              <View style={styles.scopeDetails}>
+                <Text style={styles.scopeDescription}>
+                  This swap will transfer ALL assignments for the entire week to the acceptor.
+                </Text>
+                <View style={styles.scopeNote}>
+                  <Ionicons name="information-circle" size={16} color="#F59E0B" />
+                  <Text style={styles.scopeNoteText}>
+                    Next week, the normal rotation will resume automatically.
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Requester Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Requested By</Text>
@@ -257,6 +328,17 @@ export const SwapRequestDetailsScreen = () => {
                 {request.assignment?.user?.fullName || 'Unknown'}
               </Text>
             </View>
+
+            {/* ✅ Show task frequency */}
+            {request.assignment?.task?.executionFrequency && (
+              <View style={styles.detailRow}>
+                <Ionicons name="repeat" size={18} color="#6B7280" />
+                <Text style={styles.detailLabel}>Frequency:</Text>
+                <Text style={styles.detailValue}>
+                  {request.assignment.task.executionFrequency}
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -351,7 +433,7 @@ const styles = StyleSheet.create({
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center', 
     padding: 20,
   },
   loadingText: {
@@ -377,6 +459,12 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4F46E5',
+    marginTop: 12,
   },
   headerTitle: {
     fontSize: 18,
@@ -421,6 +509,88 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: 12,
+  },
+  // ✅ NEW: Scope Card Styles
+  scopeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  scopeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  scopeIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  scopeTitleContainer: {
+    flex: 1,
+  },
+  scopeTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  scopeBadge: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  scopeDetails: {
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    paddingTop: 16,
+    gap: 12,
+  },
+  scopeDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  scopeDetailLabel: {
+    fontSize: 14,
+    color: '#6B7280',
+    width: 70,
+  },
+  scopeDetailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    flex: 1,
+  },
+  scopeDescription: {
+    fontSize: 14,
+    color: '#4B5563',
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  scopeNote: {
+    flexDirection: 'row',
+    backgroundColor: '#F9FAFB',
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+    marginTop: 8,
+  },
+  scopeNoteText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#4B5563',
+    fontStyle: 'italic',
   },
   userCard: {
     flexDirection: 'row',
@@ -554,11 +724,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-   backButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4F46E5',
-    marginTop: 12,
   },
 });

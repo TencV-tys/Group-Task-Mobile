@@ -1,160 +1,186 @@
-// src/screens/GroupTasksScreen.tsx - UPDATED WITH COMPLETE NOW BUTTON
-import React, { useEffect, useState } from 'react';
+// src/screens/TaskDetailsScreen.tsx - COMPLETE FIXED VERSION WITH CLEAR SUBMISSION STATUS
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  ScrollView,
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
-  RefreshControl,
   Alert,
-  Dimensions,
-  StatusBar
+  StatusBar,
+  Platform,
+  Image,
+  Linking
 } from 'react-native';
 import { TaskService } from '../taskServices/TaskService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { SettingsModal } from '../components/SettingsModal';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-export default function GroupTasksScreen({ navigation, route }: any) {
-  const { groupId, groupName, userRole } = route.params || {};
+export default function TaskDetailsScreen({ navigation, route }: any) {
+  const { taskId, groupId, userRole } = route.params || {};
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);  
+  const [task, setTask] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
-  const [myTasks, setMyTasks] = useState<any[]>([]);
-  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isSubmittable, setIsSubmittable] = useState(false);
+  const [currentTimeSlot, setCurrentTimeSlot] = useState<any>(null);
+  const [submissionStatus, setSubmissionStatus] = useState<'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed'>('waiting');
+  
+  const isAdmin = userRole === 'ADMIN';
 
-  const fetchTasks = async (isRefreshing = false) => {
-    if (isRefreshing) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
+  useEffect(() => {
+    if (taskId) fetchTaskDetails();
+  }, [taskId]);
+
+  useEffect(() => {
+    if (task?.userAssignment && !task.userAssignment.completed) {
+      const timer = startCountdownTimer();
+      return () => clearInterval(timer);
     }
-    setError(null);
+  }, [task, timeLeft]);
 
+  const fetchTaskDetails = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      console.log('Fetching tasks for group:', groupId);
-      
-      // Get ALL tasks
-      const allTasksResult = await TaskService.getGroupTasks(groupId);
-      
-      if (allTasksResult.success) {
-        // Process tasks to ensure assignment info is properly set
-        const processedTasks = (allTasksResult.tasks || []).map((task: any) => {
-          const userAssignment = task.assignments?.find(
-            (a: any) => a.user && a.user.id
-          );
-          
-          return {
-            ...task,
-            isAssignedToUser: !!userAssignment || !!task.userAssignment,
-            userAssignment: userAssignment || task.userAssignment
-          };
-        });
-        
-        setTasks(processedTasks);
+      const result = await TaskService.getTaskDetails(taskId);
+      if (result.success) {
+        const processedTask = processTaskData(result.task);
+        setTask(processedTask);
+        checkTimeValidity(processedTask);
       } else {
-        setError(allTasksResult.message || 'Failed to load tasks');
+        setError(result.message || 'Failed to load task details');
       }
-      
-      // Get MY tasks using the dedicated endpoint
-      const myTasksResult = await TaskService.getMyTasks(groupId);
-      
-      if (myTasksResult.success && myTasksResult.tasks) {
-        // Create a map to deduplicate by task id
-        const taskMap = new Map();
-        
-        myTasksResult.tasks.forEach((task: any) => {
-          if (task && task.id) {
-            // Check if this task is submittable now
-            const isSubmittableNow = checkIfSubmittableNow(task);
-            
-            const enhancedTask = {
-              ...task,
-              isAssignedToUser: true,
-              userAssignment: task.assignment || task.userAssignment,
-              isSubmittableNow,
-              timeLeft: calculateTimeLeft(task)
-            };
-            
-            if (!taskMap.has(task.id)) {
-              taskMap.set(task.id, enhancedTask);
-            }
-          }
-        });
-        
-        // Convert map back to array
-        const uniqueMyTasks = Array.from(taskMap.values());
-        setMyTasks(uniqueMyTasks);
-      } else {
-        setMyTasks([]);
-      }  
-      
     } catch (err: any) {
-      console.error('Error fetching tasks:', err);
+      console.error('Error fetching task details:', err);
       setError(err.message || 'Network error');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
-  // Helper function to check if a task is submittable now
-  const checkIfSubmittableNow = (task: any) => {
-    if (!task.userAssignment || task.userAssignment.completed) {
-      return false;
+  const processTaskData = (taskData: any) => {
+    if (taskData.timeSlots && taskData.timeSlots.length > 0) {
+      taskData.timeSlots.sort((a: any, b: any) => {
+        const timeA = convertTimeToMinutes(a.startTime);
+        const timeB = convertTimeToMinutes(b.startTime);
+        return timeA - timeB;
+      });
+    }
+    
+    if (taskData.selectedDays && taskData.selectedDays.length > 0) {
+      const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      taskData.selectedDays.sort((a: string, b: string) => 
+        dayOrder.indexOf(a) - dayOrder.indexOf(b)
+      );
+    }
+    
+    if (taskData.assignments && taskData.assignments.length > 0) {
+      taskData.assignments.sort((a: any, b: any) => 
+        new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
+      );
+    }
+    
+    return taskData;
+  };
+
+  const convertTimeToMinutes = (time: string) => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const checkTimeValidity = (taskData: any) => {
+    if (!taskData?.userAssignment || taskData.userAssignment.completed) {
+      setIsSubmittable(false);
+      setCurrentTimeSlot(null);
+      setSubmissionStatus('completed');
+      return;
     }
 
     const now = new Date();
-    const dueDate = new Date(task.userAssignment.dueDate);
+    const assignmentDate = new Date(taskData.userAssignment.dueDate);
     const today = now.toDateString();
-    const assignmentDay = dueDate.toDateString();
+    const assignmentDay = assignmentDate.toDateString();
     
     if (today !== assignmentDay) {
-      return false;
+      setIsSubmittable(false);
+      setCurrentTimeSlot(null);
+      setSubmissionStatus('wrong_day');
+      return;
     }
 
-    if (task.userAssignment.timeSlot) {
-      const [endHour, endMinute] = task.userAssignment.timeSlot.endTime.split(':').map(Number);
-      
+    if (taskData.userAssignment.timeSlot || (taskData.timeSlots && taskData.timeSlots.length > 0)) {
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       const currentInMinutes = currentHour * 60 + currentMinute;
-      const endInMinutes = endHour * 60 + endMinute;
       
-      // Can submit 30 minutes before end time until 30 minutes after end time
-      const canSubmitStart = endInMinutes - 30;
-      const canSubmitEnd = endInMinutes + 30;
+      let activeSlot = null;
+      let slotFound = false;
       
-      return currentInMinutes >= canSubmitStart && currentInMinutes <= canSubmitEnd;
+      const slotsToCheck = taskData.timeSlots || [taskData.userAssignment.timeSlot].filter(Boolean);
+      
+      for (const slot of slotsToCheck) {
+        if (!slot) continue;
+        
+        const slotStart = convertTimeToMinutes(slot.startTime);
+        const slotEnd = convertTimeToMinutes(slot.endTime);
+        const graceEnd = slotEnd + 30;
+        
+        if (currentInMinutes >= slotStart && currentInMinutes <= graceEnd) {
+          activeSlot = slot;
+          slotFound = true;
+          
+          const canSubmitStart = slotEnd - 30;
+          const canSubmit = currentInMinutes >= canSubmitStart && currentInMinutes <= graceEnd;
+          
+          setIsSubmittable(canSubmit);
+          setSubmissionStatus(canSubmit ? 'available' : 'waiting');
+          
+          const timeLeftMs = (graceEnd - currentInMinutes) * 60000;
+          setTimeLeft(Math.max(0, Math.floor(timeLeftMs / 1000)));
+          break;
+        }
+      }
+      
+      setCurrentTimeSlot(activeSlot || taskData.userAssignment.timeSlot);
+      
+      if (!slotFound) {
+        setIsSubmittable(false);
+        setSubmissionStatus('expired');
+        setTimeLeft(0);
+        
+        if (slotsToCheck.length > 0) {
+          const firstSlotStart = convertTimeToMinutes(slotsToCheck[0].startTime);
+          if (currentInMinutes < firstSlotStart) {
+            setSubmissionStatus('waiting');
+            const timeUntilFirstSlot = (firstSlotStart - currentInMinutes) * 60000;
+            setTimeLeft(Math.floor(timeUntilFirstSlot / 1000));
+          }
+        }
+      }
+    } else {
+      setIsSubmittable(true);
+      setSubmissionStatus('available');
+      setCurrentTimeSlot(null);
+      setTimeLeft(null);
     }
-    
-    return true;
   };
 
-  // Helper function to calculate time left for submission
-  const calculateTimeLeft = (task: any) => {
-    if (!task.userAssignment || task.userAssignment.completed || !task.userAssignment.timeSlot) {
-      return null;
-    }
+  const startCountdownTimer = () => {
+    const timer = setInterval(() => {
+      if (timeLeft !== null && timeLeft > 0) {
+        setTimeLeft(prev => (prev !== null ? prev - 1 : null));
+      } else if (timeLeft === 0) {
+        setIsSubmittable(false);
+        setSubmissionStatus('expired');
+        clearInterval(timer);
+      }
+    }, 1000);
 
-    const now = new Date();
-    const [endHour, endMinute] = task.userAssignment.timeSlot.endTime.split(':').map(Number);
-    
-    const endTime = new Date();
-    endTime.setHours(endHour, endMinute, 0, 0);
-    const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
-    
-    const timeLeftMs = gracePeriodEnd.getTime() - now.getTime();
-    return Math.max(0, Math.floor(timeLeftMs / 1000));
+    return timer;
   };
 
-  // Format time left for display
   const formatTimeLeft = (seconds: number) => {
     if (seconds >= 3600) {
       const hours = Math.floor(seconds / 3600);
@@ -162,116 +188,118 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       return `${hours}h ${mins}m`;
     } else if (seconds >= 60) {
       const mins = Math.floor(seconds / 60);
-      return `${mins}m`;
+      const secs = seconds % 60;
+      return `${mins}m ${secs}s`;
     } else {
       return `${seconds}s`;
     }
   };
 
-  useEffect(() => {
-    if (groupId) {
-      fetchTasks();
+  const getSubmissionStatusInfo = () => {
+    switch (submissionStatus) {
+      case 'available':
+        return {
+          label: '✓ AVAILABLE TO SUBMIT',
+          color: '#2b8a3e',
+          bgColor: '#d3f9d8',
+          borderColor: '#8ce99a',
+          icon: 'check-circle',
+          description: 'You can submit your completion now',
+          buttonText: 'Complete Assignment',
+          canSubmit: true
+        };
+      case 'waiting':
+        return {
+          label: '⏳ WAITING FOR SUBMISSION WINDOW',
+          color: '#e67700',
+          bgColor: '#fff3bf',
+          borderColor: '#ffd43b',
+          icon: 'clock',
+          description: timeLeft && timeLeft > 0 
+            ? `Submission opens in ${formatTimeLeft(timeLeft)}` 
+            : 'Submit within 30 minutes before/after time slot',
+          buttonText: 'Waiting for Submission Window',
+          canSubmit: false
+        };
+      case 'expired':
+        return {
+          label: '❌ SUBMISSION CLOSED',
+          color: '#fa5252',
+          bgColor: '#ffc9c9',
+          borderColor: '#ff8787',
+          icon: 'timer-off',
+          description: 'The 30-minute submission window has expired',
+          buttonText: 'Submission Closed',
+          canSubmit: false
+        };
+      case 'wrong_day':
+        return {
+          label: '📅 NOT DUE TODAY',
+          color: '#6c757d',
+          bgColor: '#f1f3f5',
+          borderColor: '#dee2e6',
+          icon: 'calendar',
+          description: task?.userAssignment 
+            ? `Due on ${new Date(task.userAssignment.dueDate).toLocaleDateString()}`
+            : 'This assignment is not due today',
+          buttonText: 'Not Due Today',
+          canSubmit: false
+        };
+      case 'completed':
+        return {
+          label: '✓ ALREADY COMPLETED',
+          color: '#2b8a3e',
+          bgColor: '#d3f9d8',
+          borderColor: '#8ce99a',
+          icon: 'check-circle',
+          description: 'You have already submitted this assignment',
+          buttonText: 'Already Completed',
+          canSubmit: false
+        };
+      default:
+        return {
+          label: '⏳ CHECKING STATUS...',
+          color: '#6c757d',
+          bgColor: '#f1f3f5',
+          borderColor: '#dee2e6',
+          icon: 'clock',
+          description: 'Verifying submission availability',
+          buttonText: 'Checking...',
+          canSubmit: false
+        };
     }
-  }, [groupId]);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchTasks();
-    });
-
-    return unsubscribe;
-  }, [navigation]);
-
-  const handleCreateTask = () => {
-    if (userRole !== 'ADMIN') {
-      Alert.alert('Restricted', 'Only admins can create tasks');
-      return;
-    }
-    navigation.navigate('CreateTask', {
-      groupId,
-      groupName,
-      onTaskCreated: () => {
-        fetchTasks();
-      }
-    });
   };
 
-  const handleEditTask = (task: any) => {
-    if (selectedTab === 'my') {
-      return;
+  const handleBack = () => navigation.goBack();
+
+  const handleEdit = () => {
+    if (task) {
+      navigation.navigate('UpdateTask', {
+        task,
+        groupId: task.groupId || groupId,
+        groupName: task.group?.name,
+        onTaskUpdated: fetchTaskDetails
+      });
     }
-    
-    if (userRole !== 'ADMIN') {
-      Alert.alert('Restricted', 'Only admins can edit tasks');
-      return;
-    }
-    
-    navigation.navigate('UpdateTask', {
-      task,
-      groupId,
-      groupName,
-      onTaskUpdated: () => {
-        fetchTasks();
-      }
-    });
   };
 
-  const handleViewTaskDetails = (taskId: string) => {
-    navigation.navigate('TaskDetails', { 
-      taskId,
-      groupId,
-      userRole
-    });
-  };
+  const handleDelete = async () => {
+    if (!task) return;
 
-  const handleCompleteNow = (task: any) => {
-    if (!task.userAssignment) {
-      Alert.alert('Error', 'No assignment found for this task');
-      return;
-    }
-
-    navigation.navigate('CompleteAssignment', {
-      assignmentId: task.userAssignment.id,
-      taskTitle: task.title,
-      dueDate: task.userAssignment.dueDate,
-      timeSlot: task.userAssignment.timeSlot || task.timeSlots?.[0],
-      onCompleted: () => {
-        fetchTasks();
-        Alert.alert('Success', 'Assignment submitted successfully!');
-      }
-    });
-  };
-
-  const handleDeleteTask = async (taskId: string, taskTitle: string) => {
-    if (selectedTab === 'my') {
-      Alert.alert('Not Allowed', 'Cannot delete tasks from My Task view. Go to All Tasks tab.');
-      return;
-    }
-    
-    if (userRole !== 'ADMIN') {
-      Alert.alert('Restricted', 'Only admins can delete tasks');
-      return;
-    }
-    
     Alert.alert(
       'Delete Task',
-      `Are you sure you want to delete "${taskTitle}"?`,
+      `Are you sure you want to delete "${task.title}"?`,
       [
-        { 
-          text: 'Cancel', 
-          style: 'cancel' 
-        },
+        { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Delete', 
           style: 'destructive',
           onPress: async () => {
             try {
-              const result = await TaskService.deleteTask(taskId);
-              
+              const result = await TaskService.deleteTask(task.id);
               if (result.success) {
-                setTasks(prev => prev.filter(t => t.id !== taskId));
-                setMyTasks(prev => prev.filter(t => t.id !== taskId));
                 Alert.alert('Success', 'Task deleted successfully');
+                navigation.goBack();
               } else {
                 Alert.alert('Error', result.message || 'Failed to delete task');
               }
@@ -285,482 +313,666 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     );
   };
 
-  const showTaskOptions = (task: any) => {
-    if (selectedTab === 'my') {
-      handleViewTaskDetails(task.id);
+  const handleCompleteAssignment = () => {
+    if (!task?.userAssignment || !isSubmittable) {
+      const statusInfo = getSubmissionStatusInfo();
+      Alert.alert(
+        'Cannot Submit',
+        statusInfo.description,
+        [{ text: 'OK' }]
+      );
       return;
     }
     
-    const isAdmin = userRole === 'ADMIN';
+    navigation.navigate('CompleteAssignment', {
+      assignmentId: task.userAssignment.id,
+      taskTitle: task.title,
+      dueDate: task.userAssignment.dueDate,
+      timeSlot: currentTimeSlot || task.userAssignment.timeSlot,
+      onCompleted: () => {
+        fetchTaskDetails();
+        Alert.alert('Success', 'Assignment submitted successfully!');
+      }
+    });
+  };
+
+  const handleViewAssignmentDetails = (assignment?: any) => {
+    const assignmentId = assignment?.id || task?.userAssignment?.id;
+    if (!assignmentId) return;
     
-    if (isAdmin) {
-      Alert.alert(
-        'Task Options',
-        `"${task.title}"`,
-        [
-          {
-            text: 'Edit Task',
-            onPress: () => handleEditTask(task)
-          },
-          {
-            text: 'Delete Task',
-            style: 'destructive',
-            onPress: () => handleDeleteTask(task.id, task.title)
-          },
-          {
-            text: 'View Details',
-            onPress: () => handleViewTaskDetails(task.id)
-          },
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          }
-        ]
-      );
-    } else {
-      handleViewTaskDetails(task.id);
+    navigation.navigate('AssignmentDetails', {
+      assignmentId,
+      isAdmin: isAdmin,
+      onVerified: fetchTaskDetails
+    });
+  };
+
+  const handleViewPhoto = (photoUrl: string) => {
+    if (photoUrl) {
+      Linking.openURL(photoUrl).catch(err => {
+        Alert.alert('Error', 'Could not open image');
+      });
     }
   };
 
-  const renderAssignmentInfo = (task: any) => {
-    const hasAssignment = task.userAssignment || task.assignments?.length > 0;
+  const getVerificationStatus = (assignment: any) => {
+    if (!assignment?.completed) return { 
+      status: 'pending', 
+      color: '#e67700', 
+      icon: 'clock-outline',
+      text: 'Pending'
+    };
     
-    if (!hasAssignment) {
+    if (assignment.verified === true) return { 
+      status: 'verified', 
+      color: '#2b8a3e', 
+      icon: 'check-circle',
+      text: 'Verified'
+    };
+    
+    if (assignment.verified === false) return { 
+      status: 'rejected', 
+      color: '#fa5252', 
+      icon: 'close-circle',
+      text: 'Rejected'
+    };
+    
+    return { 
+      status: 'pending_verification', 
+      color: '#e67700', 
+      icon: 'clock-check',
+      text: 'Awaiting Verification'
+    };
+  };
+
+  const getCompletionTimeText = (assignment: any) => {
+    if (!assignment?.completed || !assignment?.completedAt) return '';
+    
+    const dueDate = new Date(assignment.dueDate);
+    const completedAt = new Date(assignment.completedAt);
+    const diffMs = completedAt.getTime() - dueDate.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    
+    if (diffHours < 0) {
+      return `${Math.abs(diffHours)} hours early`;
+    } else if (diffHours === 0) {
+      return "on time";
+    } else {
+      return `${diffHours} hours late`;
+    }
+  };
+
+  const isAdminAssignedToTask = () => isAdmin && task?.userAssignment;
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity 
+        onPress={handleBack} 
+        style={styles.backButton}
+        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+      >
+        <Text style={styles.backButtonText}>←</Text>
+      </TouchableOpacity>
+      
+      <View style={styles.titleContainer}>
+        <Text style={styles.title} numberOfLines={1}>
+          Task Details
+        </Text>
+      </View>
+      
+      {isAdmin && task && !isAdminAssignedToTask() ? (
+        <TouchableOpacity 
+          style={styles.editButton}
+          onPress={handleEdit}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
+          <MaterialCommunityIcons name="pencil" size={24} color="#007AFF" />
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.headerSpacer} />
+      )}
+    </View>
+  );
+
+  const renderMemberAssignmentSection = () => {
+    if (!task?.userAssignment) {
       return (
-        <View style={styles.unassignedInfo}>
-          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
-          <Text style={styles.unassignedText}>
-            Not assigned to anyone
-          </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My Assignment</Text>
+          <View style={styles.notAssignedCard}>
+            <MaterialCommunityIcons name="account-question" size={24} color="#868e96" />
+            <Text style={styles.notAssignedText}>
+              Not assigned to you this week
+            </Text>
+          </View>
         </View>
       );
     }
 
-    let currentAssignment = null;
-    
-    if (task.userAssignment) {
-      currentAssignment = task.userAssignment;
-    } else if (task.assignments && task.assignments.length > 0) {
-      if (selectedTab === 'my') {
-        currentAssignment = task.assignment || task.assignments[0];
-      } else {
-        if (task.currentAssignee) {
-          currentAssignment = task.assignments.find(
-            (a: any) => a.userId === task.currentAssignee
-          );
-        }
-        if (!currentAssignment && task.assignments.length > 0) {
-          currentAssignment = task.assignments[0];
-        }
-      }
-    }
-    
-    if (!currentAssignment) {
+    const status = getVerificationStatus(task.userAssignment);
+    const submissionStatusInfo = getSubmissionStatusInfo();
+
+    if (!task.userAssignment.completed) {
       return (
-        <View style={styles.unassignedInfo}>
-          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
-          <Text style={styles.unassignedText}>
-            Not assigned to anyone
-          </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My Assignment</Text>
+          <View style={styles.assignmentCard}>
+            <View style={styles.assignmentHeader}>
+              <MaterialCommunityIcons name="account-clock" size={24} color="#e67700" />
+              <View style={styles.assignmentInfo}>
+                <Text style={styles.assignmentTitle}>Assigned to You</Text>
+                <Text style={styles.assignmentDate}>
+                  Due: {new Date(task.userAssignment.dueDate).toLocaleDateString()}
+                  {task.userAssignment.timeSlot && ` • ${task.userAssignment.timeSlot.startTime} - ${task.userAssignment.timeSlot.endTime}`}
+                </Text>
+              </View>
+            </View>
+            
+            {/* CLEAR SUBMISSION STATUS LABEL - PROMINENT DISPLAY */}
+            <View style={[styles.submissionStatusCard, { 
+              backgroundColor: submissionStatusInfo.bgColor,
+              borderColor: submissionStatusInfo.borderColor 
+            }]}>
+              <View style={styles.submissionStatusHeader}>
+                <View style={[styles.statusIconContainer, { backgroundColor: submissionStatusInfo.color + '20' }]}>
+                  <MaterialCommunityIcons 
+                    name={submissionStatusInfo.icon as any} 
+                    size={22} 
+                    color={submissionStatusInfo.color} 
+                  />
+                </View>
+                <View style={styles.statusTextContainer}>
+                  <Text style={[styles.submissionStatusLabel, { color: submissionStatusInfo.color }]}>
+                    {submissionStatusInfo.label}
+                  </Text>
+                  <Text style={[styles.submissionStatusDescription, { color: submissionStatusInfo.color }]}>
+                    {submissionStatusInfo.description}
+                  </Text>
+                </View>
+              </View>
+              
+              {submissionStatus === 'available' && timeLeft !== null && (
+                <View style={styles.timerContainer}>
+                  <View style={[styles.timerBadge, timeLeft < 300 ? styles.urgentTimerBadge : styles.normalTimerBadge]}>
+                    <MaterialCommunityIcons 
+                      name={timeLeft < 300 ? "timer-alert" : "timer"} 
+                      size={16} 
+                      color={timeLeft < 300 ? "#fa5252" : "#2b8a3e"} 
+                    />
+                    <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : "#2b8a3e" }]}>
+                      {formatTimeLeft(timeLeft)} remaining
+                    </Text>
+                  </View>
+                  {timeLeft < 300 && (
+                    <Text style={styles.urgentMessage}>Submit now! Grace period ending soon.</Text>
+                  )}
+                </View>
+              )}
+              
+              {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
+                <View style={styles.waitingContainer}>
+                  <View style={styles.waitingBadge}>
+                    <MaterialCommunityIcons name="clock-start" size={16} color="#e67700" />
+                    <Text style={styles.waitingText}>
+                      Opens in {formatTimeLeft(timeLeft)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+            
+            {/* COMPLETE BUTTON - ONLY SHOW WHEN AVAILABLE */}
+            {submissionStatusInfo.canSubmit ? (
+              <TouchableOpacity
+                style={styles.completeButton}
+                onPress={handleCompleteAssignment}
+                activeOpacity={0.8}
+              >
+                <View style={styles.completeButtonContent}>
+                  <MaterialCommunityIcons name="check-circle" size={22} color="white" />
+                  <Text style={styles.completeButtonText}>{submissionStatusInfo.buttonText}</Text>
+                </View>
+                {timeLeft && timeLeft < 600 && (
+                  <View style={styles.completeButtonFooter}>
+                    <MaterialCommunityIcons name="alert" size={14} color="white" />
+                    <Text style={styles.completeButtonSubtext}>
+                      {timeLeft < 300 ? 'Urgent! ' : ''}{formatTimeLeft(timeLeft)} left
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.disabledButtonContainer}>
+                <TouchableOpacity
+                  style={styles.disabledButton}
+                  disabled={true}
+                  onPress={() => {
+                    Alert.alert(
+                      submissionStatusInfo.label,
+                      submissionStatusInfo.description,
+                      [{ text: 'OK' }]
+                    );
+                  }}
+                >
+                  <MaterialCommunityIcons 
+                    name={submissionStatusInfo.icon as any} 
+                    size={20} 
+                    color="#868e96" 
+                  />
+                  <Text style={styles.disabledButtonText}>
+                    {submissionStatusInfo.buttonText}
+                  </Text>
+                </TouchableOpacity>
+                <Text style={styles.disabledButtonHint}>
+                  ⓘ {submissionStatusInfo.description}
+                </Text>
+              </View>
+            )}
+            
+            {isAdmin && (
+              <View style={styles.adminNote}>
+                <MaterialCommunityIcons name="shield-account" size={16} color="#007AFF" />
+                <Text style={styles.adminNoteText}>
+                  You're completing this as an admin
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       );
     }
-
-    const isCompleted = currentAssignment?.completed;
-    const assigneeName = currentAssignment?.user?.fullName || 'Unknown';
-    const dueDate = currentAssignment?.dueDate ? new Date(currentAssignment.dueDate) : null;
-    const isAssignedToMe = task.isAssignedToUser || task.userAssignment;
-    
+ 
     return (
-      <View style={[
-        styles.assignmentInfo,
-        isCompleted ? styles.completedAssignment : styles.pendingAssignment,
-        isAssignedToMe && styles.myAssignment
-      ]}>
-        <View style={styles.assignmentHeader}>
-          <MaterialCommunityIcons 
-            name={isCompleted ? "check-circle" : isAssignedToMe ? "account" : "account-clock"} 
-            size={16} 
-            color={isCompleted ? "#2b8a3e" : isAssignedToMe ? "#007AFF" : "#e67700"} 
-          />
-          <Text style={[
-            styles.assignmentStatus,
-            isCompleted ? { color: "#2b8a3e" } : 
-            isAssignedToMe ? { color: "#007AFF" } : 
-            { color: "#e67700" }
-          ]}>
-            {isCompleted ? 'Completed' : 
-             isAssignedToMe ? 'Assigned to you' : 
-             `Assigned to ${assigneeName}`}
-          </Text>
-        </View>
-        
-        <View style={styles.assignmentDetails}>
-          {dueDate && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Due:</Text> {dueDate.toLocaleDateString()}
-            </Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>My Submission</Text>
+        <View style={styles.completionCard}>
+          <View style={styles.completionHeader}>
+            <View style={[styles.statusIconContainer, { backgroundColor: status.color + '20' }]}>
+              <MaterialCommunityIcons 
+                name={status.icon as any} 
+                size={24} 
+                color={status.color} 
+              />
+            </View>
+            <View style={styles.completionInfo}>
+              <Text style={[styles.completionTitle, { color: status.color }]}>
+                {status.text}
+              </Text>
+              <Text style={styles.completionDate}>
+                Completed: {new Date(task.userAssignment.completedAt).toLocaleDateString()}
+                {getCompletionTimeText(task.userAssignment) && ` • ${getCompletionTimeText(task.userAssignment)}`}
+              </Text>
+            </View>
+          </View>
+          
+          {task.userAssignment.photoUrl && (
+            <TouchableOpacity
+              style={styles.photoPreview}
+              onPress={() => handleViewPhoto(task.userAssignment.photoUrl)}
+            >
+              <MaterialCommunityIcons name="image" size={20} color="#007AFF" />
+              <Text style={styles.viewPhotoText}>View Submitted Photo</Text>
+            </TouchableOpacity>
           )}
-          {task.executionFrequency && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Frequency:</Text> {task.executionFrequency.toLowerCase()}
-            </Text>
+          
+          {task.userAssignment.notes && (
+            <View style={styles.userNotesCard}>
+              <Text style={styles.notesTitle}>Your Notes:</Text>
+              <Text style={styles.notesText}>{task.userAssignment.notes}</Text>
+            </View>
           )}
-          {task.selectedDays?.length > 0 && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Days:</Text> {task.selectedDays.join(', ')}
-            </Text>
+          
+          {task.userAssignment.adminNotes && status.status === 'rejected' && (
+            <View style={styles.adminFeedbackCard}>
+              <Text style={styles.adminFeedbackTitle}>Admin Feedback:</Text>
+              <Text style={styles.adminFeedbackText}>{task.userAssignment.adminNotes}</Text>
+            </View>
           )}
-          {task.timeSlots?.length > 0 && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Time:</Text> {
-                task.timeSlots.slice(0, 2).map((slot: any) => 
-                  `${slot.startTime}-${slot.endTime}${slot.label ? ` (${slot.label})` : ''}`
-                ).join(', ')
-              }
-              {task.timeSlots.length > 2 && `... +${task.timeSlots.length - 2} more`}
-            </Text>
+          
+          {status.status === 'pending_verification' && (
+            <View style={styles.infoBox}>
+              <MaterialCommunityIcons name="information" size={16} color="#6c757d" />
+              <Text style={styles.infoText}>
+                Your submission is pending admin verification. Points will be awarded once verified.
+              </Text>
+            </View>
           )}
-          {currentAssignment?.points !== undefined && currentAssignment.points > 0 && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Points:</Text> {currentAssignment.points}
-            </Text>
-          )}
+          
+          <TouchableOpacity
+            style={styles.viewDetailsButton}
+            onPress={() => handleViewAssignmentDetails(task.userAssignment)}
+          >
+            <MaterialCommunityIcons name="eye" size={16} color="#007AFF" />
+            <Text style={styles.viewDetailsText}>View Submission Details</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
   };
 
-  const renderTask = ({ item }: any) => {
-    const isAdmin = userRole === 'ADMIN';
-    const isCompleted = item.assignment?.completed || item.userAssignment?.completed;
-    const isMyTasksView = selectedTab === 'my';
-    const isSubmittableNow = item.isSubmittableNow;
-    const timeLeft = item.timeLeft;
+  const renderAdminAssignmentView = (assignment: any) => {
+    const status = getVerificationStatus(assignment);
     
     return (
       <TouchableOpacity
-        style={[
-          styles.taskCard,
-          isCompleted && styles.completedTaskCard,
-          isMyTasksView && isSubmittableNow && styles.submittableTaskCard
-        ]}
-        onPress={() => handleViewTaskDetails(item.id)}
-        onLongPress={() => !isMyTasksView && isAdmin && showTaskOptions(item)}
+        key={assignment.id}
+        style={styles.adminAssignmentCard}
+        onPress={() => handleViewAssignmentDetails(assignment)}
+        activeOpacity={0.7}
       >
-        <View style={styles.taskHeader}>
-          <View style={[
-            styles.taskIcon,
-            isCompleted 
-              ? { backgroundColor: '#34c759' }
-              : { backgroundColor: '#e7f5ff' }
-          ]}>
-            <MaterialCommunityIcons 
-              name={isCompleted ? "check" : "format-list-checks"} 
-              size={20} 
-              color={isCompleted ? 'white' : '#007AFF'} 
-            />
-          </View>
-          <View style={styles.taskInfo}>
-            <View style={styles.taskTitleRow}>
-              <Text style={[
-                styles.taskTitle,
-                isCompleted && styles.completedTaskTitle
-              ]} numberOfLines={2}>
-                {item.title}
-              </Text>
-              
-              {!isMyTasksView && isAdmin && (
-                <TouchableOpacity 
-                  style={styles.editButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleEditTask(item);
-                  }}
-                >
-                  <MaterialCommunityIcons name="pencil" size={18} color="#6c757d" />
-                </TouchableOpacity>
+        <View style={styles.adminAssignmentHeader}>
+          <View style={styles.userInfo}>
+            <View style={styles.userAvatar}>
+              {assignment.user?.avatarUrl ? (
+                <Image source={{ uri: assignment.user.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text style={styles.userAvatarText}>
+                  {assignment.user?.fullName?.charAt(0) || 'U'}
+                </Text>
               )}
             </View>
-            
-            {item.description && (
-              <Text style={[
-                styles.taskDescription,
-                isCompleted && styles.completedTaskDescription
-              ]} numberOfLines={2}>
-                {item.description}
+            <View style={styles.userDetails}>
+              <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
+              <Text style={styles.assignmentDateSmall}>
+                Due: {new Date(assignment.dueDate).toLocaleDateString()}
               </Text>
-            )}
-            
-            <View style={styles.taskMeta}>
-              <View style={styles.pointsBadge}>
-                <MaterialCommunityIcons name="star" size={12} color="#e67700" />
-                <Text style={styles.taskPoints}>{item.points} pts</Text>
-              </View>
-              
-              {item.category && (
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.taskCategory}>{item.category}</Text>
-                </View>
-              )}
             </View>
           </View>
-        </View>
-        
-        {renderAssignmentInfo(item)}
-        
-        {/* COMPLETE NOW BUTTON - Only in My Task tab for submittable tasks */}
-        {isMyTasksView && !isCompleted && isSubmittableNow && (
-          <TouchableOpacity
-            style={styles.completeNowButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleCompleteNow(item);
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={styles.completeNowContent}>
-              <MaterialCommunityIcons name="check-circle" size={20} color="white" />
-              <Text style={styles.completeNowText}>Complete Now</Text>
-              {timeLeft && timeLeft < 600 && (
-                <View style={styles.timeLeftBadge}>
-                  <Text style={styles.timeLeftText}>
-                    {formatTimeLeft(timeLeft)}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        )}
-        
-        {/* Time left indicator for tasks that are submittable soon */}
-        {isMyTasksView && !isCompleted && !isSubmittableNow && timeLeft && timeLeft > 0 && (
-          <View style={styles.timeLeftContainer}>
-            <MaterialCommunityIcons name="timer" size={14} color="#e67700" />
-            <Text style={styles.timeLeftLabel}>
-              Submission opens in {formatTimeLeft(timeLeft)}
+          <View style={[styles.statusBadge, { backgroundColor: status.color + '20' }]}>
+            <MaterialCommunityIcons name={status.icon as any} size={10} color={status.color} />
+            <Text style={[styles.statusText, { color: status.color }]}>
+              {status.text}
             </Text>
           </View>
-        )}
-        
-        <View style={styles.taskFooter}>
-          <Text style={styles.taskCreator}>
-            <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
-          </Text>
-          <Text style={styles.taskDate}>
-            {new Date(item.createdAt).toLocaleDateString()}
-          </Text>
         </View>
         
-        {!isMyTasksView && isAdmin && (
-          <TouchableOpacity 
-            style={styles.deleteButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleDeleteTask(item.id, item.title);
-            }}
-          >
-            <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
-          </TouchableOpacity>
+        {assignment.completed && (
+          <View style={styles.adminAssignmentDetails}>
+            <Text style={styles.completedText}>
+              Submitted: {new Date(assignment.completedAt).toLocaleDateString()}
+            </Text>
+            {assignment.photoUrl && (
+              <View style={styles.hasPhotoBadge}>
+                <MaterialCommunityIcons name="image" size={8} color="#007AFF" />
+                <Text style={styles.hasPhotoText}>Photo</Text>
+              </View>
+            )}
+            {assignment.notes && (
+              <View style={styles.hasNotesBadge}>
+                <MaterialCommunityIcons name="note-text" size={8} color="#e67700" />
+                <Text style={styles.hasNotesText}>Notes</Text>
+              </View>
+            )}
+          </View>
+        )}
+        
+        {assignment.adminNotes && (
+          <View style={styles.adminNotesPreview}>
+            <Text style={styles.adminNotesPreviewText} numberOfLines={1}>
+              {assignment.adminNotes}
+            </Text>
+          </View>
         )}
       </TouchableOpacity>
     );
   };
 
-  const handleNavigateToAssignment = () => {
-    navigation.navigate('TaskAssignment', {
-      groupId,
-      groupName,
-      userRole
-    });
-  };
-
   const renderContent = () => {
-    const currentTasks = selectedTab === 'my' ? myTasks : tasks;
-    const showEmpty = !loading && currentTasks.length === 0;
-    
-    return (
-      <FlatList
-        data={currentTasks}
-        renderItem={renderTask}
-        keyExtractor={(item, index) => {
-          return item?.id || `task-${index}`;
-        }}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => fetchTasks(true)}
-            colors={['#007AFF']}
-          />
-        }
-        ListEmptyComponent={
-          showEmpty ? (
-            <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons 
-                name={selectedTab === 'my' ? "clipboard-text" : "clipboard-list"} 
-                size={64} 
-                color="#dee2e6" 
-              />
-              <Text style={styles.emptyText}>
-                {selectedTab === 'my' ? 'No tasks assigned to you' : 'No tasks yet'}
-              </Text>
-              <Text style={styles.emptySubtext}>
-                {selectedTab === 'my' 
-                  ? 'You have no assigned tasks for this week'
-                  : userRole === 'ADMIN'
-                    ? 'Create the first task for your group'
-                    : 'No tasks have been created yet'}
-              </Text>
-              {userRole === 'ADMIN' && selectedTab === 'all' && (
-                <TouchableOpacity
-                  style={styles.emptyButton}
-                  onPress={handleCreateTask}
-                >
-                  <Text style={styles.emptyButtonText}>Create First Task</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          ) : null
-        }
-        contentContainerStyle={styles.listContainer}
-      />
-    );
-  };
-
-  if (loading && !refreshing) {
-    return (
-      <SafeAreaView style={styles.container}>
+    if (loading) {
+      return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading tasks...</Text>
+          <Text style={styles.loadingText}>Loading task details...</Text>
         </View>
-      </SafeAreaView>
-    );
-  }
+      );
+    }
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      
-      {/* Header with Burger Icon */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()} 
-          style={styles.backButton}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.titleContainer}>
-          <Text style={styles.title} numberOfLines={1}>
-            {groupName || 'Tasks'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {selectedTab === 'all' ? 'All Tasks' : 'My Task'}
-          </Text>
-        </View>
-        
-        {/* Settings/Burger Icon */}
-        <TouchableOpacity 
-          style={styles.settingsButton}
-          onPress={() => setShowSettingsModal(true)}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-        >
-          <MaterialCommunityIcons name="dots-vertical" size={24} color="#007AFF" />
-        </TouchableOpacity>
-      </View>
-
-      {/* Content Area */}
-      {error ? (
+    if (error) {
+      return (
         <View style={styles.errorContainer}>
           <MaterialCommunityIcons name="alert-circle" size={48} color="#dc3545" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={() => fetchTasks()}
+            onPress={fetchTaskDetails}
           >
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
         </View>
-      ) : (
-        renderContent()
-      )}
+      );
+    }
 
-      {/* Floating Action Buttons Container - Only show for ADMIN in All Tasks tab */}
-      {userRole === 'ADMIN' && selectedTab === 'all' && (
-        <View style={styles.floatingButtonsContainer}>
-          {/* Quick Assignment Button */}
-          <TouchableOpacity
-            style={[styles.floatingButton, styles.assignButton]}
-            onPress={handleNavigateToAssignment}
-            activeOpacity={0.8}
-          >
-            <View style={styles.floatingButtonInner}>
-              <MaterialCommunityIcons name="account-switch" size={22} color="white" />
-              <Text style={styles.floatingButtonText}>Assign</Text>
-            </View>
-          </TouchableOpacity>
-          
-          {/* Create Task Button - Plus Icon Only */}
-          <TouchableOpacity
-            style={[styles.floatingButton, styles.createButton]}
-            onPress={handleCreateTask}
-            activeOpacity={0.8}
-          >
-            <MaterialCommunityIcons name="plus" size={28} color="white" />
-          </TouchableOpacity>
+    if (!task) {
+      return (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name="file-question" size={64} color="#dee2e6" />
+          <Text style={styles.emptyText}>Task not found</Text>
         </View>
-      )}
+      );
+    }
 
-      {/* Bottom Tab Navigation - Changed "My Tasks" to "My Task" */}
-      <View style={styles.bottomTab}>
-        <TouchableOpacity 
-          style={[styles.tabButton, selectedTab === 'all' && styles.activeTabButton]}
-          onPress={() => setSelectedTab('all')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.tabIconContainer}>
-            <MaterialCommunityIcons 
-              name="format-list-bulleted" 
-              size={24} 
-              color={selectedTab === 'all' ? '#007AFF' : '#8e8e93'} 
-            />
+    return (
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.card}>
+          <View style={styles.taskHeader}>
+            <View style={styles.taskIcon}>
+              <MaterialCommunityIcons 
+                name="format-list-checks" 
+                size={24} 
+                color="#007AFF" 
+              />
+            </View>
+            <View style={styles.taskTitleContainer}>
+              <Text style={styles.taskTitle}>{task.title}</Text>
+              <View style={styles.pointsBadge}>
+                <MaterialCommunityIcons name="star" size={16} color="#e67700" />
+                <Text style={styles.pointsText}>{task.points} points</Text>
+              </View>
+            </View>
           </View>
-          <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>
-            All Tasks
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tabButton, selectedTab === 'my' && styles.activeTabButton]}
-          onPress={() => setSelectedTab('my')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.tabIconContainer}>
-            <MaterialCommunityIcons 
-              name="clipboard-check" 
-              size={24} 
-              color={selectedTab === 'my' ? '#007AFF' : '#8e8e93'} 
-            />
-          </View>
-          <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>
-            My Task
-          </Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* Settings Modal */}
-      <SettingsModal
-        visible={showSettingsModal}
-        onClose={() => setShowSettingsModal(false)}
-        groupId={groupId}
-        groupName={groupName}
-        userRole={userRole}
-        navigation={navigation}
-        onNavigateToAssignment={handleNavigateToAssignment}
-        onRefreshTasks={() => fetchTasks(true)}
-      />
+          {task.description && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Description</Text>
+              <Text style={styles.description}>{task.description}</Text>
+            </View>
+          )}
+
+          <View style={styles.detailsGrid}>
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Frequency</Text>
+              <Text style={styles.detailValue}>{task.executionFrequency}</Text>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Category</Text>
+              <Text style={styles.detailValue}>{task.category || 'None'}</Text>
+            </View>
+
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Status</Text>
+              <View style={[
+                styles.taskStatusBadge,
+                task.userAssignment?.completed ? styles.completedStatus : styles.pendingStatus
+              ]}>
+                <Text style={styles.taskStatusText}>
+                  {task.userAssignment?.completed ? 'Completed' : 'Active'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Recurring</Text>
+              <Text style={styles.detailValue}>{task.isRecurring ? 'Yes' : 'No'}</Text>
+            </View>
+          </View>
+
+          {renderMemberAssignmentSection()}
+
+          {task.executionFrequency === 'WEEKLY' && task.selectedDays?.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Scheduled Days</Text>
+              <View style={styles.daysContainer}>
+                {task.selectedDays.map((day: string, index: number) => (
+                  <View key={index} style={styles.dayChip}>
+                    <MaterialCommunityIcons name="calendar" size={14} color="#1864ab" />
+                    <Text style={styles.dayText}>{day}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {task.timeSlots?.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Time Slots</Text>
+              <View style={styles.timeSlotsContainer}>
+                {task.timeSlots.map((slot: any, index: number) => {
+                  const isCurrent = currentTimeSlot && 
+                    slot.startTime === currentTimeSlot.startTime && 
+                    slot.endTime === currentTimeSlot.endTime;
+                  
+                  return (
+                    <View 
+                      key={index} 
+                      style={[
+                        styles.timeSlotCard,
+                        isCurrent && styles.currentTimeSlotCard
+                      ]}
+                    >
+                      <View style={styles.timeSlotHeader}>
+                        <MaterialCommunityIcons 
+                          name={isCurrent ? "clock-check" : "clock"} 
+                          size={20} 
+                          color={isCurrent ? "#2b8a3e" : "#007AFF"} 
+                        />
+                        <Text style={[
+                          styles.timeSlotTime,
+                          isCurrent && styles.currentTimeSlotTime
+                        ]}>
+                          {slot.startTime} - {slot.endTime}
+                        </Text>
+                        {slot.points !== undefined && slot.points > 0 && (
+                          <View style={styles.slotPointsBadge}>
+                            <Text style={styles.slotPointsText}>{slot.points} pts</Text>
+                          </View>
+                        )}
+                      </View>
+                      {slot.label && (
+                        <Text style={styles.timeSlotLabel}>{slot.label}</Text>
+                      )}
+                      {isCurrent && isSubmittable && (
+                        <View style={styles.activeSlotIndicator}>
+                          <MaterialCommunityIcons name="check-circle" size={12} color="#2b8a3e" />
+                          <Text style={styles.activeSlotText}>Active - Can Submit</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+              <Text style={styles.timeSlotNote}>
+                ⓘ Submit within 30 minutes before/after time slot end
+              </Text>
+            </View>
+          )}
+
+          {isAdmin && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Assignments & Rotation</Text>
+              
+              <View style={styles.adminInfoBox}>
+                <MaterialCommunityIcons name="shield-account" size={20} color="#007AFF" />
+                <View style={styles.adminInfoContent}>
+                  <Text style={styles.adminInfoTitle}>Admin Information</Text>
+                  <Text style={styles.adminInfoText}>
+                    You have full control over this task. You can edit, delete, or reassign it. Click on assignments to verify/reject submissions.
+                  </Text>
+                </View>
+              </View>
+
+              {task.currentAssignee && (
+                <View style={styles.assigneeInfo}>
+                  <Text style={styles.assigneeLabel}>Current Assignee:</Text>
+                  <Text style={styles.assigneeValue}>
+                    {task.assignments?.[0]?.user?.fullName || 'Unknown'} (Week {task.group?.currentRotationWeek || 1})
+                  </Text>
+                </View>
+              )}
+
+              {task.rotationMembers && Array.isArray(task.rotationMembers) && (
+                <View style={styles.rotationInfo}>
+                  <Text style={styles.rotationLabel}>Rotation Members:</Text>
+                  <View style={styles.rotationMembersList}>
+                    {task.rotationMembers.map((member: any, index: number) => (
+                      <View key={member.userId} style={styles.rotationMemberItem}>
+                        <View style={[
+                          styles.rotationMemberAvatar,
+                          member.userId === task.currentAssignee && styles.currentAssigneeAvatar
+                        ]}>
+                          <Text style={styles.rotationMemberInitial}>
+                            {member.fullName?.charAt(0) || '?'}
+                          </Text>
+                        </View>
+                        <Text style={[
+                          styles.rotationMemberName,
+                          member.userId === task.currentAssignee && styles.currentAssigneeName
+                        ]}>
+                          {member.fullName}
+                          {member.userId === task.currentAssignee && ' (Current)'}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {task.assignments?.length > 0 ? (
+                <View style={styles.assignmentsContainer}>
+                  <Text style={styles.assignmentsSubtitle}>Recent Assignments:</Text>
+                  {task.assignments.slice(0, 5).map((assignment: any, index: number) => 
+                    renderAdminAssignmentView(assignment)
+                  )}
+                  {task.assignments.length > 5 && (
+                    <Text style={styles.moreAssignments}>
+                      +{task.assignments.length - 5} more assignments
+                    </Text>
+                  )}
+                </View>
+              ) : (
+                <Text style={styles.noAssignments}>No assignments yet</Text>
+              )}
+            </View>
+          )}
+
+          {isAdmin && !isAdminAssignedToTask() && (
+            <TouchableOpacity 
+              style={styles.deleteButton}
+              onPress={handleDelete}
+            >
+              <MaterialCommunityIcons name="delete" size={20} color="#fa5252" />
+              <Text style={styles.deleteButtonText}>Delete Task</Text>
+            </TouchableOpacity>
+          )}
+
+          {!isAdmin && (
+            <View style={styles.memberInfoBox}>
+              <MaterialCommunityIcons name="information" size={20} color="#6c757d" />
+              <Text style={styles.memberInfoText}>
+                Only group administrators can edit or delete tasks.
+              </Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      {renderHeader()}
+      {renderContent()}
     </SafeAreaView>
   );
 }
@@ -770,27 +982,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa'
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 80
-  },
-  myAssignment: {
-    backgroundColor: '#e7f5ff',
-    borderColor: '#a5d8ff'
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#6c757d',
-    fontSize: 14
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 5,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
@@ -800,8 +997,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20
+    alignItems: 'center'
   },
   backButtonText: {
     fontSize: 24,
@@ -820,13 +1016,7 @@ const styles = StyleSheet.create({
     color: '#212529',
     textAlign: 'center'
   },
-  subtitle: {
-    fontSize: 12,
-    color: '#6c757d',
-    marginTop: 2,
-    textAlign: 'center'
-  },
-  settingsButton: {
+  editButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
@@ -834,12 +1024,25 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#f8f9fa'
   },
+  headerSpacer: {
+    width: 40
+  }, 
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 80
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#6c757d',
+    fontSize: 14
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    paddingBottom: 100
+    padding: 20
   },
   errorText: {
     color: '#dc3545',
@@ -859,346 +1062,806 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16
   },
-  listContainer: {
-    padding: 16,
-    paddingBottom: 100
-  },
-  taskCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-    position: 'relative'
-  },
-  completedTaskCard: {
-    backgroundColor: '#f8f9fa',
-    opacity: 0.9
-  },
-  submittableTaskCard: {
-    borderWidth: 2,
-    borderColor: '#2b8a3e',
-    backgroundColor: '#f0f9f0'
-  },
-  taskHeader: {
-    flexDirection: 'row',
-    marginBottom: 12
-  },
-  taskIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12
-  },
-  taskInfo: {
-    flex: 1,
-    marginRight: 40
-  },
-  taskTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6
-  },
-  taskTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    flex: 1,
-    marginRight: 8,
-    lineHeight: 22
-  },
-  completedTaskTitle: {
-    color: '#6c757d',
-    textDecorationLine: 'line-through'
-  },
-  editButton: {
-    padding: 4
-  },
-  deleteButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#fff5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ffc9c9'
-  },
-  taskDescription: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginBottom: 10,
-    lineHeight: 20
-  },
-  completedTaskDescription: {
-    color: '#adb5bd'
-  },
-  taskMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8
-  },
-  pointsBadge: {
-    backgroundColor: '#fff3bf',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4
-  },
-  taskPoints: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#e67700'
-  },
-  categoryBadge: {
-    backgroundColor: '#e7f5ff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12
-  },
-  taskCategory: {
-    fontSize: 12,
-    color: '#1864ab'
-  },
-  taskFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f3f5',
-    paddingTop: 12,
-    marginTop: 12
-  },
-  taskCreator: {
-    fontSize: 12,
-    color: '#868e96',
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  taskDate: {
-    fontSize: 12,
-    color: '#868e96'
-  },
-  assignmentInfo: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1
-  },
-  unassignedInfo: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderStyle: 'dashed',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6
-  },
-  unassignedText: {
-    fontSize: 13,
-    color: '#868e96',
-    fontStyle: 'italic'
-  },
-  completedAssignment: {
-    backgroundColor: '#d3f9d8',
-    borderColor: '#b2f2bb'
-  },
-  pendingAssignment: {
-    backgroundColor: '#fff3bf',
-    borderColor: '#ffd43b'
-  },
-  assignmentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8
-  },
-  assignmentStatus: {
-    fontSize: 14,
-    fontWeight: '600'
-  },
-  assignmentDetails: {
-    gap: 4
-  },
-  assignmentDetail: {
-    fontSize: 12,
-    color: '#495057'
-  },
-  detailLabel: {
-    fontWeight: '600',
-    color: '#212529'
-  },
-  // Complete Now Button Styles
-  completeNowButton: {
-    backgroundColor: '#2b8a3e',
-    borderRadius: 8,
-    marginBottom: 12,
-    overflow: 'hidden'
-  },
-  completeNowContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    gap: 8
-  },
-  completeNowText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  timeLeftBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginLeft: 8
-  },
-  timeLeftText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  timeLeftContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff3bf',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-    gap: 6
-  },
-  timeLeftLabel: {
-    fontSize: 13,
-    color: '#e67700',
-    fontWeight: '500'
-  },
   emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
-    marginTop: 40
+    padding: 20
   },
   emptyText: {
     fontSize: 18,
     color: '#6c757d',
-    marginBottom: 8,
     marginTop: 16,
     textAlign: 'center'
   },
-  emptySubtext: {
+  content: {
+    flex: 1,
+    padding: 16
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1
+  },
+  taskHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20
+  },
+  taskIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#e7f5ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16
+  },
+  taskTitleContainer: {
+    flex: 1
+  },
+  taskTitle: {
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 8
+  },
+  pointsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start'
+  },
+  pointsText: {
     fontSize: 14,
-    color: '#adb5bd',
+    fontWeight: '600',
+    color: '#e67700',
+    marginLeft: 6
+  },
+  section: {
+    marginBottom: 24
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 12
+  },
+  description: {
+    fontSize: 15,
+    color: '#6c757d',
+    lineHeight: 22
+  },
+  detailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+    marginBottom: 24
+  },
+  detailItem: {
+    width: '48%'
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: '#868e96',
+    marginBottom: 4
+  },
+  detailValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#212529'
+  },
+  taskStatusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start'
+  },
+  completedStatus: {
+    backgroundColor: '#d3f9d8'
+  },
+  pendingStatus: {
+    backgroundColor: '#fff3bf'
+  },
+  taskStatusText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#212529'
+  },
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  dayChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f5ff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    gap: 6
+  },
+  dayText: {
+    fontSize: 14,
+    color: '#1864ab',
+    fontWeight: '500'
+  },
+  timeSlotsContainer: {
+    gap: 12
+  },
+  timeSlotCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
+  },
+  currentTimeSlotCard: {
+    backgroundColor: '#e7f5ff',
+    borderColor: '#a5d8ff',
+    borderWidth: 2
+  },
+  timeSlotHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4
+  },
+  timeSlotTime: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#212529',
+    flex: 1
+  },
+  currentTimeSlotTime: {
+    color: '#1864ab',
+    fontWeight: '600'
+  },
+  slotPointsBadge: {
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12
+  },
+  slotPointsText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#e67700'
+  },
+  timeSlotLabel: {
+    fontSize: 14,
+    color: '#6c757d',
+    marginLeft: 28,
+    marginBottom: 4
+  },
+  activeSlotIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#d3f9d8',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    gap: 4,
+    marginTop: 4
+  },
+  activeSlotText: {
+    fontSize: 12,
+    color: '#2b8a3e',
+    fontWeight: '500'
+  },
+  timeSlotNote: {
+    fontSize: 12,
+    color: '#868e96',
+    fontStyle: 'italic',
+    marginTop: 8
+  },
+  // Assignment Section
+  assignmentCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
+  },
+  assignmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16
+  },
+  assignmentInfo: {
+    flex: 1
+  },
+  assignmentTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1864ab',
+    marginBottom: 4
+  },
+  assignmentDate: {
+    fontSize: 14,
+    color: '#495057'
+  },
+  // NEW STYLES FOR SUBMISSION STATUS
+  submissionStatusCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+  },
+  submissionStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statusIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusTextContainer: {
+    flex: 1,
+  },
+  submissionStatusLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  submissionStatusDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  timerContainer: {
+    marginTop: 12,
+    marginLeft: 56,
+  },
+  timerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  normalTimerBadge: {
+    backgroundColor: '#d3f9d8',
+  },
+  urgentTimerBadge: {
+    backgroundColor: '#ffc9c9',
+  },
+  timerText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  urgentMessage: {
+    fontSize: 13,
+    color: '#fa5252',
+    fontWeight: '600',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  waitingContainer: {
+    marginTop: 12,
+    marginLeft: 56,
+  },
+  waitingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  waitingText: {
+    fontSize: 14,
+    color: '#e67700',
+    fontWeight: '600',
+  },
+  completeButton: {
+    backgroundColor: '#2b8a3e',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  completeButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+  },
+  completeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  completeButtonFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingBottom: 10,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  completeButtonSubtext: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  disabledButtonContainer: {
+    marginTop: 8,
+  },
+  disabledButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#f1f3f5',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  disabledButtonText: {
+    color: '#868e96',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  disabledButtonHint: {
+    fontSize: 13,
+    color: '#868e96',
     textAlign: 'center',
-    marginBottom: 24,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  timeInfoSection: {
+    backgroundColor: '#fff3bf',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ffd43b'
+  },
+  timeInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4
+  },
+  timeInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#e67700'
+  },
+  timeInfoText: {
+    fontSize: 13,
+    color: '#e67700',
+    marginBottom: 8,
+    lineHeight: 18
+  },
+  currentSlotInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4
+  },
+  currentSlotLabel: {
+    fontSize: 13,
+    color: '#495057',
+    fontWeight: '500'
+  },
+  currentSlotTime: {
+    fontSize: 13,
+    color: '#1864ab',
+    fontWeight: '600'
+  },
+  adminNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: '#d0ebff',
+    borderRadius: 6
+  },
+  adminNoteText: {
+    fontSize: 14,
+    color: '#1864ab',
+    fontWeight: '500'
+  },
+  notAssignedCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    alignItems: 'center',
+    gap: 12
+  },
+  notAssignedText: {
+    fontSize: 16,
+    color: '#868e96',
+    textAlign: 'center'
+  },
+  // Completion Card
+  completionCard: {
+    backgroundColor: '#e7f5ff',
+    borderRadius: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#a5d8ff'
+  },
+  completionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16
+  },
+  completionInfo: {
+    flex: 1
+  },
+  completionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4
+  },
+  completionDate: {
+    fontSize: 14,
+    color: '#495057'
+  },
+  photoPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6'
+  },
+  viewPhotoText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500'
+  },
+  userNotesCard: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#dee2e6'
+  },
+  notesTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 4
+  },
+  notesText: {
+    fontSize: 14,
+    color: '#6c757d',
     lineHeight: 20
   },
-  emptyButton: { 
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8
+  adminFeedbackCard: {
+    backgroundColor: '#fff5f5',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#ffc9c9'
   },
-  emptyButtonText: {
-    color: 'white',
+  adminFeedbackTitle: {
+    fontSize: 14,
     fontWeight: '600',
-    fontSize: 16
+    color: '#fa5252',
+    marginBottom: 4
   },
-  floatingButtonsContainer: {
-    position: 'absolute',
-    bottom: 90,
-    right: 20,
-    alignItems: 'flex-end',
-    gap: 12,
-    zIndex: 100
+  adminFeedbackText: {
+    fontSize: 14,
+    color: '#495057',
+    lineHeight: 20
   },
-  floatingButton: {
-    borderRadius: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 8
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#6c757d',
+    lineHeight: 18
+  },
+  viewDetailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 12,
+    marginTop: 12
+  },
+  viewDetailsText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500'
+  },
+  // Admin View
+  adminInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f5ff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    gap: 12
+  },
+  adminInfoContent: {
+    flex: 1
+  },
+  adminInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1864ab',
+    marginBottom: 4
+  },
+  adminInfoText: {
+    fontSize: 13,
+    color: '#1864ab',
+    lineHeight: 18
+  },
+  assigneeInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
+  },
+  assigneeLabel: {
+    fontSize: 12,
+    color: '#868e96',
+    marginBottom: 4
+  },
+  assigneeValue: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#212529'
+  },
+  rotationInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
+  },
+  rotationLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 8
+  },
+  rotationMembersList: {
+    gap: 8
+  },
+  rotationMemberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  rotationMemberAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#6c757d',
     justifyContent: 'center',
     alignItems: 'center'
   },
-  assignButton: {
-    backgroundColor: '#28a745',
-    paddingHorizontal: 16,
-    paddingVertical: 10
+  currentAssigneeAvatar: {
+    backgroundColor: '#007AFF'
   },
-  createButton: {
-    backgroundColor: '#007AFF',
-    width: 56,
-    height: 56,
-    borderRadius: 28
-  },
-  floatingButtonInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6
-  },
-  floatingButtonText: {
+  rotationMemberInitial: {
     color: 'white',
-    fontWeight: '600',
+    fontWeight: 'bold',
     fontSize: 14
   },
-  bottomTab: {
-    flexDirection: 'row',
+  rotationMemberName: {
+    fontSize: 14,
+    color: '#495057'
+  },
+  currentAssigneeName: {
+    fontWeight: '600',
+    color: '#007AFF'
+  },
+  assignmentsContainer: {
+    gap: 12
+  },
+  assignmentsSubtitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+    marginBottom: 8
+  },
+  adminAssignmentCard: {
     backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
-    paddingTop: 8,
-    paddingBottom: 8,
-    paddingHorizontal: 16,
-    height: 70,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    zIndex: 50
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    marginBottom: 8
   },
-  tabButton: {
+  adminAssignmentHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8
+  },
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1
+  },
+  userAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#007AFF',
     justifyContent: 'center',
-    paddingHorizontal: 4,
-    minWidth: 80,
-    flex: 1,
-    height: '100%'
-  },
-  activeTabButton: {},
-  tabIconContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4
+    overflow: 'hidden'
   },
-  tabText: {
+  avatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18
+  },
+  userAvatarText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: 'bold'
+  },
+  userDetails: {
+    flex: 1
+  },
+  userName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#212529'
+  },
+  assignmentDateSmall: {
     fontSize: 12,
-    color: '#8e8e93',
-    textAlign: 'center',
-    fontWeight: '500'
+    color: '#868e96'
   },
-  activeTabText: {
-    color: '#007AFF', 
-    fontWeight: '600'
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 4,
+    maxWidth: 100,
+    flexShrink: 1
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '600',
+    flexShrink: 1
+  },
+  adminAssignmentDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+    flexWrap: 'wrap'
+  },
+  completedText: {
+    fontSize: 12,
+    color: '#6c757d'
+  },
+  hasPhotoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f5ff',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4
+  },
+  hasPhotoText: {
+    fontSize: 10,
+    color: '#007AFF'
+  },
+  hasNotesBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4
+  },
+  hasNotesText: {
+    fontSize: 10,
+    color: '#e67700'
+  },
+  adminNotesPreview: {
+    backgroundColor: '#f8f9fa',
+    padding: 6,
+    borderRadius: 6,
+    marginTop: 8
+  },
+  adminNotesPreviewText: {
+    fontSize: 11,
+    color: '#868e96',
+    fontStyle: 'italic'
+  },
+  moreAssignments: {
+    fontSize: 14,
+    color: '#868e96',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic'
+  },
+  noAssignments: {
+    fontSize: 14,
+    color: '#868e96',
+    fontStyle: 'italic'
+  },
+  memberInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+    gap: 12
+  },
+  memberInfoText: {
+    fontSize: 14,
+    color: '#6c757d',
+    flex: 1
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fff5f5',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffc9c9',
+    marginTop: 16
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fa5252'
   }
 });

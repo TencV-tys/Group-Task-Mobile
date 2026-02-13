@@ -1,3 +1,4 @@
+// src/screens/AssignmentDetailsScreen.tsx - COMPLETE FIXED VERSION WITH CLEAR SUBMISSION STATUS
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,7 +12,8 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  Dimensions
+  Dimensions,
+  StatusBar
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../AssignmentServices/AssignmentService';
@@ -28,6 +30,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'rejected'>('pending');
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isSubmittable, setIsSubmittable] = useState(false);
+  const [submissionStatus, setSubmissionStatus] = useState<'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed'>('waiting');
 
   useEffect(() => {
     if (assignmentId) {
@@ -37,9 +40,10 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
   useEffect(() => {
     if (assignment && !assignment.completed) {
-      checkTimeValidity();
+      const timer = startCountdownTimer();
+      return () => clearInterval(timer);
     }
-  }, [assignment]);
+  }, [assignment, timeLeft]);
 
   const fetchAssignmentDetails = async () => {
     setLoading(true);
@@ -55,6 +59,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           result.assignment.verified === false ? 'rejected' : 'pending'
         );
         setAdminNotes(result.assignment.adminNotes || '');
+        checkTimeValidity(result.assignment);
       } else {
         setError(result.message || 'Failed to load assignment details');
       }
@@ -66,35 +71,40 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  const checkTimeValidity = () => {
-    if (!assignment) return;
+  const checkTimeValidity = (assignmentData: any) => {
+    if (!assignmentData || assignmentData.completed) {
+      setIsSubmittable(false);
+      setSubmissionStatus('completed');
+      return;
+    }
 
     const now = new Date();
-    const assignmentDate = new Date(assignment.dueDate);
+    const assignmentDate = new Date(assignmentData.dueDate);
     const today = now.toDateString();
     const assignmentDay = assignmentDate.toDateString();
     
     if (today !== assignmentDay) {
       setIsSubmittable(false);
+      setSubmissionStatus('wrong_day');
       return;
     }
 
-    if (assignment.timeSlot) {
-      const [startHour, startMinute] = assignment.timeSlot.startTime.split(':').map(Number);
-      const [endHour, endMinute] = assignment.timeSlot.endTime.split(':').map(Number);
+    if (assignmentData.timeSlot) {
+      const [endHour, endMinute] = assignmentData.timeSlot.endTime.split(':').map(Number);
       
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       const currentInMinutes = currentHour * 60 + currentMinute;
       const endInMinutes = endHour * 60 + endMinute;
       
-      // Can submit 30 minutes before end time until 30 minutes after end time
       const canSubmitStart = endInMinutes - 30;
       const canSubmitEnd = endInMinutes + 30;
       
-      setIsSubmittable(currentInMinutes >= canSubmitStart && currentInMinutes <= canSubmitEnd);
+      const canSubmit = currentInMinutes >= canSubmitStart && currentInMinutes <= canSubmitEnd;
+      setIsSubmittable(canSubmit);
+      setSubmissionStatus(canSubmit ? 'available' : 
+        currentInMinutes < canSubmitStart ? 'waiting' : 'expired');
       
-      // Calculate time left for submission
       if (currentInMinutes <= canSubmitEnd) {
         const endTime = new Date();
         endTime.setHours(endHour, endMinute, 0, 0);
@@ -104,11 +114,124 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       }
     } else {
       setIsSubmittable(true);
+      setSubmissionStatus('available');
+      setTimeLeft(null);
+    }
+  };
+
+  const startCountdownTimer = () => {
+    const timer = setInterval(() => {
+      if (timeLeft !== null && timeLeft > 0) {
+        setTimeLeft(prev => (prev !== null ? prev - 1 : null));
+      } else if (timeLeft === 0) {
+        setIsSubmittable(false);
+        setSubmissionStatus('expired');
+        clearInterval(timer);
+      }
+    }, 1000);
+
+    return timer;
+  };
+
+  const formatTimeLeft = (seconds: number) => {
+    if (seconds >= 3600) {
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${mins}m`;
+    } else if (seconds >= 60) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}m ${secs}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
+  const getSubmissionStatusInfo = () => {
+    switch (submissionStatus) {
+      case 'available':
+        return {
+          label: '✓ AVAILABLE TO SUBMIT',
+          color: '#2b8a3e',
+          bgColor: '#d3f9d8',
+          borderColor: '#8ce99a',
+          icon: 'check-circle',
+          description: 'You can submit your completion now',
+          buttonText: 'Complete Assignment',
+          canSubmit: true
+        };
+      case 'waiting':
+        return {
+          label: '⏳ WAITING FOR SUBMISSION WINDOW',
+          color: '#e67700',
+          bgColor: '#fff3bf',
+          borderColor: '#ffd43b',
+          icon: 'clock',
+          description: timeLeft && timeLeft > 0 
+            ? `Submission opens in ${formatTimeLeft(timeLeft)}` 
+            : 'Submit within 30 minutes before/after time slot',
+          buttonText: 'Waiting for Submission Window',
+          canSubmit: false
+        };
+      case 'expired':
+        return {
+          label: '❌ SUBMISSION CLOSED',
+          color: '#fa5252',
+          bgColor: '#ffc9c9',
+          borderColor: '#ff8787',
+          icon: 'timer-off',
+          description: 'The 30-minute submission window has expired',
+          buttonText: 'Submission Closed',
+          canSubmit: false
+        };
+      case 'wrong_day':
+        return {
+          label: '📅 NOT DUE TODAY',
+          color: '#6c757d',
+          bgColor: '#f1f3f5',
+          borderColor: '#dee2e6',
+          icon: 'calendar',
+          description: assignment 
+            ? `Due on ${new Date(assignment.dueDate).toLocaleDateString()}`
+            : 'This assignment is not due today',
+          buttonText: 'Not Due Today',
+          canSubmit: false
+        };
+      case 'completed':
+        return {
+          label: '✓ ALREADY COMPLETED',
+          color: '#2b8a3e',
+          bgColor: '#d3f9d8',
+          borderColor: '#8ce99a',
+          icon: 'check-circle',
+          description: 'You have already submitted this assignment',
+          buttonText: 'Already Completed',
+          canSubmit: false
+        };
+      default:
+        return {
+          label: '⏳ CHECKING STATUS...',
+          color: '#6c757d',
+          bgColor: '#f1f3f5',
+          borderColor: '#dee2e6',
+          icon: 'clock',
+          description: 'Verifying submission availability',
+          buttonText: 'Checking...',
+          canSubmit: false
+        };
     }
   };
 
   const handleCompleteAssignment = () => {
-    if (!assignment || !isSubmittable) return;
+    if (!assignment || !isSubmittable) {
+      const statusInfo = getSubmissionStatusInfo();
+      Alert.alert(
+        'Cannot Submit',
+        statusInfo.description,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     
     navigation.navigate('CompleteAssignment', {
       assignmentId: assignment.id,
@@ -118,6 +241,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       onCompleted: () => {
         fetchAssignmentDetails();
         if (onVerified) onVerified();
+        Alert.alert('Success', 'Assignment submitted successfully!');
       }
     });
   };
@@ -204,85 +328,131 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  const formatTimeLeft = (seconds: number) => {
-    if (seconds >= 3600) {
-      const hours = Math.floor(seconds / 3600);
-      const mins = Math.floor((seconds % 3600) / 60);
-      return `${hours}h ${mins}m`;
-    } else if (seconds >= 60) {
-      const mins = Math.floor(seconds / 60);
-      return `${mins}m`;
-    } else {
-      return `${seconds}s`;
-    }
-  };
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity 
+        onPress={() => navigation.goBack()}
+        style={styles.backButton}
+        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+      >
+        <Text style={styles.backButtonText}>←</Text>
+      </TouchableOpacity>
+      
+      <View style={styles.titleContainer}>
+        <Text style={styles.title} numberOfLines={1}>
+          Assignment Details
+        </Text>
+      </View>
+      
+      <View style={styles.headerSpacer} />
+    </View>
+  );
 
   const renderCompleteButton = () => {
     if (!assignment?.completed) {
-      const isToday = new Date().toDateString() === new Date(assignment.dueDate).toDateString();
+      const submissionStatusInfo = getSubmissionStatusInfo();
       
       return (
         <View style={styles.completeSection}>
           <Text style={styles.sectionTitle}>Complete This Assignment</Text>
           
-          {isToday && assignment.timeSlot && (
-            <View style={styles.timeInfoBox}>
-              <MaterialCommunityIcons name="clock-alert" size={16} color="#e67700" />
-              <View style={styles.timeInfoContent}>
-                <Text style={styles.timeInfoTitle}>Submission Window</Text>
-                <Text style={styles.timeInfoText}>
-                  {assignment.timeSlot.startTime} - {assignment.timeSlot.endTime}
+          {/* CLEAR SUBMISSION STATUS LABEL - PROMINENT DISPLAY */}
+          <View style={[styles.submissionStatusCard, { 
+            backgroundColor: submissionStatusInfo.bgColor,
+            borderColor: submissionStatusInfo.borderColor 
+          }]}>
+            <View style={styles.submissionStatusHeader}>
+              <View style={[styles.statusIconContainer, { backgroundColor: submissionStatusInfo.color + '20' }]}>
+                <MaterialCommunityIcons 
+                  name={submissionStatusInfo.icon as any} 
+                  size={22} 
+                  color={submissionStatusInfo.color} 
+                />
+              </View>
+              <View style={styles.statusTextContainer}>
+                <Text style={[styles.submissionStatusLabel, { color: submissionStatusInfo.color }]}>
+                  {submissionStatusInfo.label}
                 </Text>
-                <Text style={styles.timeInfoNote}>
-                  Submit within 30 minutes of end time
+                <Text style={[styles.submissionStatusDescription, { color: submissionStatusInfo.color }]}>
+                  {submissionStatusInfo.description}
                 </Text>
-                
-                {timeLeft !== null && timeLeft > 0 && (
-                  <View style={[
-                    styles.timerBadge,
-                    timeLeft < 300 && styles.timerWarning
-                  ]}>
-                    <MaterialCommunityIcons 
-                      name="timer" 
-                      size={14} 
-                      color={timeLeft < 300 ? "#fa5252" : "#2b8a3e"} 
-                    />
-                    <Text style={[
-                      styles.timerText,
-                      timeLeft < 300 && styles.timerWarningText
-                    ]}>
-                      {formatTimeLeft(timeLeft)} left
-                    </Text>
-                  </View>
-                )}
               </View>
             </View>
-          )}
+            
+            {submissionStatus === 'available' && timeLeft !== null && (
+              <View style={styles.timerContainer}>
+                <View style={[styles.timerBadge, timeLeft < 300 ? styles.urgentTimerBadge : styles.normalTimerBadge]}>
+                  <MaterialCommunityIcons 
+                    name={timeLeft < 300 ? "timer-alert" : "timer"} 
+                    size={16} 
+                    color={timeLeft < 300 ? "#fa5252" : "#2b8a3e"} 
+                  />
+                  <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : "#2b8a3e" }]}>
+                    {formatTimeLeft(timeLeft)} remaining
+                  </Text>
+                </View>
+                {timeLeft < 300 && (
+                  <Text style={styles.urgentMessage}>Submit now! Grace period ending soon.</Text>
+                )}
+              </View>
+            )}
+            
+            {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
+              <View style={styles.waitingContainer}>
+                <View style={styles.waitingBadge}>
+                  <MaterialCommunityIcons name="clock-start" size={16} color="#e67700" />
+                  <Text style={styles.waitingText}>
+                    Opens in {formatTimeLeft(timeLeft)}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
           
-          {isSubmittable ? (
+          {/* COMPLETE BUTTON - ONLY SHOW WHEN AVAILABLE */}
+          {submissionStatusInfo.canSubmit ? (
             <TouchableOpacity
               style={styles.completeButton}
               onPress={handleCompleteAssignment}
               activeOpacity={0.8}
             >
-              <MaterialCommunityIcons name="check-circle" size={20} color="white" />
-              <Text style={styles.completeButtonText}>Complete Assignment</Text>
+              <View style={styles.completeButtonContent}>
+                <MaterialCommunityIcons name="check-circle" size={20} color="white" />
+                <Text style={styles.completeButtonText}>{submissionStatusInfo.buttonText}</Text>
+              </View>
+              {timeLeft && timeLeft < 600 && (
+                <View style={styles.completeButtonFooter}>
+                  <MaterialCommunityIcons name="alert" size={14} color="white" />
+                  <Text style={styles.completeButtonSubtext}>
+                    {timeLeft < 300 ? 'Urgent! ' : ''}{formatTimeLeft(timeLeft)} left
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
-          ) : isToday ? (
-            <View style={styles.disabledCard}>
-              <MaterialCommunityIcons name="clock-alert" size={20} color="#868e96" />
-              <Text style={styles.disabledText}>
-                {assignment.timeSlot 
-                  ? 'Submit during allowed time window'
-                  : 'Cannot submit at this time'
-                }
-              </Text>
-            </View>
           ) : (
-            <View style={styles.futureCard}>
-              <MaterialCommunityIcons name="calendar" size={20} color="#1864ab" />
-              <Text style={styles.futureText}>
-                Available on due date: {new Date(assignment.dueDate).toLocaleDateString()}
+            <View style={styles.disabledButtonContainer}>
+              <TouchableOpacity
+                style={styles.disabledButton}
+                disabled={true}
+                onPress={() => {
+                  Alert.alert(
+                    submissionStatusInfo.label,
+                    submissionStatusInfo.description,
+                    [{ text: 'OK' }]
+                  );
+                }}
+              >
+                <MaterialCommunityIcons 
+                  name={submissionStatusInfo.icon as any} 
+                  size={20} 
+                  color="#868e96" 
+                />
+                <Text style={styles.disabledButtonText}>
+                  {submissionStatusInfo.buttonText}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.disabledButtonHint}>
+                ⓘ {submissionStatusInfo.description}
               </Text>
             </View>
           )}
@@ -318,8 +488,14 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             onPress={() => handleVerify(false)}
             disabled={verifying}
           >
-            <MaterialCommunityIcons name="close-circle" size={20} color="white" />
-            <Text style={styles.verifyButtonText}>Reject</Text>
+            {verifying ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="close-circle" size={20} color="white" />
+                <Text style={styles.verifyButtonText}>Reject</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -327,8 +503,14 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             onPress={() => handleVerify(true)}
             disabled={verifying}
           >
-            <MaterialCommunityIcons name="check-circle" size={20} color="white" />
-            <Text style={styles.verifyButtonText}>Approve</Text>
+            {verifying ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="check-circle" size={20} color="white" />
+                <Text style={styles.verifyButtonText}>Approve</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -438,7 +620,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             </View>
           </View>
 
-          {/* Complete Assignment Button */}
+          {/* Complete Assignment Button with Clear Status */}
           {renderCompleteButton()}
 
           {/* Points and Details */}
@@ -534,24 +716,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.titleContainer}>
-          <Text style={styles.title} numberOfLines={1}>
-            Assignment Details
-          </Text>
-        </View>
-        
-        <View style={styles.headerSpacer} />
-      </View>
-
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      {renderHeader()}
       {renderContent()}
     </SafeAreaView>
   );
@@ -733,71 +899,121 @@ const styles = StyleSheet.create({
   completeSection: {
     marginBottom: 24
   },
-  timeInfoBox: {
-    flexDirection: 'row',
-    backgroundColor: '#fff3bf',
-    padding: 12,
-    borderRadius: 8,
+  // NEW STYLES FOR SUBMISSION STATUS
+  submissionStatusCard: {
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#ffd43b',
-    gap: 12
+    borderWidth: 2,
   },
-  timeInfoContent: {
-    flex: 1
+  submissionStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
-  timeInfoTitle: {
+  statusIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusTextContainer: {
+    flex: 1,
+  },
+  submissionStatusLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  submissionStatusDescription: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#e67700',
-    marginBottom: 4
+    lineHeight: 20,
   },
-  timeInfoText: {
-    fontSize: 14,
-    color: '#e67700',
-    marginBottom: 4
-  },
-  timeInfoNote: {
-    fontSize: 13,
-    color: '#e67700',
-    marginBottom: 8
+  timerContainer: {
+    marginTop: 12,
+    marginLeft: 56,
   },
   timerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#d3f9d8',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    borderRadius: 20,
     alignSelf: 'flex-start',
-    gap: 6
+    gap: 6,
   },
-  timerWarning: {
-    backgroundColor: '#ffc9c9'
+  normalTimerBadge: {
+    backgroundColor: '#d3f9d8',
+  },
+  urgentTimerBadge: {
+    backgroundColor: '#ffc9c9',
   },
   timerText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#2b8a3e'
+    fontSize: 14,
+    fontWeight: '700',
   },
-  timerWarningText: {
-    color: '#fa5252'
+  urgentMessage: {
+    fontSize: 13,
+    color: '#fa5252',
+    fontWeight: '600',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  waitingContainer: {
+    marginTop: 12,
+    marginLeft: 56,
+  },
+  waitingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  waitingText: {
+    fontSize: 14,
+    color: '#e67700',
+    fontWeight: '600',
   },
   completeButton: {
+    backgroundColor: '#2b8a3e',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  completeButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#2b8a3e',
     padding: 16,
-    borderRadius: 8
   },
   completeButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600'
+    fontWeight: '700',
   },
-  disabledCard: {
+  completeButtonFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingBottom: 10,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  completeButtonSubtext: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  disabledButtonContainer: {
+    marginTop: 8,
+  },
+  disabledButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -806,28 +1022,19 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#dee2e6'
+    borderColor: '#dee2e6',
   },
-  disabledText: {
+  disabledButtonText: {
     color: '#868e96',
     fontSize: 16,
-    fontWeight: '600'
+    fontWeight: '600',
   },
-  futureCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#e7f5ff',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#a5d8ff'
-  },
-  futureText: {
-    color: '#1864ab',
-    fontSize: 16,
-    fontWeight: '600'
+  disabledButtonHint: {
+    fontSize: 13,
+    color: '#868e96',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   detailsGrid: {
     flexDirection: 'row',

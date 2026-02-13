@@ -1,3 +1,4 @@
+// src/screens/TaskDetailsScreen.tsx - COMPLETE FIXED VERSION WITH CLEAR SUBMISSION STATUS
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -24,6 +25,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isSubmittable, setIsSubmittable] = useState(false);
   const [currentTimeSlot, setCurrentTimeSlot] = useState<any>(null);
+  const [submissionStatus, setSubmissionStatus] = useState<'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed'>('waiting');
   
   const isAdmin = userRole === 'ADMIN';
 
@@ -33,9 +35,10 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
 
   useEffect(() => {
     if (task?.userAssignment && !task.userAssignment.completed) {
-      startCountdownTimer();
+      const timer = startCountdownTimer();
+      return () => clearInterval(timer);
     }
-  }, [task]);
+  }, [task, timeLeft]);
 
   const fetchTaskDetails = async () => {
     setLoading(true);
@@ -58,7 +61,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   };
 
   const processTaskData = (taskData: any) => {
-    // Sort time slots by start time
     if (taskData.timeSlots && taskData.timeSlots.length > 0) {
       taskData.timeSlots.sort((a: any, b: any) => {
         const timeA = convertTimeToMinutes(a.startTime);
@@ -67,7 +69,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       });
     }
     
-    // Sort selected days
     if (taskData.selectedDays && taskData.selectedDays.length > 0) {
       const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       taskData.selectedDays.sort((a: string, b: string) => 
@@ -75,7 +76,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       );
     }
     
-    // Sort assignments by due date (newest first)
     if (taskData.assignments && taskData.assignments.length > 0) {
       taskData.assignments.sort((a: any, b: any) => 
         new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
@@ -94,6 +94,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     if (!taskData?.userAssignment || taskData.userAssignment.completed) {
       setIsSubmittable(false);
       setCurrentTimeSlot(null);
+      setSubmissionStatus('completed');
       return;
     }
 
@@ -105,60 +106,64 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     if (today !== assignmentDay) {
       setIsSubmittable(false);
       setCurrentTimeSlot(null);
+      setSubmissionStatus('wrong_day');
       return;
     }
 
-    if (taskData.userAssignment.timeSlot) {
-      const [startHour, startMinute] = taskData.userAssignment.timeSlot.startTime.split(':').map(Number);
-      const [endHour, endMinute] = taskData.userAssignment.timeSlot.endTime.split(':').map(Number);
-      
+    if (taskData.userAssignment.timeSlot || (taskData.timeSlots && taskData.timeSlots.length > 0)) {
       const currentHour = now.getHours();
       const currentMinute = now.getMinutes();
       const currentInMinutes = currentHour * 60 + currentMinute;
-      const startInMinutes = startHour * 60 + startMinute;
-      const endInMinutes = endHour * 60 + endMinute;
       
-      // Check current time against all time slots
       let activeSlot = null;
-      if (taskData.timeSlots) {
-        for (const slot of taskData.timeSlots) {
-          const slotStart = convertTimeToMinutes(slot.startTime);
-          const slotEnd = convertTimeToMinutes(slot.endTime);
-          const graceEnd = slotEnd + 30; // 30 minutes grace period
+      let slotFound = false;
+      
+      const slotsToCheck = taskData.timeSlots || [taskData.userAssignment.timeSlot].filter(Boolean);
+      
+      for (const slot of slotsToCheck) {
+        if (!slot) continue;
+        
+        const slotStart = convertTimeToMinutes(slot.startTime);
+        const slotEnd = convertTimeToMinutes(slot.endTime);
+        const graceEnd = slotEnd + 30;
+        
+        if (currentInMinutes >= slotStart && currentInMinutes <= graceEnd) {
+          activeSlot = slot;
+          slotFound = true;
           
-          if (currentInMinutes >= slotStart && currentInMinutes <= graceEnd) {
-            activeSlot = slot;
-            const timeLeftMs = (graceEnd - currentInMinutes) * 60000;
-            setTimeLeft(Math.max(0, Math.floor(timeLeftMs / 1000)));
-            
-            // Can submit from 30 minutes before end time until grace period ends
-            const canSubmitStart = slotEnd - 30;
-            setIsSubmittable(currentInMinutes >= canSubmitStart && currentInMinutes <= graceEnd);
-            break;
-          }
+          const canSubmitStart = slotEnd - 30;
+          const canSubmit = currentInMinutes >= canSubmitStart && currentInMinutes <= graceEnd;
+          
+          setIsSubmittable(canSubmit);
+          setSubmissionStatus(canSubmit ? 'available' : 'waiting');
+          
+          const timeLeftMs = (graceEnd - currentInMinutes) * 60000;
+          setTimeLeft(Math.max(0, Math.floor(timeLeftMs / 1000)));
+          break;
         }
       }
       
       setCurrentTimeSlot(activeSlot || taskData.userAssignment.timeSlot);
       
-      if (!activeSlot) {
+      if (!slotFound) {
         setIsSubmittable(false);
-        // Check if we're before first slot or after last slot
-        if (taskData.timeSlots && taskData.timeSlots.length > 0) {
-          const firstSlotStart = convertTimeToMinutes(taskData.timeSlots[0].startTime);
-          const lastSlotEnd = convertTimeToMinutes(taskData.timeSlots[taskData.timeSlots.length - 1].endTime) + 30;
-          
+        setSubmissionStatus('expired');
+        setTimeLeft(0);
+        
+        if (slotsToCheck.length > 0) {
+          const firstSlotStart = convertTimeToMinutes(slotsToCheck[0].startTime);
           if (currentInMinutes < firstSlotStart) {
+            setSubmissionStatus('waiting');
             const timeUntilFirstSlot = (firstSlotStart - currentInMinutes) * 60000;
             setTimeLeft(Math.floor(timeUntilFirstSlot / 1000));
-          } else if (currentInMinutes > lastSlotEnd) {
-            setTimeLeft(0);
           }
         }
       }
     } else {
       setIsSubmittable(true);
+      setSubmissionStatus('available');
       setCurrentTimeSlot(null);
+      setTimeLeft(null);
     }
   };
 
@@ -168,11 +173,12 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         setTimeLeft(prev => (prev !== null ? prev - 1 : null));
       } else if (timeLeft === 0) {
         setIsSubmittable(false);
+        setSubmissionStatus('expired');
         clearInterval(timer);
       }
     }, 1000);
 
-    return () => clearInterval(timer);
+    return timer;
   };
 
   const formatTimeLeft = (seconds: number) => {
@@ -182,19 +188,86 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       return `${hours}h ${mins}m`;
     } else if (seconds >= 60) {
       const mins = Math.floor(seconds / 60);
-      return `${mins}m`;
+      const secs = seconds % 60;
+      return `${mins}m ${secs}s`;
     } else {
       return `${seconds}s`;
     }
   };
 
-  const getTimeStatus = () => {
-    if (timeLeft === null) return null;
-    
-    if (timeLeft === 0) return { text: 'Time expired', color: '#fa5252', icon: 'timer-off' };
-    if (timeLeft < 300) return { text: `${formatTimeLeft(timeLeft)} left`, color: '#fa5252', icon: 'timer-alert' };
-    if (timeLeft < 1800) return { text: `${formatTimeLeft(timeLeft)} left`, color: '#e67700', icon: 'timer' };
-    return { text: `${formatTimeLeft(timeLeft)} left`, color: '#2b8a3e', icon: 'timer' };
+  const getSubmissionStatusInfo = () => {
+    switch (submissionStatus) {
+      case 'available':
+        return {
+          label: '✓ AVAILABLE TO SUBMIT',
+          color: '#2b8a3e',
+          bgColor: '#d3f9d8',
+          borderColor: '#8ce99a',
+          icon: 'check-circle',
+          description: 'You can submit your completion now',
+          buttonText: 'Complete Assignment',
+          canSubmit: true
+        };
+      case 'waiting':
+        return {
+          label: '⏳ WAITING FOR SUBMISSION WINDOW',
+          color: '#e67700',
+          bgColor: '#fff3bf',
+          borderColor: '#ffd43b',
+          icon: 'clock',
+          description: timeLeft && timeLeft > 0 
+            ? `Submission opens in ${formatTimeLeft(timeLeft)}` 
+            : 'Submit within 30 minutes before/after time slot',
+          buttonText: 'Waiting for Submission Window',
+          canSubmit: false
+        };
+      case 'expired':
+        return {
+          label: '❌ SUBMISSION CLOSED',
+          color: '#fa5252',
+          bgColor: '#ffc9c9',
+          borderColor: '#ff8787',
+          icon: 'timer-off',
+          description: 'The 30-minute submission window has expired',
+          buttonText: 'Submission Closed',
+          canSubmit: false
+        };
+      case 'wrong_day':
+        return {
+          label: '📅 NOT DUE TODAY',
+          color: '#6c757d',
+          bgColor: '#f1f3f5',
+          borderColor: '#dee2e6',
+          icon: 'calendar',
+          description: task?.userAssignment 
+            ? `Due on ${new Date(task.userAssignment.dueDate).toLocaleDateString()}`
+            : 'This assignment is not due today',
+          buttonText: 'Not Due Today',
+          canSubmit: false
+        };
+      case 'completed':
+        return {
+          label: '✓ ALREADY COMPLETED',
+          color: '#2b8a3e',
+          bgColor: '#d3f9d8',
+          borderColor: '#8ce99a',
+          icon: 'check-circle',
+          description: 'You have already submitted this assignment',
+          buttonText: 'Already Completed',
+          canSubmit: false
+        };
+      default:
+        return {
+          label: '⏳ CHECKING STATUS...',
+          color: '#6c757d',
+          bgColor: '#f1f3f5',
+          borderColor: '#dee2e6',
+          icon: 'clock',
+          description: 'Verifying submission availability',
+          buttonText: 'Checking...',
+          canSubmit: false
+        };
+    }
   };
 
   const handleBack = () => navigation.goBack();
@@ -241,14 +314,25 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   };
 
   const handleCompleteAssignment = () => {
-    if (!task?.userAssignment || !isSubmittable) return;
+    if (!task?.userAssignment || !isSubmittable) {
+      const statusInfo = getSubmissionStatusInfo();
+      Alert.alert(
+        'Cannot Submit',
+        statusInfo.description,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
     
     navigation.navigate('CompleteAssignment', {
       assignmentId: task.userAssignment.id,
       taskTitle: task.title,
       dueDate: task.userAssignment.dueDate,
       timeSlot: currentTimeSlot || task.userAssignment.timeSlot,
-      onCompleted: fetchTaskDetails
+      onCompleted: () => {
+        fetchTaskDetails();
+        Alert.alert('Success', 'Assignment submitted successfully!');
+      }
     });
   };
 
@@ -366,12 +450,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
 
     const status = getVerificationStatus(task.userAssignment);
+    const submissionStatusInfo = getSubmissionStatusInfo();
 
     if (!task.userAssignment.completed) {
-      const timeStatus = getTimeStatus();
-      const isToday = new Date().toDateString() === new Date(task.userAssignment.dueDate).toDateString();
-      const hasTimeSlot = task.userAssignment.timeSlot || (task.timeSlots && task.timeSlots.length > 0);
-      
       return (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Assignment</Text>
@@ -387,47 +468,61 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
               </View>
             </View>
             
-            {/* Time Information */}
-            {isToday && hasTimeSlot && (
-              <View style={styles.timeInfoSection}>
-                <View style={styles.timeInfoHeader}>
-                  <MaterialCommunityIcons name="clock-alert" size={16} color="#e67700" />
-                  <Text style={styles.timeInfoTitle}>Submission Window</Text>
+            {/* CLEAR SUBMISSION STATUS LABEL - PROMINENT DISPLAY */}
+            <View style={[styles.submissionStatusCard, { 
+              backgroundColor: submissionStatusInfo.bgColor,
+              borderColor: submissionStatusInfo.borderColor 
+            }]}>
+              <View style={styles.submissionStatusHeader}>
+                <View style={[styles.statusIconContainer, { backgroundColor: submissionStatusInfo.color + '20' }]}>
+                  <MaterialCommunityIcons 
+                    name={submissionStatusInfo.icon as any} 
+                    size={22} 
+                    color={submissionStatusInfo.color} 
+                  />
                 </View>
-                <Text style={styles.timeInfoText}>
-                  Submit within 30 minutes of time slot end
-                </Text>
-                
-                {timeStatus && (
-                  <View style={[
-                    styles.timerContainer,
-                    { backgroundColor: `${timeStatus.color}15` }
-                  ]}>
-                    <MaterialCommunityIcons 
-                      name={timeStatus.icon as any} 
-                      size={14} 
-                      color={timeStatus.color} 
-                    />
-                    <Text style={[styles.timerText, { color: timeStatus.color }]}>
-                      {timeStatus.text}
-                    </Text>
-                  </View>
-                )}
-                
-                {currentTimeSlot && (
-                  <View style={styles.currentSlotInfo}>
-                    <Text style={styles.currentSlotLabel}>Current Slot:</Text>
-                    <Text style={styles.currentSlotTime}>
-                      {currentTimeSlot.startTime} - {currentTimeSlot.endTime}
-                      {currentTimeSlot.label && ` (${currentTimeSlot.label})`}
-                    </Text>
-                  </View>
-                )}
+                <View style={styles.statusTextContainer}>
+                  <Text style={[styles.submissionStatusLabel, { color: submissionStatusInfo.color }]}>
+                    {submissionStatusInfo.label}
+                  </Text>
+                  <Text style={[styles.submissionStatusDescription, { color: submissionStatusInfo.color }]}>
+                    {submissionStatusInfo.description}
+                  </Text>
+                </View>
               </View>
-            )}
+              
+              {submissionStatus === 'available' && timeLeft !== null && (
+                <View style={styles.timerContainer}>
+                  <View style={[styles.timerBadge, timeLeft < 300 ? styles.urgentTimerBadge : styles.normalTimerBadge]}>
+                    <MaterialCommunityIcons 
+                      name={timeLeft < 300 ? "timer-alert" : "timer"} 
+                      size={16} 
+                      color={timeLeft < 300 ? "#fa5252" : "#2b8a3e"} 
+                    />
+                    <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : "#2b8a3e" }]}>
+                      {formatTimeLeft(timeLeft)} remaining
+                    </Text>
+                  </View>
+                  {timeLeft < 300 && (
+                    <Text style={styles.urgentMessage}>Submit now! Grace period ending soon.</Text>
+                  )}
+                </View>
+              )}
+              
+              {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
+                <View style={styles.waitingContainer}>
+                  <View style={styles.waitingBadge}>
+                    <MaterialCommunityIcons name="clock-start" size={16} color="#e67700" />
+                    <Text style={styles.waitingText}>
+                      Opens in {formatTimeLeft(timeLeft)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
             
-            {/* Complete Button */}
-            {isSubmittable ? (
+            {/* COMPLETE BUTTON - ONLY SHOW WHEN AVAILABLE */}
+            {submissionStatusInfo.canSubmit ? (
               <TouchableOpacity
                 style={styles.completeButton}
                 onPress={handleCompleteAssignment}
@@ -435,36 +530,42 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
               >
                 <View style={styles.completeButtonContent}>
                   <MaterialCommunityIcons name="check-circle" size={22} color="white" />
-                  <Text style={styles.completeButtonText}>Mark as Complete</Text>
+                  <Text style={styles.completeButtonText}>{submissionStatusInfo.buttonText}</Text>
                 </View>
-                {timeStatus && timeLeft && timeLeft < 600 && (
-                  <Text style={styles.completeButtonSubtext}>
-                    Submit before time runs out!
-                  </Text>
+                {timeLeft && timeLeft < 600 && (
+                  <View style={styles.completeButtonFooter}>
+                    <MaterialCommunityIcons name="alert" size={14} color="white" />
+                    <Text style={styles.completeButtonSubtext}>
+                      {timeLeft < 300 ? 'Urgent! ' : ''}{formatTimeLeft(timeLeft)} left
+                    </Text>
+                  </View>
                 )}
               </TouchableOpacity>
-            ) : isToday ? (
-              <View style={styles.disabledCard}>
-                <MaterialCommunityIcons name="clock-alert" size={24} color="#868e96" />
-                <View style={styles.disabledInfo}>
-                  <Text style={styles.disabledTitle}>Submission Closed</Text>
-                  <Text style={styles.disabledText}>
-                    {hasTimeSlot 
-                      ? 'Submit during allowed time window (30 min before/after slot)'
-                      : 'Cannot submit at this time'
-                    }
-                  </Text>
-                </View>
-              </View>
             ) : (
-              <View style={styles.futureCard}>
-                <MaterialCommunityIcons name="calendar-clock" size={24} color="#1864ab" />
-                <View style={styles.futureInfo}>
-                  <Text style={styles.futureTitle}>Available Soon</Text>
-                  <Text style={styles.futureText}>
-                    This assignment will be available on the due date
+              <View style={styles.disabledButtonContainer}>
+                <TouchableOpacity
+                  style={styles.disabledButton}
+                  disabled={true}
+                  onPress={() => {
+                    Alert.alert(
+                      submissionStatusInfo.label,
+                      submissionStatusInfo.description,
+                      [{ text: 'OK' }]
+                    );
+                  }}
+                >
+                  <MaterialCommunityIcons 
+                    name={submissionStatusInfo.icon as any} 
+                    size={20} 
+                    color="#868e96" 
+                  />
+                  <Text style={styles.disabledButtonText}>
+                    {submissionStatusInfo.buttonText}
                   </Text>
-                </View>
+                </TouchableOpacity>
+                <Text style={styles.disabledButtonHint}>
+                  ⓘ {submissionStatusInfo.description}
+                </Text>
               </View>
             )}
             
@@ -486,11 +587,13 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         <Text style={styles.sectionTitle}>My Submission</Text>
         <View style={styles.completionCard}>
           <View style={styles.completionHeader}>
-            <MaterialCommunityIcons 
-              name={status.icon as any} 
-              size={24} 
-              color={status.color} 
-            />
+            <View style={[styles.statusIconContainer, { backgroundColor: status.color + '20' }]}>
+              <MaterialCommunityIcons 
+                name={status.icon as any} 
+                size={24} 
+                color={status.color} 
+              />
+            </View>
             <View style={styles.completionInfo}>
               <Text style={[styles.completionTitle, { color: status.color }]}>
                 {status.text}
@@ -507,10 +610,8 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
               style={styles.photoPreview}
               onPress={() => handleViewPhoto(task.userAssignment.photoUrl)}
             >
-              <View style={styles.photoPreviewContent}>
-                <MaterialCommunityIcons name="image" size={20} color="#007AFF" />
-                <Text style={styles.viewPhotoText}>View Submitted Photo</Text>
-              </View>
+              <MaterialCommunityIcons name="image" size={20} color="#007AFF" />
+              <Text style={styles.viewPhotoText}>View Submitted Photo</Text>
             </TouchableOpacity>
           )}
           
@@ -593,13 +694,13 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             {assignment.photoUrl && (
               <View style={styles.hasPhotoBadge}>
                 <MaterialCommunityIcons name="image" size={8} color="#007AFF" />
-                <Text style={styles.hasPhotoText}>Has Photo</Text>
+                <Text style={styles.hasPhotoText}>Photo</Text>
               </View>
             )}
             {assignment.notes && (
               <View style={styles.hasNotesBadge}>
                 <MaterialCommunityIcons name="note-text" size={8} color="#e67700" />
-                <Text style={styles.hasNotesText}>Has Notes</Text>
+                <Text style={styles.hasNotesText}>Notes</Text>
               </View>
             )}
           </View>
@@ -1192,6 +1293,144 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#495057'
   },
+  // NEW STYLES FOR SUBMISSION STATUS
+  submissionStatusCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+  },
+  submissionStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statusIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statusTextContainer: {
+    flex: 1,
+  },
+  submissionStatusLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  submissionStatusDescription: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  timerContainer: {
+    marginTop: 12,
+    marginLeft: 56,
+  },
+  timerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  normalTimerBadge: {
+    backgroundColor: '#d3f9d8',
+  },
+  urgentTimerBadge: {
+    backgroundColor: '#ffc9c9',
+  },
+  timerText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  urgentMessage: {
+    fontSize: 13,
+    color: '#fa5252',
+    fontWeight: '600',
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  waitingContainer: {
+    marginTop: 12,
+    marginLeft: 56,
+  },
+  waitingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    gap: 6,
+  },
+  waitingText: {
+    fontSize: 14,
+    color: '#e67700',
+    fontWeight: '600',
+  },
+  completeButton: {
+    backgroundColor: '#2b8a3e',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  completeButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+  },
+  completeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  completeButtonFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingBottom: 10,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+  },
+  completeButtonSubtext: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  disabledButtonContainer: {
+    marginTop: 8,
+  },
+  disabledButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#f1f3f5',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  disabledButtonText: {
+    color: '#868e96',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  disabledButtonHint: {
+    fontSize: 13,
+    color: '#868e96',
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
   timeInfoSection: {
     backgroundColor: '#fff3bf',
     padding: 12,
@@ -1217,20 +1456,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     lineHeight: 18
   },
-  timerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
-    gap: 6,
-    marginBottom: 8
-  },
-  timerText: {
-    fontSize: 13,
-    fontWeight: '600'
-  },
   currentSlotInfo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1246,78 +1471,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#1864ab',
     fontWeight: '600'
-  },
-  completeButton: {
-    backgroundColor: '#2b8a3e',
-    borderRadius: 8,
-    overflow: 'hidden'
-  },
-  completeButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16
-  },
-  completeButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  completeButtonSubtext: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 12,
-    textAlign: 'center',
-    paddingBottom: 8,
-    fontStyle: 'italic'
-  },
-  disabledCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f3f5',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    gap: 12
-  },
-  disabledInfo: {
-    flex: 1
-  },
-  disabledTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#868e96',
-    marginBottom: 4
-  },
-  disabledText: {
-    fontSize: 14,
-    color: '#868e96',
-    lineHeight: 18
-  },
-  futureCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e7f5ff',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#a5d8ff',
-    gap: 12
-  },
-  futureInfo: {
-    flex: 1
-  },
-  futureTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1864ab',
-    marginBottom: 4
-  },
-  futureText: {
-    fontSize: 14,
-    color: '#1864ab',
-    lineHeight: 18
   },
   adminNote: {
     flexDirection: 'row',
@@ -1375,18 +1528,16 @@ const styles = StyleSheet.create({
     color: '#495057'
   },
   photoPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: 'white',
     padding: 12,
     borderRadius: 8,
     marginTop: 8,
     borderWidth: 1,
     borderColor: '#dee2e6'
-  },
-  photoPreviewContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8
   },
   viewPhotoText: {
     color: '#007AFF',

@@ -355,35 +355,53 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  const getVerificationStatus = (assignment: any) => {
-    if (!assignment?.completed) return { 
-      status: 'pending', 
-      color: '#e67700', 
-      icon: 'clock-outline',
-      text: 'Pending'
-    };
+ // In TaskDetailsScreen.tsx - UPDATE THIS FUNCTION
+const getVerificationStatus = (assignment: any) => {
+  if (!assignment?.completed) {
+    // Check if the assignment is due today
+    const today = new Date().toDateString();
+    const dueDate = new Date(assignment.dueDate).toDateString();
     
-    if (assignment.verified === true) return { 
-      status: 'verified', 
-      color: '#2b8a3e', 
-      icon: 'check-circle',
-      text: 'Verified'
-    };
-    
-    if (assignment.verified === false) return { 
-      status: 'rejected', 
-      color: '#fa5252', 
-      icon: 'close-circle',
-      text: 'Rejected'
-    };
-    
-    return { 
-      status: 'pending_verification', 
-      color: '#e67700', 
-      icon: 'clock-check',
-      text: 'Awaiting Verification'
-    };
+    if (today === dueDate) {
+      // Due today but not completed - show "Not Completed"
+      return { 
+        status: 'not_completed',
+        color: '#fa5252', // Red - urgent/overdue
+        icon: 'alert-circle',
+        text: 'Not Completed'
+      };
+    } else {
+      // Not due today - show "Pending"
+      return { 
+        status: 'pending',
+        color: '#e67700', // Orange - future
+        icon: 'clock-outline',
+        text: 'Pending'
+      };
+    }
+  }
+  
+  if (assignment.verified === true) return { 
+    status: 'verified', 
+    color: '#2b8a3e', 
+    icon: 'check-circle',
+    text: 'Verified'
   };
+  
+  if (assignment.verified === false) return { 
+    status: 'rejected', 
+    color: '#fa5252', 
+    icon: 'close-circle',
+    text: 'Rejected'
+  };
+  
+  return { 
+    status: 'pending_verification', 
+    color: '#e67700', 
+    icon: 'clock-check',
+    text: 'Pending Verification'
+  };
+};
 
   const getCompletionTimeText = (assignment: any) => {
     if (!assignment?.completed || !assignment?.completedAt) return '';

@@ -1,4 +1,4 @@
-// src/screens/TaskDetailsScreen.tsx - COMPLETE FIXED VERSION WITH CLEAR SUBMISSION STATUS
+// src/screens/TaskDetailsScreen.tsx - COMPLETE FIXED VERSION WITH ALL STYLES MERGED
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -26,6 +26,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const [isSubmittable, setIsSubmittable] = useState(false);
   const [currentTimeSlot, setCurrentTimeSlot] = useState<any>(null);
   const [submissionStatus, setSubmissionStatus] = useState<'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed'>('waiting');
+  const [currentWeekSubmissions, setCurrentWeekSubmissions] = useState<any[]>([]);
   
   const isAdmin = userRole === 'ADMIN';
 
@@ -49,6 +50,20 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         const processedTask = processTaskData(result.task);
         setTask(processedTask);
         checkTimeValidity(processedTask);
+        
+        // Get current week number from group
+        const currentWeek = processedTask.group?.currentRotationWeek || 1;
+        
+        // Filter ONLY current week submissions for the current user
+        if (processedTask.assignments && processedTask.userId) {
+          const myCurrentWeekSubmissions = processedTask.assignments.filter(
+            (a: any) => 
+              a.userId === processedTask.userId && 
+              a.rotationWeek === currentWeek &&
+              a.completed === true
+          );
+          setCurrentWeekSubmissions(myCurrentWeekSubmissions);
+        }
       } else {
         setError(result.message || 'Failed to load task details');
       }
@@ -355,53 +370,49 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   };
 
- // In TaskDetailsScreen.tsx - UPDATE THIS FUNCTION
-const getVerificationStatus = (assignment: any) => {
-  if (!assignment?.completed) {
-    // Check if the assignment is due today
-    const today = new Date().toDateString();
-    const dueDate = new Date(assignment.dueDate).toDateString();
-    
-    if (today === dueDate) {
-      // Due today but not completed - show "Not Completed"
-      return { 
-        status: 'not_completed',
-        color: '#fa5252', // Red - urgent/overdue
-        icon: 'alert-circle',
-        text: 'Not Completed'
-      };
-    } else {
-      // Not due today - show "Pending"
-      return { 
-        status: 'pending',
-        color: '#e67700', // Orange - future
-        icon: 'clock-outline',
-        text: 'Pending'
-      };
+  const getVerificationStatus = (assignment: any) => {
+    if (!assignment?.completed) {
+      const today = new Date().toDateString();
+      const dueDate = new Date(assignment.dueDate).toDateString();
+      
+      if (today === dueDate) {
+        return { 
+          status: 'not_completed',
+          color: '#fa5252',
+          icon: 'alert-circle',
+          text: 'Not Completed'
+        };
+      } else {
+        return { 
+          status: 'pending',
+          color: '#e67700',
+          icon: 'clock-outline',
+          text: 'Pending'
+        };
+      }
     }
-  }
-  
-  if (assignment.verified === true) return { 
-    status: 'verified', 
-    color: '#2b8a3e', 
-    icon: 'check-circle',
-    text: 'Verified'
+    
+    if (assignment.verified === true) return { 
+      status: 'verified', 
+      color: '#2b8a3e', 
+      icon: 'check-circle',
+      text: 'Verified'
+    };
+    
+    if (assignment.verified === false) return { 
+      status: 'rejected', 
+      color: '#fa5252', 
+      icon: 'close-circle',
+      text: 'Rejected'
+    };
+    
+    return { 
+      status: 'pending_verification', 
+      color: '#e67700', 
+      icon: 'clock-check',
+      text: 'Pending Verification'
+    };
   };
-  
-  if (assignment.verified === false) return { 
-    status: 'rejected', 
-    color: '#fa5252', 
-    icon: 'close-circle',
-    text: 'Rejected'
-  };
-  
-  return { 
-    status: 'pending_verification', 
-    color: '#e67700', 
-    icon: 'clock-check',
-    text: 'Pending Verification'
-  };
-};
 
   const getCompletionTimeText = (assignment: any) => {
     if (!assignment?.completed || !assignment?.completedAt) return '';
@@ -467,7 +478,6 @@ const getVerificationStatus = (assignment: any) => {
       );
     }
 
-    const status = getVerificationStatus(task.userAssignment);
     const submissionStatusInfo = getSubmissionStatusInfo();
 
     if (!task.userAssignment.completed) {
@@ -486,7 +496,6 @@ const getVerificationStatus = (assignment: any) => {
               </View>
             </View>
             
-            {/* CLEAR SUBMISSION STATUS LABEL - PROMINENT DISPLAY */}
             <View style={[styles.submissionStatusCard, { 
               backgroundColor: submissionStatusInfo.bgColor,
               borderColor: submissionStatusInfo.borderColor 
@@ -539,7 +548,6 @@ const getVerificationStatus = (assignment: any) => {
               )}
             </View>
             
-            {/* COMPLETE BUTTON - ONLY SHOW WHEN AVAILABLE */}
             {submissionStatusInfo.canSubmit ? (
               <TouchableOpacity
                 style={styles.completeButton}
@@ -600,70 +608,91 @@ const getVerificationStatus = (assignment: any) => {
       );
     }
  
+    return null;
+  };
+
+  const renderMySubmissionsSection = () => {
+    if (currentWeekSubmissions.length === 0) {
+      return (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>My Submissions This Week</Text>
+          <View style={styles.notAssignedCard}>
+            <MaterialCommunityIcons name="clipboard-text" size={24} color="#868e96" />
+            <Text style={styles.notAssignedText}>
+              No submissions yet this week
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>My Submission</Text>
-        <View style={styles.completionCard}>
-          <View style={styles.completionHeader}>
-            <View style={[styles.statusIconContainer, { backgroundColor: status.color + '20' }]}>
-              <MaterialCommunityIcons 
-                name={status.icon as any} 
-                size={24} 
-                color={status.color} 
-              />
-            </View>
-            <View style={styles.completionInfo}>
-              <Text style={[styles.completionTitle, { color: status.color }]}>
-                {status.text}
-              </Text>
-              <Text style={styles.completionDate}>
-                Completed: {new Date(task.userAssignment.completedAt).toLocaleDateString()}
-                {getCompletionTimeText(task.userAssignment) && ` • ${getCompletionTimeText(task.userAssignment)}`}
-              </Text>
-            </View>
-          </View>
+        <Text style={styles.sectionTitle}>My Submissions This Week</Text>
+        {currentWeekSubmissions.map((submission: any, index: number) => {
+          const status = getVerificationStatus(submission);
           
-          {task.userAssignment.photoUrl && (
+          return (
             <TouchableOpacity
-              style={styles.photoPreview}
-              onPress={() => handleViewPhoto(task.userAssignment.photoUrl)}
+              key={submission.id || index}
+              style={styles.submissionHistoryCard}
+              onPress={() => handleViewAssignmentDetails(submission)}
+              activeOpacity={0.7}
             >
-              <MaterialCommunityIcons name="image" size={20} color="#007AFF" />
-              <Text style={styles.viewPhotoText}>View Submitted Photo</Text>
+              <View style={styles.submissionHistoryHeader}>
+                <View style={[styles.statusIconSmall, { backgroundColor: status.color + '20' }]}>
+                  <MaterialCommunityIcons 
+                    name={status.icon as any} 
+                    size={16} 
+                    color={status.color} 
+                  />
+                </View>
+                <View style={styles.submissionHistoryInfo}>
+                  <Text style={[styles.submissionHistoryStatus, { color: status.color }]}>
+                    {status.text}
+                  </Text>
+                  <Text style={styles.submissionHistoryDate}>
+                    {new Date(submission.dueDate).toLocaleDateString()}
+                    {submission.timeSlot && ` • ${submission.timeSlot.startTime} - ${submission.timeSlot.endTime}`}
+                  </Text>
+                </View>
+              </View>
+
+              {submission.completedAt && (
+                <Text style={styles.submittedDate}>
+                  Submitted: {new Date(submission.completedAt).toLocaleDateString()} • {getCompletionTimeText(submission)}
+                </Text>
+              )}
+
+              <View style={styles.submissionHistoryMeta}>
+                {submission.photoUrl && (
+                  <View style={styles.hasPhotoBadgeSmall}>
+                    <MaterialCommunityIcons name="image" size={12} color="#007AFF" />
+                    <Text style={styles.hasPhotoTextSmall}>Photo</Text>
+                  </View>
+                )}
+                {submission.notes && (
+                  <View style={styles.hasNotesBadgeSmall}>
+                    <MaterialCommunityIcons name="note-text" size={12} color="#e67700" />
+                    <Text style={styles.hasNotesTextSmall}>Notes</Text>
+                  </View>
+                )}
+                <Text style={styles.pointsEarned}>
+                  +{submission.points} pts
+                </Text>
+              </View>
+
+              {submission.adminNotes && status.status === 'rejected' && (
+                <View style={styles.adminFeedbackPreview}>
+                  <MaterialCommunityIcons name="message-alert" size={12} color="#fa5252" />
+                  <Text style={styles.adminFeedbackPreviewText} numberOfLines={1}>
+                    {submission.adminNotes}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
-          )}
-          
-          {task.userAssignment.notes && (
-            <View style={styles.userNotesCard}>
-              <Text style={styles.notesTitle}>Your Notes:</Text>
-              <Text style={styles.notesText}>{task.userAssignment.notes}</Text>
-            </View>
-          )}
-          
-          {task.userAssignment.adminNotes && status.status === 'rejected' && (
-            <View style={styles.adminFeedbackCard}>
-              <Text style={styles.adminFeedbackTitle}>Admin Feedback:</Text>
-              <Text style={styles.adminFeedbackText}>{task.userAssignment.adminNotes}</Text>
-            </View>
-          )}
-          
-          {status.status === 'pending_verification' && (
-            <View style={styles.infoBox}>
-              <MaterialCommunityIcons name="information" size={16} color="#6c757d" />
-              <Text style={styles.infoText}>
-                Your submission is pending admin verification. Points will be awarded once verified.
-              </Text>
-            </View>
-          )}
-          
-          <TouchableOpacity
-            style={styles.viewDetailsButton}
-            onPress={() => handleViewAssignmentDetails(task.userAssignment)}
-          >
-            <MaterialCommunityIcons name="eye" size={16} color="#007AFF" />
-            <Text style={styles.viewDetailsText}>View Submission Details</Text>
-          </TouchableOpacity>
-        </View>
+          );
+        })}
       </View>
     );
   };
@@ -693,6 +722,7 @@ const getVerificationStatus = (assignment: any) => {
               <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
               <Text style={styles.assignmentDateSmall}>
                 Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                {assignment.rotationWeek && ` • Week ${assignment.rotationWeek}`}
               </Text>
             </View>
           </View>
@@ -808,24 +838,19 @@ const getVerificationStatus = (assignment: any) => {
             </View>
 
             <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Status</Text>
-              <View style={[
-                styles.taskStatusBadge,
-                task.userAssignment?.completed ? styles.completedStatus : styles.pendingStatus
-              ]}>
-                <Text style={styles.taskStatusText}>
-                  {task.userAssignment?.completed ? 'Completed' : 'Active'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Recurring</Text>
               <Text style={styles.detailValue}>{task.isRecurring ? 'Yes' : 'No'}</Text>
+            </View>
+            
+            <View style={styles.detailItem}>
+              <Text style={styles.detailLabel}>Current Week</Text>
+              <Text style={styles.detailValue}>Week {task.group?.currentRotationWeek || 1}</Text>
             </View>
           </View>
 
           {renderMemberAssignmentSection()}
+          
+          {!isAdmin && renderMySubmissionsSection()}
 
           {task.executionFrequency === 'WEEKLY' && task.selectedDays?.length > 0 && (
             <View style={styles.section}>
@@ -947,13 +972,16 @@ const getVerificationStatus = (assignment: any) => {
 
               {task.assignments?.length > 0 ? (
                 <View style={styles.assignmentsContainer}>
-                  <Text style={styles.assignmentsSubtitle}>Recent Assignments:</Text>
-                  {task.assignments.slice(0, 5).map((assignment: any, index: number) => 
-                    renderAdminAssignmentView(assignment)
-                  )}
-                  {task.assignments.length > 5 && (
+                  <Text style={styles.assignmentsSubtitle}>Recent Assignments (Current Week):</Text>
+                  {task.assignments
+                    .filter((a: any) => a.rotationWeek === (task.group?.currentRotationWeek || 1))
+                    .slice(0, 5)
+                    .map((assignment: any, index: number) => 
+                      renderAdminAssignmentView(assignment)
+                    )}
+                  {task.assignments.filter((a: any) => a.rotationWeek === (task.group?.currentRotationWeek || 1)).length > 5 && (
                     <Text style={styles.moreAssignments}>
-                      +{task.assignments.length - 5} more assignments
+                      +{task.assignments.filter((a: any) => a.rotationWeek === (task.group?.currentRotationWeek || 1)).length - 5} more assignments
                     </Text>
                   )}
                 </View>
@@ -1178,23 +1206,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#212529'
   },
-  taskStatusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'flex-start'
-  },
-  completedStatus: {
-    backgroundColor: '#d3f9d8'
-  },
-  pendingStatus: {
-    backgroundColor: '#fff3bf'
-  },
-  taskStatusText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#212529'
-  },
   daysContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -1311,7 +1322,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#495057'
   },
-  // NEW STYLES FOR SUBMISSION STATUS
+  // Submission Status Styles
   submissionStatusCard: {
     borderRadius: 12,
     padding: 16,
@@ -1449,47 +1460,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontStyle: 'italic',
   },
-  timeInfoSection: {
-    backgroundColor: '#fff3bf',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#ffd43b'
-  },
-  timeInfoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4
-  },
-  timeInfoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#e67700'
-  },
-  timeInfoText: {
-    fontSize: 13,
-    color: '#e67700',
-    marginBottom: 8,
-    lineHeight: 18
-  },
-  currentSlotInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4
-  },
-  currentSlotLabel: {
-    fontSize: 13,
-    color: '#495057',
-    fontWeight: '500'
-  },
-  currentSlotTime: {
-    fontSize: 13,
-    color: '#1864ab',
-    fontWeight: '600'
-  },
   adminNote: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1519,116 +1489,102 @@ const styles = StyleSheet.create({
     color: '#868e96',
     textAlign: 'center'
   },
-  // Completion Card
-  completionCard: {
-    backgroundColor: '#e7f5ff',
+  // Submission History Styles
+  submissionHistoryCard: {
+    backgroundColor: '#f8f9fa',
     borderRadius: 8,
-    padding: 16,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#a5d8ff'
+    borderColor: '#e9ecef'
   },
-  completionHeader: {
+  submissionHistoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 16
+    gap: 10,
+    marginBottom: 8
   },
-  completionInfo: {
+  statusIconSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  submissionHistoryInfo: {
     flex: 1
   },
-  completionTitle: {
-    fontSize: 18,
+  submissionHistoryStatus: {
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4
+    marginBottom: 2
   },
-  completionDate: {
-    fontSize: 14,
-    color: '#495057'
+  submissionHistoryDate: {
+    fontSize: 12,
+    color: '#6c757d'
   },
-  photoPreview: {
+  submittedDate: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginBottom: 8,
+    marginLeft: 38
+  },
+  submissionHistoryMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: 'white',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#dee2e6'
+    gap: 10,
+    marginLeft: 38,
+    marginTop: 4
   },
-  viewPhotoText: {
-    color: '#007AFF',
-    fontSize: 14,
-    fontWeight: '500'
+  hasPhotoBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e7f5ff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4
   },
-  userNotesCard: {
-    backgroundColor: 'white',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#dee2e6'
+  hasPhotoTextSmall: {
+    fontSize: 11,
+    color: '#007AFF'
   },
-  notesTitle: {
-    fontSize: 14,
+  hasNotesBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4
+  },
+  hasNotesTextSmall: {
+    fontSize: 11,
+    color: '#e67700'
+  },
+  pointsEarned: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#495057',
-    marginBottom: 4
+    color: '#e67700',
+    marginLeft: 'auto'
   },
-  notesText: {
-    fontSize: 14,
-    color: '#6c757d',
-    lineHeight: 20
-  },
-  adminFeedbackCard: {
+  adminFeedbackPreview: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#fff5f5',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#ffc9c9'
+    padding: 8,
+    borderRadius: 6,
+    marginTop: 8,
+    marginLeft: 38,
+    gap: 6
   },
-  adminFeedbackTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+  adminFeedbackPreviewText: {
+    fontSize: 11,
     color: '#fa5252',
-    marginBottom: 4
-  },
-  adminFeedbackText: {
-    fontSize: 14,
-    color: '#495057',
-    lineHeight: 20
-  },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 12,
-    gap: 8
-  },
-  infoText: {
     flex: 1,
-    fontSize: 14,
-    color: '#6c757d',
-    lineHeight: 18
+    fontStyle: 'italic'
   },
-  viewDetailsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 12,
-    marginTop: 12
-  },
-  viewDetailsText: {
-    color: '#007AFF',
-    fontSize: 14,
-    fontWeight: '500'
-  },
-  // Admin View
+  // Admin View Styles
   adminInfoBox: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,4 +1,3 @@
-// src/screens/AssignmentDetailsScreen.tsx - COMPLETE FIXED VERSION WITH CLEAR SUBMISSION STATUS
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -17,6 +16,8 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../AssignmentServices/AssignmentService';
+import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
+import { SwapRequestService } from '../SwapRequestServices.ts/SwapRequestService';
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +32,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isSubmittable, setIsSubmittable] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed'>('waiting');
+  
+  const { hasPendingRequest, getPendingRequestForAssignment } = useSwapRequests();
 
   useEffect(() => {
     if (assignmentId) {
@@ -129,7 +132,6 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
         clearInterval(timer);
       }
     }, 1000);
-
     return timer;
   };
 
@@ -246,9 +248,37 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     });
   };
 
+  const handleRequestSwap = async () => {
+    if (!assignment) return;
+    
+    try {
+      const checkResult = await SwapRequestService.checkCanSwap(assignment.id);
+      
+      if (!checkResult.success) {
+        Alert.alert('Cannot Swap', checkResult.message || 'Unable to request swap');
+        return;
+      }
+      
+      if (checkResult.canSwap === false) {
+        Alert.alert('Cannot Swap', checkResult.reason || 'This assignment cannot be swapped');
+        return;
+      }
+      
+      navigation.navigate('CreateSwapRequest', {
+        assignmentId: assignment.id,
+        groupId: assignment.task.group.id,
+        taskTitle: assignment.task.title,
+        dueDate: assignment.dueDate,
+        taskPoints: assignment.points,
+        timeSlot: assignment.timeSlot?.startTime || 'Scheduled time'
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to check swap availability');
+    }
+  };
+
   const handleVerify = async (verified: boolean) => {
     if (!assignment) return;
-
     setVerifying(true);
     
     try {
@@ -356,7 +386,6 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
         <View style={styles.completeSection}>
           <Text style={styles.sectionTitle}>Complete This Assignment</Text>
           
-          {/* CLEAR SUBMISSION STATUS LABEL - PROMINENT DISPLAY */}
           <View style={[styles.submissionStatusCard, { 
             backgroundColor: submissionStatusInfo.bgColor,
             borderColor: submissionStatusInfo.borderColor 
@@ -409,7 +438,6 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             )}
           </View>
           
-          {/* COMPLETE BUTTON - ONLY SHOW WHEN AVAILABLE */}
           {submissionStatusInfo.canSubmit ? (
             <TouchableOpacity
               style={styles.completeButton}
@@ -455,6 +483,54 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                 ⓘ {submissionStatusInfo.description}
               </Text>
             </View>
+          )}
+        </View>
+      );
+    }
+    return null;
+  };
+
+  const renderSwapButton = () => {
+    if (!assignment?.completed && assignment) {
+      const hasPending = hasPendingRequest(assignment.id);
+      const pendingRequest = getPendingRequestForAssignment(assignment.id);
+      
+      return (
+        <View style={styles.swapSection}>
+          <Text style={styles.sectionTitle}>Need to Swap?</Text>
+          
+          {!hasPending ? (
+            <TouchableOpacity
+              style={styles.swapButton}
+              onPress={handleRequestSwap}
+              activeOpacity={0.8}
+            >
+              <View style={styles.swapButtonContent}>
+                <MaterialCommunityIcons name="swap-horizontal" size={20} color="#4F46E5" />
+                <Text style={styles.swapButtonText}>Request Swap</Text>
+              </View>
+              <Text style={styles.swapButtonSubtext}>
+                Find someone to take over this assignment
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.pendingSwapButton}
+              onPress={() => {
+                if (pendingRequest) {
+                  navigation.navigate('SwapRequestDetails', { requestId: pendingRequest.id });
+                }
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.swapButtonContent}>
+                <MaterialCommunityIcons name="clock" size={20} color="#F59E0B" />
+                <Text style={styles.pendingSwapText}>Swap Request Pending</Text>
+              </View>
+              <Text style={styles.pendingSwapSubtext}>
+                Tap to view request details
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
       );
@@ -620,8 +696,11 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             </View>
           </View>
 
-          {/* Complete Assignment Button with Clear Status */}
+          {/* Complete Assignment Button */}
           {renderCompleteButton()}
+
+          {/* Swap Request Button */}
+          {renderSwapButton()}
 
           {/* Points and Details */}
           <View style={styles.detailsGrid}>
@@ -895,11 +974,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6c757d'
   },
-  // Complete Assignment Section
   completeSection: {
-    marginBottom: 24
+    marginBottom: 16
   },
-  // NEW STYLES FOR SUBMISSION STATUS
   submissionStatusCard: {
     borderRadius: 12,
     padding: 16,
@@ -1035,6 +1112,50 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+  swapSection: {
+    marginBottom: 24,
+  },
+  swapButton: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#4F46E5',
+    borderStyle: 'dashed',
+  },
+  swapButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 4,
+  },
+  swapButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4F46E5',
+  },
+  swapButtonSubtext: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginLeft: 32,
+  },
+  pendingSwapButton: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  pendingSwapText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#F59E0B',
+  },
+  pendingSwapSubtext: {
+    fontSize: 13,
+    color: '#92400E',
+    marginLeft: 32,
   },
   detailsGrid: {
     flexDirection: 'row',

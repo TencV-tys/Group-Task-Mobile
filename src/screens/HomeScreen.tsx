@@ -1,4 +1,3 @@
-// In HomeScreen.tsx - UPDATED VERSION
 import React, { useEffect } from 'react';
 import { 
   View, 
@@ -15,13 +14,18 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useHomeData } from '../homeHook/useHomeHook';
+import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
   const { loading, refreshing, error, homeData, refreshHomeData } = useHomeData();
+  const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
 
-  // Extract data with proper fallbacks
+  useEffect(() => {
+    loadPendingForMe();
+  }, []);
+
   const user = homeData?.user || { 
     fullName: 'User', 
     groupsCount: 0, 
@@ -48,25 +52,28 @@ export default function HomeScreen({ navigation }: any) {
   const leaderboard = homeData?.leaderboard || [];
   const currentWeekTasks = homeData?.currentWeekTasks || [];
 
-  // Navigation handlers for clickable cards
   const handleViewGroups = () => {
-  console.log("🔍 Attempting to navigate to 'MyGroups' screen");
-  
-  try {
-    navigation.navigate('MyGroups');
-    console.log("✅ Navigation to MyGroups successful");
-  } catch (error) {
-    console.error("❌ Navigation error:", error);
-    console.error("Available screens:", navigation.getState()?.routeNames);
-    Alert.alert('Navigation Error', `Screen 'MyGroups' not found. Available screens: ${navigation.getState()?.routeNames?.join(', ')}`);
-  }
-};
+    console.log("🔍 Attempting to navigate to 'MyGroups' screen");
+    
+    try {
+      navigation.navigate('MyGroups');
+      console.log("✅ Navigation to MyGroups successful");
+    } catch (error) {
+      console.error("❌ Navigation error:", error);
+      Alert.alert('Navigation Error', 'Could not navigate to groups');
+    }
+  };
+
   const handleViewCompletedTasks = () => {
     Alert.alert('Coming Soon', 'Task history screen will show your completed tasks');
   };
  
   const handleViewSwapRequests = () => {
-    Alert.alert('Coming Soon', 'Swap requests will be implemented soon!');
+    navigation.navigate('MySwapRequests');
+  };
+
+  const handleViewPendingSwapRequests = () => {
+    navigation.navigate('PendingSwapRequests');
   };
 
   const handleViewLeaderboard = () => {
@@ -74,23 +81,22 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const handleGroupPress = (group: any) => {
-  console.log("🔍 Attempting to navigate to 'GroupTasks' screen");
-  console.log("With group ID:", group?.id);
-  
-  try {
-    navigation.navigate('GroupTasks', { 
-      groupId: group.id,
-      groupName: group.name,
-      userRole: group.role || 'MEMBER'
-    });
-    console.log("✅ Navigation to GroupTasks successful");
-  } catch (error) {
-    console.error("❌ Navigation error:", error);
-    Alert.alert('Navigation Error', 'Could not navigate to group tasks');
-  }
-};
+    console.log("🔍 Attempting to navigate to 'GroupTasks' screen");
+    console.log("With group ID:", group?.id);
+    
+    try {
+      navigation.navigate('GroupTasks', { 
+        groupId: group.id,
+        groupName: group.name,
+        userRole: group.role || 'MEMBER'
+      });
+      console.log("✅ Navigation to GroupTasks successful");
+    } catch (error) {
+      console.error("❌ Navigation error:", error);
+      Alert.alert('Navigation Error', 'Could not navigate to group tasks');
+    }
+  };
 
-  // Show loading state
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
@@ -102,7 +108,6 @@ export default function HomeScreen({ navigation }: any) {
     );
   }
 
-  // Show error state
   if (error && !homeData) {
     return (
       <SafeAreaView style={styles.container}>
@@ -122,7 +127,6 @@ export default function HomeScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */} 
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Dashboard</Text>
@@ -130,23 +134,37 @@ export default function HomeScreen({ navigation }: any) {
             Welcome to GroupTask
           </Text>
         </View>
-        <TouchableOpacity 
-          style={styles.profileButton}
-          onPress={() => navigation.navigate('Profile')}
-        >
-          {user.avatarUrl ? (
-            <Image 
-              source={{ uri: user.avatarUrl }} 
-              style={styles.avatar} 
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {user.fullName?.charAt(0) || 'U'}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.swapButton}
+            onPress={handleViewPendingSwapRequests}
+          >
+            <MaterialCommunityIcons name="swap-horizontal" size={24} color="#4F46E5" />
+            {totalPendingForMe > 0 && (
+              <View style={styles.swapBadge}>
+                <Text style={styles.swapBadgeText}>{totalPendingForMe}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.profileButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            {user.avatarUrl ? (
+              <Image 
+                source={{ uri: user.avatarUrl }} 
+                style={styles.avatar} 
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarText}>
+                  {user.fullName?.charAt(0) || 'U'}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -160,7 +178,6 @@ export default function HomeScreen({ navigation }: any) {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Welcome Card */}
         <View style={styles.welcomeCard}>
           <View style={styles.welcomeContent}>
             <Text style={styles.welcomeText}>Welcome back,</Text>
@@ -177,12 +194,10 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Clickable Stats Cards */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Overview</Text>
           
           <View style={styles.statsGrid}>
-            {/* Groups Card */}
             <TouchableOpacity 
               style={styles.statCard}
               onPress={handleViewGroups}
@@ -198,12 +213,10 @@ export default function HomeScreen({ navigation }: any) {
               <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
             </TouchableOpacity>
             
-            {/* Tasks Due Card - ONLY SHOW IF YOU HAVE GROUPS */}
             {stats.groupsCount > 0 && stats.tasksDue > 0 && (
               <TouchableOpacity 
                 style={[styles.statCard, styles.urgentCard]}
                 onPress={() => {
-                  // Navigate to first group's tasks if you have tasks due
                   if (groups.length > 0) {
                     handleGroupPress(groups[0]);
                   }
@@ -232,7 +245,6 @@ export default function HomeScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
             
-            {/* Completed Tasks Card */}
             <TouchableOpacity 
               style={styles.statCard}
               onPress={handleViewCompletedTasks}
@@ -253,27 +265,23 @@ export default function HomeScreen({ navigation }: any) {
               <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
             </TouchableOpacity>
             
-            {/* Swap Requests Card - Only show if any */}
-            {stats.swapRequests > 0 && (
-              <TouchableOpacity 
-                style={styles.statCard}
-                onPress={handleViewSwapRequests}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.statIcon, { backgroundColor: '#FF3B30' }]}>
-                  <MaterialCommunityIcons name="swap-horizontal" size={22} color="white" />
-                </View>
-                <View style={styles.statContent}>
-                  <Text style={styles.statNumber}>{stats.swapRequests}</Text>
-                  <Text style={styles.statLabel}>Swap Requests</Text>
-                </View>
-                <View style={styles.notificationDot} />
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity 
+              style={styles.statCard}
+              onPress={handleViewSwapRequests}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.statIcon, { backgroundColor: '#4F46E5' }]}>
+                <MaterialCommunityIcons name="swap-horizontal" size={22} color="white" />
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statNumber}>{stats.swapRequests || 0}</Text>
+                <Text style={styles.statLabel}>My Swap Requests</Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Quick Actions - REMOVED CREATE TASK */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           
@@ -302,18 +310,22 @@ export default function HomeScreen({ navigation }: any) {
 
             <TouchableOpacity 
               style={styles.quickActionCard}
-              onPress={handleViewGroups}
+              onPress={handleViewSwapRequests}
               activeOpacity={0.7}
-            > 
-              <View style={[styles.actionIcon, { backgroundColor: '#FF9500' }]}>
-                <MaterialCommunityIcons name="account-multiple" size={28} color="white" />
+            >
+              <View style={[styles.actionIcon, { backgroundColor: '#4F46E5' }]}>
+                <MaterialCommunityIcons name="swap-horizontal" size={28} color="white" />
               </View>
-              <Text style={styles.actionTitle}>My Groups</Text>
-            </TouchableOpacity> 
+              <Text style={styles.actionTitle}>My Swaps</Text>
+              {stats.swapRequests > 0 && (
+                <View style={styles.actionBadge}>
+                  <Text style={styles.actionBadgeText}>{stats.swapRequests}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Your Groups */}
         {groups.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
@@ -368,7 +380,6 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         )}
 
-        {/* Recent Activity */}
         <View style={[styles.section, { marginBottom: 30 }]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
@@ -386,7 +397,7 @@ export default function HomeScreen({ navigation }: any) {
                     styles.activityIconContainer,
                     { backgroundColor: activity.type === 'task' ? '#34c759' : 
                                       activity.type === 'group' ? '#007AFF' : 
-                                      activity.type === 'swap' ? '#FF9500' : '#6c757d' }
+                                      activity.type === 'swap' ? '#4F46E5' : '#6c757d' }
                   ]}>
                     <MaterialCommunityIcons 
                       name={activity.icon || 'information'} 
@@ -420,12 +431,12 @@ export default function HomeScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -449,6 +460,34 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     marginTop: 2,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  swapButton: {
+    position: 'relative',
+    padding: 8,
+  },
+  swapBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  swapBadgeText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
   profileButton: {
     padding: 4,
   },
@@ -470,7 +509,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  // Welcome Card
   welcomeCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -517,7 +555,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#856404',
   },
-  // Sections
   section: {
     paddingHorizontal: 16,
     marginBottom: 24,
@@ -538,7 +575,6 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '500',
   },
-  // Stats Cards
   statsGrid: {
     gap: 12,
   },
@@ -599,13 +635,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '500',
   },
-  notificationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF3B30',
-  },
-  // Quick Actions
   quickActionsGrid: {
     flexDirection: 'row',
     gap: 12,
@@ -621,6 +650,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
+    position: 'relative',
   },
   actionIcon: {
     width: 56,
@@ -636,76 +666,23 @@ const styles = StyleSheet.create({
     color: '#212529',
     textAlign: 'center',
   },
-  // Tasks
-  tasksContainer: {
-    gap: 8,
-  },
-  taskCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'white',
+  actionBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#EF4444',
     borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  completedTaskCard: {
-    opacity: 0.7,
-  },
-  taskLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  taskStatus: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#007AFF',
+    minWidth: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    paddingHorizontal: 6,
   },
-  taskStatusCompleted: {
-    backgroundColor: '#34c759',
-    borderColor: '#34c759',
-  },
-  taskInfo: {
-    flex: 1,
-  },
-  taskTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 2,
-  },
-  completedTaskTitle: {
-    textDecorationLine: 'line-through',
-    color: '#6c757d',
-  },
-  taskGroup: {
-    fontSize: 13,
-    color: '#6c757d',
-  },
-  taskRight: {
-    alignItems: 'flex-end',
-  },
-  taskPoints: {
-    fontSize: 14,
+  actionBadgeText: {
+    color: 'white',
+    fontSize: 11,
     fontWeight: 'bold',
-    color: '#34c759',
-    marginBottom: 2,
   },
-  taskDue: {
-    fontSize: 13,
-    color: '#6c757d',
-  },
-  // Groups
   groupsScroll: {
     marginHorizontal: -16,
     paddingHorizontal: 16,
@@ -765,87 +742,6 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '600',
   },
-  // Leaderboard
-  leaderboardCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  leaderboardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  rankBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f8f9fa',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  firstRank: {
-    backgroundColor: '#FFF3CD',
-  },
-  secondRank: {
-    backgroundColor: '#f1f3f5',
-  },
-  thirdRank: {
-    backgroundColor: '#f8f9fa',
-  },
-  rankText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  leaderboardAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e9ecef',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  leaderboardAvatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  leaderboardAvatarText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#6c757d',
-  },
-  leaderboardInfo: {
-    flex: 1,
-  },
-  leaderboardName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 2,
-  },
-  leaderboardStats: {
-    fontSize: 13,
-    color: '#6c757d',
-  },
-  leaderboardPoints: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  pointsValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#212529',
-  },
-  // Activity
   activityContainer: {
     gap: 8,
   },
@@ -892,7 +788,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#007AFF',
   },
-  // Empty States
   emptyState: {
     backgroundColor: 'white',
     borderRadius: 12,
@@ -918,7 +813,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 20,
   },
-  // Loading & Error States
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

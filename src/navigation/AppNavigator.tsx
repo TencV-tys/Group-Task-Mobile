@@ -19,6 +19,12 @@ import AssignmentDetailsScreen from '../screens/AssignmentDetailsScreen';
 import CompleteAssignmentScreen from '../screens/CompleteAssignmentScreen';
 import PendingVerificationsScreen from '../screens/PendingVerificationScreen';
 
+// Import Swap Request Screens
+import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
+import { MySwapRequestsScreen } from '../screens/MySwapRequestScreen';
+import { CreateSwapRequestScreen } from '../screens/CreateSwapRequestScreen';
+import { SwapRequestDetailsScreen } from '../screens/SwapRequestDetailsScreen';
+
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
@@ -62,7 +68,7 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
       
-      {/* Task Management - ADD THESE */}
+      {/* Task Management */}
       <Stack.Screen 
         name="GroupTasks" 
         component={GroupTasksScreen}
@@ -80,16 +86,17 @@ export default function AppNavigator() {
           title: 'Create Task'
         }}
       />
-      <Stack.Screen 
-  name="UpdateTask" 
-  component={UpdateTaskScreen}
-  options={{ 
-    headerShown: false,
-    title: 'Edit Task'
-  }}
-/>
       
-     <Stack.Screen 
+      <Stack.Screen 
+        name="UpdateTask" 
+        component={UpdateTaskScreen}
+        options={{ 
+          headerShown: false,
+          title: 'Edit Task'
+        }}
+      />
+      
+      <Stack.Screen 
         name="Profile" 
         component={ProfileScreen}
         options={{ 
@@ -97,56 +104,100 @@ export default function AppNavigator() {
         }}
       /> 
        
-       <Stack.Screen 
-  name="GroupMembers" 
-  component={GroupMembersScreen}
-  options={{ 
-    headerShown: false,
-    title: 'Group Members'
-  }}
-/>
- <Stack.Screen 
-  name="TaskDetails" 
-  component={TaskDetailsScreen}
-  options={{ headerShown: false }}
-/> 
+      <Stack.Screen 
+        name="GroupMembers" 
+        component={GroupMembersScreen}
+        options={{ 
+          headerShown: false,
+          title: 'Group Members'
+        }}
+      />
+      
+      <Stack.Screen 
+        name="TaskDetails" 
+        component={TaskDetailsScreen}
+        options={{ headerShown: false }}
+      /> 
 
-<Stack.Screen 
-  name="TaskAssignment" 
-  component={TaskAssignmentScreen}
-  options={{ headerShown:false }}
-/>
-<Stack.Screen 
-  name="RotationSchedule" 
-  component={RotationScheduleScreen}
-  options={{ 
-    headerShown: false,
-    title: 'Rotation Schedule'
-  }}
-/>
-  
-    <Stack.Screen 
-    name="CompleteAssignment" 
-    component={CompleteAssignmentScreen} 
-    options={{ 
-     headerShown:false
-    }}
-  />
-  
-  <Stack.Screen 
-    name="AssignmentDetails" 
-    component={AssignmentDetailsScreen} 
-    options={{ 
-     headerShown:false
-    }}
-  />
-  
-  <Stack.Screen 
-  name="PendingVerifications" 
-  component={PendingVerificationsScreen} 
-  options={{ headerShown: false }}
-/>
+      <Stack.Screen 
+        name="TaskAssignment" 
+        component={TaskAssignmentScreen}
+        options={{ headerShown: false }}
+      />
+      
+      <Stack.Screen 
+        name="RotationSchedule" 
+        component={RotationScheduleScreen}
+        options={{ 
+          headerShown: false,
+          title: 'Rotation Schedule'
+        }}
+      />
+      
+      <Stack.Screen 
+        name="CompleteAssignment" 
+        component={CompleteAssignmentScreen} 
+        options={{ 
+          headerShown: false
+        }}
+      />
+      
+      <Stack.Screen 
+        name="AssignmentDetails" 
+        component={AssignmentDetailsScreen} 
+        options={{ 
+          headerShown: false
+        }}
+      />
+      
+      <Stack.Screen 
+        name="PendingVerifications" 
+        component={PendingVerificationsScreen} 
+        options={{ headerShown: false }}
+      />
 
+      {/* ============= SWAP REQUEST SCREENS ============= */}
+      
+      {/* Pending swap requests that need user's response */}
+      <Stack.Screen
+        name="PendingSwapRequests"
+        component={PendingSwapRequestsScreen}
+        options={{ 
+          headerShown: false,
+          title: 'Swap Requests'
+        }}
+      />
+      
+      {/* User's own swap requests history */}
+      <Stack.Screen
+        name="MySwapRequests"
+        component={MySwapRequestsScreen}
+        options={{ 
+          headerShown: false,
+          title: 'My Swap Requests'
+        }}
+      />
+      
+      {/* Create a new swap request */}
+      <Stack.Screen
+        name="CreateSwapRequest"
+        component={CreateSwapRequestScreen}
+        options={{ 
+          headerShown: false,
+          title: 'Request Swap'
+        }}
+      />
+      
+      {/* View swap request details */}
+      <Stack.Screen
+        name="SwapRequestDetails"
+        component={SwapRequestDetailsScreen}
+        options={{ 
+          headerShown: false,
+          title: 'Swap Request Details'
+        }}
+      />
+      
     </Stack.Navigator>
   );
 }

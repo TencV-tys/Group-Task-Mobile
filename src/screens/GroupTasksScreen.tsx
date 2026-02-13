@@ -1,4 +1,3 @@
-// src/screens/GroupTasksScreen.tsx - UPDATED WITH COMPLETE NOW BUTTON
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -16,6 +15,7 @@ import {
 import { TaskService } from '../taskServices/TaskService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SettingsModal } from '../components/SettingsModal';
+import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -28,6 +28,23 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  
+  const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
+
+  useEffect(() => {
+    if (groupId) {
+      fetchTasks();
+      loadPendingForMe(groupId);
+    }
+  }, [groupId]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchTasks();
+      loadPendingForMe(groupId);
+    });
+    return unsubscribe;
+  }, [navigation, groupId]);
 
   const fetchTasks = async (isRefreshing = false) => {
     if (isRefreshing) {
@@ -40,11 +57,9 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     try {
       console.log('Fetching tasks for group:', groupId);
       
-      // Get ALL tasks
       const allTasksResult = await TaskService.getGroupTasks(groupId);
       
       if (allTasksResult.success) {
-        // Process tasks to ensure assignment info is properly set
         const processedTasks = (allTasksResult.tasks || []).map((task: any) => {
           const userAssignment = task.assignments?.find(
             (a: any) => a.user && a.user.id
@@ -62,16 +77,13 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         setError(allTasksResult.message || 'Failed to load tasks');
       }
       
-      // Get MY tasks using the dedicated endpoint
       const myTasksResult = await TaskService.getMyTasks(groupId);
       
       if (myTasksResult.success && myTasksResult.tasks) {
-        // Create a map to deduplicate by task id
         const taskMap = new Map();
         
         myTasksResult.tasks.forEach((task: any) => {
           if (task && task.id) {
-            // Check if this task is submittable now
             const isSubmittableNow = checkIfSubmittableNow(task);
             
             const enhancedTask = {
@@ -88,7 +100,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           }
         });
         
-        // Convert map back to array
         const uniqueMyTasks = Array.from(taskMap.values());
         setMyTasks(uniqueMyTasks);
       } else {
@@ -104,7 +115,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     }
   };
 
-  // Helper function to check if a task is submittable now
   const checkIfSubmittableNow = (task: any) => {
     if (!task.userAssignment || task.userAssignment.completed) {
       return false;
@@ -127,7 +137,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       const currentInMinutes = currentHour * 60 + currentMinute;
       const endInMinutes = endHour * 60 + endMinute;
       
-      // Can submit 30 minutes before end time until 30 minutes after end time
       const canSubmitStart = endInMinutes - 30;
       const canSubmitEnd = endInMinutes + 30;
       
@@ -137,7 +146,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return true;
   };
 
-  // Helper function to calculate time left for submission
   const calculateTimeLeft = (task: any) => {
     if (!task.userAssignment || task.userAssignment.completed || !task.userAssignment.timeSlot) {
       return null;
@@ -154,7 +162,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return Math.max(0, Math.floor(timeLeftMs / 1000));
   };
 
-  // Format time left for display
   const formatTimeLeft = (seconds: number) => {
     if (seconds >= 3600) {
       const hours = Math.floor(seconds / 3600);
@@ -167,20 +174,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       return `${seconds}s`;
     }
   };
-
-  useEffect(() => {
-    if (groupId) {
-      fetchTasks();
-    }
-  }, [groupId]);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      fetchTasks();
-    });
-
-    return unsubscribe;
-  }, [navigation]);
 
   const handleCreateTask = () => {
     if (userRole !== 'ADMIN') {
@@ -257,10 +250,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       'Delete Task',
       `Are you sure you want to delete "${taskTitle}"?`,
       [
-        { 
-          text: 'Cancel', 
-          style: 'cancel' 
-        },
+        { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Delete', 
           style: 'destructive',
@@ -321,6 +311,62 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       handleViewTaskDetails(task.id);
     }
   };
+
+  const handleNavigateToSwapRequests = () => {
+    navigation.navigate('PendingSwapRequests');
+  };
+
+  const handleNavigateToAssignment = () => {
+    navigation.navigate('TaskAssignment', {
+      groupId,
+      groupName,
+      userRole
+    });
+  };
+
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity 
+        onPress={() => navigation.goBack()} 
+        style={styles.backButton}
+        hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+      >
+        <Text style={styles.backButtonText}>←</Text>
+      </TouchableOpacity>
+      
+      <View style={styles.titleContainer}>
+        <Text style={styles.title} numberOfLines={1}>
+          {groupName || 'Tasks'}
+        </Text>
+        <Text style={styles.subtitle}>
+          {selectedTab === 'all' ? 'All Tasks' : 'My Task'}
+        </Text>
+      </View>
+      
+      <View style={styles.headerRight}>
+        <TouchableOpacity 
+          style={styles.swapButton}
+          onPress={handleNavigateToSwapRequests}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
+          <MaterialCommunityIcons name="swap-horizontal" size={24} color="#4F46E5" />
+          {totalPendingForMe > 0 && (
+            <View style={styles.swapBadge}>
+              <Text style={styles.swapBadgeText}>{totalPendingForMe}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.settingsButton}
+          onPress={() => setShowSettingsModal(true)}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
+          <MaterialCommunityIcons name="dots-vertical" size={24} color="#007AFF" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const renderAssignmentInfo = (task: any) => {
     const hasAssignment = task.userAssignment || task.assignments?.length > 0;
@@ -509,7 +555,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         
         {renderAssignmentInfo(item)}
         
-        {/* COMPLETE NOW BUTTON - Only in My Task tab for submittable tasks */}
         {isMyTasksView && !isCompleted && isSubmittableNow && (
           <TouchableOpacity
             style={styles.completeNowButton}
@@ -533,7 +578,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           </TouchableOpacity>
         )}
         
-        {/* Time left indicator for tasks that are submittable soon */}
         {isMyTasksView && !isCompleted && !isSubmittableNow && timeLeft && timeLeft > 0 && (
           <View style={styles.timeLeftContainer}>
             <MaterialCommunityIcons name="timer" size={14} color="#e67700" />
@@ -565,14 +609,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         )}
       </TouchableOpacity>
     );
-  };
-
-  const handleNavigateToAssignment = () => {
-    navigation.navigate('TaskAssignment', {
-      groupId,
-      groupName,
-      userRole
-    });
   };
 
   const renderContent = () => {
@@ -642,36 +678,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       
-      {/* Header with Burger Icon */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()} 
-          style={styles.backButton}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-        >
-          <Text style={styles.backButtonText}>←</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.titleContainer}>
-          <Text style={styles.title} numberOfLines={1}>
-            {groupName || 'Tasks'}
-          </Text>
-          <Text style={styles.subtitle}>
-            {selectedTab === 'all' ? 'All Tasks' : 'My Task'}
-          </Text>
-        </View>
-        
-        {/* Settings/Burger Icon */}
-        <TouchableOpacity 
-          style={styles.settingsButton}
-          onPress={() => setShowSettingsModal(true)}
-          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-        >
-          <MaterialCommunityIcons name="dots-vertical" size={24} color="#007AFF" />
-        </TouchableOpacity>
-      </View>
+      {renderHeader()}
 
-      {/* Content Area */}
       {error ? (
         <View style={styles.errorContainer}>
           <MaterialCommunityIcons name="alert-circle" size={48} color="#dc3545" />
@@ -687,25 +695,23 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         renderContent()
       )}
 
-      {/* Floating Action Buttons Container - Only show for ADMIN in All Tasks tab */}
       {userRole === 'ADMIN' && selectedTab === 'all' && (
         <View style={styles.floatingButtonsContainer}>
-                <TouchableOpacity
-      style={[styles.floatingButton, styles.reviewButton]}
-      onPress={() => navigation.navigate('PendingVerifications', {
-        groupId,
-        groupName,
-        userRole
-      })}
-      activeOpacity={0.8}
-    >
-      <View style={styles.floatingButtonInner}>
-        <MaterialCommunityIcons name="clipboard-check" size={22} color="white" />
-        <Text style={styles.floatingButtonText}>Review</Text>
-      </View>
-    </TouchableOpacity>
-    
-          {/* Quick Assignment Button */}
+          <TouchableOpacity
+            style={[styles.floatingButton, styles.reviewButton]}
+            onPress={() => navigation.navigate('PendingVerifications', {
+              groupId,
+              groupName,
+              userRole
+            })}
+            activeOpacity={0.8}
+          >
+            <View style={styles.floatingButtonInner}>
+              <MaterialCommunityIcons name="clipboard-check" size={22} color="white" />
+              <Text style={styles.floatingButtonText}>Review</Text>
+            </View>
+          </TouchableOpacity>
+          
           <TouchableOpacity
             style={[styles.floatingButton, styles.assignButton]}
             onPress={handleNavigateToAssignment}
@@ -717,7 +723,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             </View>
           </TouchableOpacity>
           
-          {/* Create Task Button - Plus Icon Only */}
           <TouchableOpacity
             style={[styles.floatingButton, styles.createButton]}
             onPress={handleCreateTask}
@@ -728,7 +733,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         </View>
       )}
 
-      {/* Bottom Tab Navigation - Changed "My Tasks" to "My Task" */}
       <View style={styles.bottomTab}>
         <TouchableOpacity 
           style={[styles.tabButton, selectedTab === 'all' && styles.activeTabButton]}
@@ -765,7 +769,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Settings Modal */}
       <SettingsModal
         visible={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
@@ -790,10 +793,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingBottom: 80
-  },
-  myAssignment: {
-    backgroundColor: '#e7f5ff',
-    borderColor: '#a5d8ff'
   },
   loadingText: {
     marginTop: 12,
@@ -841,13 +840,38 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center'
   },
-  settingsButton: {
-    width: 40,
-    height: 40,
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    width: 80,
+    justifyContent: 'flex-end'
+  },
+  swapButton: {
+    position: 'relative',
+    padding: 8,
+  },
+  swapBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#f8f9fa'
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  swapBadgeText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  settingsButton: {
+    padding: 8,
   },
   errorContainer: {
     flex: 1,
@@ -1013,6 +1037,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1
   },
+  myAssignment: {
+    backgroundColor: '#e7f5ff',
+    borderColor: '#a5d8ff'
+  },
   unassignedInfo: {
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
@@ -1059,7 +1087,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#212529'
   },
-  // Complete Now Button Styles
   completeNowButton: {
     backgroundColor: '#2b8a3e',
     borderRadius: 8,
@@ -1164,6 +1191,11 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28
   },
+  reviewButton: {
+    backgroundColor: '#e67700',
+    paddingHorizontal: 16,
+    paddingVertical: 10
+  },
   floatingButtonInner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1215,10 +1247,5 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#007AFF', 
     fontWeight: '600' 
-  },
-   reviewButton: {
-  backgroundColor: '#e67700', // Orange color to differentiate
-  paddingHorizontal: 16,
-  paddingVertical: 10
-},
-}); 
+  }
+});

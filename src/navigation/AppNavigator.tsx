@@ -17,6 +17,7 @@ import TaskAssignmentScreen from '../screens/TaskAssignmentScreen';
 import RotationScheduleScreen from '../screens/RotationScheduleScreen';
 import AssignmentDetailsScreen from '../screens/AssignmentDetailsScreen';
 import CompleteAssignmentScreen from '../screens/CompleteAssignmentScreen';
+import PendingVerificationsScreen from '../screens/PendingVerificationScreen';
 
 const Stack = createStackNavigator();
 
@@ -139,6 +140,12 @@ export default function AppNavigator() {
      headerShown:false
     }}
   />
+  
+  <Stack.Screen 
+  name="PendingVerifications" 
+  component={PendingVerificationsScreen} 
+  options={{ headerShown: false }}
+/>
 
     </Stack.Navigator>
   );

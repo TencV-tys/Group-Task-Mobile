@@ -412,56 +412,57 @@ static async completeAssignment(
     }
   }
 
-  // Get group assignments (admin only)
-  static async getGroupAssignments(
-    groupId: string, 
-    filters?: {
-      status?: string;
-      week?: number;
-      userId?: string;
-      limit?: number;
-      offset?: number;
-    }
-  ) {
-    try {
-      let url = `${API_URL}/group/${groupId}`;
-      const params = new URLSearchParams();
-      
-      if (filters?.status) params.append('status', filters.status);
-      if (filters?.week) params.append('week', filters.week?.toString());
-      if (filters?.userId) params.append('userId', filters.userId);
-      if (filters?.limit) params.append('limit', filters.limit?.toString());
-      if (filters?.offset) params.append('offset', filters.offset?.toString());
-      
-      const queryString = params.toString();
-      if (queryString) url += `?${queryString}`;
-
-      console.log('AssignmentService: Getting group assignments', url);
-      
-      const headers = await this.getHeaders(false);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to load group assignments: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      return result;
-
-    } catch (error: any) {
-      console.error('AssignmentService.getGroupAssignments error:', error);
-      return {
-        success: false,
-        message: error.message || 'Failed to load group assignments',
-        error: error.message
-      };
-    }
+// In AssignmentService.ts - FIXED getGroupAssignments URL
+static async getGroupAssignments(
+  groupId: string, 
+  filters?: {
+    status?: string;
+    week?: number;
+    userId?: string;
+    limit?: number;
+    offset?: number;
   }
+) {
+  try {
+    // FIXED: Add '/assignments' at the end to match backend route
+    let url = `${API_URL}/group/${groupId}/assignments`; // ← ADDED '/assignments'
+    const params = new URLSearchParams();
+    
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.week) params.append('week', filters.week?.toString());
+    if (filters?.userId) params.append('userId', filters.userId);
+    if (filters?.limit) params.append('limit', filters.limit?.toString());
+    if (filters?.offset) params.append('offset', filters.offset?.toString());
+    
+    const queryString = params.toString();
+    if (queryString) url += `?${queryString}`;
 
+    console.log('AssignmentService: Getting group assignments', url);
+    
+    const headers = await this.getHeaders(false);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load group assignments: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('AssignmentService.getGroupAssignments error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to load group assignments',
+      error: error.message
+    };
+  }
+}
+ 
   // Get assignment statistics
   static async getAssignmentStats(groupId: string) {
     try {

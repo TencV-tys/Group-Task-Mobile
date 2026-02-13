@@ -12,11 +12,11 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../taskServices/TaskService';
 import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
-
+import { useNavigation } from '@react-navigation/native';
 interface SettingsModalProps {
   visible: boolean;
   onClose: () => void;
-  groupId: string;
+  groupId: string; 
   groupName: string;
   userRole: string;
   navigation: any;
@@ -107,7 +107,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       ]
     );
   };
-
+const handleReviewSubmissions = () => {
+  navigation.navigate('PendingVerifications', {
+    groupId,
+    groupName,
+    userRole
+  });
+  onClose();
+};
   const handleViewRotationSchedule = () => {
     navigation.navigate('RotationSchedule', { groupId, groupName });
     onClose();
@@ -284,6 +291,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <Text style={styles.actionButtonText}>Manage Members</Text>
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#999" />
                 </TouchableOpacity>
+                   
+                     <TouchableOpacity 
+      style={[styles.actionButton, styles.reviewButton]}
+      onPress={handleReviewSubmissions}
+    >
+      <MaterialCommunityIcons name="clipboard-check" size={18} color="#007AFF" />
+      <View style={styles.reviewButtonContent}>
+        <Text style={styles.actionButtonText}>Review Submissions</Text>
+        <View style={styles.pendingBadge}>
+          <Text style={styles.pendingBadgeText}>Pending</Text>
+        </View>
+      </View>
+      <MaterialCommunityIcons name="chevron-right" size={18} color="#999" />
+    </TouchableOpacity>
 
                 <TouchableOpacity 
                   style={styles.actionButton}
@@ -640,5 +661,28 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '600',
     fontSize: 14
-  }
+  },
+  reviewButton: {
+  backgroundColor: '#e7f5ff',
+  borderColor: '#a5d8ff'
+},
+reviewButtonContent: {
+  flex: 1,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginHorizontal: 12
+},
+pendingBadge: {
+  backgroundColor: '#e67700',
+  paddingHorizontal: 8,
+  paddingVertical: 2,
+  borderRadius: 12,
+  marginLeft: 8
+},
+pendingBadgeText: {
+  color: 'white',
+  fontSize: 11,
+  fontWeight: '600'
+}
 });

@@ -690,6 +690,21 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       {/* Floating Action Buttons Container - Only show for ADMIN in All Tasks tab */}
       {userRole === 'ADMIN' && selectedTab === 'all' && (
         <View style={styles.floatingButtonsContainer}>
+                <TouchableOpacity
+      style={[styles.floatingButton, styles.reviewButton]}
+      onPress={() => navigation.navigate('PendingVerifications', {
+        groupId,
+        groupName,
+        userRole
+      })}
+      activeOpacity={0.8}
+    >
+      <View style={styles.floatingButtonInner}>
+        <MaterialCommunityIcons name="clipboard-check" size={22} color="white" />
+        <Text style={styles.floatingButtonText}>Review</Text>
+      </View>
+    </TouchableOpacity>
+    
           {/* Quick Assignment Button */}
           <TouchableOpacity
             style={[styles.floatingButton, styles.assignButton]}
@@ -1199,6 +1214,11 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#007AFF', 
-    fontWeight: '600'
-  } 
+    fontWeight: '600' 
+  },
+   reviewButton: {
+  backgroundColor: '#e67700', // Orange color to differentiate
+  paddingHorizontal: 16,
+  paddingVertical: 10
+},
 }); 

@@ -26,12 +26,32 @@ type CreateSwapRequestRouteParams = {
   dueDate?: string;
   taskPoints?: number;
   timeSlot?: string;
+  executionFrequency?: 'DAILY' | 'WEEKLY';
+  timeSlots?: Array<{
+    id: string;
+    startTime: string;
+    endTime: string;
+    label?: string;
+  }>;
 };
+
+const DAYS_OF_WEEK = [
+  'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'
+];
 
 export const CreateSwapRequestScreen = () => {
   const navigation = useNavigation();
   const route = useRoute<RouteProp<{ params: CreateSwapRequestRouteParams }, 'params'>>();
-  const { assignmentId, groupId, taskTitle, dueDate, taskPoints, timeSlot } = route.params;
+  const { 
+    assignmentId, 
+    groupId, 
+    taskTitle, 
+    dueDate, 
+    taskPoints, 
+    timeSlot,
+    executionFrequency,
+    timeSlots 
+  } = route.params;
   
   const { createSwapRequest, loading } = useSwapRequests();
   const { members, fetchGroupMembers } = useGroupMembers();
@@ -42,9 +62,13 @@ export const CreateSwapRequestScreen = () => {
   const [showMemberSelector, setShowMemberSelector] = useState(false);
   const [canSwap, setCanSwap] = useState<{ canSwap: boolean; reason?: string }>({ canSwap: true });
   const [checking, setChecking] = useState(true);
+  
+  // ✅ NEW: Swap scope state
+  const [swapScope, setSwapScope] = useState<'week' | 'day'>('week');
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load members when component mounts
     fetchGroupMembers(groupId);
     checkSwapAvailability();
   }, [groupId, assignmentId]);
@@ -84,33 +108,45 @@ export const CreateSwapRequestScreen = () => {
     return now.toISOString();
   };
 
-  const handleSubmit = async () => {
-    if (!canSwap.canSwap) {
-      Alert.alert('Cannot Swap', canSwap.reason || 'This assignment cannot be swapped');
-      return;
-    }
+const handleSubmit = async () => {
+  if (!canSwap.canSwap) {
+    Alert.alert('Cannot Swap', canSwap.reason || 'This assignment cannot be swapped');
+    return;
+  }
 
-    try {
-      const result = await createSwapRequest({
-        assignmentId,
-        reason: reason.trim() || undefined,
-        targetUserId,
-        expiresAt: calculateExpiryDate(),
-      });
+  // Validation for day scope
+  if (swapScope === 'day' && !selectedDay) {
+    Alert.alert('Error', 'Please select a day to swap');
+    return;
+  }
 
-      if (result.success) {
-        Alert.alert(
-          'Success',
-          'Swap request created successfully',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
-      } else {
-        Alert.alert('Error', result.message || 'Failed to create swap request');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create swap request');
+  try {
+    const result = await createSwapRequest({
+      assignmentId,
+      reason: reason.trim() || undefined,
+      targetUserId,
+      expiresAt: calculateExpiryDate(),
+      // ✅ FIXED: Convert null to undefined
+      scope: swapScope,
+      selectedDay: swapScope === 'day' ? (selectedDay || undefined) : undefined,
+      selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
+    });
+
+    if (result.success) {
+      Alert.alert(
+        'Success',
+        swapScope === 'day' 
+          ? `Swap request created for ${selectedDay}!` 
+          : 'Swap request created for the entire week!',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+    } else {
+      Alert.alert('Error', result.message || 'Failed to create swap request');
     }
-  };
+  } catch (error: any) {
+    Alert.alert('Error', error.message || 'Failed to create swap request');
+  }
+};
 
   const getSelectedMemberName = () => {
     if (!targetUserId) return 'Anyone can accept';
@@ -126,6 +162,9 @@ export const CreateSwapRequestScreen = () => {
       </View>
     );
   }
+
+  const isDailyTask = executionFrequency === 'DAILY';
+  const hasMultipleTimeSlots = timeSlots && timeSlots.length > 1;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -174,6 +213,17 @@ export const CreateSwapRequestScreen = () => {
                 <Text style={[styles.detailValue, styles.pointsValue]}>{taskPoints || 0}</Text>
               </View>
             </View>
+            
+            <View style={styles.frequencyBadge}>
+              <Ionicons 
+                name={isDailyTask ? "calendar" : "calendar-week" as any} 
+                size={14} 
+                color="#6B7280" 
+              />
+              <Text style={styles.frequencyText}>
+                {isDailyTask ? 'Daily Task' : 'Weekly Task'}
+              </Text>
+            </View>
           </View>
 
           {/* Swap Status */}
@@ -189,6 +239,131 @@ export const CreateSwapRequestScreen = () => {
 
           {canSwap.canSwap && (
             <>
+              {/* ✅ NEW: Swap Scope Selection */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>What do you want to swap?</Text>
+                
+                <TouchableOpacity
+                  style={[styles.scopeOption, swapScope === 'week' && styles.scopeOptionActive]}
+                  onPress={() => setSwapScope('week')}
+                >
+                  <View style={styles.scopeIconContainer}>
+                    <Ionicons 
+                      name="calendar" 
+                      size={24} 
+                      color={swapScope === 'week' ? '#4F46E5' : '#6B7280'} 
+                    />
+                  </View>
+                  <View style={styles.scopeContent}>
+                    <Text style={[styles.scopeTitle, swapScope === 'week' && styles.scopeTitleActive]}>
+                      Entire Week
+                    </Text>
+                    <Text style={styles.scopeDescription}>
+                      Swap all days and time slots for this week
+                    </Text>
+                  </View>
+                  {swapScope === 'week' && (
+                    <Ionicons name="checkmark-circle" size={24} color="#4F46E5" />
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.scopeOption, swapScope === 'day' && styles.scopeOptionActive]}
+                  onPress={() => setSwapScope('day')}
+                >
+                  <View style={styles.scopeIconContainer}>
+                    <Ionicons 
+                      name="today" 
+                      size={24} 
+                      color={swapScope === 'day' ? '#4F46E5' : '#6B7280'} 
+                    />
+                  </View>
+                  <View style={styles.scopeContent}>
+                    <Text style={[styles.scopeTitle, swapScope === 'day' && styles.scopeTitleActive]}>
+                      Specific Day
+                    </Text>
+                    <Text style={styles.scopeDescription}>
+                      Swap only one day's assignment
+                    </Text>
+                  </View>
+                  {swapScope === 'day' && (
+                    <Ionicons name="checkmark-circle" size={24} color="#4F46E5" />
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* ✅ NEW: Day Selection (only when scope is 'day') */}
+              {swapScope === 'day' && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Select Day</Text>
+                  <View style={styles.daysContainer}>
+                    {DAYS_OF_WEEK.map(day => (
+                      <TouchableOpacity
+                        key={day}
+                        style={[
+                          styles.dayChip,
+                          selectedDay === day && styles.dayChipActive
+                        ]}
+                        onPress={() => setSelectedDay(day)}
+                      >
+                        <Text style={[
+                          styles.dayChipText,
+                          selectedDay === day && styles.dayChipTextActive
+                        ]}>
+                          {day.slice(0, 3)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* ✅ NEW: Time Slot Selection (for daily tasks with multiple slots) */}
+              {swapScope === 'day' && isDailyTask && hasMultipleTimeSlots && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Select Time Slot (Optional)</Text>
+                  <Text style={styles.sectionSubtext}>
+                    Leave empty to swap all time slots for this day
+                  </Text>
+                  
+                  <View style={styles.timeSlotsContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.timeSlotChip,
+                        !selectedTimeSlotId && styles.timeSlotChipActive
+                      ]}
+                      onPress={() => setSelectedTimeSlotId(null)}
+                    >
+                      <Text style={[
+                        styles.timeSlotChipText,
+                        !selectedTimeSlotId && styles.timeSlotChipTextActive
+                      ]}>
+                        All Time Slots
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    {timeSlots?.map(slot => (
+                      <TouchableOpacity
+                        key={slot.id}
+                        style={[
+                          styles.timeSlotChip,
+                          selectedTimeSlotId === slot.id && styles.timeSlotChipActive
+                        ]}
+                        onPress={() => setSelectedTimeSlotId(slot.id)}
+                      >
+                        <Text style={[
+                          styles.timeSlotChipText,
+                          selectedTimeSlotId === slot.id && styles.timeSlotChipTextActive
+                        ]}>
+                          {slot.startTime}-{slot.endTime}
+                          {slot.label ? ` (${slot.label})` : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
               {/* Target User Selection */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Swap With</Text>
@@ -236,7 +411,7 @@ export const CreateSwapRequestScreen = () => {
                     
                     {members && members.length > 0 ? (
                       members
-                        .filter(m => m.userId && m.user?.fullName)
+                        .filter(m => m.userId)
                         .map(member => (
                           <TouchableOpacity
                             key={member.userId}
@@ -325,8 +500,9 @@ export const CreateSwapRequestScreen = () => {
               <View style={styles.infoNote}>
                 <Ionicons name="information-circle" size={20} color="#4F46E5" />
                 <Text style={styles.infoText}>
-                  The person who accepts this swap will take over this assignment. 
-                  Your assignment will be cancelled and transferred to them.
+                  {swapScope === 'day' 
+                    ? `You're swapping ${selectedDay || 'a specific day'}'s assignment. The rest of your week remains yours.`
+                    : "You're swapping your entire week's assignment. The person who accepts will take over all your tasks for this week."}
                 </Text>
               </View>
             </>
@@ -346,7 +522,11 @@ export const CreateSwapRequestScreen = () => {
               ) : (
                 <>
                   <Ionicons name="swap-horizontal" size={20} color="#FFFFFF" />
-                  <Text style={styles.submitButtonText}>Create Swap Request</Text>
+                  <Text style={styles.submitButtonText}>
+                    {swapScope === 'day' && selectedDay
+                      ? `Create Swap Request for ${selectedDay.slice(0, 3)}`
+                      : 'Create Swap Request'}
+                  </Text>
                 </>
               )}
             </TouchableOpacity>
@@ -436,6 +616,7 @@ const styles = StyleSheet.create({
   detailsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 12,
   },
   detailItem: {
     flex: 1,
@@ -454,6 +635,22 @@ const styles = StyleSheet.create({
   },
   pointsValue: {
     color: '#F59E0B',
+  },
+  frequencyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 8,
+  },
+  frequencyText: {
+    fontSize: 12,
+    color: '#4B5563',
+    fontWeight: '500',
   },
   warningCard: {
     backgroundColor: '#FEF2F2',
@@ -478,13 +675,114 @@ const styles = StyleSheet.create({
     color: '#EF4444',
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: 12,
+  },
+  sectionSubtext: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 12,
+    fontStyle: 'italic',
+  },
+  // ✅ NEW: Scope Option Styles
+  scopeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  scopeOptionActive: {
+    borderColor: '#4F46E5',
+    backgroundColor: '#EEF2FF',
+    borderWidth: 2,
+  },
+  scopeIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F9FAFB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  scopeContent: {
+    flex: 1,
+  },
+  scopeTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 4,
+  },
+  scopeTitleActive: {
+    color: '#4F46E5',
+  },
+  scopeDescription: {
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  // ✅ NEW: Day Selection Styles
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  dayChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  dayChipActive: {
+    backgroundColor: '#4F46E5',
+    borderColor: '#4F46E5',
+  },
+  dayChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4B5563',
+  },
+  dayChipTextActive: {
+    color: '#FFFFFF',
+  },
+  // ✅ NEW: Time Slot Styles
+  timeSlotsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  timeSlotChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  timeSlotChipActive: {
+    backgroundColor: '#4F46E5',
+    borderColor: '#4F46E5',
+  },
+  timeSlotChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4B5563',
+  },
+  timeSlotChipTextActive: {
+    color: '#FFFFFF',
   },
   selectorButton: {
     backgroundColor: '#FFFFFF',

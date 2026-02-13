@@ -94,11 +94,14 @@ export const useSwapRequests = () => {
 
   // Create swap request
   const createSwapRequest = useCallback(async (data: {
-    assignmentId: string;
-    reason?: string;
-    targetUserId?: string;
-    expiresAt?: string;
-  }) => {
+  assignmentId: string;
+  reason?: string;
+  targetUserId?: string;
+  expiresAt?: string;
+  scope?: 'week' | 'day';  // ✅ NEW
+  selectedDay?: string;     // ✅ NEW
+  selectedTimeSlotId?: string; // ✅ NEW
+}) => {
     if (!userId) {
       return { success: false, message: 'User not authenticated' };
     }

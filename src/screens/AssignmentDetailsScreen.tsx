@@ -12,7 +12,7 @@ import {
   Alert,
   Linking,
   Dimensions,
-  StatusBar
+  StatusBar 
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../AssignmentServices/AssignmentService';
@@ -248,34 +248,37 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     });
   };
 
-  const handleRequestSwap = async () => {
-    if (!assignment) return;
+ const handleRequestSwap = async () => {
+  if (!assignment) return;
+  
+  try {
+    const checkResult = await SwapRequestService.checkCanSwap(assignment.id);
     
-    try {
-      const checkResult = await SwapRequestService.checkCanSwap(assignment.id);
-      
-      if (!checkResult.success) {
-        Alert.alert('Cannot Swap', checkResult.message || 'Unable to request swap');
-        return;
-      }
-      
-      if (checkResult.canSwap === false) {
-        Alert.alert('Cannot Swap', checkResult.reason || 'This assignment cannot be swapped');
-        return;
-      }
-      
-      navigation.navigate('CreateSwapRequest', {
-        assignmentId: assignment.id,
-        groupId: assignment.task.group.id,
-        taskTitle: assignment.task.title,
-        dueDate: assignment.dueDate,
-        taskPoints: assignment.points,
-        timeSlot: assignment.timeSlot?.startTime || 'Scheduled time'
-      });
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to check swap availability');
+    if (!checkResult.success) {
+      Alert.alert('Cannot Swap', checkResult.message || 'Unable to request swap');
+      return;
     }
-  };
+    
+    if (checkResult.canSwap === false) {
+      Alert.alert('Cannot Swap', checkResult.reason || 'This assignment cannot be swapped');
+      return;
+    }
+    
+    navigation.navigate('CreateSwapRequest', {
+      assignmentId: assignment.id,
+      groupId: assignment.task.group.id,
+      taskTitle: assignment.task.title,
+      dueDate: assignment.dueDate,
+      taskPoints: assignment.points,
+      timeSlot: assignment.timeSlot?.startTime || 'Scheduled time',
+      // ✅ NEW: Pass these for scope selection
+      executionFrequency: assignment.task.executionFrequency,
+      timeSlots: assignment.task.timeSlots || []
+    });
+  } catch (error: any) {
+    Alert.alert('Error', error.message || 'Failed to check swap availability');
+  }
+};
 
   const handleVerify = async (verified: boolean) => {
     if (!assignment) return;

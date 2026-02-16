@@ -6,12 +6,14 @@ interface ScheduleItem {
   taskId: string;
   taskTitle: string;
   assigneeName: string;
+  assigneeId?: string;
   week: number;
   dayOfWeek?: string;
   scheduledTime?: string;
   points: number;
   category?: string;
   status?: 'pending' | 'completed' | 'overdue';
+  completed?: boolean;
 }
 
 interface WeekSchedule {
@@ -26,9 +28,9 @@ interface WeekSchedule {
 
 interface UseRotationScheduleProps {
   groupId: string;
-  initialWeeks?: number;
+  initialWeeks?: number; // Number of past weeks to show (including current)
 }
-
+ 
 export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationScheduleProps) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,8 +42,9 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
   // Generate week labels
   const generateWeekLabel = useCallback((weekNum: number, currentWeekNum: number): string => {
     const today = new Date();
+    const weekDiff = weekNum - currentWeekNum;
     const startDate = new Date(today);
-    startDate.setDate(today.getDate() + (weekNum - currentWeekNum) * 7);
+    startDate.setDate(today.getDate() + weekDiff * 7);
     const endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
 
@@ -49,18 +52,25 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     };
 
-    return `Week ${weekNum} (${formatDate(startDate)} - ${formatDate(endDate)})`;
+    if (weekNum === currentWeekNum) {
+      return `Current Week (${formatDate(startDate)} - ${formatDate(endDate)})`;
+    } else if (weekNum < currentWeekNum) {
+      return `Week ${weekNum} (${formatDate(startDate)} - ${formatDate(endDate)})`;
+    } else {
+      return `Future Week ${weekNum} (${formatDate(startDate)} - ${formatDate(endDate)})`;
+    }
   }, []);
 
-  // Transform schedule data from API
   const transformScheduleData = useCallback((scheduleData: any, currentWeekNum: number): WeekSchedule[] => {
     const weeksMap: { [week: number]: WeekSchedule } = {};
+    
+    console.log('Transforming schedule data:', scheduleData);
     
     if (Array.isArray(scheduleData)) {
       scheduleData.forEach((weekData: any) => {
         const weekNum = weekData.week || 1;
         
-        // Only include past and current weeks
+        // Include only current and past weeks (weekNum <= currentWeekNum)
         if (weekNum > currentWeekNum) return;
         
         weeksMap[weekNum] = {
@@ -75,49 +85,59 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
         
         if (Array.isArray(weekData.tasks)) {
           weekData.tasks.forEach((task: any) => {
+            // Extract assignee name properly
+            let assigneeName = 'Unassigned';
+            let assigneeId = '';
+            
+            if (task.assignee) {
+              assigneeName = task.assignee.name || task.assignee.fullName || 'Unassigned';
+              assigneeId = task.assignee.id || '';
+            }
+            
+            // Get day of week properly
+            let dayOfWeek = '';
+            if (task.selectedDays && task.selectedDays.length > 0) {
+              dayOfWeek = task.selectedDays[0];
+            } else if (task.dayOfWeek) {
+              dayOfWeek = task.dayOfWeek;
+            }
+            
+            // Get scheduled time
+            let scheduledTime = '';
+            if (task.timeSlots && task.timeSlots.length > 0) {
+              scheduledTime = task.timeSlots[0].startTime;
+            } else if (task.scheduledTime) {
+              scheduledTime = task.scheduledTime;
+            }
+            
             const scheduleItem: ScheduleItem = {
-              taskId: task.taskId || task.id,
-              taskTitle: task.taskTitle || task.title || 'Unnamed Task',
-              assigneeName: task.assignee?.name || task.assignee?.fullName || 'Unassigned',
+              taskId: task.taskId,
+              taskTitle: task.taskTitle,
+              assigneeName: assigneeName,
+              assigneeId: assigneeId,
               week: weekNum,
-              dayOfWeek: task.selectedDays?.[0] || task.dayOfWeek,
-              scheduledTime: task.timeSlots?.[0]?.startTime,
+              dayOfWeek: dayOfWeek,
+              scheduledTime: scheduledTime,
               points: task.points || 0,
               category: task.category,
-              status: 'pending'
+              status: task.completed ? 'completed' : 'pending',
+              completed: task.completed || false
             };
             
             weeksMap[weekNum].tasks.push(scheduleItem);
             weeksMap[weekNum].totalPoints += scheduleItem.points;
-            weeksMap[weekNum].assignedTasksCount++;
+            if (assigneeName !== 'Unassigned') {
+              weeksMap[weekNum].assignedTasksCount++;
+            }
           });
         }
       });
     }
     
-    // Create weeks for past weeks (up to initialWeeks in the past)
-    // Only show current week and past weeks
-    const weeksToShow = Math.min(initialWeeks, currentWeekNum);
-    for (let i = 0; i < weeksToShow; i++) {
-      const weekNum = currentWeekNum - i; // Go backwards from current week
-      if (weekNum > 0 && !weeksMap[weekNum]) {
-        weeksMap[weekNum] = {
-          weekNumber: weekNum,
-          weekLabel: generateWeekLabel(weekNum, currentWeekNum),
-          tasks: [],
-          totalPoints: 0,
-          assignedTasksCount: 0
-        };
-      }
-    }
-    
+    // Sort weeks in descending order (newest first - current week at top)
     return Object.values(weeksMap)
-      .sort((a, b) => b.weekNumber - a.weekNumber) // Sort descending: newest first
-      .map(week => ({
-        ...week,
-        weekLabel: generateWeekLabel(week.weekNumber, currentWeekNum)
-      }));
-  }, [initialWeeks, generateWeekLabel]);
+      .sort((a, b) => b.weekNumber - a.weekNumber);
+  }, [generateWeekLabel]);
 
   // Load rotation schedule
   const loadRotationSchedule = useCallback(async () => {
@@ -125,7 +145,9 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
       setLoading(true);
       setError(null);
       
+      console.log('Loading rotation schedule for group:', groupId);
       const result = await TaskService.getRotationSchedule(groupId, initialWeeks);
+      console.log('Rotation schedule result:', result);
       
       if (result.success) {
         const currentWeekNum = result.currentWeek || 1;
@@ -134,37 +156,36 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
         if (result.schedule && Array.isArray(result.schedule)) {
           transformedWeeks = transformScheduleData(result.schedule, currentWeekNum);
         } else {
-          // Create empty weeks for past weeks only
-          const weeksToShow = Math.min(initialWeeks, currentWeekNum);
-          for (let i = 0; i < weeksToShow; i++) {
-            const weekNum = currentWeekNum - i;
-            if (weekNum > 0) {
-              transformedWeeks.push({
-                weekNumber: weekNum,
-                weekLabel: generateWeekLabel(weekNum, currentWeekNum),
-                tasks: [],
-                totalPoints: 0,
-                assignedTasksCount: 0
-              });
-            }
+          // Create empty weeks for current and past weeks only
+          const startWeek = Math.max(1, currentWeekNum - initialWeeks + 1);
+          
+          for (let weekNum = startWeek; weekNum <= currentWeekNum; weekNum++) {
+            transformedWeeks.push({
+              weekNumber: weekNum,
+              weekLabel: generateWeekLabel(weekNum, currentWeekNum),
+              tasks: [],
+              totalPoints: 0,
+              assignedTasksCount: 0
+            });
           }
-          // Sort newest first
+          // Sort descending (newest first)
           transformedWeeks.sort((a, b) => b.weekNumber - a.weekNumber);
         }
         
+        console.log('Transformed weeks (past & current only):', transformedWeeks);
         setWeeks(transformedWeeks);
         setCurrentWeek(currentWeekNum);
         
-        // Set selected week to current week if available
+        // Set selected week to current week
         if (transformedWeeks.length > 0) {
-          const currentWeekExists = transformedWeeks.find(w => w.weekNumber === currentWeekNum);
-          setSelectedWeek(currentWeekExists ? currentWeekNum : transformedWeeks[0].weekNumber);
+          setSelectedWeek(currentWeekNum);
         }
         
       } else {
         setError(result.message || 'Failed to load rotation schedule');
       }
     } catch (error: any) {
+      console.error('Error loading rotation schedule:', error);
       setError(error.message || 'Failed to load rotation schedule');
     } finally {
       setLoading(false);
@@ -199,6 +220,55 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     loadRotationSchedule();
   }, [loadRotationSchedule]);
 
+  // Calculate statistics for selected week
+  const selectedWeekData = weeks.find(w => w.weekNumber === selectedWeek) || null;
+  
+  const getSelectedWeekTasks = useCallback(() => {
+    if (!selectedWeek) return [];
+    return selectedWeekData?.tasks || [];
+  }, [selectedWeek, selectedWeekData]);
+
+  const getTaskDistributionByDay = useCallback(() => {
+    const tasks = selectedWeekData?.tasks || [];
+    const distribution: { [key: string]: number } = {
+      'Monday': 0, 'Tuesday': 0, 'Wednesday': 0, 'Thursday': 0, 
+      'Friday': 0, 'Saturday': 0, 'Sunday': 0
+    };
+    
+    tasks.forEach(task => {
+      if (task.dayOfWeek) {
+        // Capitalize first letter and ensure proper format
+        const day = task.dayOfWeek.charAt(0).toUpperCase() + task.dayOfWeek.slice(1).toLowerCase();
+        if (distribution[day] !== undefined) {
+          distribution[day]++;
+        }
+      }
+    });
+    
+    return distribution;
+  }, [selectedWeekData]);
+
+  const calculateFairnessScore = useCallback(() => {
+    const tasks = selectedWeekData?.tasks || [];
+    const pointsByAssignee: { [key: string]: number } = {};
+    
+    tasks.forEach(task => {
+      if (task.assigneeName && task.assigneeName !== 'Unassigned') {
+        pointsByAssignee[task.assigneeName] = (pointsByAssignee[task.assigneeName] || 0) + task.points;
+      }
+    });
+    
+    const values = Object.values(pointsByAssignee);
+    if (values.length === 0) return 100; // All tasks unassigned = perfect fairness
+    
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    if (mean === 0) return 100;
+    
+    const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
+    const fairness = 100 - Math.min(100, Math.round((variance / mean) * 100));
+    return Math.max(0, fairness);
+  }, [selectedWeekData]);
+
   return {
     loading,
     refreshing,
@@ -206,45 +276,14 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     selectedWeek,
     currentWeek,
     error,
-    selectedWeekData: weeks.find(w => w.weekNumber === selectedWeek) || null,
+    selectedWeekData,
     setSelectedWeek,
     loadRotationSchedule,
     rotateTasks,
     refresh,
-    getSelectedWeekTasks: useCallback(() => {
-      if (!selectedWeek) return [];
-      const weekData = weeks.find(w => w.weekNumber === selectedWeek);
-      return weekData?.tasks || [];
-    }, [weeks, selectedWeek]),
-    getTaskDistributionByDay: useCallback(() => {
-      const tasks = weeks.find(w => w.weekNumber === selectedWeek)?.tasks || [];
-      const distribution: { [key: string]: number } = {
-        'Monday': 0, 'Tuesday': 0, 'Wednesday': 0, 'Thursday': 0, 
-        'Friday': 0, 'Saturday': 0, 'Sunday': 0
-      };
-      tasks.forEach(task => {
-        if (task.dayOfWeek && distribution[task.dayOfWeek]) {
-          distribution[task.dayOfWeek]++;
-        }
-      });
-      return distribution;
-    }, [weeks, selectedWeek]),
-    calculateFairnessScore: useCallback(() => {
-      const tasks = weeks.find(w => w.weekNumber === selectedWeek)?.tasks || [];
-      const pointsByAssignee: { [key: string]: number } = {};
-      tasks.forEach(task => {
-        if (task.assigneeName && task.assigneeName !== 'Unassigned') {
-          pointsByAssignee[task.assigneeName] = (pointsByAssignee[task.assigneeName] || 0) + task.points;
-        }
-      });
-      const values = Object.values(pointsByAssignee);
-      if (values.length === 0) return 100; // All tasks unassigned = perfect fairness
-      const mean = values.reduce((a, b) => a + b, 0) / values.length;
-      if (mean === 0) return 100;
-      const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / values.length;
-      const fairness = 100 - Math.min(100, Math.round((variance / mean) * 100));
-      return Math.max(0, fairness);
-    }, [weeks, selectedWeek]),
+    getSelectedWeekTasks,
+    getTaskDistributionByDay,
+    calculateFairnessScore,
     isEmpty: weeks.length === 0,
     hasSchedule: weeks.some(week => week.tasks.length > 0),
   };

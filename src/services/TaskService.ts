@@ -272,7 +272,7 @@ export class TaskService {
       };
     }
   }
-
+ 
  static async getTaskStatistics(groupId: string) {
     try {
       console.log(`TaskService: Getting statistics for group ${groupId}`);

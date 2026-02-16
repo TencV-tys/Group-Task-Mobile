@@ -126,7 +126,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleViewRotationSchedule = () => {
-    navigation.navigate('RotationSchedule', { groupId, groupName });
+    navigation.navigate('RotationSchedule', { groupId, groupName,userRole });
     onClose();
   };
 

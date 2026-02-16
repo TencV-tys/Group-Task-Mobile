@@ -5,7 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
-  ScrollView,
+  ScrollView, 
   ActivityIndicator,
   RefreshControl,
   Alert,
@@ -18,10 +18,10 @@ import { useRotationSchedule } from '../taskHook/useRotationSchedule';
 const { width } = Dimensions.get('window');
 
 export default function RotationScheduleScreen({ route, navigation }: any) {
-  const { groupId, groupName } = route.params;
+  const { groupId, groupName, userRole } = route.params;
   
   const {
-    loading,
+    loading, 
     refreshing,
     weeks,
     selectedWeek,
@@ -41,6 +41,9 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     groupId,
     initialWeeks: 4
   });
+
+  // Check if user is admin
+  const isAdmin = userRole === 'ADMIN';
 
   // Ensure selectedWeek is set when weeks are loaded
   useEffect(() => {
@@ -345,45 +348,27 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
               <Text style={styles.emptyTasksSubtext}>
                 {selectedWeek === currentWeek 
                   ? "Tasks will appear here once they're assigned to the current week"
-                  : "No tasks have been scheduled for this future week"}
+                  : "No tasks were scheduled for this week"}
               </Text>
-              {selectedWeek === currentWeek && (
-                <TouchableOpacity 
-                  style={styles.assignTasksButton}
-                  onPress={() => navigation.navigate('TaskAssignment', { groupId, groupName })}
-                >
-                  <Text style={styles.assignTasksButtonText}>Assign Tasks</Text>
-                </TouchableOpacity>
-              )}
             </View>
           )}
         </View>
 
-        {/* Admin Actions */}
-        <View style={styles.adminSection}>
-          <Text style={styles.adminTitle}>Admin Actions</Text>
-          <View style={styles.adminActions}>
-            <TouchableOpacity 
-              style={styles.adminButton}
-              onPress={handleRotateTasks}
-            >
-              <MaterialCommunityIcons name="rotate-right" size={20} color="#007AFF" />
-              <Text style={styles.adminButtonText}>Rotate to Next Week</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={[styles.adminButton, styles.manageButton]}
-              onPress={() => navigation.navigate('TaskAssignment', { 
-                groupId, 
-                groupName,
-                fromRotation: true 
-              })}
-            >
-              <MaterialCommunityIcons name="account-switch" size={20} color="#28a745" />
-              <Text style={styles.adminButtonText}>Manage Assignments</Text>
-            </TouchableOpacity>
+        {/* Admin Actions - Only visible to admins */}
+        {isAdmin && (
+          <View style={styles.adminSection}>
+            <Text style={styles.adminTitle}>Admin Actions</Text>
+            <View style={styles.adminActions}>
+              <TouchableOpacity 
+                style={styles.adminButton}
+                onPress={handleRotateTasks}
+              >
+                <MaterialCommunityIcons name="rotate-right" size={20} color="#007AFF" />
+                <Text style={styles.adminButtonText}>Rotate to Next Week</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -789,10 +774,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#a5d8ff',
   },
-  manageButton: {
-    backgroundColor: '#d3f9d8',
-    borderColor: '#8ce99a',
-  },
   adminButtonText: {
     fontSize: 16,
     fontWeight: '600',
@@ -807,17 +788,5 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: 12,
     color: '#868e96',
-  },
-  assignTasksButton: {
-    marginTop: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-  },
-  assignTasksButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 14,
   },
 });

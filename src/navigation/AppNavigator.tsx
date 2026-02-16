@@ -26,6 +26,7 @@ import { CreateSwapRequestScreen } from '../screens/CreateSwapRequestScreen';
 import { SwapRequestDetailsScreen } from '../screens/SwapRequestDetailsScreen';
 import { DetailedStatisticsScreen } from '../screens/DetailedStatisticsScreen';
 import { FullLeaderboardScreen } from '../screens/FullLeaderboardScreen';
+import { GroupSettingsScreen } from '../screens/GroupSettingsScreen';
 
 const Stack = createStackNavigator();
 
@@ -160,57 +161,51 @@ export default function AppNavigator() {
 
       {/* ============= SWAP REQUEST SCREENS ============= */}
       
-      {/* Pending swap requests that need user's response */}
       <Stack.Screen
         name="PendingSwapRequests"
         component={PendingSwapRequestsScreen}
-        options={{ 
-          headerShown: false,
-          title: 'Swap Requests'
-        }}
+        options={{ headerShown: false }}
       />
       
-      {/* User's own swap requests history */}
       <Stack.Screen
         name="MySwapRequests"
         component={MySwapRequestsScreen}
-        options={{ 
-          headerShown: false,
-          title: 'My Swap Requests'
-        }}
+        options={{ headerShown: false }}
       />
       
-      {/* Create a new swap request */}
       <Stack.Screen
         name="CreateSwapRequest"
         component={CreateSwapRequestScreen}
-        options={{ 
-          headerShown: false,
-          title: 'Request Swap'
-        }}
+        options={{ headerShown: false }}
       />
       
-      {/* View swap request details */}
       <Stack.Screen
         name="SwapRequestDetails"
         component={SwapRequestDetailsScreen}
-        options={{ 
-          headerShown: false,
-          title: 'Swap Request Details'
-        }}
+        options={{ headerShown: false }}
       />
-      <Stack.Screen 
-  name="DetailedStatistics" 
-  component={DetailedStatisticsScreen}
-  options={{ headerShown: false }}
-/>
 
-<Stack.Screen 
-  name="FullLeaderboard" 
-  component={FullLeaderboardScreen}
-  options={{ headerShown: false }}
-/>
+      {/* ============= STATISTICS & LEADERBOARD ============= */}
       
+      <Stack.Screen 
+        name="DetailedStatistics" 
+        component={DetailedStatisticsScreen}
+        options={{ headerShown: false }}
+      />
+
+      <Stack.Screen 
+        name="FullLeaderboard" 
+        component={FullLeaderboardScreen}
+        options={{ headerShown: false }}
+      />
+
+      {/* ============= GROUP SETTINGS ============= */}
+      
+      <Stack.Screen 
+        name="GroupSettings" 
+        component={GroupSettingsScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

@@ -304,7 +304,7 @@ static async updateGroup(groupId: string, groupData: { name?: string, descriptio
       credentials: 'include'
     });
 
-    const result = await response.json();
+    const result = await response.json(); 
     return result;
 
   } catch (error: any) {

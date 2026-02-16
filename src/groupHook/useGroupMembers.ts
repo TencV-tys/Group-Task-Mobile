@@ -1,6 +1,6 @@
 // src/hooks/useGroupMembers.ts
 import { useState, useCallback } from 'react';
-import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
+import { GroupMembersService } from '../services/GroupMemberService';
 import { API_BASE_URL } from '../config/api';
 
 export function useGroupMembers() {

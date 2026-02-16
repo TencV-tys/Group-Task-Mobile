@@ -15,9 +15,9 @@ import {
   StatusBar 
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { AssignmentService } from '../AssignmentServices/AssignmentService';
+import { AssignmentService } from '../services/AssignmentService';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
-import { SwapRequestService } from '../SwapRequestServices.ts/SwapRequestService';
+import { SwapRequestService } from '../services/SwapRequestService';
 
 const { width } = Dimensions.get('window');
 

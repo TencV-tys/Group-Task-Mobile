@@ -1,6 +1,6 @@
 // src/hooks/useUpdateTask.ts
 import { useState } from 'react';
-import { TaskService, type UpdateTaskData } from '../taskServices/TaskService';
+import { TaskService, type UpdateTaskData } from '../services/TaskService';
 
 export function useUpdateTask() {
   const [loading, setLoading] = useState(false);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SwapRequestFilters,SwapRequest,SwapRequestService } from '../SwapRequestServices.ts/SwapRequestService';
+import { SwapRequestFilters,SwapRequest,SwapRequestService } from '../services/SwapRequestService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 export const useSwapRequests = () => {

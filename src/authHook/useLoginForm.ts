@@ -1,6 +1,6 @@
 // src/authHook/useLoginForm.ts
 import {useState} from 'react';
-import { AuthService } from '../authServices/AuthService';
+import { AuthService } from '../services/AuthService';
 
 interface LoginData{
   email:string;

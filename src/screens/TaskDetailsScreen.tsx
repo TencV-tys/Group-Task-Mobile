@@ -14,7 +14,7 @@ import {
   Image,
   Linking
 } from 'react-native';
-import { TaskService } from '../taskServices/TaskService';
+import { TaskService } from '../services/TaskService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function TaskDetailsScreen({ navigation, route }: any) {

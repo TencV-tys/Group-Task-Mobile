@@ -17,7 +17,7 @@ import {
   TextInput,
   Image
 } from 'react-native';
-import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
+import { GroupMembersService } from '../services/GroupMemberService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useGroupMembers } from '../groupHook/useGroupMembers';

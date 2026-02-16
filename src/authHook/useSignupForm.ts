@@ -1,6 +1,6 @@
 // src/authHook/useSignupForm.ts
 import { useState } from "react";
-import { AuthService } from "../authServices/AuthService";
+import { AuthService } from "../services/AuthService";
 import { UploadService } from "../uploadService/UploadService"; // Add this import
 
 // Define valid gender options

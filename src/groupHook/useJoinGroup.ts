@@ -1,6 +1,6 @@
 // src/hooks/useJoinGroup.ts
 import { useState, useCallback } from 'react';
-import { GroupService } from '../groupServices/GroupService'; // Adjust path as needed
+import { GroupService } from '../services/GroupService'; // Adjust path as needed
 
 export function useJoinGroup() {
   const [loading, setLoading] = useState<boolean>(false);

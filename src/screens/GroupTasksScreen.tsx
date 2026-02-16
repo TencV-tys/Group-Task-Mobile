@@ -12,7 +12,7 @@ import {
   Dimensions,
   StatusBar
 } from 'react-native';
-import { TaskService } from '../taskServices/TaskService';
+import { TaskService } from '../services/TaskService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SettingsModal } from '../components/SettingsModal';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';

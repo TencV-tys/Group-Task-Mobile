@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { TaskService } from '../taskServices/TaskService';
+import { TaskService } from '../services/TaskService';
 import { Alert } from 'react-native';
 
 interface ScheduleItem {

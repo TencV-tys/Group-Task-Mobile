@@ -1,7 +1,7 @@
 
 
 import { useState } from "react";
-import { GroupService } from "../groupServices/GroupService";
+import { GroupService } from "../services/GroupService";
 
 export function useCreateGroup(){
     const [loading, setLoading]  = useState<boolean>(false);

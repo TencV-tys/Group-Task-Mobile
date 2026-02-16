@@ -1,7 +1,7 @@
 // src/hooks/useMyGroups.ts
 import { useState, useCallback } from 'react';
-import { GroupService } from '../groupServices/GroupService';
-import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
+import { GroupService } from '../services/GroupService';
+import { GroupMembersService } from '../services/GroupMemberService';
 
 export function useMyGroups() {
   const [groups, setGroups] = useState<any[]>([]);

@@ -13,7 +13,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
-import { SwapRequestService } from '../SwapRequestServices.ts/SwapRequestService';
+import { SwapRequestService } from '../services/SwapRequestService';
 
 type SwapRequestDetailsRouteParams = {
   requestId: string;

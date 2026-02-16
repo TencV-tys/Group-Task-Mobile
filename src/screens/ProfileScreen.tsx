@@ -13,7 +13,7 @@ import {
   Image
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { AuthService } from '../authServices/AuthService';
+import { AuthService } from '../services/AuthService';
 import { useImageUpload } from '../uploadHook/useImageUpload';
 
 export default function ProfileScreen({ navigation }: any) {

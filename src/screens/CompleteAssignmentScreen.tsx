@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { AssignmentService } from '../AssignmentServices/AssignmentService';
+import { AssignmentService } from '../services/AssignmentService';
 
 const { width } = Dimensions.get('window');
 

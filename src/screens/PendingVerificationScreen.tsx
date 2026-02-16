@@ -14,7 +14,7 @@ import {
   Image
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { AssignmentService } from '../AssignmentServices/AssignmentService';
+import { AssignmentService } from '../services/AssignmentService';
 
 export default function PendingVerificationsScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};

@@ -1,7 +1,7 @@
 // src/hooks/useTaskAssignment.ts
 import { useState, useEffect } from 'react';
-import { TaskService } from '../taskServices/TaskService';
-import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
+import { TaskService } from '../services/TaskService';
+import { GroupMembersService } from '../services/GroupMemberService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const useTaskAssignment = (groupId: string) => { 

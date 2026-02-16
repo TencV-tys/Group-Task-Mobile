@@ -24,6 +24,8 @@ import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen'
 import { MySwapRequestsScreen } from '../screens/MySwapRequestScreen';
 import { CreateSwapRequestScreen } from '../screens/CreateSwapRequestScreen';
 import { SwapRequestDetailsScreen } from '../screens/SwapRequestDetailsScreen';
+import { DetailedStatisticsScreen } from '../screens/DetailedStatisticsScreen';
+import { FullLeaderboardScreen } from '../screens/FullLeaderboardScreen';
 
 const Stack = createStackNavigator();
 
@@ -197,6 +199,17 @@ export default function AppNavigator() {
           title: 'Swap Request Details'
         }}
       />
+      <Stack.Screen 
+  name="DetailedStatistics" 
+  component={DetailedStatisticsScreen}
+  options={{ headerShown: false }}
+/>
+
+<Stack.Screen 
+  name="FullLeaderboard" 
+  component={FullLeaderboardScreen}
+  options={{ headerShown: false }}
+/>
       
     </Stack.Navigator>
   );

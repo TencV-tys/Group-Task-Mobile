@@ -6,12 +6,12 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView, 
-  ActivityIndicator,
+  ActivityIndicator, 
   Alert
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { TaskService } from '../taskServices/TaskService';
-import { GroupMembersService } from '../groupMemberServices/GroupMemberService';
+import { TaskService } from '../services/TaskService';
+import { GroupMembersService } from '../services/GroupMemberService';
 import { useNavigation } from '@react-navigation/native';
 interface SettingsModalProps {
   visible: boolean;

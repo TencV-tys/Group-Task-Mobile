@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
+  SafeAreaView, 
   ScrollView,
   TextInput,
   Alert,
@@ -35,7 +35,7 @@ const CATEGORIES = [
   { label: 'Other', value: 'Other' }
 ];
 
-export default function FeedbackScreen({ navigation }: any) {
+export default function FeedbackScreen({ navigation,route }: any) {
   const [type, setType] = useState('GENERAL');
   const [category, setCategory] = useState('');
   const [message, setMessage] = useState('');
@@ -51,9 +51,14 @@ export default function FeedbackScreen({ navigation }: any) {
     loadStats
   } = useFeedback();
 
-  useEffect(() => {
-    loadStats();
-  }, []);
+useEffect(() => {
+  loadStats();
+  
+  // Check if we should show history directly
+  if (route.params?.showHistory) {
+    setShowHistory(true);
+  }
+}, [route.params?.showHistory]);
 
   useEffect(() => {
     if (showHistory) {

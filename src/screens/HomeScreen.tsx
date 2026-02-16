@@ -15,15 +15,18 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useHomeData } from '../homeHook/useHomeHook';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
+import { useNotifications } from '../notificationHook/useNotifications';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
   const { loading, refreshing, error, homeData, refreshHomeData } = useHomeData();
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
+  const { unreadCount, loadUnreadCount } = useNotifications();
 
   useEffect(() => {
     loadPendingForMe();
+    loadUnreadCount();
   }, []);
 
   const user = homeData?.user || { 
@@ -97,6 +100,10 @@ export default function HomeScreen({ navigation }: any) {
     }
   };
 
+  const handleViewNotifications = () => {
+    navigation.navigate('Notifications');
+  };
+
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
@@ -135,6 +142,22 @@ export default function HomeScreen({ navigation }: any) {
           </Text>
         </View>
         <View style={styles.headerRight}>
+          {/* Notification Button - NEW */}
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={handleViewNotifications}
+          >
+            <MaterialCommunityIcons name="bell" size={24} color="#4F46E5" />
+            {unreadCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Swap Request Button */}
           <TouchableOpacity 
             style={styles.swapButton}
             onPress={handleViewPendingSwapRequests}
@@ -147,6 +170,7 @@ export default function HomeScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
           
+          {/* Profile Button */}
           <TouchableOpacity 
             style={styles.profileButton}
             onPress={() => navigation.navigate('Profile')}
@@ -383,6 +407,12 @@ export default function HomeScreen({ navigation }: any) {
         <View style={[styles.section, { marginBottom: 30 }]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <TouchableOpacity 
+              onPress={handleViewNotifications}
+              activeOpacity={0.6}
+            >
+              <Text style={styles.seeAllText}>View All</Text>
+            </TouchableOpacity>
           </View>
           
           {recentActivity.length > 0 ? (
@@ -392,6 +422,7 @@ export default function HomeScreen({ navigation }: any) {
                   key={index} 
                   style={styles.activityCard}
                   activeOpacity={0.7}
+                  onPress={handleViewNotifications}
                 >
                   <View style={[
                     styles.activityIconContainer,
@@ -463,7 +494,31 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
+  },
+  // New notification button styles
+  notificationButton: {
+    position: 'relative',
+    padding: 8,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   swapButton: {
     position: 'relative',

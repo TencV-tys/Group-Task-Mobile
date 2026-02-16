@@ -1,4 +1,4 @@
-// src/screens/ProfileScreen.tsx - COMPLETE WITH AVATAR UPLOAD
+// src/screens/ProfileScreen.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,11 +15,21 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthService } from '../services/AuthService';
 import { useImageUpload } from '../uploadHook/useImageUpload';
+import { useFeedback } from '../feedbackHook/useFeedback';
+import { useNotifications } from '../notificationHook/useNotifications';
 
 export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const {
+    loading: feedbackLoading,
+    stats: feedbackStats,
+    loadStats
+  } = useFeedback();
+
+  const { unreadCount, loadUnreadCount } = useNotifications();
 
   const {
     uploading,
@@ -49,6 +59,13 @@ export default function ProfileScreen({ navigation }: any) {
       const userData = await AuthService.getCurrentUser();
       console.log('Loaded user data:', userData);
       setUser(userData);
+      
+      // Load feedback stats
+      await loadStats();
+      
+      // Load notification count
+      await loadUnreadCount();
+      
     } catch (error) {
       console.error('Error loading user data:', error);
     } finally {
@@ -158,7 +175,7 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const handleNotifications = () => {
-    Alert.alert('Coming Soon', 'Notification settings coming soon!');
+    navigation.navigate('Notifications');
   };
 
   const handleHelpSupport = () => {
@@ -172,6 +189,15 @@ export default function ProfileScreen({ navigation }: any) {
   const handleTermsOfService = () => {
     Alert.alert('Terms of Service', 'Our terms of service will be available soon.');
   };
+
+  // Feedback handlers
+  const handleSendFeedback = () => {
+    navigation.navigate('Feedback');
+  };
+
+ const handleViewFeedbackHistory = () => {
+  navigation.navigate('Feedback', { showHistory: true });
+};
 
   if (loading) {
     return (
@@ -192,17 +218,12 @@ export default function ProfileScreen({ navigation }: any) {
             onPress={() => navigation.goBack()}
             style={styles.backButton}
           >
-            <Text style={styles.backButtonText}>←</Text>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#007AFF" />
           </TouchableOpacity>
           
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>Profile</Text>
-            <Text style={styles.subtitle}>User information</Text>
-          </View>
+          <Text style={styles.headerTitle}>Profile</Text>
           
-          <View style={styles.refreshButton}>
-            <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
-          </View>
+          <View style={styles.rightPlaceholder} />
         </View>
 
         <View style={styles.errorContainer}>
@@ -226,31 +247,29 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Header - FIXED: Title is now visible and notification on right */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Text style={styles.backButtonText}>←</Text>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#007AFF" />
         </TouchableOpacity>
         
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>Profile</Text>
-          <Text style={styles.subtitle}>
-            {user.fullName || 'User'}
-          </Text>
-        </View>
+        <Text style={styles.headerTitle}>Profile</Text>
         
+        {/* Notification Bell - Moved to right side */}
         <TouchableOpacity 
-          onPress={onRefresh}
-          disabled={refreshing || uploading}
-          style={styles.refreshButton}
+          onPress={handleNotifications}
+          style={styles.notificationButton}
         >
-          {(refreshing || uploading) ? (
-            <ActivityIndicator size="small" color="#007AFF" />
-          ) : (
-            <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
+          <MaterialCommunityIcons name="bell" size={24} color="#333" />
+          {unreadCount > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Text>
+            </View>
           )}
         </TouchableOpacity>
       </View>
@@ -291,9 +310,6 @@ export default function ProfileScreen({ navigation }: any) {
                     source={{ uri: user.avatarUrl }}
                     style={styles.avatarImage}
                   />
-                  <View style={styles.avatarBadge}>
-                    <MaterialCommunityIcons name="check-decagram" size={16} color="#007AFF" />
-                  </View>
                   <View style={styles.editIcon}>
                     <MaterialCommunityIcons name="camera" size={16} color="white" />
                   </View>
@@ -345,30 +361,7 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Quick Stats Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Stats</Text>
-          
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <MaterialCommunityIcons name="account-group" size={24} color="#007AFF" />
-              <Text style={styles.statCardNumber}>0</Text>
-              <Text style={styles.statCardLabel}>Groups</Text>
-            </View>
-            
-            <View style={styles.statCard}>
-              <MaterialCommunityIcons name="clipboard-check" size={24} color="#34C759" />
-              <Text style={styles.statCardNumber}>0</Text>
-              <Text style={styles.statCardLabel}>Tasks Done</Text>
-            </View>
-            
-            <View style={styles.statCard}>
-              <MaterialCommunityIcons name="trophy" size={24} color="#FF9500" />
-              <Text style={styles.statCardNumber}>0</Text>
-              <Text style={styles.statCardLabel}>Points</Text>
-            </View>
-          </View>
-        </View>
+        {/* REMOVED: Quick Stats Section - This was useless */}
 
         {/* Account Settings Section */}
         <View style={styles.section}>
@@ -384,21 +377,6 @@ export default function ProfileScreen({ navigation }: any) {
               <View style={styles.menuItemLeft}>
                 <MaterialCommunityIcons name="account-cog" size={22} color="#007AFF" />
                 <Text style={[styles.menuText, uploading && styles.disabledText]}>Account Settings</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
-            </TouchableOpacity>
-            
-            <View style={styles.divider} />
-            
-            <TouchableOpacity 
-              style={styles.menuItem}
-              onPress={handleNotifications}
-              activeOpacity={0.7}
-              disabled={uploading}
-            >
-              <View style={styles.menuItemLeft}>
-                <MaterialCommunityIcons name="bell" size={22} color="#FF9500" />
-                <Text style={[styles.menuText, uploading && styles.disabledText]}>Notifications</Text>
               </View>
               <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
             </TouchableOpacity>
@@ -424,6 +402,63 @@ export default function ProfileScreen({ navigation }: any) {
               {!uploading && (
                 <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
               )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Feedback Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Feedback</Text>
+          
+          <View style={styles.menuCard}>
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handleSendFeedback}
+              activeOpacity={0.7}
+              disabled={uploading || feedbackLoading}
+            >
+              <View style={styles.menuItemLeft}>
+                <MaterialCommunityIcons name="message" size={22} color="#FF9500" />
+                <View style={styles.menuTextContainer}>
+                  <Text style={[styles.menuText, uploading && styles.disabledText]}>Send Feedback</Text>
+                  {feedbackStats && feedbackStats.total > 0 && (
+                    <Text style={styles.menuBadgeText}>
+                      {feedbackStats.total} submitted
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+            </TouchableOpacity>
+            
+            <View style={styles.divider} />
+            
+            <TouchableOpacity 
+              style={styles.menuItem}
+              onPress={handleViewFeedbackHistory}
+              activeOpacity={0.7}
+              disabled={uploading || feedbackLoading}
+            >
+              <View style={styles.menuItemLeft}>
+                <MaterialCommunityIcons name="history" size={22} color="#5856D6" />
+                <View style={styles.menuTextContainer}>
+                  <Text style={[styles.menuText, uploading && styles.disabledText]}>My Feedback History</Text>
+                  {feedbackStats && (
+                    <View style={styles.feedbackStats}>
+                      {feedbackStats.open > 0 && (
+                        <View style={[styles.statusDot, { backgroundColor: '#FF9500' }]} />
+                      )}
+                      {feedbackStats.resolved > 0 && (
+                        <View style={[styles.statusDot, { backgroundColor: '#34C759' }]} />
+                      )}
+                      <Text style={styles.feedbackStatsText}>
+                        {feedbackStats.open} open · {feedbackStats.resolved} resolved
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
             </TouchableOpacity>
           </View>
         </View>
@@ -530,17 +565,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  // Header
+  // Header - FIXED
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 5,
+    paddingVertical: 12,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
-    minHeight: 56,
   },
   backButton: {
     width: 40,
@@ -549,28 +583,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 20,
   },
-  backButtonText: {
-    fontSize: 24,
-    color: '#007AFF',
-    fontWeight: '400',
-  },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  title: {
+  headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#212529',
     textAlign: 'center',
   },
-  subtitle: {
-    fontSize: 12,
-    color: '#6c757d',
-    marginTop: 2,
-    textAlign: 'center',
+  rightPlaceholder: {
+    width: 40,
+  },
+  // Notification Button - MOVED TO RIGHT
+  notificationButton: {
+    position: 'relative',
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  notificationBadgeText: {
+    color: 'white',
+    fontSize: 9,
+    fontWeight: 'bold',
   },
   refreshButton: {
     width: 40,
@@ -674,23 +722,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
-  avatarBadge: {
+  editIcon: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  editIcon: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
     backgroundColor: '#007AFF',
     width: 32,
     height: 32,
@@ -755,35 +790,7 @@ const styles = StyleSheet.create({
     height: 12,
     backgroundColor: '#dee2e6',
   },
-  // Quick Stats
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  statCardNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#212529',
-    marginVertical: 4,
-  },
-  statCardLabel: {
-    fontSize: 12,
-    color: '#6c757d',
-    textAlign: 'center',
-  },
+  // REMOVED: Quick Stats section styles
   // Sections
   section: {
     paddingHorizontal: 16,
@@ -818,10 +825,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
+  },
+  menuTextContainer: {
+    flex: 1,
   },
   menuText: {
     fontSize: 16,
     color: '#212529',
+  },
+  menuBadgeText: {
+    fontSize: 12,
+    color: '#6c757d',
+    marginTop: 2,
   },
   disabledText: {
     color: '#6c757d',
@@ -830,6 +846,23 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#f1f3f5',
     marginLeft: 48,
+  },
+  // Feedback specific styles
+  feedbackStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  feedbackStatsText: {
+    fontSize: 11,
+    color: '#6c757d',
+    marginLeft: 4,
   },
   // App Info Card
   infoCard: {
@@ -902,4 +935,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-});
+}); 

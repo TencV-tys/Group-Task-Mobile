@@ -18,7 +18,8 @@ import RotationScheduleScreen from '../screens/RotationScheduleScreen';
 import AssignmentDetailsScreen from '../screens/AssignmentDetailsScreen';
 import CompleteAssignmentScreen from '../screens/CompleteAssignmentScreen';
 import PendingVerificationsScreen from '../screens/PendingVerificationScreen';
-
+import FeedbackScreen from '../screens/FeedbackScreen';
+import FeedbackDetailsScreen from '../screens/FeedbackDetailsScreen';
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
 import { MySwapRequestsScreen } from '../screens/MySwapRequestScreen';
@@ -199,7 +200,10 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
 
-     
+     <Stack.Screen name="Feedback" component={FeedbackScreen}
+      options={{headerShown:false}} />
+<Stack.Screen name="FeedbackDetails" component={FeedbackDetailsScreen}
+options={{headerShown:false}} />
      
     </Stack.Navigator>
   );

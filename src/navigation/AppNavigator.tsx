@@ -26,7 +26,7 @@ import { CreateSwapRequestScreen } from '../screens/CreateSwapRequestScreen';
 import { SwapRequestDetailsScreen } from '../screens/SwapRequestDetailsScreen';
 import { DetailedStatisticsScreen } from '../screens/DetailedStatisticsScreen';
 import { FullLeaderboardScreen } from '../screens/FullLeaderboardScreen';
-import { GroupSettingsScreen } from '../screens/GroupSettingsScreen';
+
 
 const Stack = createStackNavigator();
 
@@ -199,13 +199,8 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
 
-      {/* ============= GROUP SETTINGS ============= */}
-      
-      <Stack.Screen 
-        name="GroupSettings" 
-        component={GroupSettingsScreen}
-        options={{ headerShown: false }}
-      />
+     
+     
     </Stack.Navigator>
   );
 }

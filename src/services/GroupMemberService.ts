@@ -1,4 +1,3 @@
-// src/groupMemberServices/GroupMemberService.ts (React Native - FRONTEND)
 import {API_BASE_URL} from '../config/api';
 
 const API_URL = `${API_BASE_URL}/api/group`; 
@@ -33,7 +32,7 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Getting members with rotation for group ${groupId}`);
       
-      const response = await fetch(`${API_URL}/${groupId}/members/rotation`, {
+      const response = await fetch(`${API_URL}/${groupId}/members-rotation`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -68,6 +67,28 @@ export class GroupMembersService {
       return {
         success: false,
         message: error.message || 'Failed to load group info'
+      };
+    }
+  }
+
+  // ✅ NEW: Get full group settings (admin only)
+  static async getGroupSettings(groupId: string) {
+    try {
+      console.log(`GroupMembersService: Getting settings for group ${groupId}`);
+      
+      const response = await fetch(`${API_URL}/${groupId}/settings`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('GroupMembersService.getGroupSettings error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load group settings'
       };
     }
   }
@@ -206,7 +227,7 @@ export class GroupMembersService {
       console.log(`GroupMembersService: Leaving group ${groupId}`);
       
       const response = await fetch(`${API_URL}/${groupId}/leave`, {
-        method: 'POST',
+        method: 'DELETE', // Changed from POST to DELETE to match backend
         credentials: 'include'
       });
 
@@ -227,7 +248,7 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Getting rotation schedule for group ${groupId} (${weeks} weeks)`);
       
-      const response = await fetch(`${API_URL}/${groupId}/rotation-schedule?weeks=${weeks}`, {
+      const response = await fetch(`${API_URL}/${groupId}/rotation-preview?weeks=${weeks}`, {
         method: 'GET',
         credentials: 'include'
       });
@@ -249,7 +270,6 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Getting group details for ${groupId}`);
       
-      // Note: This endpoint might be the same as getGroupInfo
       const response = await fetch(`${API_URL}/${groupId}`, {
         method: 'GET',
         credentials: 'include'
@@ -272,7 +292,6 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Getting current week assignments for group ${groupId}`);
       
-      // This endpoint should be added to your backend
       const response = await fetch(`${API_URL}/${groupId}/current-assignments`, {
         method: 'GET',
         credentials: 'include'
@@ -289,82 +308,151 @@ export class GroupMembersService {
       };
     }
   }
-  // Add this method to src/groupMemberServices/GroupMemberService.ts
-static async updateGroup(groupId: string, groupData: { name?: string, description?: string }) {
-  try {
-    console.log(`GroupMembersService: Updating group ${groupId} with data:`, groupData);
-    
-    const response = await fetch(`${API_URL}/${groupId}/update`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify(groupData),
-      credentials: 'include'
-    });
 
-    const result = await response.json(); 
-    return result;
+  // ✅ UPDATED: Update group (name, description) - admin only
+  static async updateGroup(groupId: string, groupData: { name?: string, description?: string }) {
+    try {
+      console.log(`GroupMembersService: Updating group ${groupId} with data:`, groupData);
+      
+      const response = await fetch(`${API_URL}/${groupId}/update`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(groupData),
+        credentials: 'include'
+      });
 
-  } catch (error: any) {
-    console.error('GroupMembersService.updateGroup error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to update group'
-    };
+      const result = await response.json(); 
+      return result;
+
+    } catch (error: any) {
+      console.error('GroupMembersService.updateGroup error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to update group'
+      };
+    }
+  }
+
+  // ✅ NEW: Transfer ownership (admin only)
+  static async transferOwnership(groupId: string, newAdminId: string) {
+    try {
+      console.log(`GroupMembersService: Transferring ownership of group ${groupId} to user ${newAdminId}`);
+      
+      const response = await fetch(`${API_URL}/${groupId}/transfer-ownership`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ newAdminId }),
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('GroupMembersService.transferOwnership error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to transfer ownership'
+      };
+    }
+  }
+
+  // ✅ NEW: Regenerate invite code (admin only)
+  static async regenerateInviteCode(groupId: string) {
+    try {
+      console.log(`GroupMembersService: Regenerating invite code for group ${groupId}`);
+      
+      const response = await fetch(`${API_URL}/${groupId}/regenerate-invite`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('GroupMembersService.regenerateInviteCode error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to regenerate invite code'
+      };
+    }
+  }
+
+  // ✅ NEW: Delete group (admin only)
+  static async deleteGroup(groupId: string) {
+    try {
+      console.log(`GroupMembersService: Deleting group ${groupId}`);
+      
+      const response = await fetch(`${API_URL}/${groupId}/delete`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('GroupMembersService.deleteGroup error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to delete group'
+      };
+    }
+  }
+
+  // ✅ NEW: Delete group avatar
+  static async deleteGroupAvatar(groupId: string) {
+    try {
+      console.log(`GroupMembersService: Deleting avatar for group ${groupId}`);
+      
+      const response = await fetch(`${API_URL}/${groupId}/avatar`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('GroupMembersService.deleteGroupAvatar error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to delete group avatar'
+      };
+    }
+  }
+
+  // Upload group avatar - use the upload service endpoint
+  static async uploadGroupAvatar(groupId: string, base64Image: string) {
+    try {
+      console.log(`GroupMembersService: Uploading avatar for group ${groupId}`);
+      
+      const response = await fetch(`${API_BASE_URL}/api/uploads/group/${groupId}/avatar/base64`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({ avatarBase64: base64Image }),
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('GroupMembersService.uploadGroupAvatar error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to upload group avatar'
+      };
+    }
   }
 }
-
-// Upload group avatar - use the upload service endpoint
-static async uploadGroupAvatar(groupId: string, base64Image: string) {
-  try {
-    console.log(`GroupMembersService: Uploading avatar for group ${groupId}`);
-    
-    // Use the upload service endpoint
-    const response = await fetch(`${API_BASE_URL}/api/uploads/group/${groupId}/avatar/base64`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({ avatarBase64: base64Image }),
-      credentials: 'include'
-    });
-
-    const result = await response.json();
-    return result;
-
-  } catch (error: any) {
-    console.error('GroupMembersService.uploadGroupAvatar error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to upload group avatar'
-    };
-  }
-}
-
-// Delete group avatar - CORRECTED
-static async deleteGroupAvatar(groupId: string) {
-  try {
-    console.log(`GroupMembersService: Deleting avatar for group ${groupId}`);
-    
-    // CORRECT: Use the upload service endpoint
-    const response = await fetch(`${API_BASE_URL}/api/uploads/group/${groupId}/avatar`, {
-      method: 'DELETE',
-      credentials: 'include'
-    });
-
-    const result = await response.json();
-    return result;
-
-  } catch (error: any) { 
-    console.error('GroupMembersService.deleteGroupAvatar error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to delete group avatar'
-    };
-  }
-}
-
-} 

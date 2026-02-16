@@ -22,7 +22,6 @@ interface SettingsModalProps {
   navigation: any;
   onNavigateToAssignment?: () => void;
   onRefreshTasks?: () => void;
-  onCreateTask?: () => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -34,7 +33,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   navigation,
   onNavigateToAssignment,
   onRefreshTasks,
-  onCreateTask
 }) => {
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
@@ -137,7 +135,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onClose();
   };
 
-  const handleViewMembers = () => {
+  // Group Settings - navigates to GroupMembers screen which has all settings
+  const handleGroupSettings = () => {
     navigation.navigate('GroupMembers', { groupId, groupName, userRole });
     onClose();
   };
@@ -155,22 +154,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       groupId, 
       groupName
     });
-    onClose();
-  };
-
-  const handleGroupSettings = () => {
-    navigation.navigate('GroupSettings', { groupId, groupName, userRole });
-    onClose();
-  };
-
-  const handleCreateTask = () => {
-    if (!isAdmin) {
-      Alert.alert('Restricted', 'Only admins can create tasks');
-      onClose();
-      return;
-    }
-    
-    onCreateTask?.();
     onClose();
   };
 
@@ -240,18 +223,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </View>
 
           <ScrollView style={styles.modalBody}>
-            {isAdmin && (
-              <View style={styles.section}>
-                <TouchableOpacity 
-                  style={styles.createTaskButton}
-                  onPress={handleCreateTask}
-                >
-                  <MaterialCommunityIcons name="plus-circle" size={24} color="#fff" />
-                  <Text style={styles.createTaskButtonText}>Create New Task</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
+            {/* Rotation Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="calendar-sync" size={20} color="#007AFF" />
@@ -285,6 +257,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </TouchableOpacity>
             </View>
 
+            {/* Admin Actions - Only visible to admins */}
             {isAdmin && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -301,12 +274,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#999" />
                 </TouchableOpacity>
 
+                {/* Group Settings - renamed and icon changed */}
                 <TouchableOpacity 
                   style={styles.actionButton}
-                  onPress={handleViewMembers}
+                  onPress={handleGroupSettings}
                 >
-                  <MaterialCommunityIcons name="account-group" size={18} color="#007AFF" />
-                  <Text style={styles.actionButtonText}>Manage Members</Text>
+                  <MaterialCommunityIcons name="cog" size={18} color="#007AFF" />
+                  <Text style={styles.actionButtonText}>Group Settings</Text>
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#999" />
                 </TouchableOpacity>
                    
@@ -323,18 +297,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#999" />
                 </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={handleGroupSettings}
-                >
-                  <MaterialCommunityIcons name="cog" size={18} color="#007AFF" />
-                  <Text style={styles.actionButtonText}>Group Settings</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#999" />
-                </TouchableOpacity>
               </View>
             )}
 
+            {/* Statistics Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="chart-bar" size={20} color="#007AFF" />
@@ -387,6 +353,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </TouchableOpacity>
             </View>
 
+            {/* Leaderboard Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="podium" size={20} color="#007AFF" />
@@ -476,21 +443,6 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 24
-  },
-  createTaskButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 12,
-    gap: 10,
-    marginBottom: 16
-  },
-  createTaskButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold'
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -703,7 +655,7 @@ const styles = StyleSheet.create({
   },
   pendingBadgeText: {
     color: 'white',
-    fontSize: 11,
+    fontSize: 11, 
     fontWeight: '600'
   }
 });

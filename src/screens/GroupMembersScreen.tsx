@@ -1,4 +1,3 @@
-// src/screens/GroupMembersScreen.tsx
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -37,7 +36,13 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     fetchGroupMembers,
     updateGroupAvatar,
     removeGroupAvatar,
-    setMembers
+    setMembers,
+    updateGroupInfo,
+    transferOwnership,
+    regenerateInviteCode,
+    deleteGroup,
+    updateMemberRole,
+    removeMember
   } = useGroupMembers();
 
   const [currentUserRole, setCurrentUserRole] = useState<string>(userRole || 'MEMBER');
@@ -48,6 +53,9 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     description: ''
   });
   const [savingGroup, setSavingGroup] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [selectedMemberForTransfer, setSelectedMemberForTransfer] = useState<any>(null);
   
   // Avatar upload hook - for group avatars
   const {
@@ -158,6 +166,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       });
       
       if (result.success) {
+        updateGroupInfo(result.group);
         Alert.alert('Success', 'Group updated successfully');
         setShowEditModal(false);
         fetchData(true); // Refresh data to get updated group info
@@ -195,7 +204,6 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     try {
       const photo = await takePhotoWithCamera();
       if (photo) {
-        // Upload the photo using uploadGroupAvatar
         await uploadGroupAvatar(groupId, photo);
       }
     } catch (err: any) {
@@ -207,7 +215,6 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     try {
       const photo = await pickImageFromGallery();
       if (photo) {
-        // Upload the photo using uploadGroupAvatar
         await uploadGroupAvatar(groupId, photo);
       }
     } catch (err: any) {
@@ -270,17 +277,11 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           text: 'Remove', 
           style: 'destructive',
           onPress: async () => {
-            try {
-              const result = await GroupMembersService.removeMember(groupId, member.id);
-              
-              if (result.success) {
-                setMembers(prev => prev.filter(m => m.id !== member.id));
-                Alert.alert('Success', 'Member removed successfully');
-              } else {
-                Alert.alert('Error', result.message || 'Failed to remove member');
-              }
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to remove member');
+            const result = await removeMember(groupId, member.id);
+            if (result.success) {
+              Alert.alert('Success', 'Member removed successfully');
+            } else {
+              Alert.alert('Error', result.message || 'Failed to remove member');
             }
           }
         }
@@ -311,25 +312,113 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         { 
           text: 'Confirm', 
           onPress: async () => {
-            try {
-              const result = await GroupMembersService.updateMemberRole(groupId, member.id, newRole);
-              
-              if (result.success) {
-                setMembers(prev => prev.map(m => 
-                  m.id === member.id ? { ...m, role: newRole } : m
-                ));
-                Alert.alert('Success', 'Role updated successfully');
-              } else {
-                Alert.alert('Error', result.message || 'Failed to update role');
-              }
-            } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to update role');
+            const result = await updateMemberRole(groupId, member.id, newRole);
+            if (result.success) {
+              Alert.alert('Success', 'Role updated successfully');
+            } else {
+              Alert.alert('Error', result.message || 'Failed to update role');
             }
           }
         } 
       ]
     );   
-  };  
+  };
+
+  const handleTransferOwnership = () => {
+    // Get all members except current user
+    const otherMembers = members.filter(m => m.userId !== currentUserId);
+    
+    if (otherMembers.length === 0) {
+      Alert.alert('No Members', 'There are no other members to transfer ownership to.');
+      return;
+    }
+
+    Alert.alert(
+      'Transfer Ownership',
+      'Select new group admin:',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        ...otherMembers.map(m => ({
+          text: `${m.fullName} ${m.role === 'ADMIN' ? '(Admin)' : ''}`,
+          onPress: () => confirmTransfer(m)
+        })),
+      ]
+    );
+  };
+
+  const confirmTransfer = (member: any) => {
+    Alert.alert(
+      'Confirm Transfer',
+      `Are you sure you want to make ${member.fullName} the new group admin? You will lose admin privileges.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Transfer',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await transferOwnership(groupId, member.userId);
+            if (result.success) {
+              Alert.alert(
+                'Success',
+                'Ownership transferred. You are now a regular member.',
+                [{ text: 'OK', onPress: () => fetchData(true) }]
+              );
+            } else {
+              Alert.alert('Error', result.message || 'Failed to transfer ownership');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleRegenerateInviteCode = () => {
+    Alert.alert(
+      'Regenerate Invite Code',
+      'Are you sure? The old invite code will stop working immediately.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Regenerate',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await regenerateInviteCode(groupId);
+            if (result.success) {
+              Alert.alert('Success', 'New invite code generated');
+            } else {
+              Alert.alert('Error', result.message || 'Failed to regenerate code');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleDeleteGroup = () => {
+    Alert.alert(
+      'Delete Group',
+      'Are you absolutely sure? This will permanently delete the group and all its tasks. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Permanently',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await deleteGroup(groupId);
+            if (result.success) {
+              Alert.alert(
+                'Group Deleted',
+                'The group has been permanently deleted.',
+                [{ text: 'OK', onPress: () => navigation.navigate('MyGroups') }]
+              );
+            } else {
+              Alert.alert('Error', result.message || 'Failed to delete group');
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const handleLeaveGroup = () => {
     // Check if user is the only admin
@@ -338,7 +427,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       if (adminCount <= 1) {
         Alert.alert(
           'Cannot Leave as Only Admin',
-          'You are the only admin in this group. Promote another member to admin before leaving.'
+          'You are the only admin in this group. Transfer ownership or delete the group before leaving.'
         );
         return;
       }
@@ -556,9 +645,19 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           <MaterialCommunityIcons name="arrow-left" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Group Info</Text>
-        <TouchableOpacity onPress={() => fetchData(true)}>
-          <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={() => fetchData(true)} style={styles.headerIcon}>
+            <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
+          </TouchableOpacity>
+          {currentUserRole === 'ADMIN' && (
+            <TouchableOpacity 
+              onPress={() => setShowSettingsModal(true)} 
+              style={styles.headerIcon}
+            >
+              <MaterialCommunityIcons name="cog" size={24} color="#007AFF" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ScrollView
@@ -657,6 +756,9 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               style={styles.inviteCodeCard}
               onPress={() => {
                 Alert.alert('Invite Code', inviteCodeToShow, [
+                  { text: 'Copy', onPress: () => {
+                    // Copy to clipboard
+                  }},
                   { text: 'Share', onPress: handleShareInvite },
                   { text: 'OK', style: 'cancel' }
                 ]);
@@ -669,6 +771,16 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             <Text style={styles.inviteInstructions}>
               Share this code with friends to join the group
             </Text>
+
+            {currentUserRole === 'ADMIN' && (
+              <TouchableOpacity 
+                style={styles.regenerateButton}
+                onPress={handleRegenerateInviteCode}
+              >
+                <MaterialCommunityIcons name="refresh" size={16} color="#e67700" />
+                <Text style={styles.regenerateButtonText}>Regenerate Code</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -679,7 +791,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             <View style={styles.warningContent}>
               <Text style={styles.warningTitle}>You are the only admin</Text>
               <Text style={styles.warningText}>
-                Promote another member to admin before leaving the group.
+                Transfer ownership to another member before leaving the group.
               </Text>
             </View>
           </View>
@@ -741,6 +853,94 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Settings Modal */}
+      <Modal
+        visible={showSettingsModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSettingsModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Group Settings</Text>
+              <TouchableOpacity onPress={() => setShowSettingsModal(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody}>
+              {/* Transfer Ownership */}
+              <TouchableOpacity 
+                style={styles.settingsItem}
+                onPress={() => {
+                  setShowSettingsModal(false);
+                  handleTransferOwnership();
+                }}
+              >
+                <View style={[styles.settingsIcon, { backgroundColor: '#EEF2FF' }]}>
+                  <MaterialCommunityIcons name="swap-horizontal" size={20} color="#4F46E5" />
+                </View>
+                <View style={styles.settingsContent}>
+                  <Text style={styles.settingsTitle}>Transfer Ownership</Text>
+                  <Text style={styles.settingsDescription}>
+                    Make another member the group admin
+                  </Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+
+              {/* Regenerate Invite Code */}
+              <TouchableOpacity 
+                style={styles.settingsItem}
+                onPress={() => {
+                  setShowSettingsModal(false);
+                  handleRegenerateInviteCode();
+                }}
+              >
+                <View style={[styles.settingsIcon, { backgroundColor: '#FEF3C7' }]}>
+                  <MaterialCommunityIcons name="refresh" size={20} color="#F59E0B" />
+                </View>
+                <View style={styles.settingsContent}>
+                  <Text style={styles.settingsTitle}>Regenerate Invite Code</Text>
+                  <Text style={styles.settingsDescription}>
+                    Create a new invite code (old one stops working)
+                  </Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
+              </TouchableOpacity>
+
+              {/* Delete Group - Danger */}
+              <TouchableOpacity 
+                style={[styles.settingsItem, styles.dangerItem]}
+                onPress={() => {
+                  setShowSettingsModal(false);
+                  handleDeleteGroup();
+                }}
+              >
+                <View style={[styles.settingsIcon, { backgroundColor: '#FEE2E2' }]}>
+                  <MaterialCommunityIcons name="trash-can" size={20} color="#EF4444" />
+                </View>
+                <View style={styles.settingsContent}>
+                  <Text style={[styles.settingsTitle, styles.dangerText]}>Delete Group</Text>
+                  <Text style={styles.settingsDescription}>
+                    Permanently delete this group and all tasks
+                  </Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color="#EF4444" />
+              </TouchableOpacity>
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={styles.modalCloseButton}
+              onPress={() => setShowSettingsModal(false)}
+            >
+              <Text style={styles.modalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Edit Group Modal */}
       <Modal
@@ -904,6 +1104,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#000'
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  headerIcon: {
+    padding: 4
   },
   avatarBanner: {
     padding: 20,
@@ -1086,7 +1294,24 @@ const styles = StyleSheet.create({
   },
   inviteInstructions: {
     fontSize: 14,
-    color: '#6c757d'
+    color: '#6c757d',
+    marginBottom: 12
+  },
+  regenerateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    backgroundColor: '#fff3bf',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffd43b'
+  },
+  regenerateButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#e67700'
   },
   warningSection: {
     flexDirection: 'row',
@@ -1328,6 +1553,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0'
   },
+  modalCloseButton: {
+    padding: 16,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0'
+  },
+  modalCloseText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF'
+  },
   cancelButton: {
     flex: 1,
     paddingVertical: 14,
@@ -1442,5 +1678,40 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     flex: 1,
     lineHeight: 20
+  },
+  // Settings Modal Items
+  settingsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    gap: 16
+  },
+  dangerItem: {
+    borderBottomWidth: 0
+  },
+  settingsIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  settingsContent: {
+    flex: 1
+  },
+  settingsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 4
+  },
+  settingsDescription: {
+    fontSize: 14,
+    color: '#6c757d'
+  },
+  dangerText: {
+    color: '#EF4444'
   }
 });

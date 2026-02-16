@@ -12,7 +12,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
-import { useNavigation } from '@react-navigation/native';
+
 interface SettingsModalProps {
   visible: boolean;
   onClose: () => void;
@@ -41,6 +41,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [groupStats, setGroupStats] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [rotationWeek, setRotationWeek] = useState<number>(1);
+  const [members, setMembers] = useState<any[]>([]);
 
   const isAdmin = userRole === 'ADMIN';
 
@@ -48,20 +49,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     if (!visible) return;
 
     try {
+      // Load stats from TaskService
       setLoadingStats(true);
       const statsResult = await TaskService.getTaskStatistics(groupId);
       if (statsResult.success) {
-        setGroupStats(statsResult.statistics); 
+        setGroupStats(statsResult.statistics);
+        
+        // Create leaderboard from pointsByUser if available
+        if (statsResult.statistics?.pointsByUser) {
+          const sortedUsers = Object.values(statsResult.statistics.pointsByUser)
+            .sort((a: any, b: any) => b.totalPoints - a.totalPoints)
+            .slice(0, 5);
+          setLeaderboard(sortedUsers);
+        }
       }
 
+      // Load group info from GroupMembersService
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
         setRotationWeek(groupResult.group?.currentRotationWeek || 1);
       }
 
-      setLoadingLeaderboard(true);
-      const leaderboardResult = await getLeaderboardData(groupId);
-      setLeaderboard(leaderboardResult);
+      // Load members for potential leaderboard data
+      const membersResult = await GroupMembersService.getGroupMembers(groupId);
+      if (membersResult.success) {
+        setMembers(membersResult.members || []);
+      }
 
     } catch (error) {
       console.error('Error loading group data:', error);
@@ -71,14 +84,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const getLeaderboardData = async (groupId: string) => {
-    return [
-      { userId: '1', userName: 'John Doe', points: 45, completedTasks: 12 },
-      { userId: '2', userName: 'Jane Smith', points: 38, completedTasks: 10 },
-      { userId: '3', userName: 'Bob Johnson', points: 28, completedTasks: 8 },
-      { userId: '4', userName: 'Alice Brown', points: 22, completedTasks: 6 },
-    ];
-  };
+  useEffect(() => {
+    if (visible) {
+      loadGroupData();
+    }
+  }, [visible]);
 
   const handleRotateTasks = async () => {
     Alert.alert(
@@ -107,14 +117,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       ]
     );
   };
-const handleReviewSubmissions = () => {
-  navigation.navigate('PendingVerifications', {
-    groupId,
-    groupName,
-    userRole
-  });
-  onClose();
-};
+
+  const handleReviewSubmissions = () => {
+    navigation.navigate('PendingVerifications', {
+      groupId,
+      groupName,
+      userRole
+    });
+    onClose();
+  };
+
   const handleViewRotationSchedule = () => {
     navigation.navigate('RotationSchedule', { groupId, groupName });
     onClose();
@@ -131,6 +143,18 @@ const handleReviewSubmissions = () => {
   };
 
   const handleTaskStatistics = () => {
+    navigation.navigate('DetailedStatistics', { 
+      groupId, 
+      groupName
+    });
+    onClose();
+  };
+
+  const handleViewFullLeaderboard = () => {
+    navigation.navigate('FullLeaderboard', { 
+      groupId, 
+      groupName
+    });
     onClose();
   };
 
@@ -149,12 +173,6 @@ const handleReviewSubmissions = () => {
     onCreateTask?.();
     onClose();
   };
-
-  useEffect(() => {
-    if (visible) {
-      loadGroupData();
-    }
-  }, [visible]);
 
   const renderLeaderboardItem = (item: any, index: number) => {
     const isFirst = index === 0;
@@ -191,13 +209,13 @@ const handleReviewSubmissions = () => {
               {item.userName}
             </Text>
             <Text style={styles.userStats}>
-              {item.completedTasks} tasks • {item.points} pts
+              {item.assignments?.length || 0} tasks • {item.totalPoints} pts
             </Text>
           </View>
         </View>
         
         <View style={styles.pointsBadge}>
-          <Text style={styles.pointsText}>{item.points}</Text>
+          <Text style={styles.pointsText}>{item.totalPoints}</Text>
         </View>
       </View>
     );
@@ -292,19 +310,19 @@ const handleReviewSubmissions = () => {
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#999" />
                 </TouchableOpacity>
                    
-                     <TouchableOpacity 
-      style={[styles.actionButton, styles.reviewButton]}
-      onPress={handleReviewSubmissions}
-    >
-      <MaterialCommunityIcons name="clipboard-check" size={18} color="#007AFF" />
-      <View style={styles.reviewButtonContent}>
-        <Text style={styles.actionButtonText}>Review Submissions</Text>
-        <View style={styles.pendingBadge}>
-          <Text style={styles.pendingBadgeText}>Pending</Text>
-        </View>
-      </View>
-      <MaterialCommunityIcons name="chevron-right" size={18} color="#999" />
-    </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.actionButton, styles.reviewButton]}
+                  onPress={handleReviewSubmissions}
+                >
+                  <MaterialCommunityIcons name="clipboard-check" size={18} color="#007AFF" />
+                  <View style={styles.reviewButtonContent}>
+                    <Text style={styles.actionButtonText}>Review Submissions</Text>
+                    <View style={styles.pendingBadge}>
+                      <Text style={styles.pendingBadgeText}>Pending</Text>
+                    </View>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={18} color="#999" />
+                </TouchableOpacity>
 
                 <TouchableOpacity 
                   style={styles.actionButton}
@@ -387,7 +405,10 @@ const handleReviewSubmissions = () => {
                 <Text style={styles.noDataText}>No leaderboard data yet</Text>
               )}
 
-              <TouchableOpacity style={styles.viewAllButton}>
+              <TouchableOpacity 
+                style={styles.viewAllButton}
+                onPress={handleViewFullLeaderboard}
+              >
                 <Text style={styles.viewAllText}>View Full Leaderboard</Text>
               </TouchableOpacity>
             </View>
@@ -663,26 +684,26 @@ const styles = StyleSheet.create({
     fontSize: 14
   },
   reviewButton: {
-  backgroundColor: '#e7f5ff',
-  borderColor: '#a5d8ff'
-},
-reviewButtonContent: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  marginHorizontal: 12
-},
-pendingBadge: {
-  backgroundColor: '#e67700',
-  paddingHorizontal: 8,
-  paddingVertical: 2,
-  borderRadius: 12,
-  marginLeft: 8
-},
-pendingBadgeText: {
-  color: 'white',
-  fontSize: 11,
-  fontWeight: '600'
-}
+    backgroundColor: '#e7f5ff',
+    borderColor: '#a5d8ff'
+  },
+  reviewButtonContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 12
+  },
+  pendingBadge: {
+    backgroundColor: '#e67700',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8
+  },
+  pendingBadgeText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '600'
+  }
 });

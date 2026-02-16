@@ -18,7 +18,6 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
     loadLeaderboardData();
@@ -26,17 +25,13 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
 
   const loadLeaderboardData = async () => {
     try {
-      // Using your existing TaskService.getTaskStatistics
+      // Using TaskService.getTaskStatistics which already has pointsByUser
       const result = await TaskService.getTaskStatistics(groupId);
-      if (result.success) {
-        setStats(result.statistics);
-        
-        // Create leaderboard from pointsByUser if available
-        if (result.statistics?.pointsByUser) {
-          const sortedUsers = Object.values(result.statistics.pointsByUser)
-            .sort((a: any, b: any) => b.totalPoints - a.totalPoints);
-          setLeaderboard(sortedUsers);
-        }
+      if (result.success && result.statistics?.pointsByUser) {
+        // Convert pointsByUser object to array and sort by points
+        const sortedUsers = Object.values(result.statistics.pointsByUser)
+          .sort((a: any, b: any) => b.totalPoints - a.totalPoints);
+        setLeaderboard(sortedUsers);
       }
     } catch (error) {
       console.error('Error loading leaderboard:', error);

@@ -25,7 +25,7 @@ function cleanTaskData(obj: any): any {
     }
     return Object.keys(cleaned).length > 0 ? cleaned : undefined;
   }
-  
+   
   return obj;
 }
 

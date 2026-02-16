@@ -1,6 +1,6 @@
 // src/hooks/useHomeData.ts
 import { useState, useEffect, useCallback } from 'react';
-import { HomeService } from '../homeService/HomeService'; // Fixed import path
+import { HomeService } from '../services/HomeService'; // Fixed import path
 
 export function useHomeData() {
   const [loading, setLoading] = useState<boolean>(true);

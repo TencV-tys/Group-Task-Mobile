@@ -11,42 +11,32 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LeaderboardService, LeaderboardEntry } from '../services/LeaderboardService';
+import { TaskService } from '../services/TaskService';
 
 export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const { groupId, groupName } = route.params;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [selectedWeek, setSelectedWeek] = useState<'current' | 'previous' | 'all'>('current');
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(true);
-  const limit = 20;
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
 
   useEffect(() => {
-    loadLeaderboard();
-  }, [groupId, selectedWeek]);
+    loadLeaderboardData();
+  }, [groupId]);
 
-  const loadLeaderboard = async (reset = true) => {
-    if (reset) {
-      setLoading(true);
-      setPage(0);
-    }
-
+  const loadLeaderboardData = async () => {
     try {
-      const result = await LeaderboardService.getGroupLeaderboard(groupId, {
-        week: selectedWeek === 'current' ? undefined : -1,
-        limit,
-        offset: reset ? 0 : page * limit,
-      });
-
+      // Using your existing TaskService.getTaskStatistics
+      const result = await TaskService.getTaskStatistics(groupId);
       if (result.success) {
-        if (reset) {
-          setLeaderboard(result.data.entries || []);
-        } else {
-          setLeaderboard(prev => [...prev, ...(result.data.entries || [])]);
+        setStats(result.statistics);
+        
+        // Create leaderboard from pointsByUser if available
+        if (result.statistics?.pointsByUser) {
+          const sortedUsers = Object.values(result.statistics.pointsByUser)
+            .sort((a: any, b: any) => b.totalPoints - a.totalPoints);
+          setLeaderboard(sortedUsers);
         }
-        setHasMore(result.data.entries?.length === limit);
       }
     } catch (error) {
       console.error('Error loading leaderboard:', error);
@@ -58,14 +48,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    loadLeaderboard(true);
-  };
-
-  const handleLoadMore = () => {
-    if (!loading && hasMore) {
-      setPage(prev => prev + 1);
-      loadLeaderboard(false);
-    }
+    loadLeaderboardData();
   };
 
   const getRankIcon = (index: number) => {
@@ -81,7 +64,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     }
   };
 
-  const renderLeaderboardItem = ({ item, index }: { item: LeaderboardEntry; index: number }) => (
+  const renderLeaderboardItem = ({ item, index }: { item: any; index: number }) => (
     <View style={[
       styles.leaderboardItem,
       index === 0 && styles.firstPlace,
@@ -98,27 +81,36 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
             <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
           ) : (
             <Text style={styles.avatarText}>
-              {item.fullName?.charAt(0).toUpperCase() || '?'}
+              {item.userName?.charAt(0).toUpperCase() || '?'}
             </Text>
           )}
         </View>
         
         <View style={styles.userInfo}>
           <Text style={styles.userName} numberOfLines={1}>
-            {item.fullName}
+            {item.userName}
           </Text>
           <Text style={styles.userStats}>
-            {item.completedTasks} tasks • {item.completionRate}% completion
+            {item.assignments?.length || 0} tasks
           </Text>
         </View>
       </View>
 
       <View style={styles.pointsContainer}>
-        <Text style={styles.pointsValue}>{item.points}</Text>
+        <Text style={styles.pointsValue}>{item.totalPoints}</Text>
         <Text style={styles.pointsLabel}>points</Text>
       </View>
     </View>
   );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+        <Text style={styles.loadingText}>Loading leaderboard...</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -130,33 +122,6 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
         <Text style={styles.groupName} numberOfLines={1}>{groupName}</Text>
       </View>
 
-      <View style={styles.weekSelector}>
-        <TouchableOpacity
-          style={[styles.weekButton, selectedWeek === 'current' && styles.weekButtonActive]}
-          onPress={() => setSelectedWeek('current')}
-        >
-          <Text style={[styles.weekText, selectedWeek === 'current' && styles.weekTextActive]}>
-            Current Week
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.weekButton, selectedWeek === 'previous' && styles.weekButtonActive]}
-          onPress={() => setSelectedWeek('previous')}
-        >
-          <Text style={[styles.weekText, selectedWeek === 'previous' && styles.weekTextActive]}>
-            Previous Week
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.weekButton, selectedWeek === 'all' && styles.weekButtonActive]}
-          onPress={() => setSelectedWeek('all')}
-        >
-          <Text style={[styles.weekText, selectedWeek === 'all' && styles.weekTextActive]}>
-            All Time
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       <FlatList
         data={leaderboard}
         renderItem={renderLeaderboardItem}
@@ -165,8 +130,6 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
-        onEndReached={handleLoadMore}
-        onEndReachedThreshold={0.5}
         ListHeaderComponent={
           <View style={styles.statsHeader}>
             <Text style={styles.statsTitle}>Top Performers</Text>
@@ -176,20 +139,13 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
           </View>
         }
         ListEmptyComponent={
-          loading ? null : (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="trophy-outline" size={64} color="#D1D5DB" />
-              <Text style={styles.emptyTitle}>No Data Yet</Text>
-              <Text style={styles.emptyText}>
-                Complete tasks to earn points and appear on the leaderboard
-              </Text>
-            </View>
-          )
-        }
-        ListFooterComponent={
-          loading && !refreshing ? (
-            <ActivityIndicator style={styles.loader} color="#4F46E5" />
-          ) : null
+          <View style={styles.emptyContainer}>
+            <Ionicons name="trophy-outline" size={64} color="#D1D5DB" />
+            <Text style={styles.emptyTitle}>No Data Yet</Text>
+            <Text style={styles.emptyText}>
+              Complete tasks to earn points and appear on the leaderboard
+            </Text>
+          </View>
         }
       />
     </SafeAreaView>
@@ -200,6 +156,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
   },
   header: {
     flexDirection: 'row',
@@ -223,33 +189,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     maxWidth: 120,
-  },
-  weekSelector: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    margin: 16,
-    padding: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  weekButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  weekButtonActive: {
-    backgroundColor: '#4F46E5',
-  },
-  weekText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  weekTextActive: {
-    color: '#FFFFFF',
   },
   listContent: {
     padding: 16,
@@ -372,8 +311,5 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     textAlign: 'center',
     paddingHorizontal: 32,
-  },
-  loader: {
-    marginVertical: 20,
   },
 });

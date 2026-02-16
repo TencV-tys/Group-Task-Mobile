@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { TaskService } from '../taskServices/TaskService';
+import { TaskService } from '../services/TaskService';
 
 const { width } = Dimensions.get('window');
 
@@ -22,11 +22,12 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
 
   useEffect(() => {
     loadStatistics();
-  }, [groupId, selectedPeriod]);
+  }, [groupId]);
 
   const loadStatistics = async () => {
     setLoading(true);
     try {
+      // Using your existing TaskService.getTaskStatistics
       const result = await TaskService.getTaskStatistics(groupId);
       if (result.success) {
         setStats(result.statistics);
@@ -53,6 +54,10 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     );
   }
 
+  // Get data from your stats structure
+  const currentWeek = stats?.currentWeek || {};
+  const userStats = stats?.userStats || {};
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -64,35 +69,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Period Selector */}
-        <View style={styles.periodSelector}>
-          <TouchableOpacity
-            style={[styles.periodButton, selectedPeriod === 'week' && styles.periodButtonActive]}
-            onPress={() => setSelectedPeriod('week')}
-          >
-            <Text style={[styles.periodText, selectedPeriod === 'week' && styles.periodTextActive]}>
-              This Week
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.periodButton, selectedPeriod === 'month' && styles.periodButtonActive]}
-            onPress={() => setSelectedPeriod('month')}
-          >
-            <Text style={[styles.periodText, selectedPeriod === 'month' && styles.periodTextActive]}>
-              This Month
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.periodButton, selectedPeriod === 'all' && styles.periodButtonActive]}
-            onPress={() => setSelectedPeriod('all')}
-          >
-            <Text style={[styles.periodText, selectedPeriod === 'all' && styles.periodTextActive]}>
-              All Time
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Summary Cards */}
+        {/* Summary Cards - Using your actual data */}
         <View style={styles.summaryGrid}>
           <View style={styles.summaryCard}>
             <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
@@ -106,7 +83,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             <View style={[styles.iconContainer, { backgroundColor: '#D1FAE5' }]}>
               <Ionicons name="checkmark-circle" size={24} color="#10B981" />
             </View>
-            <Text style={styles.summaryNumber}>{stats?.currentWeek?.completedAssignments || 0}</Text>
+            <Text style={styles.summaryNumber}>{currentWeek?.completedAssignments || 0}</Text>
             <Text style={styles.summaryLabel}>Completed</Text>
           </View>
 
@@ -114,7 +91,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             <View style={[styles.iconContainer, { backgroundColor: '#FEF3C7' }]}>
               <Ionicons name="time" size={24} color="#F59E0B" />
             </View>
-            <Text style={styles.summaryNumber}>{stats?.currentWeek?.pendingAssignments || 0}</Text>
+            <Text style={styles.summaryNumber}>{currentWeek?.pendingAssignments || 0}</Text>
             <Text style={styles.summaryLabel}>Pending</Text>
           </View>
 
@@ -127,18 +104,18 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
           </View>
         </View>
 
-        {/* Points Overview */}
+        {/* Points Overview - Using your actual data */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Points Overview</Text>
           <View style={styles.pointsCard}>
             <View style={styles.pointsRow}>
               <Text style={styles.pointsLabel}>Total Points Earned:</Text>
-              <Text style={styles.pointsValue}>{stats?.currentWeek?.completedPoints || 0}</Text>
+              <Text style={styles.pointsValue}>{currentWeek?.completedPoints || 0}</Text>
             </View>
             <View style={styles.pointsRow}>
               <Text style={styles.pointsLabel}>Pending Points:</Text>
               <Text style={[styles.pointsValue, styles.pendingPoints]}>
-                {stats?.currentWeek?.pendingPoints || 0}
+                {currentWeek?.pendingPoints || 0}
               </Text>
             </View>
             <View style={styles.progressBar}>
@@ -146,19 +123,19 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
                 style={[
                   styles.progressFill, 
                   { 
-                    width: `${stats?.currentWeek?.completionRate || 0}%`,
-                    backgroundColor: getCompletionRateColor(stats?.currentWeek?.completionRate || 0)
+                    width: `${currentWeek?.completionRate || 0}%`,
+                    backgroundColor: getCompletionRateColor(currentWeek?.completionRate || 0)
                   }
                 ]} 
               />
             </View>
             <Text style={styles.completionRate}>
-              {stats?.currentWeek?.completionRate || 0}% Completion Rate
+              {currentWeek?.completionRate || 0}% Completion Rate
             </Text>
           </View>
         </View>
 
-        {/* Task Distribution */}
+        {/* Task Distribution - Using your actual data */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Task Distribution</Text>
           <View style={styles.distributionCard}>
@@ -186,31 +163,31 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
           </View>
         </View>
 
-        {/* User Performance */}
-        {stats?.userStats && (
+        {/* User Performance - Using your actual userStats */}
+        {userStats && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Your Performance</Text>
             <View style={styles.performanceCard}>
               <View style={styles.performanceRow}>
                 <Text>Your Assignments:</Text>
-                <Text style={styles.performanceNumber}>{stats.userStats.totalAssignments || 0}</Text>
+                <Text style={styles.performanceNumber}>{userStats.totalAssignments || 0}</Text>
               </View>
               <View style={styles.performanceRow}>
                 <Text>Completed:</Text>
                 <Text style={[styles.performanceNumber, { color: '#10B981' }]}>
-                  {stats.userStats.completed || 0}
+                  {userStats.completed || 0}
                 </Text>
               </View>
               <View style={styles.performanceRow}>
                 <Text>Pending:</Text>
                 <Text style={[styles.performanceNumber, { color: '#F59E0B' }]}>
-                  {stats.userStats.pending || 0}
+                  {userStats.pending || 0}
                 </Text>
               </View>
               <View style={styles.performanceRow}>
                 <Text>Your Points:</Text>
                 <Text style={[styles.performanceNumber, { color: '#4F46E5' }]}>
-                  {stats.userStats.userPoints || 0}
+                  {userStats.userPoints || 0}
                 </Text>
               </View>
             </View>
@@ -256,33 +233,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-  },
-  periodSelector: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  periodButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  periodButtonActive: {
-    backgroundColor: '#4F46E5',
-  },
-  periodText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#6B7280',
-  },
-  periodTextActive: {
-    color: '#FFFFFF',
   },
   summaryGrid: {
     flexDirection: 'row',

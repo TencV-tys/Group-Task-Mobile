@@ -21,6 +21,7 @@ import PendingVerificationsScreen from '../screens/PendingVerificationScreen';
 import FeedbackScreen from '../screens/FeedbackScreen';
 import FeedbackDetailsScreen from '../screens/FeedbackDetailsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import FeedbackHistoryScreen from '../screens/FeedbackHistoryScreen';
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
 import { MySwapRequestsScreen } from '../screens/MySwapRequestScreen';
@@ -212,6 +213,10 @@ options={{headerShown:false}} />
  <Stack.Screen name="Notifications"
   component={NotificationsScreen}
   options={{headerShown:false}} />
+
+  <Stack.Screen name="FeedbackHistory" 
+  component={FeedbackHistoryScreen} 
+  options={{ headerShown: false }} />
 
     </Stack.Navigator>
   );

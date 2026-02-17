@@ -195,8 +195,8 @@ export default function ProfileScreen({ navigation }: any) {
     navigation.navigate('Feedback');
   };
 
- const handleViewFeedbackHistory = () => {
-  navigation.navigate('Feedback', { showHistory: true });
+const handleViewFeedbackHistory = () => {
+  navigation.navigate('FeedbackHistory');
 };
 
   if (loading) {

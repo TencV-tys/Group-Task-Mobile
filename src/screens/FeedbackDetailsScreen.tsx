@@ -18,17 +18,20 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
     loading,
     selectedFeedback,
     loadFeedbackDetails,
-    deleteFeedback,  // Use the actual delete function, not confirmDelete
+    deleteFeedback,
     clearSelected
   } = useFeedback();
 
   useEffect(() => {
-    loadFeedbackDetails(feedbackId);
+    // Only load if we don't have this feedback or it's a different one
+    if (!selectedFeedback || selectedFeedback.id !== feedbackId) {
+      loadFeedbackDetails(feedbackId);
+    }
 
     return () => {
       clearSelected();
     };
-  }, [feedbackId, loadFeedbackDetails, clearSelected]);
+  }, [feedbackId]); // Only depend on feedbackId, not the functions
 
   const handleDelete = () => {
     Alert.alert(
@@ -171,7 +174,7 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
     </SafeAreaView>
   );
 }
-
+ 
 // Reuse helper functions from FeedbackScreen
 const getFeedbackIcon = (type: string) => {
   const icons: Record<string, string> = {
@@ -389,7 +392,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6c757d',
     marginBottom: 2,
-  },
+  }, 
   timelineSubDate: {
     fontSize: 12,
     color: '#adb5bd',

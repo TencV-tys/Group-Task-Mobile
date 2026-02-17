@@ -1115,4 +1115,4 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     lineHeight: 20
   } 
-});
+});   

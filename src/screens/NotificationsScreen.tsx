@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529',
+    color: '#212529', 
   },
   badge: {
     backgroundColor: '#FF3B30',

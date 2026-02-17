@@ -202,9 +202,9 @@ export default function AppNavigator() {
       />
 
      <Stack.Screen name="Feedback" 
-     component={FeedbackScreen}
+     component={FeedbackScreen} 
       options={{headerShown:false}} />
-      
+
 <Stack.Screen name="FeedbackDetails" 
 component={FeedbackDetailsScreen}
 options={{headerShown:false}} />

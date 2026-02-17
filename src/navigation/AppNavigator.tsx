@@ -3,8 +3,8 @@ import { createStackNavigator } from '@react-navigation/stack';
 
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
-import ForgotPasswordScreen from '../screens/ForgotPasswordScreen'; // Add this
-import ResetPasswordScreen from '../screens/ResetPasswordScreen';   // Add this
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import HomeScreen from '../screens/HomeScreen';
 import MyGroupScreen from '../screens/myGroupScreen';
 import JoinGroupScreen from '../screens/JoinGroupScreen';
@@ -49,19 +49,22 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
       
-      {/* ✅ NEW: Password Reset Screens */}
+      {/* Password Reset Screens */}
       <Stack.Screen
-        name="ForgotPassword"
+        name="ResetPassword"
+        component={ResetPasswordScreen}
+        options={{ headerShown: false }}  // Removed initialParams
+      />
+      
+      
+      <Stack.Screen
+        name="ForgotPassword" 
         component={ForgotPasswordScreen}
         options={{ headerShown: false }}
       />
       
-      <Stack.Screen
-        name="ResetPassword"
-        component={ResetPasswordScreen}
-        options={{ headerShown: false }}
-      />
-      
+
+
       {/* Main App Screens */}
       <Stack.Screen 
         name="Home" 
@@ -176,8 +179,7 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
 
-      {/* ============= SWAP REQUEST SCREENS ============= */}
-      
+      {/* Swap Request Screens */}
       <Stack.Screen
         name="PendingSwapRequests"
         component={PendingSwapRequestsScreen}
@@ -202,8 +204,7 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
 
-      {/* ============= STATISTICS & LEADERBOARD ============= */}
-      
+      {/* Statistics & Leaderboard */}
       <Stack.Screen 
         name="DetailedStatistics" 
         component={DetailedStatisticsScreen}

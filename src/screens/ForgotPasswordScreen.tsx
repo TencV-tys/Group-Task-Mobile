@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator
 } from 'react-native';
-import { AuthService } from '../services/AuthService';
+
 import { API_BASE_URL } from '../config/api';
 export default function ForgotPasswordScreen({ navigation }: any) {
   const [email, setEmail] = useState('');

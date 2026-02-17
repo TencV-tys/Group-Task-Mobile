@@ -71,7 +71,7 @@ export function useLoginForm(){
         setFormData({ email: '', password: '' });
         setMessage('');
         setSuccess(false);
-    };
+    }; 
 
     return {
         formData,

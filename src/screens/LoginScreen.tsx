@@ -14,7 +14,7 @@ import { useLoginForm } from '../authHook/useLoginForm';
 export default function LoginScreen({ navigation }: any) {
   const {
     formData, 
-    loading,
+    loading, 
     message,
     handleChange,
     handleSubmit
@@ -85,9 +85,20 @@ export default function LoginScreen({ navigation }: any) {
         )}
       </TouchableOpacity>
       
+      {/* ✅ NEW: Forgot Password Link */}
+      <TouchableOpacity 
+        onPress={() => navigation.navigate('ForgotPassword')}
+        disabled={loading}
+        style={styles.forgotPasswordContainer}
+      >
+        <Text style={styles.forgotPasswordLink}>Forgot Password?</Text>
+      </TouchableOpacity>
+      
+      {/* Sign Up Link */}
       <TouchableOpacity 
         onPress={() => navigation.navigate('Signup')}
         disabled={loading}
+        style={styles.signupContainer}
       >
         <Text style={styles.link}>Need an account? Sign Up</Text>
       </TouchableOpacity>
@@ -117,6 +128,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     marginBottom: 15,
     backgroundColor: 'white',
+    fontSize: 16,
   },
   button: {
     height: 50,
@@ -134,16 +146,32 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  link: {
+  // ✅ NEW: Forgot Password Styles
+  forgotPasswordContainer: {
+    marginTop: 15,
+    paddingVertical: 5,
+  },
+  forgotPasswordLink: {
+    color: '#007AFF',
+    textAlign: 'center',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  signupContainer: {
     marginTop: 20,
+    paddingVertical: 5,
+  },
+  link: {
     color: '#007AFF',
     textAlign: 'center',
     fontSize: 16,
+    fontWeight: '500',
   },
   messageBox: {
     padding: 12,
     borderRadius: 6,
     marginBottom: 20,
+    borderWidth: 1,
   },
   successBox: {
     backgroundColor: '#d4edda',
@@ -156,5 +184,6 @@ const styles = StyleSheet.create({
   messageText: {
     textAlign: 'center',
     fontSize: 14,
+    color: '#333',
   },
 });

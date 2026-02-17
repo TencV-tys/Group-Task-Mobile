@@ -3,6 +3,8 @@ import { createStackNavigator } from '@react-navigation/stack';
 
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen'; // Add this
+import ResetPasswordScreen from '../screens/ResetPasswordScreen';   // Add this
 import HomeScreen from '../screens/HomeScreen';
 import MyGroupScreen from '../screens/myGroupScreen';
 import JoinGroupScreen from '../screens/JoinGroupScreen';
@@ -30,7 +32,6 @@ import { SwapRequestDetailsScreen } from '../screens/SwapRequestDetailsScreen';
 import { DetailedStatisticsScreen } from '../screens/DetailedStatisticsScreen';
 import { FullLeaderboardScreen } from '../screens/FullLeaderboardScreen';
 
-
 const Stack = createStackNavigator();
 
 export default function AppNavigator() {
@@ -45,6 +46,19 @@ export default function AppNavigator() {
       <Stack.Screen
         name="Signup"
         component={SignupScreen}
+        options={{ headerShown: false }}
+      />
+      
+      {/* ✅ NEW: Password Reset Screens */}
+      <Stack.Screen
+        name="ForgotPassword"
+        component={ForgotPasswordScreen}
+        options={{ headerShown: false }}
+      />
+      
+      <Stack.Screen
+        name="ResetPassword"
+        component={ResetPasswordScreen}
         options={{ headerShown: false }}
       />
       
@@ -202,21 +216,29 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
 
-     <Stack.Screen name="Feedback" 
-     component={FeedbackScreen} 
-      options={{headerShown:false}} />
+      <Stack.Screen 
+        name="Feedback" 
+        component={FeedbackScreen} 
+        options={{headerShown:false}} 
+      />
 
-<Stack.Screen name="FeedbackDetails" 
-component={FeedbackDetailsScreen}
-options={{headerShown:false}} />
+      <Stack.Screen 
+        name="FeedbackDetails" 
+        component={FeedbackDetailsScreen}
+        options={{headerShown:false}} 
+      />
      
- <Stack.Screen name="Notifications"
-  component={NotificationsScreen}
-  options={{headerShown:false}} />
+      <Stack.Screen 
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{headerShown:false}} 
+      />
 
-  <Stack.Screen name="FeedbackHistory" 
-  component={FeedbackHistoryScreen} 
-  options={{ headerShown: false }} />
+      <Stack.Screen 
+        name="FeedbackHistory" 
+        component={FeedbackHistoryScreen} 
+        options={{ headerShown: false }} 
+      />
 
     </Stack.Navigator>
   );

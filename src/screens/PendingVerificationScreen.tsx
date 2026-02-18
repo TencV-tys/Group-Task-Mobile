@@ -10,11 +10,11 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  StatusBar,
+  StatusBar, 
   Image
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { AssignmentService } from '../services/AssignmentService';
+import { AssignmentService } from '../services/AssignmentService'; 
 
 export default function PendingVerificationsScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};

@@ -1,4 +1,4 @@
-// src/screens/TaskDetailsScreen.tsx - COMPLETE FIXED VERSION WITH ALL STYLES MERGED
+// src/screens/TaskDetailsScreen.tsx - UPDATED WITH CURRENT DAY PRIORITY
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -76,6 +76,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   };
 
   const processTaskData = (taskData: any) => {
+    // Sort time slots
     if (taskData.timeSlots && taskData.timeSlots.length > 0) {
       taskData.timeSlots.sort((a: any, b: any) => {
         const timeA = convertTimeToMinutes(a.startTime);
@@ -84,6 +85,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       });
     }
     
+    // Sort selected days
     if (taskData.selectedDays && taskData.selectedDays.length > 0) {
       const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       taskData.selectedDays.sort((a: string, b: string) => 
@@ -91,10 +93,53 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       );
     }
     
+    // SORT ASSIGNMENTS - Current day first, then future, then past
     if (taskData.assignments && taskData.assignments.length > 0) {
-      taskData.assignments.sort((a: any, b: any) => 
-        new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
-      );
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      taskData.assignments.sort((a: any, b: any) => {
+        const dateA = new Date(a.dueDate);
+        const dateB = new Date(b.dueDate);
+        
+        // Normalize to start of day for comparison
+        const dayA = new Date(dateA);
+        dayA.setHours(0, 0, 0, 0);
+        
+        const dayB = new Date(dateB);
+        dayB.setHours(0, 0, 0, 0);
+        
+        // Check if each assignment is due today
+        const isAToday = dayA.getTime() === today.getTime();
+        const isBToday = dayB.getTime() === today.getTime();
+        
+        // Today's assignments come first
+        if (isAToday && !isBToday) return -1;
+        if (!isAToday && isBToday) return 1;
+        
+        // If both are today, sort by time (earlier first)
+        if (isAToday && isBToday) {
+          return dateA.getTime() - dateB.getTime();
+        }
+        
+        // Future assignments come next (sorted by date)
+        const isAFuture = dayA.getTime() >= today.getTime();
+        const isBFuture = dayB.getTime() >= today.getTime();
+        
+        if (isAFuture && !isBFuture) return -1;
+        if (!isAFuture && isBFuture) return 1;
+        
+        // Both future - sort ascending
+        if (isAFuture && isBFuture) {
+          return dateA.getTime() - dateB.getTime();
+        }
+        
+        // Both past - sort descending (most recent first)
+        return dateB.getTime() - dateA.getTime();
+      });
     }
     
     return taskData;
@@ -433,6 +478,13 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
 
   const isAdminAssignedToTask = () => isAdmin && task?.userAssignment;
 
+  // Helper to check if assignment is due today
+  const isDueToday = (dueDate: string) => {
+    const today = new Date().toDateString();
+    const due = new Date(dueDate).toDateString();
+    return today === due;
+  };
+
   const renderHeader = () => (
     <View style={styles.header}>
       <TouchableOpacity 
@@ -626,19 +678,47 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       );
     }
 
+    // Sort submissions: today's first, then recent
+    const sortedSubmissions = [...currentWeekSubmissions].sort((a: any, b: any) => {
+      const isAToday = isDueToday(a.dueDate);
+      const isBToday = isDueToday(b.dueDate);
+      
+      if (isAToday && !isBToday) return -1;
+      if (!isAToday && isBToday) return 1;
+      
+      // If both today, sort by time
+      if (isAToday && isBToday) {
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      }
+      
+      // Otherwise sort by most recent first
+      return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+    });
+
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>My Submissions This Week</Text>
-        {currentWeekSubmissions.map((submission: any, index: number) => {
+        {sortedSubmissions.map((submission: any, index: number) => {
           const status = getVerificationStatus(submission);
+          const dueToday = isDueToday(submission.dueDate);
           
           return (
             <TouchableOpacity
               key={submission.id || index}
-              style={styles.submissionHistoryCard}
+              style={[
+                styles.submissionHistoryCard,
+                dueToday && styles.todaySubmissionCard
+              ]}
               onPress={() => handleViewAssignmentDetails(submission)}
               activeOpacity={0.7}
             >
+              {dueToday && (
+                <View style={styles.todayBadge}>
+                  <MaterialCommunityIcons name="clock-alert" size={12} color="#fff" />
+                  <Text style={styles.todayBadgeText}>Due Today</Text>
+                </View>
+              )}
+              
               <View style={styles.submissionHistoryHeader}>
                 <View style={[styles.statusIconSmall, { backgroundColor: status.color + '20' }]}>
                   <MaterialCommunityIcons 
@@ -654,6 +734,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                   <Text style={styles.submissionHistoryDate}>
                     {new Date(submission.dueDate).toLocaleDateString()}
                     {submission.timeSlot && ` • ${submission.timeSlot.startTime} - ${submission.timeSlot.endTime}`}
+                    {dueToday && <Text style={styles.todayText}> (Today)</Text>}
                   </Text>
                 </View>
               </View>
@@ -699,14 +780,25 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
 
   const renderAdminAssignmentView = (assignment: any) => {
     const status = getVerificationStatus(assignment);
+    const dueToday = isDueToday(assignment.dueDate);
     
     return (
       <TouchableOpacity
         key={assignment.id}
-        style={styles.adminAssignmentCard}
+        style={[
+          styles.adminAssignmentCard,
+          dueToday && styles.todayAdminCard
+        ]}
         onPress={() => handleViewAssignmentDetails(assignment)}
         activeOpacity={0.7}
       >
+        {dueToday && (
+          <View style={styles.todayAdminBadge}>
+            <MaterialCommunityIcons name="clock-alert" size={10} color="#fff" />
+            <Text style={styles.todayAdminBadgeText}>Due Today</Text>
+          </View>
+        )}
+        
         <View style={styles.adminAssignmentHeader}>
           <View style={styles.userInfo}>
             <View style={styles.userAvatar}>
@@ -723,6 +815,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
               <Text style={styles.assignmentDateSmall}>
                 Due: {new Date(assignment.dueDate).toLocaleDateString()}
                 {assignment.rotationWeek && ` • Week ${assignment.rotationWeek}`}
+                {dueToday && <Text style={styles.todaySmallText}> (Today)</Text>}
               </Text>
             </View>
           </View>
@@ -856,12 +949,33 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Scheduled Days</Text>
               <View style={styles.daysContainer}>
-                {task.selectedDays.map((day: string, index: number) => (
-                  <View key={index} style={styles.dayChip}>
-                    <MaterialCommunityIcons name="calendar" size={14} color="#1864ab" />
-                    <Text style={styles.dayText}>{day}</Text>
-                  </View>
-                ))}
+                {task.selectedDays.map((day: string, index: number) => {
+                  const isToday = day === new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                  return (
+                    <View 
+                      key={index} 
+                      style={[
+                        styles.dayChip,
+                        isToday && styles.todayDayChip
+                      ]}
+                    >
+                      <MaterialCommunityIcons 
+                        name={isToday ? "clock-alert" : "calendar"} 
+                        size={14} 
+                        color={isToday ? "#2b8a3e" : "#1864ab"} 
+                      />
+                      <Text style={[
+                        styles.dayText,
+                        isToday && styles.todayDayText
+                      ]}>
+                        {day}
+                      </Text>
+                      {isToday && (
+                        <Text style={styles.todayDayLabel}>Today</Text>
+                      )}
+                    </View>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -1023,6 +1137,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   );
 }
 
+// [ALL STYLES FROM YOUR ORIGINAL FILE PLUS THESE NEW STYLES]
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1220,10 +1335,29 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     gap: 6
   },
+  todayDayChip: {
+    backgroundColor: '#d3f9d8',
+    borderWidth: 1,
+    borderColor: '#2b8a3e',
+  },
   dayText: {
     fontSize: 14,
     color: '#1864ab',
     fontWeight: '500'
+  },
+  todayDayText: {
+    color: '#2b8a3e',
+    fontWeight: '700'
+  },
+  todayDayLabel: {
+    fontSize: 10,
+    color: '#2b8a3e',
+    fontWeight: '600',
+    backgroundColor: '#fff',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 4
   },
   timeSlotsContainer: {
     gap: 12
@@ -1496,7 +1630,31 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: '#e9ecef',
+    position: 'relative'
+  },
+  todaySubmissionCard: {
+    backgroundColor: '#d3f9d8',
+    borderColor: '#2b8a3e',
+    borderWidth: 2
+  },
+  todayBadge: {
+    position: 'absolute',
+    top: -10,
+    right: 10,
+    backgroundColor: '#fa5252',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+    zIndex: 1
+  },
+  todayBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600'
   },
   submissionHistoryHeader: {
     flexDirection: 'row',
@@ -1522,6 +1680,10 @@ const styles = StyleSheet.create({
   submissionHistoryDate: {
     fontSize: 12,
     color: '#6c757d'
+  },
+  todayText: {
+    color: '#fa5252',
+    fontWeight: '700'
   },
   submittedDate: {
     fontSize: 12,
@@ -1687,7 +1849,31 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: '#e9ecef',
-    marginBottom: 8
+    marginBottom: 8,
+    position: 'relative'
+  },
+  todayAdminCard: {
+    backgroundColor: '#d3f9d8',
+    borderColor: '#2b8a3e',
+    borderWidth: 2
+  },
+  todayAdminBadge: {
+    position: 'absolute',
+    top: -8,
+    right: 8,
+    backgroundColor: '#fa5252',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    gap: 3,
+    zIndex: 1
+  },
+  todayAdminBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '600'
   },
   adminAssignmentHeader: {
     flexDirection: 'row',
@@ -1731,6 +1917,10 @@ const styles = StyleSheet.create({
   assignmentDateSmall: {
     fontSize: 12,
     color: '#868e96'
+  },
+  todaySmallText: {
+    color: '#fa5252',
+    fontWeight: '600'
   },
   statusBadge: {
     flexDirection: 'row',

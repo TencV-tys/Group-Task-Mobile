@@ -421,9 +421,9 @@ static async getGroupAssignments(
     userId?: string;
     limit?: number;
     offset?: number;
-  }
+  } 
 ) {
-  try {
+  try { 
     // FIXED: Add '/assignments' at the end to match backend route
     let url = `${API_URL}/group/${groupId}/assignments`; // ← ADDED '/assignments'
     const params = new URLSearchParams();

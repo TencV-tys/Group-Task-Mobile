@@ -123,7 +123,11 @@ export default function NotificationsScreen({ navigation }: any) {
       'REMINDER': 'bell',
       'POINTS_EARNED': 'trophy',
       'NEW_MEMBER': 'account-plus',
-      'TASK_CREATED': 'plus-circle'
+      'TASK_CREATED': 'plus-circle',
+          'SUBMISSION_PENDING': 'clock-check', // New submission to review
+    'SUBMISSION_VERIFIED': 'check-circle', // User's submission verified
+    'SUBMISSION_REJECTED': 'close-circle', // User's submission rejected
+    'SUBMISSION_DECISION': 'message-check', 
     };
     return icons[type] || 'bell';
   };
@@ -137,7 +141,11 @@ export default function NotificationsScreen({ navigation }: any) {
       'TASK_OVERDUE': '#FF3B30',
       'GROUP_JOINED': '#4CD964',
       'SWAP_REQUEST': '#4F46E5',
-      'POINTS_EARNED': '#FFD700'
+      'POINTS_EARNED': '#FFD700',
+         'SUBMISSION_PENDING': '#FF9500', // Orange - pending review
+    'SUBMISSION_VERIFIED': '#34C759', // Green - verified
+    'SUBMISSION_REJECTED': '#FF3B30', // Red - rejected
+    'SUBMISSION_DECISION': '#5856D6', // Purple - decision made
     };
     return colors[type] || '#8E8E93';
   };

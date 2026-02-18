@@ -19,13 +19,6 @@ const linking = {
       Login: 'login',
       Signup: 'signup',
       ForgotPassword: 'forgot-password', // YOU NEED THIS!
-      ResetPassword: {
-        path: 'ResetPassword',
-        parse: {
-          token: (token: string) => token,
-          email: (email: string) => decodeURIComponent(email),
-        },
-      },
       
       // Main App Screens
       Home: 'home',

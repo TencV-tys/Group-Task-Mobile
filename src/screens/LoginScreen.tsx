@@ -10,7 +10,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { useLoginForm } from '../authHook/useLoginForm';
-
+import { Linking } from 'react-native';
 export default function LoginScreen({ navigation }: any) {
   const {
     formData, 
@@ -87,7 +87,7 @@ export default function LoginScreen({ navigation }: any) {
       
       {/* ✅ NEW: Forgot Password Link */}
       <TouchableOpacity 
-        onPress={() => navigation.navigate('ForgotPassword')}
+        onPress={() =>   Linking.openURL('http://192.168.1.29:5000/forgot-password')}
         disabled={loading}
         style={styles.forgotPasswordContainer}
       >

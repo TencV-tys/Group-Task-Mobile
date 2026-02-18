@@ -4,7 +4,6 @@ import { createStackNavigator } from '@react-navigation/stack';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
-import ResetPasswordScreen from '../screens/ResetPasswordScreen';
 import HomeScreen from '../screens/HomeScreen';
 import MyGroupScreen from '../screens/myGroupScreen';
 import JoinGroupScreen from '../screens/JoinGroupScreen';
@@ -43,6 +42,7 @@ export default function AppNavigator() {
         component={LoginScreen}
         options={{ headerShown: false }}
       />
+   
       <Stack.Screen
         name="Signup"
         component={SignupScreen}
@@ -50,12 +50,7 @@ export default function AppNavigator() {
       />
       
       {/* Password Reset Screens */}
-      <Stack.Screen
-        name="ResetPassword"
-        component={ResetPasswordScreen}
-        options={{ headerShown: false }}  // Removed initialParams
-      />
-      
+    
       
       <Stack.Screen
         name="ForgotPassword" 

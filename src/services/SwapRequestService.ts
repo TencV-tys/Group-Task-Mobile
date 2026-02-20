@@ -339,7 +339,7 @@ export class SwapRequestService {
         canSwap: false,
         message: error.message || 'Failed to check swap status'
       };
-    }
+    } 
   }
 
   // ACCEPT: Accept a swap request

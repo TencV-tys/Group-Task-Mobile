@@ -27,6 +27,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const [currentTimeSlot, setCurrentTimeSlot] = useState<any>(null);
   const [submissionStatus, setSubmissionStatus] = useState<'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed'>('waiting');
   const [currentWeekSubmissions, setCurrentWeekSubmissions] = useState<any[]>([]);
+  const [todayAssignment, setTodayAssignment] = useState<any>(null); // NEW: Track today's assignment
   
   const isAdmin = userRole === 'ADMIN';
 
@@ -49,6 +50,10 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       if (result.success) {
         const processedTask = processTaskData(result.task);
         setTask(processedTask);
+        
+        // Find today's assignment
+        findTodayAssignment(processedTask);
+        
         checkTimeValidity(processedTask);
         
         // Get current week number from group
@@ -72,6 +77,43 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       setError(err.message || 'Network error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // NEW: Function to find today's assignment
+  const findTodayAssignment = (taskData: any) => {
+    if (!taskData.assignments || !taskData.userId) {
+      setTodayAssignment(null);
+      return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Find assignments due today for current user
+    const todayAssignments = taskData.assignments.filter((a: any) => {
+      if (a.userId !== taskData.userId) return false;
+      
+      const dueDate = new Date(a.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      
+      return dueDate.getTime() === today.getTime();
+    });
+
+    // If multiple today assignments, sort by time
+    if (todayAssignments.length > 0) {
+      todayAssignments.sort((a: any, b: any) => {
+        const timeA = new Date(a.dueDate).getTime();
+        const timeB = new Date(b.dueDate).getTime();
+        return timeA - timeB;
+      });
+      
+      setTodayAssignment(todayAssignments[0]); // Set the earliest one
+    } else {
+      setTodayAssignment(null);
     }
   };
 
@@ -513,156 +555,149 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         <View style={styles.headerSpacer} />
       )}
     </View>
-  );
+  );// src/screens/TaskDetailsScreen.tsx - FIXED to show ONLY today's assignment
 
-  const renderMemberAssignmentSection = () => {
-    if (!task?.userAssignment) {
-      return (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Assignment</Text>
-          <View style={styles.notAssignedCard}>
-            <MaterialCommunityIcons name="account-question" size={24} color="#868e96" />
-            <Text style={styles.notAssignedText}>
-              Not assigned to you this week
+const renderMemberAssignmentSection = () => {
+  if (!task?.userAssignment) {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>My Assignment</Text>
+        <View style={styles.notAssignedCard}>
+          <MaterialCommunityIcons name="account-question" size={24} color="#868e96" />
+          <Text style={styles.notAssignedText}>
+            Not assigned to you this week
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Check if today's assignment exists
+  if (!todayAssignment) {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>My Assignment</Text>
+        <View style={styles.notAssignedCard}>
+          <MaterialCommunityIcons name="calendar" size={24} color="#868e96" />
+          <Text style={styles.notAssignedText}>
+            No assignment due today
+          </Text>
+          <Text style={styles.notAssignedSubtext}>
+            Your next assignment is on {new Date(task.userAssignment.dueDate).toLocaleDateString()}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  const submissionStatusInfo = getSubmissionStatusInfo();
+
+  return (
+    <TouchableOpacity 
+      style={styles.section}
+      onPress={() => handleViewAssignmentDetails(todayAssignment)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>Today's Assignment</Text>
+        <View style={styles.todayAssignmentBadge}>
+          <MaterialCommunityIcons name="clock-alert" size={12} color="#fff" />
+          <Text style={styles.todayAssignmentBadgeText}>Due Today</Text>
+        </View>
+      </View>
+      
+      <View style={[styles.assignmentCard, styles.todayAssignmentCard]}>
+        <View style={styles.assignmentHeader}>
+          <MaterialCommunityIcons 
+            name="clock-alert" 
+            size={24} 
+            color="#fa5252" 
+          />
+          <View style={styles.assignmentInfo}>
+            <Text style={styles.todayAssignmentTitle}>
+              {task.title}
+            </Text>
+            <Text style={styles.assignmentDate}>
+              Due: {new Date(todayAssignment.dueDate).toLocaleDateString()}
+              {todayAssignment.timeSlot && ` • ${todayAssignment.timeSlot.startTime} - ${todayAssignment.timeSlot.endTime}`}
             </Text>
           </View>
         </View>
-      );
-    }
-
-    const submissionStatusInfo = getSubmissionStatusInfo();
-
-    if (!task.userAssignment.completed) {
-      return (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Assignment</Text>
-          <View style={styles.assignmentCard}>
-            <View style={styles.assignmentHeader}>
-              <MaterialCommunityIcons name="account-clock" size={24} color="#e67700" />
-              <View style={styles.assignmentInfo}>
-                <Text style={styles.assignmentTitle}>Assigned to You</Text>
-                <Text style={styles.assignmentDate}>
-                  Due: {new Date(task.userAssignment.dueDate).toLocaleDateString()}
-                  {task.userAssignment.timeSlot && ` • ${task.userAssignment.timeSlot.startTime} - ${task.userAssignment.timeSlot.endTime}`}
+        
+        {!todayAssignment.completed && (
+          <View style={[styles.submissionStatusCard, { 
+            backgroundColor: submissionStatusInfo.bgColor,
+            borderColor: submissionStatusInfo.borderColor 
+          }]}>
+            <View style={styles.submissionStatusHeader}>
+              <View style={[styles.statusIconContainer, { backgroundColor: submissionStatusInfo.color + '20' }]}>
+                <MaterialCommunityIcons 
+                  name={submissionStatusInfo.icon as any} 
+                  size={22} 
+                  color={submissionStatusInfo.color} 
+                />
+              </View>
+              <View style={styles.statusTextContainer}>
+                <Text style={[styles.submissionStatusLabel, { color: submissionStatusInfo.color }]}>
+                  {submissionStatusInfo.label}
+                </Text>
+                <Text style={[styles.submissionStatusDescription, { color: submissionStatusInfo.color }]}>
+                  {submissionStatusInfo.description}
                 </Text>
               </View>
             </View>
             
-            <View style={[styles.submissionStatusCard, { 
-              backgroundColor: submissionStatusInfo.bgColor,
-              borderColor: submissionStatusInfo.borderColor 
-            }]}>
-              <View style={styles.submissionStatusHeader}>
-                <View style={[styles.statusIconContainer, { backgroundColor: submissionStatusInfo.color + '20' }]}>
+            {submissionStatus === 'available' && timeLeft !== null && (
+              <View style={styles.timerContainer}>
+                <View style={[styles.timerBadge, timeLeft < 300 ? styles.urgentTimerBadge : styles.normalTimerBadge]}>
                   <MaterialCommunityIcons 
-                    name={submissionStatusInfo.icon as any} 
-                    size={22} 
-                    color={submissionStatusInfo.color} 
+                    name={timeLeft < 300 ? "timer-alert" : "timer"} 
+                    size={16} 
+                    color={timeLeft < 300 ? "#fa5252" : "#2b8a3e"} 
                   />
-                </View>
-                <View style={styles.statusTextContainer}>
-                  <Text style={[styles.submissionStatusLabel, { color: submissionStatusInfo.color }]}>
-                    {submissionStatusInfo.label}
-                  </Text>
-                  <Text style={[styles.submissionStatusDescription, { color: submissionStatusInfo.color }]}>
-                    {submissionStatusInfo.description}
+                  <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : "#2b8a3e" }]}>
+                    {formatTimeLeft(timeLeft)} remaining
                   </Text>
                 </View>
-              </View>
-              
-              {submissionStatus === 'available' && timeLeft !== null && (
-                <View style={styles.timerContainer}>
-                  <View style={[styles.timerBadge, timeLeft < 300 ? styles.urgentTimerBadge : styles.normalTimerBadge]}>
-                    <MaterialCommunityIcons 
-                      name={timeLeft < 300 ? "timer-alert" : "timer"} 
-                      size={16} 
-                      color={timeLeft < 300 ? "#fa5252" : "#2b8a3e"} 
-                    />
-                    <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : "#2b8a3e" }]}>
-                      {formatTimeLeft(timeLeft)} remaining
-                    </Text>
-                  </View>
-                  {timeLeft < 300 && (
-                    <Text style={styles.urgentMessage}>Submit now! Grace period ending soon.</Text>
-                  )}
-                </View>
-              )}
-              
-              {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
-                <View style={styles.waitingContainer}>
-                  <View style={styles.waitingBadge}>
-                    <MaterialCommunityIcons name="clock-start" size={16} color="#e67700" />
-                    <Text style={styles.waitingText}>
-                      Opens in {formatTimeLeft(timeLeft)}
-                    </Text>
-                  </View>
-                </View>
-              )}
-            </View>
-            
-            {submissionStatusInfo.canSubmit ? (
-              <TouchableOpacity
-                style={styles.completeButton}
-                onPress={handleCompleteAssignment}
-                activeOpacity={0.8}
-              >
-                <View style={styles.completeButtonContent}>
-                  <MaterialCommunityIcons name="check-circle" size={22} color="white" />
-                  <Text style={styles.completeButtonText}>{submissionStatusInfo.buttonText}</Text>
-                </View>
-                {timeLeft && timeLeft < 600 && (
-                  <View style={styles.completeButtonFooter}>
-                    <MaterialCommunityIcons name="alert" size={14} color="white" />
-                    <Text style={styles.completeButtonSubtext}>
-                      {timeLeft < 300 ? 'Urgent! ' : ''}{formatTimeLeft(timeLeft)} left
-                    </Text>
-                  </View>
+                {timeLeft < 300 && (
+                  <Text style={styles.urgentMessage}>Submit now! Grace period ending soon.</Text>
                 )}
-              </TouchableOpacity>
-            ) : (
-              <View style={styles.disabledButtonContainer}>
-                <TouchableOpacity
-                  style={styles.disabledButton}
-                  disabled={true}
-                  onPress={() => {
-                    Alert.alert(
-                      submissionStatusInfo.label,
-                      submissionStatusInfo.description,
-                      [{ text: 'OK' }]
-                    );
-                  }}
-                >
-                  <MaterialCommunityIcons 
-                    name={submissionStatusInfo.icon as any} 
-                    size={20} 
-                    color="#868e96" 
-                  />
-                  <Text style={styles.disabledButtonText}>
-                    {submissionStatusInfo.buttonText}
-                  </Text>
-                </TouchableOpacity>
-                <Text style={styles.disabledButtonHint}>
-                  ⓘ {submissionStatusInfo.description}
-                </Text>
               </View>
             )}
             
-            {isAdmin && (
-              <View style={styles.adminNote}>
-                <MaterialCommunityIcons name="shield-account" size={16} color="#007AFF" />
-                <Text style={styles.adminNoteText}>
-                  You're completing this as an admin
-                </Text>
+            {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
+              <View style={styles.waitingContainer}>
+                <View style={styles.waitingBadge}>
+                  <MaterialCommunityIcons name="clock-start" size={16} color="#e67700" />
+                  <Text style={styles.waitingText}>
+                    Opens in {formatTimeLeft(timeLeft)}
+                  </Text>
+                </View>
               </View>
             )}
           </View>
+        )}
+        
+        {todayAssignment.completed && (
+          <View style={styles.completedInfoCard}>
+            <MaterialCommunityIcons name="check-circle" size={20} color="#2b8a3e" />
+            <View style={styles.completedInfoText}>
+              <Text style={styles.completedTitle}>Already Completed</Text>
+              <Text style={styles.completedDate}>
+                Submitted on: {new Date(todayAssignment.completedAt).toLocaleDateString()}
+              </Text>
+            </View>
+          </View>
+        )}
+        
+        <View style={styles.viewDetailsIndicator}>
+          <Text style={styles.viewDetailsText}>Tap to view full details</Text>
+          <MaterialCommunityIcons name="chevron-right" size={16} color="#007AFF" />
         </View>
-      );
-    }
- 
-    return null;
-  };
-
+      </View>
+    </TouchableOpacity>
+  );
+};
   const renderMySubmissionsSection = () => {
     if (currentWeekSubmissions.length === 0) {
       return (
@@ -2027,5 +2062,79 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fa5252'
-  }
-});
+  },
+   sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12
+  },
+  todayAssignmentBadge: {
+    backgroundColor: '#fa5252',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4
+  },
+  todayAssignmentBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600'
+  },
+  todayAssignmentTitle: {
+    color: '#fa5252'
+  },
+  todayHighlight: {
+    color: '#fa5252',
+    fontWeight: '700'
+  },
+  completedInfoCard: {
+    flexDirection: 'row',
+    backgroundColor: '#d3f9d8',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 12,
+    gap: 12,
+    alignItems: 'center'
+  },
+  completedInfoText: {
+    flex: 1
+  },
+  completedTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2b8a3e',
+    marginBottom: 2
+  },
+  completedDate: {
+    fontSize: 12,
+    color: '#2b8a3e'
+  },
+  viewDetailsIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+    gap: 4
+  },
+  viewDetailsText: {
+    fontSize: 12,
+    color: '#007AFF'
+  },
+  todayAssignmentCard: {
+  borderWidth: 2,
+  borderColor: '#fa5252',
+  backgroundColor: '#fff5f5'
+},
+notAssignedSubtext: {
+  fontSize: 13,
+  color: '#adb5bd',
+  textAlign: 'center',
+  marginTop: 8
+}
+}); 

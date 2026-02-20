@@ -264,6 +264,10 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       return;
     }
     
+    // Determine the day for this assignment
+    const assignmentDay = assignment.assignmentDay || 
+      (assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : undefined);
+    
     navigation.navigate('CreateSwapRequest', {
       assignmentId: assignment.id,
       groupId: assignment.task.group.id,
@@ -271,15 +275,17 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       dueDate: assignment.dueDate,
       taskPoints: assignment.points,
       timeSlot: assignment.timeSlot?.startTime || 'Scheduled time',
-      // ✅ NEW: Pass these for scope selection
       executionFrequency: assignment.task.executionFrequency,
-      timeSlots: assignment.task.timeSlots || []
+      timeSlots: assignment.task.timeSlots || [],
+      // ✅ PASS THE DAY AND TIME SLOT
+      selectedDay: assignmentDay,
+      assignmentDay: assignmentDay,
+      selectedTimeSlotId: assignment.timeSlot?.id
     });
   } catch (error: any) {
     Alert.alert('Error', error.message || 'Failed to check swap availability');
   }
 };
-
   const handleVerify = async (verified: boolean) => {
     if (!assignment) return;
     setVerifying(true);

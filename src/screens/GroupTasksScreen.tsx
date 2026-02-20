@@ -16,6 +16,7 @@ import { TaskService } from '../services/TaskService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SettingsModal } from '../components/SettingsModal';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -28,8 +29,25 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [selectedTab, setSelectedTab] = useState<'all' | 'my'>('all');
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const userStr = await AsyncStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setCurrentUserId(user.id);
+        }
+      } catch (error) {
+        console.error('Error getting current user:', error);
+      }
+    };
+    
+    getCurrentUser();
+  }, []);
 
   useEffect(() => {
     if (groupId) {
@@ -324,6 +342,160 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     });
   };
 
+  const renderAssignmentInfo = (task: any) => {
+    const hasAssignment = task.userAssignment || task.assignments?.length > 0;
+    
+    if (!hasAssignment) {
+      return (
+        <View style={styles.unassignedInfo}>
+          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
+          <Text style={styles.unassignedText}>
+            Not assigned to anyone
+          </Text>
+        </View>
+      );
+    }
+
+    let currentAssignment = null;
+    let assigneeName = 'Unknown';
+    let isAssignedToMe = false;
+    let isCompleted = false;
+    
+    if (selectedTab === 'my') {
+      // IN MY TASKS TAB: Only show MY assignments
+      if (task.userAssignment) {
+        currentAssignment = task.userAssignment;
+        isAssignedToMe = true;
+        assigneeName = 'You';
+        isCompleted = currentAssignment?.completed || false;
+      } else if (task.assignment) {
+        currentAssignment = task.assignment;
+        isAssignedToMe = true;
+        assigneeName = 'You';
+        isCompleted = currentAssignment?.completed || false;
+      }
+    } else {
+      // IN ALL TASKS TAB: Show the actual assigned member's name
+      if (task.assignments && task.assignments.length > 0) {
+        if (task.currentAssignee) {
+          currentAssignment = task.assignments.find(
+            (a: any) => a.userId === task.currentAssignee
+          );
+        }
+        
+        if (!currentAssignment) {
+          currentAssignment = task.assignments[0];
+        }
+        
+        if (currentAssignment) {
+          assigneeName = currentAssignment.user?.fullName || 'Unknown';
+          isAssignedToMe = currentAssignment.userId === currentUserId;
+          isCompleted = currentAssignment.completed || false;
+        }
+      } else if (task.userAssignment) {
+        currentAssignment = task.userAssignment;
+        assigneeName = task.userAssignment.user?.fullName || 'Unknown';
+        isAssignedToMe = task.userAssignment.userId === currentUserId;
+        isCompleted = task.userAssignment.completed || false;
+      }
+    }
+    
+    if (!currentAssignment) {
+      return (
+        <View style={styles.unassignedInfo}>
+          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
+          <Text style={styles.unassignedText}>
+            Not assigned to anyone
+          </Text>
+        </View>
+      );
+    }
+
+    const dueDate = currentAssignment?.dueDate ? new Date(currentAssignment.dueDate) : null;
+    
+    // Determine the display text based on tab
+    const getAssignmentText = () => {
+      if (selectedTab === 'my') {
+        return isCompleted ? 'Completed' : 'Assigned to you';
+      } else {
+        return isCompleted ? 'Completed' : `Assigned to ${assigneeName}`;
+      }
+    };
+
+    // Determine icon based on tab and status
+    const getIcon = () => {
+      if (isCompleted) return "check-circle";
+      if (selectedTab === 'my') return "account";
+      return isAssignedToMe ? "account" : "account-clock";
+    };
+
+    // Determine color based on tab and status
+    const getColor = () => {
+      if (isCompleted) return "#2b8a3e";
+      if (selectedTab === 'my') return "#007AFF";
+      return isAssignedToMe ? "#007AFF" : "#e67700";
+    };
+
+    const assignmentText = getAssignmentText();
+    const iconName = getIcon();
+    const iconColor = getColor();
+
+    return (
+      <View style={[
+        styles.assignmentInfo,
+        isCompleted ? styles.completedAssignment : styles.pendingAssignment,
+        !isCompleted && isAssignedToMe && selectedTab === 'all' && styles.myAssignment
+      ]}>
+        <View style={styles.assignmentHeader}>
+          <MaterialCommunityIcons 
+            name={iconName} 
+            size={16} 
+            color={iconColor} 
+          />
+          <Text style={[
+            styles.assignmentStatus,
+            { color: iconColor }
+          ]}>
+            {assignmentText}
+          </Text>
+        </View>
+        
+        <View style={styles.assignmentDetails}>
+          {dueDate && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Due:</Text> {dueDate.toLocaleDateString()}
+            </Text>
+          )}
+          {task.executionFrequency && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Frequency:</Text> {task.executionFrequency.toLowerCase()}
+            </Text>
+          )}
+          {task.selectedDays?.length > 0 && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Days:</Text> {task.selectedDays.join(', ')}
+            </Text>
+          )}
+          {task.timeSlots?.length > 0 && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Time:</Text> {
+                task.timeSlots.slice(0, 2).map((slot: any) => 
+                  `${slot.startTime}-${slot.endTime}${slot.label ? ` (${slot.label})` : ''}`
+                ).join(', ')
+              }
+              {task.timeSlots.length > 2 && `... +${task.timeSlots.length - 2} more`}
+            </Text>
+          )}
+          {currentAssignment?.points !== undefined && currentAssignment.points > 0 && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Points:</Text> {currentAssignment.points}
+            </Text>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   const renderHeader = () => (
     <View style={styles.header}>
       <TouchableOpacity 
@@ -367,115 +539,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       </View>
     </View>
   );
-
-  const renderAssignmentInfo = (task: any) => {
-    const hasAssignment = task.userAssignment || task.assignments?.length > 0;
-    
-    if (!hasAssignment) {
-      return (
-        <View style={styles.unassignedInfo}>
-          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
-          <Text style={styles.unassignedText}>
-            Not assigned to anyone
-          </Text>
-        </View>
-      );
-    }
-
-    let currentAssignment = null;
-    
-    if (task.userAssignment) {
-      currentAssignment = task.userAssignment;
-    } else if (task.assignments && task.assignments.length > 0) {
-      if (selectedTab === 'my') {
-        currentAssignment = task.assignment || task.assignments[0];
-      } else {
-        if (task.currentAssignee) {
-          currentAssignment = task.assignments.find(
-            (a: any) => a.userId === task.currentAssignee
-          );
-        }
-        if (!currentAssignment && task.assignments.length > 0) {
-          currentAssignment = task.assignments[0];
-        }
-      }
-    }
-    
-    if (!currentAssignment) {
-      return (
-        <View style={styles.unassignedInfo}>
-          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
-          <Text style={styles.unassignedText}>
-            Not assigned to anyone
-          </Text>
-        </View>
-      );
-    }
-
-    const isCompleted = currentAssignment?.completed;
-    const assigneeName = currentAssignment?.user?.fullName || 'Unknown';
-    const dueDate = currentAssignment?.dueDate ? new Date(currentAssignment.dueDate) : null;
-    const isAssignedToMe = task.isAssignedToUser || task.userAssignment;
-    
-    return (
-      <View style={[
-        styles.assignmentInfo,
-        isCompleted ? styles.completedAssignment : styles.pendingAssignment,
-        isAssignedToMe && styles.myAssignment
-      ]}>
-        <View style={styles.assignmentHeader}>
-          <MaterialCommunityIcons 
-            name={isCompleted ? "check-circle" : isAssignedToMe ? "account" : "account-clock"} 
-            size={16} 
-            color={isCompleted ? "#2b8a3e" : isAssignedToMe ? "#007AFF" : "#e67700"} 
-          />
-          <Text style={[
-            styles.assignmentStatus,
-            isCompleted ? { color: "#2b8a3e" } : 
-            isAssignedToMe ? { color: "#007AFF" } : 
-            { color: "#e67700" }
-          ]}>
-            {isCompleted ? 'Completed' : 
-             isAssignedToMe ? 'Assigned to you' : 
-             `Assigned to ${assigneeName}`}
-          </Text>
-        </View>
-        
-        <View style={styles.assignmentDetails}>
-          {dueDate && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Due:</Text> {dueDate.toLocaleDateString()}
-            </Text>
-          )}
-          {task.executionFrequency && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Frequency:</Text> {task.executionFrequency.toLowerCase()}
-            </Text>
-          )}
-          {task.selectedDays?.length > 0 && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Days:</Text> {task.selectedDays.join(', ')}
-            </Text>
-          )}
-          {task.timeSlots?.length > 0 && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Time:</Text> {
-                task.timeSlots.slice(0, 2).map((slot: any) => 
-                  `${slot.startTime}-${slot.endTime}${slot.label ? ` (${slot.label})` : ''}`
-                ).join(', ')
-              }
-              {task.timeSlots.length > 2 && `... +${task.timeSlots.length - 2} more`}
-            </Text>
-          )}
-          {currentAssignment?.points !== undefined && currentAssignment.points > 0 && (
-            <Text style={styles.assignmentDetail}>
-              <Text style={styles.detailLabel}>Points:</Text> {currentAssignment.points}
-            </Text>
-          )}
-        </View>
-      </View>
-    );
-  };
 
   const renderTask = ({ item }: any) => {
     const isAdmin = userRole === 'ADMIN';
@@ -783,6 +846,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   );
 }
 
+// Keep your existing styles here
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -1,3 +1,4 @@
+// src/screens/CreateSwapRequestScreen.tsx - UPDATED with auto day selection
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -33,6 +34,10 @@ type CreateSwapRequestRouteParams = {
     endTime: string;
     label?: string;
   }>;
+  // NEW: Add these for better context
+  selectedDay?: string; // The day this assignment is for
+  assignmentDay?: string; // Alternative field name
+  selectedTimeSlotId?: string; // The time slot this assignment is for
 };
 
 const DAYS_OF_WEEK = [
@@ -50,7 +55,11 @@ export const CreateSwapRequestScreen = () => {
     taskPoints, 
     timeSlot,
     executionFrequency,
-    timeSlots 
+    timeSlots,
+    // NEW: Get the assignment's day
+    selectedDay: propSelectedDay,
+    assignmentDay,
+    selectedTimeSlotId: propSelectedTimeSlotId
   } = route.params;
   
   const { createSwapRequest, loading } = useSwapRequests();
@@ -63,10 +72,29 @@ export const CreateSwapRequestScreen = () => {
   const [canSwap, setCanSwap] = useState<{ canSwap: boolean; reason?: string }>({ canSwap: true });
   const [checking, setChecking] = useState(true);
   
-  // ✅ NEW: Swap scope state
-  const [swapScope, setSwapScope] = useState<'week' | 'day'>('week');
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
-  const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(null);
+  // ✅ AUTO-SET based on the assignment's day
+  const [swapScope, setSwapScope] = useState<'week' | 'day'>('day'); // Default to 'day' now
+  const [selectedDay, setSelectedDay] = useState<string | null>(
+    // Auto-set from the assignment's day
+    propSelectedDay || assignmentDay || null
+  );
+  const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(
+    propSelectedTimeSlotId || null
+  );
+
+  // Get the current day of the week for this assignment
+  useEffect(() => {
+    if (dueDate) {
+      const date = new Date(dueDate);
+      const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+      const dayFromDate = dayNames[date.getDay()];
+      
+      // If no day was passed but we have a due date, set it from the date
+      if (!selectedDay && dueDate) {
+        setSelectedDay(dayFromDate);
+      }
+    }
+  }, [dueDate]);
 
   useEffect(() => {
     fetchGroupMembers(groupId);
@@ -108,27 +136,32 @@ export const CreateSwapRequestScreen = () => {
     return now.toISOString();
   };
 
+// In CreateSwapRequestScreen.tsx - FIXED handleSubmit
+
 const handleSubmit = async () => {
   if (!canSwap.canSwap) {
     Alert.alert('Cannot Swap', canSwap.reason || 'This assignment cannot be swapped');
     return;
   }
 
-  // Validation for day scope
-  if (swapScope === 'day' && !selectedDay) {
-    Alert.alert('Error', 'Please select a day to swap');
-    return;
+  // For day scope, we MUST have a selected day
+  if (swapScope === 'day') {
+    if (!selectedDay) {
+      Alert.alert('Error', 'Cannot determine which day to swap. Please try again.');
+      return;
+    }
   }
 
   try {
     const result = await createSwapRequest({
       assignmentId,
       reason: reason.trim() || undefined,
-      targetUserId,
+      targetUserId, 
       expiresAt: calculateExpiryDate(),
-      // ✅ FIXED: Convert null to undefined
       scope: swapScope,
+      // FIXED: Convert null to undefined
       selectedDay: swapScope === 'day' ? (selectedDay || undefined) : undefined,
+      // FIXED: Convert null to undefined
       selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
     });
 
@@ -137,7 +170,7 @@ const handleSubmit = async () => {
         'Success',
         swapScope === 'day' 
           ? `Swap request created for ${selectedDay}!` 
-          : 'Swap request created for the entire week!',
+          : 'Swap request created for the entire week!', 
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } else {
@@ -165,6 +198,9 @@ const handleSubmit = async () => {
 
   const isDailyTask = executionFrequency === 'DAILY';
   const hasMultipleTimeSlots = timeSlots && timeSlots.length > 1;
+
+  // Format the due date for display
+  const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -196,9 +232,7 @@ const handleSubmit = async () => {
               <View style={styles.detailItem}>
                 <Ionicons name="calendar-outline" size={16} color="#6B7280" />
                 <Text style={styles.detailLabel}>Due Date</Text>
-                <Text style={styles.detailValue}>
-                  {dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A'}
-                </Text>
+                <Text style={styles.detailValue}>{formattedDueDate}</Text>
               </View>
               
               <View style={styles.detailItem}>
@@ -213,6 +247,16 @@ const handleSubmit = async () => {
                 <Text style={[styles.detailValue, styles.pointsValue]}>{taskPoints || 0}</Text>
               </View>
             </View>
+
+            {/* Show the day this assignment is for */}
+            {selectedDay && (
+              <View style={styles.assignmentDayBadge}>
+                <Ionicons name="today" size={14} color="#4F46E5" />
+                <Text style={styles.assignmentDayText}>
+                  This assignment is for: <Text style={styles.assignmentDayBold}>{selectedDay}</Text>
+                </Text>
+              </View>
+            )}
             
             <View style={styles.frequencyBadge}>
               <Ionicons 
@@ -239,130 +283,17 @@ const handleSubmit = async () => {
 
           {canSwap.canSwap && (
             <>
-              {/* ✅ NEW: Swap Scope Selection */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>What do you want to swap?</Text>
-                
-                <TouchableOpacity
-                  style={[styles.scopeOption, swapScope === 'week' && styles.scopeOptionActive]}
-                  onPress={() => setSwapScope('week')}
-                >
-                  <View style={styles.scopeIconContainer}>
-                    <Ionicons 
-                      name="calendar" 
-                      size={24} 
-                      color={swapScope === 'week' ? '#4F46E5' : '#6B7280'} 
-                    />
-                  </View>
-                  <View style={styles.scopeContent}>
-                    <Text style={[styles.scopeTitle, swapScope === 'week' && styles.scopeTitleActive]}>
-                      Entire Week
-                    </Text>
-                    <Text style={styles.scopeDescription}>
-                      Swap all days and time slots for this week
-                    </Text>
-                  </View>
-                  {swapScope === 'week' && (
-                    <Ionicons name="checkmark-circle" size={24} color="#4F46E5" />
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.scopeOption, swapScope === 'day' && styles.scopeOptionActive]}
-                  onPress={() => setSwapScope('day')}
-                >
-                  <View style={styles.scopeIconContainer}>
-                    <Ionicons 
-                      name="today" 
-                      size={24} 
-                      color={swapScope === 'day' ? '#4F46E5' : '#6B7280'} 
-                    />
-                  </View>
-                  <View style={styles.scopeContent}>
-                    <Text style={[styles.scopeTitle, swapScope === 'day' && styles.scopeTitleActive]}>
-                      Specific Day
-                    </Text>
-                    <Text style={styles.scopeDescription}>
-                      Swap only one day's assignment
-                    </Text>
-                  </View>
-                  {swapScope === 'day' && (
-                    <Ionicons name="checkmark-circle" size={24} color="#4F46E5" />
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {/* ✅ NEW: Day Selection (only when scope is 'day') */}
-              {swapScope === 'day' && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Select Day</Text>
-                  <View style={styles.daysContainer}>
-                    {DAYS_OF_WEEK.map(day => (
-                      <TouchableOpacity
-                        key={day}
-                        style={[
-                          styles.dayChip,
-                          selectedDay === day && styles.dayChipActive
-                        ]}
-                        onPress={() => setSelectedDay(day)}
-                      >
-                        <Text style={[
-                          styles.dayChipText,
-                          selectedDay === day && styles.dayChipTextActive
-                        ]}>
-                          {day.slice(0, 3)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* ✅ NEW: Time Slot Selection (for daily tasks with multiple slots) */}
-              {swapScope === 'day' && isDailyTask && hasMultipleTimeSlots && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Select Time Slot (Optional)</Text>
-                  <Text style={styles.sectionSubtext}>
-                    Leave empty to swap all time slots for this day
+              {/* Info Banner - Show what's being swapped */}
+              <View style={styles.infoBanner}>
+                <Ionicons name="information-circle" size={24} color="#4F46E5" />
+                <View style={styles.infoBannerContent}>
+                  <Text style={styles.infoBannerTitle}>Swap this specific day</Text>
+                  <Text style={styles.infoBannerText}>
+                    You're swapping the assignment for {selectedDay || 'this day'}. 
+                    The person who accepts will take over this day only.
                   </Text>
-                  
-                  <View style={styles.timeSlotsContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.timeSlotChip,
-                        !selectedTimeSlotId && styles.timeSlotChipActive
-                      ]}
-                      onPress={() => setSelectedTimeSlotId(null)}
-                    >
-                      <Text style={[
-                        styles.timeSlotChipText,
-                        !selectedTimeSlotId && styles.timeSlotChipTextActive
-                      ]}>
-                        All Time Slots
-                      </Text>
-                    </TouchableOpacity>
-                    
-                    {timeSlots?.map(slot => (
-                      <TouchableOpacity
-                        key={slot.id}
-                        style={[
-                          styles.timeSlotChip,
-                          selectedTimeSlotId === slot.id && styles.timeSlotChipActive
-                        ]}
-                        onPress={() => setSelectedTimeSlotId(slot.id)}
-                      >
-                        <Text style={[
-                          styles.timeSlotChipText,
-                          selectedTimeSlotId === slot.id && styles.timeSlotChipTextActive
-                        ]}>
-                          {slot.startTime}-{slot.endTime}
-                          {slot.label ? ` (${slot.label})` : ''}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
                 </View>
-              )}
+              </View>
 
               {/* Target User Selection */}
               <View style={styles.section}>
@@ -500,9 +431,8 @@ const handleSubmit = async () => {
               <View style={styles.infoNote}>
                 <Ionicons name="information-circle" size={20} color="#4F46E5" />
                 <Text style={styles.infoText}>
-                  {swapScope === 'day' 
-                    ? `You're swapping ${selectedDay || 'a specific day'}'s assignment. The rest of your week remains yours.`
-                    : "You're swapping your entire week's assignment. The person who accepts will take over all your tasks for this week."}
+                  You're swapping the assignment for <Text style={styles.infoBold}>{selectedDay || 'this day'}</Text>. 
+                  The rest of your week's assignments remain yours.
                 </Text>
               </View>
             </>
@@ -523,8 +453,8 @@ const handleSubmit = async () => {
                 <>
                   <Ionicons name="swap-horizontal" size={20} color="#FFFFFF" />
                   <Text style={styles.submitButtonText}>
-                    {swapScope === 'day' && selectedDay
-                      ? `Create Swap Request for ${selectedDay.slice(0, 3)}`
+                    {selectedDay
+                      ? `Swap ${selectedDay.slice(0, 3)}'s Assignment`
                       : 'Create Swap Request'}
                   </Text>
                 </>
@@ -934,5 +864,51 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+   assignmentDayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  assignmentDayText: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+  assignmentDayBold: {
+    fontWeight: '700',
+    color: '#4F46E5',
+  },
+  infoBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    gap: 12,
+  },
+  infoBannerContent: {
+    flex: 1,
+  },
+  infoBannerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4F46E5',
+    marginBottom: 4,
+  },
+  infoBannerText: {
+    fontSize: 14,
+    color: '#1F2937',
+    lineHeight: 20,
+  },
+  infoBold: {
+    fontWeight: '700',
+    color: '#4F46E5',
   },
 });

@@ -18,6 +18,10 @@ export const getBackendIP = (): string => {
   if (currentIP.startsWith('10.219.65.')) {
     return '10.219.65.2';
   }
+
+    if (currentIP.startsWith('10.116.190.')) {
+    return '10.116.190.2';
+  }
   
   // For any other case, use the same IP
   return currentIP;

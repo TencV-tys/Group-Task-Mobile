@@ -1,21 +1,38 @@
+// services/NotificationService.ts - UPDATED with proper types
 import { API_BASE_URL } from '../config/api';
 
 const API_URL = `${API_BASE_URL}/api/notifications`;
 
 export interface Notification {
   id: string;
+  userId: string;
   type: string;
   title: string;
   message: string;
   data: any;
   read: boolean;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface NotificationsResponse {
+  success: boolean;
+  message?: string;
+  notifications?: Notification[];
+  data?: {
+    notifications?: Notification[];
+    count?: number;
+    unreadCount?: number;
+    pagination?: any;
+  };
+  count?: number;
+  unreadCount?: number;
 }
 
 export class NotificationService {
   
   // Get user's notifications
-  static async getNotifications(page: number = 1, limit: number = 20) {
+  static async getNotifications(page: number = 1, limit: number = 20): Promise<NotificationsResponse> {
     try {
       const response = await fetch(`${API_URL}/?page=${page}&limit=${limit}`, {
         method: "GET",
@@ -23,6 +40,10 @@ export class NotificationService {
       });
 
       const result = await response.json();
+      
+      // Log the actual structure to debug
+      console.log('Notifications response structure:', Object.keys(result));
+      
       return result;
 
     } catch (error: any) {
@@ -35,7 +56,7 @@ export class NotificationService {
   }
 
   // Get unread count
-  static async getUnreadCount() {
+  static async getUnreadCount(): Promise<{ success: boolean; count: number; message?: string }> {
     try {
       const response = await fetch(`${API_URL}/unread-count`, {
         method: "GET",
@@ -111,6 +132,25 @@ export class NotificationService {
         success: false,
         message: "Cannot connect to the server"
       };
+    }
+  }
+  
+  // Helper method to check for specific notification types
+  static async hasUnreadNotificationsOfType(type: string): Promise<boolean> {
+    try {
+      const response = await this.getNotifications(1, 20);
+      
+      // Check different possible response structures
+      const notifications = response.notifications || response.data?.notifications || [];
+      
+      if (Array.isArray(notifications)) {
+        return notifications.some(n => n.type === type && !n.read);
+      }
+      
+      return false;
+    } catch (error) {
+      console.error(`Error checking for ${type} notifications:`, error);
+      return false;
     }
   }
 }

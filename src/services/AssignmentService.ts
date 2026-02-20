@@ -1,6 +1,7 @@
-// services/AssignmentService.ts - FIXED AND COMPLETE VERSION
+// services/AssignmentService.ts - COMPLETE UPDATED WITH NOTIFICATION INTEGRATION
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NotificationService } from './NotificationService';
 
 const API_URL = `${API_BASE_URL}/api/assignments`;
 
@@ -145,7 +146,29 @@ export interface UpcomingAssignment {
 export interface CompleteAssignmentParams {
   photoUri?: string;
   notes?: string;
-  photoFile?: File;
+}
+
+export interface CompleteAssignmentResponse {
+  success: boolean;
+  message: string;
+  assignment?: Assignment;
+  notifications?: {
+    notifiedAdmins: number;
+    showSuccessNotification: boolean;
+    notificationMessage: string;
+  };
+  validation?: any;
+}
+
+export interface VerifyAssignmentResponse {
+  success: boolean;
+  message: string;
+  assignment?: Assignment;
+  notifications?: {
+    notifiedUser: boolean;
+    notifiedOtherAdmins: number;
+    userNotificationMessage: string;
+  };
 }
 
 export class AssignmentService {
@@ -177,89 +200,97 @@ export class AssignmentService {
     return headers;
   }
 
- // Complete an assignment WITH PHOTO UPLOAD (Simplified for React Native)
-static async completeAssignment(
-  assignmentId: string, 
-  data: CompleteAssignmentParams
-) {
-  try {
-    console.log('AssignmentService: Completing assignment', assignmentId, data);
-    
-    const token = await this.getAuthToken();
-    
-    // Always use FormData for React Native when we have a photo
-    if (data.photoUri) {
-      const formData = new FormData();
+  // Complete an assignment WITH PHOTO UPLOAD
+  static async completeAssignment(
+    assignmentId: string, 
+    data: CompleteAssignmentParams
+  ): Promise<CompleteAssignmentResponse> {
+    try {
+      console.log('AssignmentService: Completing assignment', assignmentId, data);
       
-      // Add notes if provided
-      if (data.notes) {
-        formData.append('notes', data.notes);
-      }
+      const token = await this.getAuthToken();
       
-      // Add photo - React Native FormData format
-      const filename = data.photoUri.split('/').pop() || 'photo.jpg';
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-      
-      formData.append('photo', {
-        uri: data.photoUri,
-        name: filename,
-        type,
-      } as any);
-      
-      const headers: HeadersInit = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      // Don't set Content-Type for FormData
-      
-      console.log('Sending FormData with photo to:', `${API_URL}/${assignmentId}/complete`);
-      
-      const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
+      // Always use FormData for React Native when we have a photo
+      if (data.photoUri) {
+        const formData = new FormData();
+        
+        // Add notes if provided
+        if (data.notes) {
+          formData.append('notes', data.notes);
+        }
+        
+        // Add photo - React Native FormData format
+        const filename = data.photoUri.split('/').pop() || 'photo.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+        
+        formData.append('photo', {
+          uri: data.photoUri,
+          name: filename,
+          type,
+        } as any);
+        
+        const headers: HeadersInit = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        console.log('Sending FormData with photo to:', `${API_URL}/${assignmentId}/complete`);
+        
+        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
 
-      const result = await response.json();
-      console.log('AssignmentService: Complete response (with photo)', result);
-      
-      if (!response.ok) {
-        throw new Error(result.message || `Failed to complete assignment: ${response.status}`);
-      }
-      
-      return result;
-    } else {
-      // No photo, use JSON
-      const headers = await this.getHeaders();
-      
-      const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          notes: data.notes
-        }),
-      });
+        const result = await response.json();
+        console.log('AssignmentService: Complete response (with photo)', result);
+        
+        if (!response.ok) {
+          throw new Error(result.message || `Failed to complete assignment: ${response.status}`);
+        }
+        
+        // After successful submission, refresh notifications to get the latest
+        if (result.success) {
+          await NotificationService.getUnreadCount(); // This will update the badge count
+        }
+        
+        return result;
+      } else {
+        // No photo, use JSON
+        const headers = await this.getHeaders();
+        
+        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            notes: data.notes
+          }),
+        });
 
-      const result = await response.json();
-      console.log('AssignmentService: Complete response', result);
-      
-      if (!response.ok) {
-        throw new Error(result.message || `Failed to complete assignment: ${response.status}`);
+        const result = await response.json();
+        console.log('AssignmentService: Complete response', result);
+        
+        if (!response.ok) {
+          throw new Error(result.message || `Failed to complete assignment: ${response.status}`);
+        }
+        
+        // After successful submission, refresh notifications
+        if (result.success) {
+          await NotificationService.getUnreadCount();
+        }
+        
+        return result;
       }
-      
-      return result;
+
+    } catch (error: any) {
+      console.error('AssignmentService.completeAssignment error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to complete assignment. Please check your connection.',
+      };
     }
-
-  } catch (error: any) {
-    console.error('AssignmentService.completeAssignment error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to complete assignment. Please check your connection.',
-      error: error.message 
-    };
   }
-}
   
   // Verify an assignment (admin only)
   static async verifyAssignment(
@@ -268,7 +299,7 @@ static async completeAssignment(
       verified: boolean; 
       adminNotes?: string;
     }
-  ) {
+  ): Promise<VerifyAssignmentResponse> {
     try {
       console.log('AssignmentService: Verifying assignment', assignmentId, data);
       
@@ -287,6 +318,11 @@ static async completeAssignment(
         throw new Error(result.message || `Failed to verify assignment: ${response.status}`);
       }
       
+      // After verification, refresh notifications to get the latest
+      if (result.success) {
+        await NotificationService.getUnreadCount();
+      }
+      
       return result;
 
     } catch (error: any) {
@@ -294,7 +330,6 @@ static async completeAssignment(
       return {
         success: false,
         message: error.message || 'Failed to verify assignment',
-        error: error.message
       };
     }
   }
@@ -325,7 +360,6 @@ static async completeAssignment(
       return {
         success: false,
         message: error.message || 'Failed to load assignment details. Please check your connection.',
-        error: error.message
       };
     }
   }
@@ -373,7 +407,6 @@ static async completeAssignment(
       return {
         success: false,
         message: error.message || 'Failed to load assignments',
-        error: error.message
       };
     }
   }
@@ -407,61 +440,58 @@ static async completeAssignment(
       return {
         success: false,
         message: error.message || 'Failed to load today assignments',
-        error: error.message
       };
     }
   }
 
-// In AssignmentService.ts - FIXED getGroupAssignments URL
-static async getGroupAssignments(
-  groupId: string, 
-  filters?: {
-    status?: string;
-    week?: number;
-    userId?: string;
-    limit?: number;
-    offset?: number;
-  } 
-) {
-  try { 
-    // FIXED: Add '/assignments' at the end to match backend route
-    let url = `${API_URL}/group/${groupId}/assignments`; // ← ADDED '/assignments'
-    const params = new URLSearchParams();
-    
-    if (filters?.status) params.append('status', filters.status);
-    if (filters?.week) params.append('week', filters.week?.toString());
-    if (filters?.userId) params.append('userId', filters.userId);
-    if (filters?.limit) params.append('limit', filters.limit?.toString());
-    if (filters?.offset) params.append('offset', filters.offset?.toString());
-    
-    const queryString = params.toString();
-    if (queryString) url += `?${queryString}`;
+  // Get group assignments
+  static async getGroupAssignments(
+    groupId: string, 
+    filters?: {
+      status?: string;
+      week?: number;
+      userId?: string;
+      limit?: number;
+      offset?: number;
+    } 
+  ) {
+    try { 
+      let url = `${API_URL}/group/${groupId}/assignments`;
+      const params = new URLSearchParams();
+      
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.week) params.append('week', filters.week?.toString());
+      if (filters?.userId) params.append('userId', filters.userId);
+      if (filters?.limit) params.append('limit', filters.limit?.toString());
+      if (filters?.offset) params.append('offset', filters.offset?.toString());
+      
+      const queryString = params.toString();
+      if (queryString) url += `?${queryString}`;
 
-    console.log('AssignmentService: Getting group assignments', url);
-    
-    const headers = await this.getHeaders(false);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
-    });
+      console.log('AssignmentService: Getting group assignments', url);
+      
+      const headers = await this.getHeaders(false);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to load group assignments: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Failed to load group assignments: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('AssignmentService.getGroupAssignments error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load group assignments',
+      };
     }
-    
-    const result = await response.json();
-    return result;
-
-  } catch (error: any) {
-    console.error('AssignmentService.getGroupAssignments error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to load group assignments',
-      error: error.message
-    };
   }
-}
  
   // Get assignment statistics
   static async getAssignmentStats(groupId: string) {
@@ -488,7 +518,6 @@ static async getGroupAssignments(
       return {
         success: false,
         message: error.message || 'Failed to load assignment statistics',
-        error: error.message
       };
     }
   }
@@ -703,51 +732,44 @@ static async getGroupAssignments(
     }
   }
 
-  // Helper: Create File from image URI (for React Native)
-  static async createFileFromUri(uri: string, fileName: string = 'photo.jpg'): Promise<File> {
+  // Get notification badge count (convenience method)
+  static async getNotificationBadgeCount(): Promise<number> {
     try {
-      // For React Native, you might need a different approach
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
-      // Create a File from Blob
-      const file = new File([blob], fileName, { type: blob.type });
-      return file;
+      const result = await NotificationService.getUnreadCount();
+      return result.count || 0;
     } catch (error) {
-      console.error('Error creating file from URI:', error);
-      throw error;
+      console.error('Error getting notification count:', error);
+      return 0;
     }
   }
 
-  // Helper: Upload photo and get URL (if your backend supports separate upload)
-  static async uploadPhoto(photoUri: string): Promise<{ success: boolean; photoUrl?: string; message?: string }> {
-    try {
-      const file = await this.createFileFromUri(photoUri);
-      const formData = new FormData();
-      formData.append('photo', file);
-      
-      const token = await this.getAuthToken();
-      const headers: HeadersInit = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      const response = await fetch(`${API_BASE_URL}/api/upload/photo`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
-      
-      const result = await response.json();
-      return result;
-    } catch (error: any) {
-      console.error('AssignmentService.uploadPhoto error:', error);
-      return {
-        success: false,
-        message: error.message || 'Failed to upload photo'
-      };
+  // Check if user has any pending notifications about submissions
+static async hasPendingSubmissionNotifications(): Promise<boolean> {
+  try {
+    const result = await NotificationService.getNotifications(1, 10);
+    
+    // Check the actual structure from your backend
+    // Based on your UserNotificationService, the response should have 'notifications' array
+    if (result.success && result.notifications && Array.isArray(result.notifications)) {
+      return result.notifications.some((n: any) => 
+        n.type === 'SUBMISSION_PENDING' && n.read === false
+      );
     }
+    
+    // Alternative: if the response has 'data.notifications'
+    if (result.success && result.data?.notifications && Array.isArray(result.data.notifications)) {
+      return result.data.notifications.some((n: any) => 
+        n.type === 'SUBMISSION_PENDING' && n.read === false
+      );
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking pending notifications:', error);
+    return false;
   }
+}
+
 
   // Get current time slot info for a task
   static async getCurrentTimeSlotInfo(taskId: string): Promise<{
@@ -780,7 +802,6 @@ static async getGroupAssignments(
     try {
       const headers = await this.getHeaders(false);
       
-      // Use task endpoint to get time slot info
       const response = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/time-slot-info`, {
         method: 'GET',
         headers,
@@ -791,7 +812,6 @@ static async getGroupAssignments(
       }
       
       const result = await response.json();
-      
       return result;
 
     } catch (error: any) {

@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+// src/screens/MySwapRequestsScreen.tsx - COMPLETE FIXED VERSION
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +9,6 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  Image,
   ScrollView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type FilterStatus = 'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
 
@@ -34,12 +35,40 @@ export const MySwapRequestsScreen = () => {
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('ALL');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
+  const [userLoading, setUserLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const limit = 20;
+
+  // Load user ID on mount
+  useEffect(() => {
+    const loadUserId = async () => {
+      try {
+        setUserLoading(true);
+        // Try to get userData first
+        let userStr = await AsyncStorage.getItem('userData');
+        if (!userStr) {
+          userStr = await AsyncStorage.getItem('user');
+        }
+        
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setUserId(user.id || user._id);
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
+      } finally {
+        setUserLoading(false);
+      }
+    };
+    loadUserId();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      loadRequests();
-    }, [activeFilter])
+      if (userId) {
+        loadRequests();
+      }
+    }, [activeFilter, userId])
   );
 
   const loadRequests = async (resetPage = true) => {
@@ -228,12 +257,76 @@ export const MySwapRequestsScreen = () => {
     );
   };
 
+  // Show loading state while checking user
+  if (userLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>My Swap Requests</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#4F46E5" />
+          <Text style={styles.loadingText}>Loading user data...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show message if no user
+  if (!userId) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>My Swap Requests</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.centerContainer}>
+          <Ionicons name="alert-circle" size={48} color="#EF4444" />
+          <Text style={styles.errorText}>User not authenticated</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => navigation.navigate('Login' as never)}
+          >
+            <Text style={styles.retryButtonText}>Go to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show loading state for requests
   if (loading && !refreshing && myRequests.length === 0) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Loading your swap requests...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>My Swap Requests</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.filterContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {renderFilterButton('ALL', 'All')}
+            {renderFilterButton('PENDING', 'Pending')}
+            {renderFilterButton('ACCEPTED', 'Accepted')}
+            {renderFilterButton('REJECTED', 'Rejected')}
+            {renderFilterButton('CANCELLED', 'Cancelled')}
+            {renderFilterButton('EXPIRED', 'Expired')}
+          </ScrollView>
+        </View>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#4F46E5" />
+          <Text style={styles.loadingText}>Loading swap requests...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -314,11 +407,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F9FAFB',
+    paddingBottom: 80,
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
     color: '#6B7280',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#EF4444',
+    marginTop: 12,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#4F46E5',
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   header: {
     flexDirection: 'row',

@@ -248,43 +248,49 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     });
   };
 
- const handleRequestSwap = async () => {
-  if (!assignment) return;
-  
-  try {
-    const checkResult = await SwapRequestService.checkCanSwap(assignment.id);
+// In AssignmentDetailsScreen.tsx - FIXED handleRequestSwap
+
+const handleRequestSwap = (preSelectedScope?: 'week' | 'day') => {
+  // This function returns a function that handles the press event
+  return async () => {
+    if (!assignment) return;
     
-    if (!checkResult.success) {
-      Alert.alert('Cannot Swap', checkResult.message || 'Unable to request swap');
-      return;
+    try {
+      const checkResult = await SwapRequestService.checkCanSwap(assignment.id);
+      
+      if (!checkResult.success) {
+        Alert.alert('Cannot Swap', checkResult.message || 'Unable to request swap');
+        return;
+      }
+      
+      if (checkResult.canSwap === false) {
+        Alert.alert('Cannot Swap', checkResult.reason || 'This assignment cannot be swapped');
+        return;
+      }
+      
+      // Determine the day for this assignment
+      const assignmentDay = assignment.assignmentDay || 
+        (assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : undefined);
+      
+      navigation.navigate('CreateSwapRequest', {
+        assignmentId: assignment.id,
+        groupId: assignment.task.group.id,
+        taskTitle: assignment.task.title,
+        dueDate: assignment.dueDate,
+        taskPoints: assignment.points,
+        timeSlot: assignment.timeSlot?.startTime || 'Scheduled time',
+        executionFrequency: assignment.task.executionFrequency,
+        timeSlots: assignment.task.timeSlots || [],
+        selectedDay: assignmentDay,
+        assignmentDay: assignmentDay,
+        selectedTimeSlotId: assignment.timeSlot?.id,
+        // If preSelectedScope is 'week', override
+        scope: preSelectedScope
+      });
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to check swap availability');
     }
-    
-    if (checkResult.canSwap === false) {
-      Alert.alert('Cannot Swap', checkResult.reason || 'This assignment cannot be swapped');
-      return;
-    }
-    
-    // Determine the day for this assignment
-    const assignmentDay = assignment.assignmentDay || 
-      (assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : undefined);
-    
-    navigation.navigate('CreateSwapRequest', {
-      assignmentId: assignment.id,
-      groupId: assignment.task.group.id,
-      taskTitle: assignment.task.title,
-      dueDate: assignment.dueDate,
-      taskPoints: assignment.points,
-      timeSlot: assignment.timeSlot?.startTime || 'Scheduled time',
-      executionFrequency: assignment.task.executionFrequency,
-      timeSlots: assignment.task.timeSlots || [],
-      // ✅ PASS THE DAY AND TIME SLOT
-      selectedDay: assignmentDay,
-      assignmentDay: assignmentDay,
-      selectedTimeSlotId: assignment.timeSlot?.id
-    });
-  } catch (error: any) {
-    Alert.alert('Error', error.message || 'Failed to check swap availability');
-  }
+  };
 };
   const handleVerify = async (verified: boolean) => {
     if (!assignment) return;
@@ -511,7 +517,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           {!hasPending ? (
             <TouchableOpacity
               style={styles.swapButton}
-              onPress={handleRequestSwap}
+              onPress={handleRequestSwap()}
               activeOpacity={0.8}
             >
               <View style={styles.swapButtonContent}>

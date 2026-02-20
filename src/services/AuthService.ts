@@ -1,4 +1,5 @@
-// src/authServices/AuthService.ts
+// src/authServices/AuthService.ts - UPDATED with consistent storage
+
 import {API_BASE_URL} from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -7,15 +8,20 @@ const API_URL = `${API_BASE_URL}/api/auth/users`;
 // Helper function to store user data
 const storeUserData = async (userData: any) => {
     try {
+        // Store in multiple formats for compatibility
         await AsyncStorage.setItem('userData', JSON.stringify(userData));
+        await AsyncStorage.setItem('user', JSON.stringify(userData)); // ADD THIS for compatibility
         
         // Also store individual fields if needed elsewhere
-        if (userData._id || userData.id) {
-            await AsyncStorage.setItem('userId', userData._id || userData.id);
+        const userId = userData._id || userData.id;
+        if (userId) {
+            await AsyncStorage.setItem('userId', userId);
         }
         if (userData.token) {
             await AsyncStorage.setItem('userToken', userData.token);
         }
+        
+        console.log('✅ User data stored successfully');
     } catch (error) {
         console.error('Error storing user data:', error);
     }
@@ -43,6 +49,7 @@ export class AuthService {
             // Store user data if login is successful
             if (result.success && result.user) {
                 await storeUserData(result.user);
+                console.log('🔐 Login successful, user stored:', result.user.id || result.user._id);
             }
 
             return result;
@@ -84,6 +91,7 @@ export class AuthService {
             // Store user data if signup is successful
             if (result.success && result.user) {
                 await storeUserData(result.user);
+                console.log('🔐 Signup successful, user stored:', result.user.id || result.user._id);
             }
 
             return result;
@@ -102,6 +110,7 @@ export class AuthService {
             // Clear local storage first
             await AsyncStorage.multiRemove([
                 'userData',
+                'user', // ADD THIS
                 'userId',
                 'userToken',
                 'userRefreshToken'
@@ -115,7 +124,7 @@ export class AuthService {
 
             if (response.ok) {
                 return {
-                    success: true,  // Changed from false to true
+                    success: true,
                     message: "Logged out successfully"
                 };
             }
@@ -135,13 +144,33 @@ export class AuthService {
         }
     }
 
-    // Add this helper method to get current user
+    // Get current user from either storage location
     static async getCurrentUser() {
         try {
-            const userData = await AsyncStorage.getItem('userData');
+            // Try userData first, then user as fallback
+            let userData = await AsyncStorage.getItem('userData');
+            if (!userData) {
+                userData = await AsyncStorage.getItem('user');
+            }
             return userData ? JSON.parse(userData) : null;
         } catch (error) {
             console.error('Error getting user data:', error);
+            return null;
+        }
+    }
+
+    // Get user ID specifically
+    static async getUserId() {
+        try {
+            // Try direct userId first
+            let userId = await AsyncStorage.getItem('userId');
+            if (userId) return userId;
+            
+            // Then try from userData
+            const userData = await this.getCurrentUser();
+            return userData?.id || userData?._id || null;
+        } catch (error) {
+            console.error('Error getting user ID:', error);
             return null;
         }
     }

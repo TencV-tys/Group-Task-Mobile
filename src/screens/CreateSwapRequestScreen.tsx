@@ -136,7 +136,8 @@ export const CreateSwapRequestScreen = () => {
     return now.toISOString();
   };
 
-// In CreateSwapRequestScreen.tsx - FIXED handleSubmit
+
+// In CreateSwapRequestScreen.tsx - Update handleSubmit with better error handling
 
 const handleSubmit = async () => {
   if (!canSwap.canSwap) {
@@ -153,33 +154,45 @@ const handleSubmit = async () => {
   }
 
   try {
+    console.log('Submitting swap request with data:', {
+      assignmentId,
+      reason: reason.trim() || undefined,
+      targetUserId,
+      expiresAt: calculateExpiryDate(),
+      scope: swapScope,
+      selectedDay: swapScope === 'day' ? (selectedDay || undefined) : undefined,
+      selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
+    });
+
     const result = await createSwapRequest({
       assignmentId,
       reason: reason.trim() || undefined,
       targetUserId, 
       expiresAt: calculateExpiryDate(),
       scope: swapScope,
-      // FIXED: Convert null to undefined
       selectedDay: swapScope === 'day' ? (selectedDay || undefined) : undefined,
-      // FIXED: Convert null to undefined
       selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
     });
+
+    console.log('Swap request result:', result);
 
     if (result.success) {
       Alert.alert(
         'Success',
         swapScope === 'day' 
           ? `Swap request created for ${selectedDay}!` 
-          : 'Swap request created for the entire week!', 
+          : 'Swap request created for the entire week!',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } else {
       Alert.alert('Error', result.message || 'Failed to create swap request');
     }
   } catch (error: any) {
+    console.error('Error in handleSubmit:', error);
     Alert.alert('Error', error.message || 'Failed to create swap request');
   }
 };
+
 
   const getSelectedMemberName = () => {
     if (!targetUserId) return 'Anyone can accept';

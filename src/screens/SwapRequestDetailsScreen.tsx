@@ -339,7 +339,7 @@ export const SwapRequestDetailsScreen = () => {
                 </Text>
               </View>
             )}
-          </View>
+          </View> 
         </View>
 
         {/* Reason */}

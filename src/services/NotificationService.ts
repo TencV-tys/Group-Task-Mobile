@@ -1,4 +1,4 @@
-// services/NotificationService.ts - UPDATED with proper types
+// services/NotificationService.ts - FIXED return types
 import { API_BASE_URL } from '../config/api';
 
 const API_URL = `${API_BASE_URL}/api/notifications`;
@@ -13,7 +13,7 @@ export interface Notification {
   read: boolean;
   createdAt: string;
   updatedAt?: string;
-}
+} 
 
 export interface NotificationsResponse {
   success: boolean;
@@ -23,10 +23,28 @@ export interface NotificationsResponse {
     notifications?: Notification[];
     count?: number;
     unreadCount?: number;
-    pagination?: any;
+    pagination?: {
+      page: number;
+      limit: number;
+      total: number;
+      pages: number;
+    };
   };
   count?: number;
   unreadCount?: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+export interface UnreadCountResponse {
+  success: boolean;
+  count: number;
+  unreadCount?: number; // Add this for compatibility
+  message?: string;
 }
 
 export class NotificationService {
@@ -56,7 +74,7 @@ export class NotificationService {
   }
 
   // Get unread count
-  static async getUnreadCount(): Promise<{ success: boolean; count: number; message?: string }> {
+  static async getUnreadCount(): Promise<UnreadCountResponse> {
     try {
       const response = await fetch(`${API_URL}/unread-count`, {
         method: "GET",
@@ -64,19 +82,27 @@ export class NotificationService {
       });
 
       const result = await response.json();
-      return result;
+      
+      // Normalize the response to always have 'count' property
+      return {
+        success: result.success,
+        count: result.count || result.unreadCount || 0,
+        unreadCount: result.unreadCount || result.count || 0,
+        message: result.message
+      };
 
     } catch (error: any) {
       console.error("Error getting unread count:", error);
       return {
         success: false,
-        count: 0
+        count: 0,
+        unreadCount: 0
       };
     }
   }
 
   // Mark notification as read
-  static async markAsRead(notificationId: string) {
+  static async markAsRead(notificationId: string): Promise<{ success: boolean; message?: string }> {
     try {
       const response = await fetch(`${API_URL}/${notificationId}/read`, {
         method: "PATCH",
@@ -96,7 +122,7 @@ export class NotificationService {
   }
 
   // Mark all as read
-  static async markAllAsRead() {
+  static async markAllAsRead(): Promise<{ success: boolean; message?: string }> {
     try {
       const response = await fetch(`${API_URL}/mark-all-read`, {
         method: "PATCH",
@@ -116,7 +142,7 @@ export class NotificationService {
   }
 
   // Delete notification
-  static async deleteNotification(notificationId: string) {
+  static async deleteNotification(notificationId: string): Promise<{ success: boolean; message?: string }> {
     try {
       const response = await fetch(`${API_URL}/${notificationId}`, {
         method: "DELETE",

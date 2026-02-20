@@ -1,3 +1,4 @@
+// src/screens/NotificationsScreen.tsx - COMPLETE UPDATED VERSION
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -53,7 +54,10 @@ export default function NotificationsScreen({ navigation }: any) {
   };
 
   const handleNavigation = (type: string, data: any) => {
+    console.log('Navigating with type:', type, 'data:', data);
+    
     switch (type) {
+      // ============= FEEDBACK TYPES =============
       case 'FEEDBACK_SUBMITTED':
       case 'FEEDBACK_STATUS_UPDATE':
         if (data?.feedbackId) {
@@ -63,27 +67,252 @@ export default function NotificationsScreen({ navigation }: any) {
         }
         break;
       
+      // ============= TASK RELATED TYPES =============
       case 'TASK_ASSIGNED':
+        if (data?.taskId) {
+          navigation.navigate('TaskDetails', { 
+            taskId: data.taskId,
+            groupId: data.groupId 
+          });
+        }
+        break;
+      
+      case 'TASK_COMPLETED':
+        if (data?.taskId) {
+          navigation.navigate('TaskDetails', { 
+            taskId: data.taskId,
+            groupId: data.groupId 
+          });
+        }
+        break;
+      
+      case 'TASK_OVERDUE':
+        if (data?.taskId) {
+          navigation.navigate('TaskDetails', { 
+            taskId: data.taskId,
+            groupId: data.groupId 
+          });
+        }
+        break;
+      
+      case 'TASK_CREATED':
+        if (data?.taskId) {
+          navigation.navigate('TaskDetails', { 
+            taskId: data.taskId,
+            groupId: data.groupId 
+          });
+        }
+        break;
+      
+      // ============= GROUP RELATED TYPES =============
+      case 'GROUP_INVITE':
+        if (data?.groupId) {
+          navigation.navigate('GroupDetails', { 
+            groupId: data.groupId,
+            inviteCode: data.inviteCode 
+          });
+        }
+        break;
+      
+      case 'GROUP_JOINED':
+        if (data?.groupId) {
+          navigation.navigate('GroupTasks', { 
+            groupId: data.groupId, 
+            groupName: data.groupName,
+            userRole: data.userRole || 'MEMBER'
+          });
+        }
+        break;
+      
+      case 'GROUP_CREATED':
+        if (data?.groupId) {
+          navigation.navigate('GroupTasks', { 
+            groupId: data.groupId, 
+            groupName: data.groupName,
+            userRole: 'ADMIN'
+          });
+        }
+        break;
+      
+      case 'NEW_MEMBER':
+        if (data?.groupId) {
+          navigation.navigate('GroupMembers', { 
+            groupId: data.groupId,
+            groupName: data.groupName 
+          });
+        }
+        break;
+      
+      // ============= SWAP REQUEST TYPES =============
+      case 'SWAP_REQUEST':
+        if (data?.swapRequestId) {
+          navigation.navigate('SwapRequestDetails', { 
+            requestId: data.swapRequestId 
+          });
+        } else if (data?.assignmentId) {
+          navigation.navigate('AssignmentDetails', { 
+            assignmentId: data.assignmentId 
+          });
+        }
+        break;
+      
+      case 'SWAP_ACCEPTED':
+        if (data?.swapRequestId) {
+          navigation.navigate('SwapRequestDetails', { 
+            requestId: data.swapRequestId 
+          });
+        } else if (data?.taskId) {
+          navigation.navigate('TaskDetails', { 
+            taskId: data.taskId,
+            groupId: data.groupId 
+          });
+        }
+        break;
+      
+      case 'SWAP_REJECTED':
+        if (data?.swapRequestId) {
+          navigation.navigate('SwapRequestDetails', { 
+            requestId: data.swapRequestId 
+          });
+        }
+        break;
+      
+      case 'SWAP_CANCELLED':
+        if (data?.swapRequestId) {
+          navigation.navigate('SwapRequestDetails', { 
+            requestId: data.swapRequestId 
+          });
+        }
+        break;
+      
+      case 'SWAP_COMPLETED':
+        if (data?.swapRequestId) {
+          navigation.navigate('SwapRequestDetails', { 
+            requestId: data.swapRequestId 
+          });
+        } else if (data?.taskId) {
+          navigation.navigate('TaskDetails', { 
+            taskId: data.taskId,
+            groupId: data.groupId 
+          });
+        }
+        break;
+      
+      case 'SWAP_ADMIN_NOTIFICATION':
+        if (data?.swapRequestId) {
+          navigation.navigate('SwapRequestDetails', { 
+            requestId: data.swapRequestId 
+          });
+        } else if (data?.taskId) {
+          navigation.navigate('TaskDetails', { 
+            taskId: data.taskId,
+            groupId: data.groupId 
+          });
+        }
+        break;
+      
+      case 'SWAP_EXPIRED':
+        if (data?.swapRequestId) {
+          navigation.navigate('SwapRequestDetails', { 
+            requestId: data.swapRequestId 
+          });
+        }
+        break;
+      
+      // ============= SUBMISSION TYPES =============
+      case 'SUBMISSION_PENDING':
+        if (data?.assignmentId) {
+          navigation.navigate('AssignmentDetails', { 
+            assignmentId: data.assignmentId,
+            isAdmin: true 
+          });
+        } else if (data?.taskId) {
+          navigation.navigate('PendingVerifications', { 
+            groupId: data.groupId,
+            groupName: data.groupName,
+            userRole: 'ADMIN'
+          });
+        }
+        break;
+      
+      case 'SUBMISSION_VERIFIED':
+        if (data?.assignmentId) {
+          navigation.navigate('AssignmentDetails', { 
+            assignmentId: data.assignmentId,
+            isAdmin: false 
+          });
+        }
+        break;
+      
+      case 'SUBMISSION_REJECTED':
+        if (data?.assignmentId) {
+          navigation.navigate('AssignmentDetails', { 
+            assignmentId: data.assignmentId,
+            isAdmin: false 
+          });
+        }
+        break;
+      
+      case 'SUBMISSION_DECISION':
+        if (data?.assignmentId) {
+          navigation.navigate('AssignmentDetails', { 
+            assignmentId: data.assignmentId,
+            isAdmin: true 
+          });
+        }
+        break;
+      
+      // ============= POINTS AND ACHIEVEMENTS =============
+      case 'POINTS_EARNED':
+        if (data?.groupId) {
+          navigation.navigate('Leaderboard', { 
+            groupId: data.groupId,
+            groupName: data.groupName 
+          });
+        }
+        break;
+      
+      // ============= MENTIONS AND REMINDERS =============
+      case 'MENTION':
+        if (data?.taskId) {
+          navigation.navigate('TaskDetails', { 
+            taskId: data.taskId,
+            groupId: data.groupId 
+          });
+        } else if (data?.commentId) {
+          navigation.navigate('CommentDetails', { 
+            commentId: data.commentId 
+          });
+        }
+        break;
+      
+      case 'REMINDER':
+        if (data?.taskId) {
+          navigation.navigate('TaskDetails', { 
+            taskId: data.taskId,
+            groupId: data.groupId 
+          });
+        }
+        break;
+      
+      // ============= DEFAULT =============
+      default:
+        console.log('Unhandled notification type:', type);
+        // If there's a taskId in data, try to navigate to task details
         if (data?.taskId) {
           navigation.navigate('TaskDetails', { taskId: data.taskId });
         }
-        break;
-      
-      case 'GROUP_INVITE':
-        if (data?.groupId) {
-          navigation.navigate('GroupDetails', { groupId: data.groupId });
+        // If there's a groupId, go to group tasks
+        else if (data?.groupId) {
+          navigation.navigate('GroupTasks', { 
+            groupId: data.groupId,
+            groupName: data.groupName || 'Group'
+          });
         }
-        break;
-      
-      case 'SWAP_REQUEST':
-        if (data?.swapRequestId) {
-          navigation.navigate('SwapRequestDetails', { swapRequestId: data.swapRequestId });
+        // Otherwise just go back
+        else {
+          navigation.goBack();
         }
-        break;
-      
-      default:
-        // Just go back to home if no specific navigation
-        navigation.goBack();
     }
   };
 
@@ -107,45 +336,88 @@ export default function NotificationsScreen({ navigation }: any) {
     deleteNotification(notificationId);
   };
 
-  const getNotificationIcon = (type: string) => {
+  const getNotificationIcon = (type: string): string => {
     const icons: Record<string, string> = {
+      // Feedback
       'FEEDBACK_SUBMITTED': 'message',
       'FEEDBACK_STATUS_UPDATE': 'update',
+      
+      // Task
       'TASK_ASSIGNED': 'clipboard-check',
       'TASK_COMPLETED': 'check-circle',
       'TASK_OVERDUE': 'alert',
+      'TASK_CREATED': 'plus-circle',
+      
+      // Group
+      'GROUP_INVITE': 'account-plus',
       'GROUP_JOINED': 'account-group',
       'GROUP_CREATED': 'home',
+      'NEW_MEMBER': 'account-plus',
+      
+      // Swap
       'SWAP_REQUEST': 'swap-horizontal',
       'SWAP_ACCEPTED': 'handshake',
-      'SWAP_DECLINED': 'close-circle',
+      'SWAP_REJECTED': 'close-circle',
+      'SWAP_CANCELLED': 'cancel',
+      'SWAP_COMPLETED': 'check-circle',
+      'SWAP_ADMIN_NOTIFICATION': 'shield-alert',
+      'SWAP_EXPIRED': 'timer-off',
+      
+      // Submission
+      'SUBMISSION_PENDING': 'clock-check',
+      'SUBMISSION_VERIFIED': 'check-circle',
+      'SUBMISSION_REJECTED': 'close-circle',
+      'SUBMISSION_DECISION': 'message-check',
+      
+      // Points
+      'POINTS_EARNED': 'trophy',
+      
+      // Other
       'MENTION': 'at',
       'REMINDER': 'bell',
-      'POINTS_EARNED': 'trophy',
-      'NEW_MEMBER': 'account-plus',
-      'TASK_CREATED': 'plus-circle',
-          'SUBMISSION_PENDING': 'clock-check', // New submission to review
-    'SUBMISSION_VERIFIED': 'check-circle', // User's submission verified
-    'SUBMISSION_REJECTED': 'close-circle', // User's submission rejected
-    'SUBMISSION_DECISION': 'message-check', 
     };
     return icons[type] || 'bell';
   };
 
-  const getNotificationColor = (type: string) => {
+  const getNotificationColor = (type: string): string => {
     const colors: Record<string, string> = {
+      // Feedback
       'FEEDBACK_SUBMITTED': '#FF9500',
       'FEEDBACK_STATUS_UPDATE': '#5856D6',
+      
+      // Task
       'TASK_ASSIGNED': '#007AFF',
       'TASK_COMPLETED': '#34C759',
       'TASK_OVERDUE': '#FF3B30',
+      'TASK_CREATED': '#5856D6',
+      
+      // Group
+      'GROUP_INVITE': '#4CD964',
       'GROUP_JOINED': '#4CD964',
+      'GROUP_CREATED': '#5856D6',
+      'NEW_MEMBER': '#4CD964',
+      
+      // Swap
       'SWAP_REQUEST': '#4F46E5',
+      'SWAP_ACCEPTED': '#10B981',
+      'SWAP_REJECTED': '#EF4444',
+      'SWAP_CANCELLED': '#6B7280',
+      'SWAP_COMPLETED': '#10B981',
+      'SWAP_ADMIN_NOTIFICATION': '#8B5CF6',
+      'SWAP_EXPIRED': '#9CA3AF',
+      
+      // Submission
+      'SUBMISSION_PENDING': '#FF9500',
+      'SUBMISSION_VERIFIED': '#34C759',
+      'SUBMISSION_REJECTED': '#FF3B30',
+      'SUBMISSION_DECISION': '#5856D6',
+      
+      // Points
       'POINTS_EARNED': '#FFD700',
-         'SUBMISSION_PENDING': '#FF9500', // Orange - pending review
-    'SUBMISSION_VERIFIED': '#34C759', // Green - verified
-    'SUBMISSION_REJECTED': '#FF3B30', // Red - rejected
-    'SUBMISSION_DECISION': '#5856D6', // Purple - decision made
+      
+      // Other
+      'MENTION': '#5856D6',
+      'REMINDER': '#007AFF',
     };
     return colors[type] || '#8E8E93';
   };
@@ -165,40 +437,45 @@ export default function NotificationsScreen({ navigation }: any) {
     return date.toLocaleDateString();
   };
 
-  const renderNotification = ({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={[styles.notificationCard, !item.read && styles.unreadCard]}
-      onPress={() => handleNotificationPress(item)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.iconContainer, { backgroundColor: getNotificationColor(item.type) }]}>
-        <MaterialCommunityIcons name={getNotificationIcon(item.type) as any} size={20} color="white" />
-      </View>
-      
-      <View style={styles.contentContainer}>
-        <View style={styles.headerContainer}>
-          <Text style={[styles.title, !item.read && styles.unreadTitle]} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
+  const renderNotification = ({ item }: { item: any }) => {
+    const iconName = getNotificationIcon(item.type);
+    const iconColor = getNotificationColor(item.type);
+    
+    return (
+      <TouchableOpacity
+        style={[styles.notificationCard, !item.read && styles.unreadCard]}
+        onPress={() => handleNotificationPress(item)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.iconContainer, { backgroundColor: iconColor }]}>
+          <MaterialCommunityIcons name={iconName as any} size={20} color="white" />
         </View>
         
-        <Text style={styles.message} numberOfLines={2}>
-          {item.message}
-        </Text>
-        
-        {!item.read && <View style={styles.unreadDot} />}
-      </View>
+        <View style={styles.contentContainer}>
+          <View style={styles.headerContainer}>
+            <Text style={[styles.title, !item.read && styles.unreadTitle]} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
+          </View>
+          
+          <Text style={styles.message} numberOfLines={2}>
+            {item.message}
+          </Text>
+          
+          {!item.read && <View style={styles.unreadDot} />}
+        </View>
 
-      <TouchableOpacity
-        style={styles.deleteButton}
-        onPress={() => handleDelete(item.id)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <MaterialCommunityIcons name="close" size={16} color="#adb5bd" />
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDelete(item.id)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialCommunityIcons name="close" size={16} color="#adb5bd" />
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>

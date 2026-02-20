@@ -1,12 +1,20 @@
+// notificationHook/useNotifications.ts - FIXED to handle normalized responses
 import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { NotificationService, Notification } from '../services/NotificationService';
+
+interface PaginationInfo {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
 
 export const useNotifications = () => {
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [pagination, setPagination] = useState({
+  const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
     limit: 20,
     total: 0,
@@ -20,9 +28,27 @@ export const useNotifications = () => {
       const result = await NotificationService.getNotifications(page, pagination.limit);
 
       if (result.success) {
-        setNotifications(result.notifications);
-        setUnreadCount(result.unreadCount);
-        setPagination(result.pagination);
+        // Handle different response structures
+        const notificationsData = result.notifications || result.data?.notifications || [];
+        const unread = result.unreadCount || result.data?.unreadCount || 0;
+        
+        setNotifications(notificationsData as Notification[]);
+        setUnreadCount(unread);
+        
+        // Handle pagination from different response structures
+        if (result.pagination) {
+          setPagination(result.pagination);
+        } else if (result.data?.pagination) {
+          setPagination(result.data.pagination);
+        } else {
+          // Default pagination if not provided
+          setPagination(prev => ({
+            ...prev,
+            page,
+            total: notificationsData.length,
+            pages: Math.ceil(notificationsData.length / prev.limit)
+          }));
+        }
       }
     } catch (error) {
       console.error('Load notifications error:', error);
@@ -36,7 +62,8 @@ export const useNotifications = () => {
     try {
       const result = await NotificationService.getUnreadCount();
       if (result.success) {
-        setUnreadCount(result.unreadCount);
+        // Now both count and unreadCount are available
+        setUnreadCount(result.count);
       }
     } catch (error) {
       console.error('Load unread count error:', error);

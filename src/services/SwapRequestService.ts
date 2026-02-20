@@ -286,7 +286,7 @@ static async getPendingForMe(filters?: { groupId?: string; limit?: number; offse
       headers,
       credentials: 'include'
     });
-
+ 
     if (!response.ok) {
       throw new Error(`Failed to load pending requests: ${response.status}`);
     }
@@ -319,7 +319,47 @@ static async getPendingForMe(filters?: { groupId?: string; limit?: number; offse
     };
   }
 }
-  
+  // In services/SwapRequestService.ts - ADD this method
+
+// GET: Get swap request details by ID
+static async getSwapRequestDetails(requestId: string): Promise<{ success: boolean; message: string; data?: any }> {
+  try {
+    console.log('SwapRequestService: Getting swap request details', requestId);
+    
+    const headers = await this.getHeaders(false);
+    
+    const response = await fetch(`${API_URL}/${requestId}`, {
+      method: 'GET',
+      headers,
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load swap request: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('SwapRequestService: Get details response:', result);
+    
+    // Handle different response structures
+    if (result.success) {
+      return {
+        success: true,
+        data: result.data || result.swapRequest || result,
+        message: result.message || 'Request details loaded'
+      };
+    }
+    
+    return result;
+
+  } catch (error: any) {
+    console.error('SwapRequestService.getSwapRequestDetails error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to load swap request details',
+    };
+  }
+}
   // ACCEPT: Accept a swap request
   static async acceptSwapRequest(requestId: string): Promise<SwapRequestResponse> {
     try {

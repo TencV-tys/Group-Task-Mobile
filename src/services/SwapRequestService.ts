@@ -1,5 +1,7 @@
+// services/SwapRequestService.ts - UPDATED with notification integration
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NotificationService } from './NotificationService'; // Import NotificationService
 
 const API_URL = `${API_BASE_URL}/api/swap-requests`;
 
@@ -8,7 +10,6 @@ export interface CreateSwapRequestData {
   reason?: string;
   targetUserId?: string;
   expiresAt?: string;
-  // ✅ NEW: Scope fields
   scope?: 'week' | 'day';
   selectedDay?: string;
   selectedTimeSlotId?: string;
@@ -24,7 +25,6 @@ export interface SwapRequest {
   expiresAt?: string;
   createdAt: string;
   updatedAt: string;
-  // ✅ NEW: Scope fields
   scope?: 'week' | 'day';
   selectedDay?: string;
   selectedTimeSlotId?: string;
@@ -71,7 +71,6 @@ export interface SwapRequest {
     fullName: string;
     avatarUrl?: string;
   };
-  // ✅ NEW: Selected time slot details
   selectedTimeSlot?: {
     id: string;
     startTime: string;
@@ -85,6 +84,19 @@ export interface SwapRequestFilters {
   groupId?: string;
   limit?: number;
   offset?: number;
+}
+
+export interface SwapRequestResponse {
+  success: boolean;
+  message: string;
+  data?: any;
+  notifications?: {
+    notifiedUsers?: number;
+    notifiedAdmins?: number;
+    notifiedRequester?: boolean;
+    notifiedTarget?: boolean;
+    notifiedAcceptor?: boolean;
+  };
 }
 
 export class SwapRequestService {
@@ -114,7 +126,7 @@ export class SwapRequestService {
   }
 
   // CREATE: Request to swap an assignment
-  static async createSwapRequest(data: CreateSwapRequestData) {
+  static async createSwapRequest(data: CreateSwapRequestData): Promise<SwapRequestResponse> {
     try {
       console.log('SwapRequestService: Creating swap request', data);
       
@@ -134,6 +146,11 @@ export class SwapRequestService {
         throw new Error(result.message || `Failed to create swap request: ${response.status}`);
       }
       
+      // After successful creation, refresh notifications
+      if (result.success) {
+        await NotificationService.getUnreadCount();
+      }
+      
       return result;
 
     } catch (error: any) {
@@ -141,7 +158,6 @@ export class SwapRequestService {
       return {
         success: false,
         message: error.message || 'Failed to create swap request',
-        error: error.message
       };
     }
   }
@@ -182,7 +198,6 @@ export class SwapRequestService {
       return {
         success: false,
         message: error.message || 'Failed to load swap requests',
-        error: error.message,
         data: { requests: [], total: 0 }
       };
     }
@@ -223,7 +238,6 @@ export class SwapRequestService {
       return {
         success: false,
         message: error.message || 'Failed to load pending requests',
-        error: error.message,
         data: { requests: [], total: 0 }
       };
     }
@@ -264,7 +278,6 @@ export class SwapRequestService {
       return {
         success: false,
         message: error.message || 'Failed to load group swap requests',
-        error: error.message,
         data: { requests: [], total: 0 }
       };
     }
@@ -295,7 +308,6 @@ export class SwapRequestService {
       return {
         success: false,
         message: error.message || 'Failed to load swap request details',
-        error: error.message
       };
     }
   }
@@ -331,7 +343,7 @@ export class SwapRequestService {
   }
 
   // ACCEPT: Accept a swap request
-  static async acceptSwapRequest(requestId: string) {
+  static async acceptSwapRequest(requestId: string): Promise<SwapRequestResponse> {
     try {
       console.log('SwapRequestService: Accepting swap request', requestId);
       
@@ -350,6 +362,11 @@ export class SwapRequestService {
         throw new Error(result.message || `Failed to accept swap request: ${response.status}`);
       }
       
+      // After successful acceptance, refresh notifications
+      if (result.success) {
+        await NotificationService.getUnreadCount();
+      }
+      
       return result;
 
     } catch (error: any) {
@@ -357,13 +374,12 @@ export class SwapRequestService {
       return {
         success: false,
         message: error.message || 'Failed to accept swap request',
-        error: error.message
       };
     }
   }
 
   // REJECT: Reject a swap request
-  static async rejectSwapRequest(requestId: string, reason?: string) {
+  static async rejectSwapRequest(requestId: string, reason?: string): Promise<SwapRequestResponse> {
     try {
       console.log('SwapRequestService: Rejecting swap request', requestId);
       
@@ -383,6 +399,11 @@ export class SwapRequestService {
         throw new Error(result.message || `Failed to reject swap request: ${response.status}`);
       }
       
+      // After successful rejection, refresh notifications
+      if (result.success) {
+        await NotificationService.getUnreadCount();
+      }
+      
       return result;
 
     } catch (error: any) {
@@ -390,13 +411,12 @@ export class SwapRequestService {
       return {
         success: false,
         message: error.message || 'Failed to reject swap request',
-        error: error.message
       };
     }
   }
 
   // CANCEL: Cancel a swap request
-  static async cancelSwapRequest(requestId: string) {
+  static async cancelSwapRequest(requestId: string): Promise<SwapRequestResponse> {
     try {
       console.log('SwapRequestService: Cancelling swap request', requestId);
       
@@ -415,6 +435,11 @@ export class SwapRequestService {
         throw new Error(result.message || `Failed to cancel swap request: ${response.status}`);
       }
       
+      // After successful cancellation, refresh notifications
+      if (result.success) {
+        await NotificationService.getUnreadCount();
+      }
+      
       return result;
 
     } catch (error: any) {
@@ -422,8 +447,29 @@ export class SwapRequestService {
       return {
         success: false,
         message: error.message || 'Failed to cancel swap request',
-        error: error.message
       };
+    }
+  }
+
+  // Helper: Check if user has any pending swap requests
+  static async hasPendingSwapRequests(): Promise<boolean> {
+    try {
+      const result = await this.getMySwapRequests({ status: 'PENDING', limit: 1 });
+      return result.success && result.data?.requests?.length > 0;
+    } catch (error) {
+      console.error('Error checking pending swap requests:', error);
+      return false;
+    }
+  }
+
+  // Helper: Check if user has any swap requests waiting for them
+  static async hasPendingForMe(): Promise<boolean> {
+    try {
+      const result = await this.getPendingForMe({ limit: 1 });
+      return result.success && result.data?.requests?.length > 0;
+    } catch (error) {
+      console.error('Error checking pending requests for me:', error);
+      return false;
     }
   }
 

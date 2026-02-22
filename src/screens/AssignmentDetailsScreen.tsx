@@ -32,6 +32,12 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isSubmittable, setIsSubmittable] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed'>('waiting');
+  const [willBePenalized, setWillBePenalized] = useState(false);
+  const [penaltyInfo, setPenaltyInfo] = useState<{
+    originalPoints: number;
+    finalPoints: number;
+    penaltyAmount: number;
+  } | null>(null);
   
   const { hasPendingRequest, getPendingRequestForAssignment } = useSwapRequests();
 
@@ -62,7 +68,13 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           result.assignment.verified === false ? 'rejected' : 'pending'
         );
         setAdminNotes(result.assignment.adminNotes || '');
-        checkTimeValidity(result.assignment);
+        
+        // Check time validity with server if needed
+        if (!result.assignment.completed) {
+          await checkTimeValidityWithServer(result.assignment);
+        } else {
+          checkTimeValidity(result.assignment);
+        }
       } else {
         setError(result.message || 'Failed to load assignment details');
       }
@@ -71,6 +83,42 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       setError(err.message || 'Network error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkTimeValidityWithServer = async (assignmentData: any) => {
+    try {
+      const result = await AssignmentService.checkSubmissionTime(assignmentData.id);
+      
+      if (result.success && result.data) {
+        setIsSubmittable(result.data.canSubmit);
+        setTimeLeft(result.data.timeLeft || null);
+        setWillBePenalized(result.data.willBePenalized || false);
+        
+        if (result.data.finalPoints !== undefined && result.data.originalPoints !== undefined) {
+          setPenaltyInfo({
+            originalPoints: result.data.originalPoints,
+            finalPoints: result.data.finalPoints,
+            penaltyAmount: result.data.originalPoints - result.data.finalPoints
+          });
+        }
+        
+        if (result.data.canSubmit) {
+          setSubmissionStatus('available');
+        } else if (result.data.reason === 'Not due date') {
+          setSubmissionStatus('wrong_day');
+        } else if (result.data.reason === 'Submission not open yet') {
+          setSubmissionStatus('waiting');
+        } else {
+          setSubmissionStatus('expired');
+        }
+      } else {
+        // Fallback to local validation
+        checkTimeValidity(assignmentData);
+      }
+    } catch (error) {
+      // Fallback to local validation
+      checkTimeValidity(assignmentData);
     }
   };
 
@@ -105,6 +153,20 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       
       const canSubmit = currentInMinutes >= canSubmitStart && currentInMinutes <= canSubmitEnd;
       setIsSubmittable(canSubmit);
+      
+      // Check if late (after end time but within grace period)
+      const isLate = currentInMinutes > endInMinutes && currentInMinutes <= canSubmitEnd;
+      setWillBePenalized(isLate);
+      
+      if (isLate && assignmentData.points) {
+        const penaltyAmount = Math.floor(assignmentData.points * 0.5);
+        setPenaltyInfo({
+          originalPoints: assignmentData.points,
+          finalPoints: assignmentData.points - penaltyAmount,
+          penaltyAmount
+        });
+      }
+      
       setSubmissionStatus(canSubmit ? 'available' : 
         currentInMinutes < canSubmitStart ? 'waiting' : 'expired');
       
@@ -119,6 +181,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       setIsSubmittable(true);
       setSubmissionStatus('available');
       setTimeLeft(null);
+      setWillBePenalized(false);
+      setPenaltyInfo(null);
     }
   };
 
@@ -150,6 +214,21 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
   };
 
   const getSubmissionStatusInfo = () => {
+    if (willBePenalized && submissionStatus === 'available') {
+      return {
+        label: '⚠️ LATE SUBMISSION',
+        color: '#e67700',
+        bgColor: '#fff3bf',
+        borderColor: '#ffd43b',
+        icon: 'timer-alert',
+        description: penaltyInfo 
+          ? `You will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}`
+          : 'Late submission - points will be reduced',
+        buttonText: 'Submit (Late)',
+        canSubmit: true
+      };
+    }
+    
     switch (submissionStatus) {
       case 'available':
         return {
@@ -235,63 +314,87 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       return;
     }
     
-    navigation.navigate('CompleteAssignment', {
-      assignmentId: assignment.id,
-      taskTitle: assignment.task?.title || 'Unknown Task',
-      dueDate: assignment.dueDate,
-      timeSlot: assignment.timeSlot,
-      onCompleted: () => {
-        fetchAssignmentDetails();
-        if (onVerified) onVerified();
-        Alert.alert('Success', 'Assignment submitted successfully!');
-      }
-    });
-  };
-
-// In AssignmentDetailsScreen.tsx - FIXED handleRequestSwap
-
-const handleRequestSwap = (preSelectedScope?: 'week' | 'day') => {
-  // This function returns a function that handles the press event
-  return async () => {
-    if (!assignment) return;
-    
-    try {
-      const checkResult = await SwapRequestService.checkCanSwap(assignment.id);
-      
-      if (!checkResult.success) {
-        Alert.alert('Cannot Swap', checkResult.message || 'Unable to request swap');
-        return;
-      }
-      
-      if (checkResult.canSwap === false) {
-        Alert.alert('Cannot Swap', checkResult.reason || 'This assignment cannot be swapped');
-        return;
-      }
-      
-      // Determine the day for this assignment
-      const assignmentDay = assignment.assignmentDay || 
-        (assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : undefined);
-      
-      navigation.navigate('CreateSwapRequest', {
+    // Show warning for late submissions
+    if (willBePenalized && penaltyInfo) {
+      Alert.alert(
+        'Late Submission',
+        `You are submitting after the scheduled time.\n\nYou will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}.\n\nDo you want to continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Submit Anyway', 
+            onPress: () => {
+              navigation.navigate('CompleteAssignment', {
+                assignmentId: assignment.id,
+                taskTitle: assignment.task?.title || 'Unknown Task',
+                dueDate: assignment.dueDate,
+                timeSlot: assignment.timeSlot,
+                isLate: true,
+                onCompleted: () => {
+                  fetchAssignmentDetails();
+                  if (onVerified) onVerified();
+                  Alert.alert('Success', 'Assignment submitted successfully!');
+                }
+              });
+            }
+          }
+        ]
+      );
+    } else {
+      navigation.navigate('CompleteAssignment', {
         assignmentId: assignment.id,
-        groupId: assignment.task.group.id,
-        taskTitle: assignment.task.title,
+        taskTitle: assignment.task?.title || 'Unknown Task',
         dueDate: assignment.dueDate,
-        taskPoints: assignment.points,
-        timeSlot: assignment.timeSlot?.startTime || 'Scheduled time',
-        executionFrequency: assignment.task.executionFrequency,
-        timeSlots: assignment.task.timeSlots || [],
-        selectedDay: assignmentDay,
-        assignmentDay: assignmentDay,
-        selectedTimeSlotId: assignment.timeSlot?.id,
-        // If preSelectedScope is 'week', override
-        scope: preSelectedScope
+        timeSlot: assignment.timeSlot,
+        onCompleted: () => {
+          fetchAssignmentDetails();
+          if (onVerified) onVerified();
+          Alert.alert('Success', 'Assignment submitted successfully!');
+        }
       });
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to check swap availability');
     }
   };
-};
+
+  const handleRequestSwap = (preSelectedScope?: 'week' | 'day') => {
+    return async () => {
+      if (!assignment) return;
+      
+      try {
+        const checkResult = await SwapRequestService.checkCanSwap(assignment.id);
+        
+        if (!checkResult.success) {
+          Alert.alert('Cannot Swap', checkResult.message || 'Unable to request swap');
+          return;
+        }
+        
+        if (checkResult.canSwap === false) {
+          Alert.alert('Cannot Swap', checkResult.reason || 'This assignment cannot be swapped');
+          return;
+        }
+        
+        const assignmentDay = assignment.assignmentDay || 
+          (assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : undefined);
+        
+        navigation.navigate('CreateSwapRequest', {
+          assignmentId: assignment.id,
+          groupId: assignment.task.group.id,
+          taskTitle: assignment.task.title,
+          dueDate: assignment.dueDate,
+          taskPoints: assignment.points,
+          timeSlot: assignment.timeSlot?.startTime || 'Scheduled time',
+          executionFrequency: assignment.task.executionFrequency,
+          timeSlots: assignment.task.timeSlots || [],
+          selectedDay: assignmentDay,
+          assignmentDay: assignmentDay,
+          selectedTimeSlotId: assignment.timeSlot?.id,
+          scope: preSelectedScope
+        });
+      } catch (error: any) {
+        Alert.alert('Error', error.message || 'Failed to check swap availability');
+      }
+    };
+  };
+
   const handleVerify = async (verified: boolean) => {
     if (!assignment) return;
     setVerifying(true);
@@ -423,6 +526,16 @@ const handleRequestSwap = (preSelectedScope?: 'week' | 'day') => {
               </View>
             </View>
             
+            {willBePenalized && penaltyInfo && (
+              <View style={styles.penaltyInfo}>
+                <MaterialCommunityIcons name="alert" size={16} color="#e67700" />
+                <Text style={styles.penaltyText}>
+                  Points: {penaltyInfo.finalPoints} / {penaltyInfo.originalPoints} 
+                  (Penalty: -{penaltyInfo.penaltyAmount})
+                </Text>
+              </View>
+            )}
+            
             {submissionStatus === 'available' && timeLeft !== null && (
               <View style={styles.timerContainer}>
                 <View style={[styles.timerBadge, timeLeft < 300 ? styles.urgentTimerBadge : styles.normalTimerBadge]}>
@@ -455,12 +568,19 @@ const handleRequestSwap = (preSelectedScope?: 'week' | 'day') => {
           
           {submissionStatusInfo.canSubmit ? (
             <TouchableOpacity
-              style={styles.completeButton}
+              style={[
+                styles.completeButton,
+                willBePenalized && styles.lateButton
+              ]}
               onPress={handleCompleteAssignment}
               activeOpacity={0.8}
             >
               <View style={styles.completeButtonContent}>
-                <MaterialCommunityIcons name="check-circle" size={20} color="white" />
+                <MaterialCommunityIcons 
+                  name={willBePenalized ? "timer-alert" : "check-circle"} 
+                  size={20} 
+                  color="white" 
+                />
                 <Text style={styles.completeButtonText}>{submissionStatusInfo.buttonText}</Text>
               </View>
               {timeLeft && timeLeft < 600 && (
@@ -1077,6 +1197,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
+  lateButton: {
+    backgroundColor: '#e67700',
+  },
   completeButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1127,6 +1250,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+  penaltyInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3bf',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8
+  },
+  penaltyText: {
+    fontSize: 13,
+    color: '#e67700',
+    fontWeight: '600'
   },
   swapSection: {
     marginBottom: 24,

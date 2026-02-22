@@ -886,7 +886,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     backgroundColor: '#007AFF',
-    paddingVertical: 16,
+    paddingVertical: 16, 
     borderRadius: 12
   },
   buttonDisabled: {

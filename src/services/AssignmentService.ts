@@ -1,4 +1,4 @@
-// services/AssignmentService.ts - COMPLETE UPDATED WITH NOTIFICATION INTEGRATION
+// services/AssignmentService.ts - COMPLETE UPDATED VERSION
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NotificationService } from './NotificationService';
@@ -91,6 +91,15 @@ export interface AssignmentDetails {
     label?: string;
     points?: number;
   };
+  timeValidation?: {
+    allowed: boolean;
+    reason?: string;
+    timeLeft?: number;
+    timeLeftText?: string;
+    willBePenalized?: boolean;
+    finalPoints?: number;
+    originalPoints?: number;
+  };
 }
 
 export interface TimeValidationResponse {
@@ -98,8 +107,6 @@ export interface TimeValidationResponse {
   message: string;
   data: {
     assignmentId: string;
-    assignmentTitle?: string;
-    dueDate: string;
     canSubmit: boolean;
     reason?: string;
     timeLeft?: number;
@@ -107,6 +114,7 @@ export interface TimeValidationResponse {
     submissionStart?: string;
     gracePeriodEnd?: string;
     currentTime: string;
+    dueDate: string;
     timeSlot?: {
       id: string;
       startTime: string;
@@ -114,6 +122,9 @@ export interface TimeValidationResponse {
       label?: string;
       points?: number;
     };
+    willBePenalized?: boolean;
+    finalPoints?: number;
+    originalPoints?: number;
   };
 }
 
@@ -131,6 +142,7 @@ export interface UpcomingAssignment {
   canSubmit: boolean;
   timeLeft?: number;
   timeLeftText?: string;
+  willBePenalized?: boolean;
   submissionInfo?: any;
   timeSlot?: {
     id: string;
@@ -152,6 +164,10 @@ export interface CompleteAssignmentResponse {
   success: boolean;
   message: string;
   assignment?: Assignment;
+  isLate?: boolean;
+  penaltyAmount?: number;
+  originalPoints?: number;
+  finalPoints?: number;
   notifications?: {
     notifiedAdmins: number;
     showSuccessNotification: boolean;
@@ -169,6 +185,31 @@ export interface VerifyAssignmentResponse {
     notifiedOtherAdmins: number;
     userNotificationMessage: string;
   };
+}
+
+export interface TodayAssignment {
+  id: string;
+  taskId: string;
+  taskTitle: string;
+  taskPoints: number;
+  group: {
+    id: string;
+    name: string;
+  };
+  dueDate: string;
+  canSubmit: boolean;
+  timeLeft?: number;
+  timeLeftText?: string;
+  reason?: string;
+  timeSlot?: {
+    id: string;
+    startTime: string;
+    endTime: string;
+    label?: string;
+    points?: number;
+  };
+  willBePenalized?: boolean;
+  finalPoints?: number;
 }
 
 export class AssignmentService {
@@ -200,7 +241,7 @@ export class AssignmentService {
     return headers;
   }
 
-  // Complete an assignment WITH PHOTO UPLOAD
+  // ========== COMPLETE ASSIGNMENT ==========
   static async completeAssignment(
     assignmentId: string, 
     data: CompleteAssignmentParams
@@ -250,9 +291,9 @@ export class AssignmentService {
           throw new Error(result.message || `Failed to complete assignment: ${response.status}`);
         }
         
-        // After successful submission, refresh notifications to get the latest
+        // After successful submission, refresh notifications
         if (result.success) {
-          await NotificationService.getUnreadCount(); // This will update the badge count
+          await NotificationService.getUnreadCount();
         }
         
         return result;
@@ -292,7 +333,7 @@ export class AssignmentService {
     }
   }
   
-  // Verify an assignment (admin only)
+  // ========== VERIFY ASSIGNMENT ==========
   static async verifyAssignment(
     assignmentId: string, 
     data: { 
@@ -318,7 +359,7 @@ export class AssignmentService {
         throw new Error(result.message || `Failed to verify assignment: ${response.status}`);
       }
       
-      // After verification, refresh notifications to get the latest
+      // After verification, refresh notifications
       if (result.success) {
         await NotificationService.getUnreadCount();
       }
@@ -334,7 +375,7 @@ export class AssignmentService {
     }
   }
 
-  // Get assignment details
+  // ========== GET ASSIGNMENT DETAILS ==========
   static async getAssignmentDetails(assignmentId: string) {
     try {
       console.log('AssignmentService: Getting assignment details', assignmentId);
@@ -364,7 +405,7 @@ export class AssignmentService {
     }
   }
 
-  // Get user's assignments
+  // ========== GET USER'S ASSIGNMENTS ==========
   static async getUserAssignments(
     userId: string, 
     filters?: {
@@ -411,8 +452,16 @@ export class AssignmentService {
     }
   }
 
-  // Get today's assignments
-  static async getTodayAssignments(groupId?: string) {
+  // ========== GET TODAY'S ASSIGNMENTS ==========
+  static async getTodayAssignments(groupId?: string): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      assignments: TodayAssignment[];
+      currentTime: string;
+      total: number;
+    };
+  }> {
     try {
       let url = `${API_URL}/today`;
       if (groupId) {
@@ -444,7 +493,7 @@ export class AssignmentService {
     }
   }
 
-  // Get group assignments
+  // ========== GET GROUP ASSIGNMENTS ==========
   static async getGroupAssignments(
     groupId: string, 
     filters?: {
@@ -456,7 +505,7 @@ export class AssignmentService {
     } 
   ) {
     try { 
-      let url = `${API_URL}/group/${groupId}/assignments`;
+      let url = `${API_URL}/group/${groupId}`;
       const params = new URLSearchParams();
       
       if (filters?.status) params.append('status', filters.status);
@@ -493,7 +542,7 @@ export class AssignmentService {
     }
   }
  
-  // Get assignment statistics
+  // ========== GET ASSIGNMENT STATISTICS ==========
   static async getAssignmentStats(groupId: string) {
     try {
       const url = `${API_URL}/group/${groupId}/stats`;
@@ -522,9 +571,7 @@ export class AssignmentService {
     }
   }
 
-  // ===================== TIME VALIDATION METHODS =====================
-
-  // Check if assignment can be submitted (time validation)
+  // ========== CHECK SUBMISSION TIME ==========
   static async checkSubmissionTime(assignmentId: string): Promise<TimeValidationResponse> {
     try {
       console.log('AssignmentService: Checking submission time for', assignmentId);
@@ -544,8 +591,8 @@ export class AssignmentService {
           message: `Server error: ${response.status}`,
           data: {
             assignmentId,
-            dueDate: '',
             canSubmit: false,
+            dueDate: '',
             currentTime: new Date().toISOString(),
             reason: `Server error: ${response.status}`
           }
@@ -554,10 +601,6 @@ export class AssignmentService {
       
       const result = await response.json();
       console.log('AssignmentService: Time check response', result);
-      
-      if (!result.success) {
-        console.error('AssignmentService.checkSubmissionTime API error:', result.message);
-      }
       
       return result;
 
@@ -568,8 +611,8 @@ export class AssignmentService {
         message: error.message || 'Network error. Please check your connection.',
         data: {
           assignmentId,
-          dueDate: '',
           canSubmit: false,
+          dueDate: '',
           currentTime: new Date().toISOString(),
           reason: 'Network error'
         }
@@ -577,7 +620,7 @@ export class AssignmentService {
     }
   }
 
-  // Get upcoming assignments with time information
+  // ========== GET UPCOMING ASSIGNMENTS ==========
   static async getUpcomingAssignments(options?: {
     groupId?: string;
     limit?: number;
@@ -635,7 +678,7 @@ export class AssignmentService {
     }
   }
 
-  // Local time validation helper (for immediate UI feedback)
+  // ========== LOCAL TIME VALIDATION HELPER ==========
   static validateLocalSubmissionTime(
     dueDate: string,
     timeSlot?: { startTime: string; endTime: string },
@@ -643,43 +686,40 @@ export class AssignmentService {
   ): {
     canSubmit: boolean;
     reason?: string;
-    timeLeft?: number; // seconds
+    timeLeft?: number;
     timeLeftText?: string;
     submissionStart?: Date;
     gracePeriodEnd?: Date;
     isToday?: boolean;
+    willBePenalized?: boolean;
   } {
     const due = new Date(dueDate);
     const current = currentTime;
     const isToday = due.toDateString() === current.toDateString();
     
-    // Check if it's the due date
     if (!isToday) {
       return {
         canSubmit: false,
         reason: 'Not due date',
         timeLeft: 0,
-        isToday: false
+        isToday: false,
+        willBePenalized: false
       };
     }
     
-    // If no time slot, allow any time on due date
     if (!timeSlot) {
       return { 
         canSubmit: true,
-        isToday: true
+        isToday: true,
+        willBePenalized: false
       };
     }
     
-    // Parse time slot end time
     const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
     const endTime = new Date(due);
     endTime.setHours(endHour, endMinute, 0, 0);
     
-    // 30 minute grace period after end time
     const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
-    
-    // Submission opens 30 minutes before end time
     const submissionStart = new Date(endTime.getTime() - 30 * 60000);
     
     if (current < submissionStart) {
@@ -687,10 +727,24 @@ export class AssignmentService {
       return {
         canSubmit: false,
         reason: 'Submission not open yet',
-        timeLeft: 0,
+        timeLeft: Math.ceil(timeUntilStart / 1000),
         submissionStart,
         gracePeriodEnd,
-        isToday: true
+        isToday: true,
+        willBePenalized: false
+      };
+    }
+    
+    if (current <= endTime) {
+      const timeLeft = endTime.getTime() - current.getTime();
+      return {
+        canSubmit: true,
+        timeLeft: Math.ceil(timeLeft / 1000),
+        timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
+        submissionStart,
+        gracePeriodEnd,
+        isToday: true,
+        willBePenalized: false
       };
     }
     
@@ -698,11 +752,12 @@ export class AssignmentService {
       const timeLeft = gracePeriodEnd.getTime() - current.getTime();
       return {
         canSubmit: true,
-        timeLeft: Math.ceil(timeLeft / 1000), // seconds
+        timeLeft: Math.ceil(timeLeft / 1000),
         timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
         submissionStart,
         gracePeriodEnd,
-        isToday: true
+        isToday: true,
+        willBePenalized: true // Late but within grace period
       };
     }
     
@@ -711,11 +766,12 @@ export class AssignmentService {
       reason: 'Submission window closed',
       timeLeft: 0,
       gracePeriodEnd,
-      isToday: true
+      isToday: true,
+      willBePenalized: true
     };
   }
 
-  // Format time left in human-readable format
+  // ========== FORMAT TIME LEFT ==========
   private static formatTimeLeft(seconds: number): string {
     if (seconds <= 0) return 'Expired';
     
@@ -732,7 +788,7 @@ export class AssignmentService {
     }
   }
 
-  // Get notification badge count (convenience method)
+  // ========== GET NOTIFICATION BADGE COUNT ==========
   static async getNotificationBadgeCount(): Promise<number> {
     try {
       const result = await NotificationService.getUnreadCount();
@@ -743,35 +799,31 @@ export class AssignmentService {
     }
   }
 
-  // Check if user has any pending notifications about submissions
-static async hasPendingSubmissionNotifications(): Promise<boolean> {
-  try {
-    const result = await NotificationService.getNotifications(1, 10);
-    
-    // Check the actual structure from your backend
-    // Based on your UserNotificationService, the response should have 'notifications' array
-    if (result.success && result.notifications && Array.isArray(result.notifications)) {
-      return result.notifications.some((n: any) => 
-        n.type === 'SUBMISSION_PENDING' && n.read === false
-      );
+  // ========== CHECK PENDING NOTIFICATIONS ==========
+  static async hasPendingSubmissionNotifications(): Promise<boolean> {
+    try {
+      const result = await NotificationService.getNotifications(1, 10);
+      
+      if (result.success && result.notifications && Array.isArray(result.notifications)) {
+        return result.notifications.some((n: any) => 
+          n.type === 'SUBMISSION_PENDING' && n.read === false
+        );
+      }
+      
+      if (result.success && result.data?.notifications && Array.isArray(result.data.notifications)) {
+        return result.data.notifications.some((n: any) => 
+          n.type === 'SUBMISSION_PENDING' && n.read === false
+        );
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error checking pending notifications:', error);
+      return false;
     }
-    
-    // Alternative: if the response has 'data.notifications'
-    if (result.success && result.data?.notifications && Array.isArray(result.data.notifications)) {
-      return result.data.notifications.some((n: any) => 
-        n.type === 'SUBMISSION_PENDING' && n.read === false
-      );
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('Error checking pending notifications:', error);
-    return false;
   }
-}
 
-
-  // Get current time slot info for a task
+  // ========== GET CURRENT TIME SLOT INFO ==========
   static async getCurrentTimeSlotInfo(taskId: string): Promise<{
     success: boolean;
     message: string;

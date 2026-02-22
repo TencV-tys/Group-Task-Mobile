@@ -13,6 +13,7 @@ import {
   StatusBar
 } from 'react-native';
 import { TaskService } from '../services/TaskService';
+import { AssignmentService } from '../services/AssignmentService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SettingsModal } from '../components/SettingsModal';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
@@ -102,14 +103,13 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         
         myTasksResult.tasks.forEach((task: any) => {
           if (task && task.id) {
-            const isSubmittableNow = checkIfSubmittableNow(task);
+            const timeValidation = checkTaskTimeValidity(task);
             
             const enhancedTask = {
               ...task,
               isAssignedToUser: true,
               userAssignment: task.assignment || task.userAssignment,
-              isSubmittableNow,
-              timeLeft: calculateTimeLeft(task)
+              ...timeValidation
             };
             
             if (!taskMap.has(task.id)) {
@@ -133,9 +133,18 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     }
   };
 
-  const checkIfSubmittableNow = (task: any) => {
+  const checkTaskTimeValidity = (task: any) => {
+    const result = {
+      isSubmittableNow: false,
+      timeLeft: null as number | null,
+      submissionStatus: 'waiting' as 'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed',
+      willBePenalized: false,
+      activeTimeSlot: null as any
+    };
+
     if (!task.userAssignment || task.userAssignment.completed) {
-      return false;
+      result.submissionStatus = 'completed';
+      return result;
     }
 
     const now = new Date();
@@ -144,40 +153,74 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     const assignmentDay = dueDate.toDateString();
     
     if (today !== assignmentDay) {
-      return false;
+      result.submissionStatus = 'wrong_day';
+      return result;
     }
 
-    if (task.userAssignment.timeSlot) {
-      const [endHour, endMinute] = task.userAssignment.timeSlot.endTime.split(':').map(Number);
-      
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
-      const currentInMinutes = currentHour * 60 + currentMinute;
+    const timeSlots = task.timeSlots || (task.userAssignment.timeSlot ? [task.userAssignment.timeSlot] : []);
+    
+    if (timeSlots.length === 0) {
+      result.isSubmittableNow = true;
+      result.submissionStatus = 'available';
+      return result;
+    }
+
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentInMinutes = currentHour * 60 + currentMinute;
+
+    for (const slot of timeSlots) {
+      const [endHour, endMinute] = slot.endTime.split(':').map(Number);
       const endInMinutes = endHour * 60 + endMinute;
       
       const canSubmitStart = endInMinutes - 30;
       const canSubmitEnd = endInMinutes + 30;
       
-      return currentInMinutes >= canSubmitStart && currentInMinutes <= canSubmitEnd;
+      if (currentInMinutes >= canSubmitStart && currentInMinutes <= canSubmitEnd) {
+        result.isSubmittableNow = true;
+        result.activeTimeSlot = slot;
+        result.submissionStatus = 'available';
+        result.willBePenalized = currentInMinutes > endInMinutes;
+        
+        const endTime = new Date();
+        endTime.setHours(endHour, endMinute, 0, 0);
+        const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
+        const timeLeftMs = gracePeriodEnd.getTime() - now.getTime();
+        result.timeLeft = Math.max(0, Math.floor(timeLeftMs / 1000));
+        
+        break;
+      } else if (currentInMinutes < canSubmitStart) {
+        const endTime = new Date();
+        endTime.setHours(endHour, endMinute, 0, 0);
+        const submissionStart = new Date(endTime.getTime() - 30 * 60000);
+        const timeUntilMs = submissionStart.getTime() - now.getTime();
+        
+        if (timeUntilMs > 0) {
+          result.timeLeft = Math.ceil(timeUntilMs / 1000);
+          result.submissionStatus = 'waiting';
+        }
+      }
     }
-    
-    return true;
-  };
 
-  const calculateTimeLeft = (task: any) => {
-    if (!task.userAssignment || task.userAssignment.completed || !task.userAssignment.timeSlot) {
-      return null;
+    if (!result.isSubmittableNow && result.submissionStatus === 'waiting') {
+      const latestSlot = [...timeSlots].sort((a, b) => {
+        const aEnd = parseInt(a.endTime.split(':')[0]) * 60 + parseInt(a.endTime.split(':')[1]);
+        const bEnd = parseInt(b.endTime.split(':')[0]) * 60 + parseInt(b.endTime.split(':')[1]);
+        return bEnd - aEnd;
+      })[0];
+      
+      if (latestSlot) {
+        const [endHour, endMinute] = latestSlot.endTime.split(':').map(Number);
+        const graceEnd = endHour * 60 + endMinute + 30;
+        
+        if (currentInMinutes > graceEnd) {
+          result.submissionStatus = 'expired';
+          result.timeLeft = 0;
+        }
+      }
     }
 
-    const now = new Date();
-    const [endHour, endMinute] = task.userAssignment.timeSlot.endTime.split(':').map(Number);
-    
-    const endTime = new Date();
-    endTime.setHours(endHour, endMinute, 0, 0);
-    const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
-    
-    const timeLeftMs = gracePeriodEnd.getTime() - now.getTime();
-    return Math.max(0, Math.floor(timeLeftMs / 1000));
+    return result;
   };
 
   const formatTimeLeft = (seconds: number) => {
@@ -187,7 +230,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       return `${hours}h ${mins}m`;
     } else if (seconds >= 60) {
       const mins = Math.floor(seconds / 60);
-      return `${mins}m`;
+      const secs = seconds % 60;
+      return `${mins}m ${secs}s`;
     } else {
       return `${seconds}s`;
     }
@@ -241,16 +285,38 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       return;
     }
 
-    navigation.navigate('CompleteAssignment', {
-      assignmentId: task.userAssignment.id,
-      taskTitle: task.title,
-      dueDate: task.userAssignment.dueDate,
-      timeSlot: task.userAssignment.timeSlot || task.timeSlots?.[0],
-      onCompleted: () => {
-        fetchTasks();
-        Alert.alert('Success', 'Assignment submitted successfully!');
+    if (task.isSubmittableNow) {
+      navigation.navigate('AssignmentDetails', {
+        assignmentId: task.userAssignment.id,
+        isAdmin: false,
+        onVerified: () => {
+          fetchTasks();
+        }
+      });
+    } else {
+      let message = 'Cannot submit this task now.';
+      
+      switch (task.submissionStatus) {
+        case 'wrong_day':
+          message = `This task is due on ${new Date(task.userAssignment.dueDate).toLocaleDateString()}. Please come back on that day.`;
+          break;
+        case 'waiting':
+          if (task.timeLeft) {
+            message = `Submission window opens in ${formatTimeLeft(task.timeLeft)}.`;
+          } else {
+            message = 'Submission window not yet open. Please wait until the scheduled time.';
+          }
+          break;
+        case 'expired':
+          message = 'The submission window for this task has expired.';
+          break;
+        case 'completed':
+          message = 'You have already completed this task.';
+          break;
       }
-    });
+      
+      Alert.alert('Cannot Submit', message, [{ text: 'OK' }]);
+    }
   };
 
   const handleDeleteTask = async (taskId: string, taskTitle: string) => {
@@ -362,7 +428,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     let isCompleted = false;
     
     if (selectedTab === 'my') {
-      // IN MY TASKS TAB: Only show MY assignments
       if (task.userAssignment) {
         currentAssignment = task.userAssignment;
         isAssignedToMe = true;
@@ -375,7 +440,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         isCompleted = currentAssignment?.completed || false;
       }
     } else {
-      // IN ALL TASKS TAB: Show the actual assigned member's name
       if (task.assignments && task.assignments.length > 0) {
         if (task.currentAssignee) {
           currentAssignment = task.assignments.find(
@@ -413,7 +477,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
     const dueDate = currentAssignment?.dueDate ? new Date(currentAssignment.dueDate) : null;
     
-    // Determine the display text based on tab
     const getAssignmentText = () => {
       if (selectedTab === 'my') {
         return isCompleted ? 'Completed' : 'Assigned to you';
@@ -422,14 +485,12 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       }
     };
 
-    // Determine icon based on tab and status
     const getIcon = () => {
       if (isCompleted) return "check-circle";
       if (selectedTab === 'my') return "account";
       return isAssignedToMe ? "account" : "account-clock";
     };
 
-    // Determine color based on tab and status
     const getColor = () => {
       if (isCompleted) return "#2b8a3e";
       if (selectedTab === 'my') return "#007AFF";
@@ -511,7 +572,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           {groupName || 'Tasks'}
         </Text>
         <Text style={styles.subtitle}>
-          {selectedTab === 'all' ? 'All Tasks' : 'My Task'}
+          {selectedTab === 'all' ? 'All Tasks' : 'My Tasks'}
         </Text>
       </View>
       
@@ -546,13 +607,16 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     const isMyTasksView = selectedTab === 'my';
     const isSubmittableNow = item.isSubmittableNow;
     const timeLeft = item.timeLeft;
+    const submissionStatus = item.submissionStatus;
+    const willBePenalized = item.willBePenalized;
     
     return (
       <TouchableOpacity
         style={[
           styles.taskCard,
           isCompleted && styles.completedTaskCard,
-          isMyTasksView && isSubmittableNow && styles.submittableTaskCard
+          isMyTasksView && isSubmittableNow && styles.submittableTaskCard,
+          isMyTasksView && willBePenalized && styles.penaltyTaskCard
         ]}
         onPress={() => handleViewTaskDetails(item.id)}
         onLongPress={() => !isMyTasksView && isAdmin && showTaskOptions(item)}
@@ -618,36 +682,58 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         
         {renderAssignmentInfo(item)}
         
-        {isMyTasksView && !isCompleted && isSubmittableNow && (
-          <TouchableOpacity
-            style={styles.completeNowButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleCompleteNow(item);
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={styles.completeNowContent}>
-              <MaterialCommunityIcons name="check-circle" size={20} color="white" />
-              <Text style={styles.completeNowText}>Complete Now</Text>
-              {timeLeft && timeLeft < 600 && (
-                <View style={styles.timeLeftBadge}>
-                  <Text style={styles.timeLeftText}>
-                    {formatTimeLeft(timeLeft)}
+        {isMyTasksView && !isCompleted && (
+          <>
+            {isSubmittableNow ? (
+              <TouchableOpacity
+                style={[
+                  styles.completeNowButton,
+                  willBePenalized && styles.lateButton
+                ]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleCompleteNow(item);
+                }}
+                activeOpacity={0.8}
+              >
+                <View style={styles.completeNowContent}>
+                  <MaterialCommunityIcons 
+                    name={willBePenalized ? "timer-alert" : "check-circle"} 
+                    size={20} 
+                    color="white" 
+                  />
+                  <Text style={styles.completeNowText}>
+                    {willBePenalized ? 'Submit Late' : 'Complete Now'}
+                  </Text>
+                  {timeLeft && timeLeft < 600 && (
+                    <View style={styles.timeLeftBadge}>
+                      <Text style={styles.timeLeftText}>
+                        {formatTimeLeft(timeLeft)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ) : (
+              submissionStatus === 'waiting' && timeLeft && timeLeft > 0 && (
+                <View style={styles.timeLeftContainer}>
+                  <MaterialCommunityIcons name="timer" size={14} color="#e67700" />
+                  <Text style={styles.timeLeftLabel}>
+                    Opens in {formatTimeLeft(timeLeft)}
                   </Text>
                 </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        )}
-        
-        {isMyTasksView && !isCompleted && !isSubmittableNow && timeLeft && timeLeft > 0 && (
-          <View style={styles.timeLeftContainer}>
-            <MaterialCommunityIcons name="timer" size={14} color="#e67700" />
-            <Text style={styles.timeLeftLabel}>
-              Submission opens in {formatTimeLeft(timeLeft)}
-            </Text>
-          </View>
+              )
+            )}
+            
+            {submissionStatus === 'expired' && (
+              <View style={[styles.timeLeftContainer, styles.expiredContainer]}>
+                <MaterialCommunityIcons name="timer-off" size={14} color="#fa5252" />
+                <Text style={[styles.timeLeftLabel, styles.expiredText]}>
+                  Submission window closed
+                </Text>
+              </View>
+            )}
+          </>
         )}
         
         <View style={styles.taskFooter}>
@@ -827,7 +913,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             />
           </View>
           <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>
-            My Task
+            My Tasks
           </Text>
         </TouchableOpacity>
       </View>
@@ -846,7 +932,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   );
 }
 
-// Keep your existing styles here
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -986,6 +1071,11 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#2b8a3e',
     backgroundColor: '#f0f9f0'
+  },
+  penaltyTaskCard: {
+    borderWidth: 2,
+    borderColor: '#e67700',
+    backgroundColor: '#fff3e0'
   },
   taskHeader: {
     flexDirection: 'row',
@@ -1157,6 +1247,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden'
   },
+  lateButton: {
+    backgroundColor: '#e67700',
+  },
   completeNowContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1194,6 +1287,13 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#e67700',
     fontWeight: '500'
+  },
+  expiredContainer: {
+    backgroundColor: '#ffc9c9',
+    borderColor: '#fa5252'
+  },
+  expiredText: {
+    color: '#fa5252'
   },
   emptyContainer: {
     alignItems: 'center',

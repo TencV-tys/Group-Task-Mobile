@@ -1,4 +1,4 @@
-// services/NotificationService.ts - FIXED return types
+// services/NotificationService.ts - UPDATED WITH ALL NOTIFICATION TYPES
 import { API_BASE_URL } from '../config/api';
 
 const API_URL = `${API_BASE_URL}/api/notifications`;
@@ -13,7 +13,59 @@ export interface Notification {
   read: boolean;
   createdAt: string;
   updatedAt?: string;
-} 
+}
+
+// Notification type constants for better type safety
+export const NotificationTypes = {
+  // Submission related
+  SUBMISSION_PENDING: 'SUBMISSION_PENDING',
+  SUBMISSION_VERIFIED: 'SUBMISSION_VERIFIED',
+  SUBMISSION_REJECTED: 'SUBMISSION_REJECTED',
+  SUBMISSION_DECISION: 'SUBMISSION_DECISION',
+  
+  // Penalty related
+  POINT_DEDUCTION: 'POINT_DEDUCTION',
+  LATE_SUBMISSION: 'LATE_SUBMISSION',
+  NEGLECT_DETECTED: 'NEGLECT_DETECTED',
+  
+  // Reminder related
+  TASK_REMINDER: 'TASK_REMINDER',
+  TASK_ACTIVE: 'TASK_ACTIVE',
+  
+  // Swap related
+  SWAP_REQUEST: 'SWAP_REQUEST',
+  SWAP_ACCEPTED: 'SWAP_ACCEPTED',
+  SWAP_REJECTED: 'SWAP_REJECTED',
+  SWAP_CANCELLED: 'SWAP_CANCELLED',
+  SWAP_COMPLETED: 'SWAP_COMPLETED',
+  SWAP_ADMIN_NOTIFICATION: 'SWAP_ADMIN_NOTIFICATION',
+  SWAP_EXPIRED: 'SWAP_EXPIRED',
+  
+  // Task related
+  TASK_ASSIGNED: 'TASK_ASSIGNED',
+  TASK_COMPLETED: 'TASK_COMPLETED',
+  TASK_OVERDUE: 'TASK_OVERDUE',
+  TASK_CREATED: 'TASK_CREATED',
+  
+  // Group related
+  GROUP_INVITE: 'GROUP_INVITE',
+  GROUP_JOINED: 'GROUP_JOINED',
+  GROUP_CREATED: 'GROUP_CREATED',
+  NEW_MEMBER: 'NEW_MEMBER',
+  
+  // Feedback related
+  FEEDBACK_SUBMITTED: 'FEEDBACK_SUBMITTED',
+  FEEDBACK_STATUS_UPDATE: 'FEEDBACK_STATUS_UPDATE',
+  
+  // Points
+  POINTS_EARNED: 'POINTS_EARNED',
+  
+  // Other
+  MENTION: 'MENTION',
+  REMINDER: 'REMINDER'
+} as const;
+
+export type NotificationType = typeof NotificationTypes[keyof typeof NotificationTypes];
 
 export interface NotificationsResponse {
   success: boolean;
@@ -43,7 +95,7 @@ export interface NotificationsResponse {
 export interface UnreadCountResponse {
   success: boolean;
   count: number;
-  unreadCount?: number; // Add this for compatibility
+  unreadCount?: number;
   message?: string;
 }
 
@@ -58,8 +110,6 @@ export class NotificationService {
       });
 
       const result = await response.json();
-      
-      // Log the actual structure to debug
       console.log('Notifications response structure:', Object.keys(result));
       
       return result;
@@ -83,7 +133,6 @@ export class NotificationService {
 
       const result = await response.json();
       
-      // Normalize the response to always have 'count' property
       return {
         success: result.success,
         count: result.count || result.unreadCount || 0,
@@ -166,7 +215,6 @@ export class NotificationService {
     try {
       const response = await this.getNotifications(1, 20);
       
-      // Check different possible response structures
       const notifications = response.notifications || response.data?.notifications || [];
       
       if (Array.isArray(notifications)) {
@@ -176,6 +224,26 @@ export class NotificationService {
       return false;
     } catch (error) {
       console.error(`Error checking for ${type} notifications:`, error);
+      return false;
+    }
+  }
+
+  // Helper to check for penalty notifications
+  static async hasPenaltyNotifications(): Promise<boolean> {
+    try {
+      const response = await this.getNotifications(1, 20);
+      const notifications = response.notifications || response.data?.notifications || [];
+      
+      if (Array.isArray(notifications)) {
+        return notifications.some(n => 
+          (n.type === 'POINT_DEDUCTION' || n.type === 'LATE_SUBMISSION' || n.type === 'NEGLECT_DETECTED') 
+          && !n.read
+        );
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error checking penalty notifications:', error);
       return false;
     }
   }

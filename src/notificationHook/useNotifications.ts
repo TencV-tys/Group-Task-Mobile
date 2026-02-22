@@ -1,7 +1,7 @@
-// notificationHook/useNotifications.ts - FIXED to handle normalized responses
+// notificationHook/useNotifications.ts - UPDATED WITH ALL TYPES
 import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
-import { NotificationService, Notification } from '../services/NotificationService';
+import { NotificationService, Notification, NotificationTypes } from '../services/NotificationService';
 
 interface PaginationInfo {
   page: number;
@@ -28,20 +28,17 @@ export const useNotifications = () => {
       const result = await NotificationService.getNotifications(page, pagination.limit);
 
       if (result.success) {
-        // Handle different response structures
         const notificationsData = result.notifications || result.data?.notifications || [];
         const unread = result.unreadCount || result.data?.unreadCount || 0;
         
         setNotifications(notificationsData as Notification[]);
         setUnreadCount(unread);
         
-        // Handle pagination from different response structures
         if (result.pagination) {
           setPagination(result.pagination);
         } else if (result.data?.pagination) {
           setPagination(result.data.pagination);
         } else {
-          // Default pagination if not provided
           setPagination(prev => ({
             ...prev,
             page,
@@ -62,7 +59,6 @@ export const useNotifications = () => {
     try {
       const result = await NotificationService.getUnreadCount();
       if (result.success) {
-        // Now both count and unreadCount are available
         setUnreadCount(result.count);
       }
     } catch (error) {
@@ -76,7 +72,6 @@ export const useNotifications = () => {
       const result = await NotificationService.markAsRead(notificationId);
       
       if (result.success) {
-        // Update local state
         setNotifications(prev => 
           prev.map(n => 
             n.id === notificationId ? { ...n, read: true } : n
@@ -116,11 +111,9 @@ export const useNotifications = () => {
       const result = await NotificationService.deleteNotification(notificationId);
       
       if (result.success) {
-        // Remove from list
         const deletedNotification = notifications.find(n => n.id === notificationId);
         setNotifications(prev => prev.filter(n => n.id !== notificationId));
         
-        // Update unread count if it was unread
         if (deletedNotification && !deletedNotification.read) {
           setUnreadCount(prev => Math.max(0, prev - 1));
         }

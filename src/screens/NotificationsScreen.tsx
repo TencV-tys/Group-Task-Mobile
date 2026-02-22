@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNotifications } from '../notificationHook/useNotifications';
+import { NotificationTypes } from '../services/NotificationService';
 
 export default function NotificationsScreen({ navigation }: any) {
   const {
@@ -42,12 +43,10 @@ export default function NotificationsScreen({ navigation }: any) {
   };
 
   const handleNotificationPress = async (notification: any) => {
-    // Mark as read if not already read
     if (!notification.read) {
       await markAsRead(notification.id);
     }
 
-    // Navigate based on notification type
     if (notification.data) {
       handleNavigation(notification.type, notification.data);
     }
@@ -57,109 +56,13 @@ export default function NotificationsScreen({ navigation }: any) {
     console.log('Navigating with type:', type, 'data:', data);
     
     switch (type) {
-      // ============= FEEDBACK TYPES =============
-      case 'FEEDBACK_SUBMITTED':
-      case 'FEEDBACK_STATUS_UPDATE':
-        if (data?.feedbackId) {
-          navigation.navigate('FeedbackDetails', { feedbackId: data.feedbackId });
-        } else {
-          navigation.navigate('Feedback');
-        }
-        break;
-      
-      // ============= TASK RELATED TYPES =============
-      case 'TASK_ASSIGNED':
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        }
-        break;
-      
-      case 'TASK_COMPLETED':
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        }
-        break;
-      
-      case 'TASK_OVERDUE':
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        }
-        break;
-      
-      case 'TASK_CREATED':
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        }
-        break;
-      
-      // ============= GROUP RELATED TYPES =============
-      case 'GROUP_INVITE':
-        if (data?.groupId) {
-          navigation.navigate('GroupDetails', { 
-            groupId: data.groupId,
-            inviteCode: data.inviteCode 
-          });
-        }
-        break;
-      
-      case 'GROUP_JOINED':
-        if (data?.groupId) {
-          navigation.navigate('GroupTasks', { 
-            groupId: data.groupId, 
-            groupName: data.groupName,
-            userRole: data.userRole || 'MEMBER'
-          });
-        }
-        break;
-      
-      case 'GROUP_CREATED':
-        if (data?.groupId) {
-          navigation.navigate('GroupTasks', { 
-            groupId: data.groupId, 
-            groupName: data.groupName,
-            userRole: 'ADMIN'
-          });
-        }
-        break;
-      
-      case 'NEW_MEMBER':
-        if (data?.groupId) {
-          navigation.navigate('GroupMembers', { 
-            groupId: data.groupId,
-            groupName: data.groupName 
-          });
-        }
-        break;
-      
-      // ============= SWAP REQUEST TYPES =============
-      case 'SWAP_REQUEST':
-        if (data?.swapRequestId) {
-          navigation.navigate('SwapRequestDetails', { 
-            requestId: data.swapRequestId 
-          });
-        } else if (data?.assignmentId) {
+      // ============= PENALTY & NEGLECT TYPES =============
+      case NotificationTypes.POINT_DEDUCTION:
+      case NotificationTypes.LATE_SUBMISSION:
+        if (data?.assignmentId) {
           navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId 
-          });
-        }
-        break;
-      
-      case 'SWAP_ACCEPTED':
-        if (data?.swapRequestId) {
-          navigation.navigate('SwapRequestDetails', { 
-            requestId: data.swapRequestId 
+            assignmentId: data.assignmentId,
+            isAdmin: false 
           });
         } else if (data?.taskId) {
           navigation.navigate('TaskDetails', { 
@@ -169,26 +72,11 @@ export default function NotificationsScreen({ navigation }: any) {
         }
         break;
       
-      case 'SWAP_REJECTED':
-        if (data?.swapRequestId) {
-          navigation.navigate('SwapRequestDetails', { 
-            requestId: data.swapRequestId 
-          });
-        }
-        break;
-      
-      case 'SWAP_CANCELLED':
-        if (data?.swapRequestId) {
-          navigation.navigate('SwapRequestDetails', { 
-            requestId: data.swapRequestId 
-          });
-        }
-        break;
-      
-      case 'SWAP_COMPLETED':
-        if (data?.swapRequestId) {
-          navigation.navigate('SwapRequestDetails', { 
-            requestId: data.swapRequestId 
+      case NotificationTypes.NEGLECT_DETECTED:
+        if (data?.assignmentId) {
+          navigation.navigate('AssignmentDetails', { 
+            assignmentId: data.assignmentId,
+            isAdmin: true 
           });
         } else if (data?.taskId) {
           navigation.navigate('TaskDetails', { 
@@ -198,29 +86,24 @@ export default function NotificationsScreen({ navigation }: any) {
         }
         break;
       
-      case 'SWAP_ADMIN_NOTIFICATION':
-        if (data?.swapRequestId) {
-          navigation.navigate('SwapRequestDetails', { 
-            requestId: data.swapRequestId 
+      // ============= REMINDER TYPES =============
+      case NotificationTypes.TASK_REMINDER:
+      case NotificationTypes.TASK_ACTIVE:
+        if (data?.assignmentId) {
+          navigation.navigate('AssignmentDetails', { 
+            assignmentId: data.assignmentId,
+            isAdmin: false 
           });
         } else if (data?.taskId) {
           navigation.navigate('TaskDetails', { 
             taskId: data.taskId,
             groupId: data.groupId 
-          });
-        }
-        break;
-      
-      case 'SWAP_EXPIRED':
-        if (data?.swapRequestId) {
-          navigation.navigate('SwapRequestDetails', { 
-            requestId: data.swapRequestId 
           });
         }
         break;
       
       // ============= SUBMISSION TYPES =============
-      case 'SUBMISSION_PENDING':
+      case NotificationTypes.SUBMISSION_PENDING:
         if (data?.assignmentId) {
           navigation.navigate('AssignmentDetails', { 
             assignmentId: data.assignmentId,
@@ -235,7 +118,8 @@ export default function NotificationsScreen({ navigation }: any) {
         }
         break;
       
-      case 'SUBMISSION_VERIFIED':
+      case NotificationTypes.SUBMISSION_VERIFIED:
+      case NotificationTypes.SUBMISSION_REJECTED:
         if (data?.assignmentId) {
           navigation.navigate('AssignmentDetails', { 
             assignmentId: data.assignmentId,
@@ -244,16 +128,7 @@ export default function NotificationsScreen({ navigation }: any) {
         }
         break;
       
-      case 'SUBMISSION_REJECTED':
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: false 
-          });
-        }
-        break;
-      
-      case 'SUBMISSION_DECISION':
+      case NotificationTypes.SUBMISSION_DECISION:
         if (data?.assignmentId) {
           navigation.navigate('AssignmentDetails', { 
             assignmentId: data.assignmentId,
@@ -262,8 +137,80 @@ export default function NotificationsScreen({ navigation }: any) {
         }
         break;
       
+      // ============= FEEDBACK TYPES =============
+      case NotificationTypes.FEEDBACK_SUBMITTED:
+      case NotificationTypes.FEEDBACK_STATUS_UPDATE:
+        if (data?.feedbackId) {
+          navigation.navigate('FeedbackDetails', { feedbackId: data.feedbackId });
+        } else {
+          navigation.navigate('Feedback');
+        }
+        break;
+      
+      // ============= TASK RELATED TYPES =============
+      case NotificationTypes.TASK_ASSIGNED:
+      case NotificationTypes.TASK_COMPLETED:
+      case NotificationTypes.TASK_OVERDUE:
+      case NotificationTypes.TASK_CREATED:
+        if (data?.taskId) {
+          navigation.navigate('TaskDetails', { 
+            taskId: data.taskId,
+            groupId: data.groupId 
+          });
+        }
+        break;
+      
+      // ============= GROUP RELATED TYPES =============
+      case NotificationTypes.GROUP_INVITE:
+        if (data?.groupId) {
+          navigation.navigate('GroupDetails', { 
+            groupId: data.groupId,
+            inviteCode: data.inviteCode 
+          });
+        }
+        break;
+      
+      case NotificationTypes.GROUP_JOINED:
+      case NotificationTypes.GROUP_CREATED:
+        if (data?.groupId) {
+          navigation.navigate('GroupTasks', { 
+            groupId: data.groupId, 
+            groupName: data.groupName,
+            userRole: data.userRole || 'MEMBER'
+          });
+        }
+        break;
+      
+      case NotificationTypes.NEW_MEMBER:
+        if (data?.groupId) {
+          navigation.navigate('GroupMembers', { 
+            groupId: data.groupId,
+            groupName: data.groupName 
+          });
+        }
+        break;
+      
+      // ============= SWAP REQUEST TYPES =============
+      case NotificationTypes.SWAP_REQUEST:
+      case NotificationTypes.SWAP_ACCEPTED:
+      case NotificationTypes.SWAP_REJECTED:
+      case NotificationTypes.SWAP_CANCELLED:
+      case NotificationTypes.SWAP_COMPLETED:
+      case NotificationTypes.SWAP_ADMIN_NOTIFICATION:
+      case NotificationTypes.SWAP_EXPIRED:
+        if (data?.swapRequestId) {
+          navigation.navigate('SwapRequestDetails', { 
+            requestId: data.swapRequestId 
+          });
+        } else if (data?.assignmentId) {
+          navigation.navigate('AssignmentDetails', { 
+            assignmentId: data.assignmentId 
+          });
+        }
+        break;
+      
       // ============= POINTS AND ACHIEVEMENTS =============
-      case 'POINTS_EARNED':
+      case NotificationTypes.POINTS_EARNED:
         if (data?.groupId) {
           navigation.navigate('Leaderboard', { 
             groupId: data.groupId,
@@ -273,7 +220,7 @@ export default function NotificationsScreen({ navigation }: any) {
         break;
       
       // ============= MENTIONS AND REMINDERS =============
-      case 'MENTION':
+      case NotificationTypes.MENTION:
         if (data?.taskId) {
           navigation.navigate('TaskDetails', { 
             taskId: data.taskId,
@@ -286,7 +233,7 @@ export default function NotificationsScreen({ navigation }: any) {
         }
         break;
       
-      case 'REMINDER':
+      case NotificationTypes.REMINDER:
         if (data?.taskId) {
           navigation.navigate('TaskDetails', { 
             taskId: data.taskId,
@@ -298,19 +245,14 @@ export default function NotificationsScreen({ navigation }: any) {
       // ============= DEFAULT =============
       default:
         console.log('Unhandled notification type:', type);
-        // If there's a taskId in data, try to navigate to task details
         if (data?.taskId) {
           navigation.navigate('TaskDetails', { taskId: data.taskId });
-        }
-        // If there's a groupId, go to group tasks
-        else if (data?.groupId) {
+        } else if (data?.groupId) {
           navigation.navigate('GroupTasks', { 
             groupId: data.groupId,
             groupName: data.groupName || 'Group'
           });
-        }
-        // Otherwise just go back
-        else {
+        } else {
           navigation.goBack();
         }
     }
@@ -338,86 +280,104 @@ export default function NotificationsScreen({ navigation }: any) {
 
   const getNotificationIcon = (type: string): string => {
     const icons: Record<string, string> = {
-      // Feedback
-      'FEEDBACK_SUBMITTED': 'message',
-      'FEEDBACK_STATUS_UPDATE': 'update',
+      // Penalty types
+      [NotificationTypes.POINT_DEDUCTION]: 'star-remove',
+      [NotificationTypes.LATE_SUBMISSION]: 'timer-alert',
+      [NotificationTypes.NEGLECT_DETECTED]: 'alert-circle',
       
-      // Task
-      'TASK_ASSIGNED': 'clipboard-check',
-      'TASK_COMPLETED': 'check-circle',
-      'TASK_OVERDUE': 'alert',
-      'TASK_CREATED': 'plus-circle',
-      
-      // Group
-      'GROUP_INVITE': 'account-plus',
-      'GROUP_JOINED': 'account-group',
-      'GROUP_CREATED': 'home',
-      'NEW_MEMBER': 'account-plus',
-      
-      // Swap
-      'SWAP_REQUEST': 'swap-horizontal',
-      'SWAP_ACCEPTED': 'handshake',
-      'SWAP_REJECTED': 'close-circle',
-      'SWAP_CANCELLED': 'cancel',
-      'SWAP_COMPLETED': 'check-circle',
-      'SWAP_ADMIN_NOTIFICATION': 'shield-alert',
-      'SWAP_EXPIRED': 'timer-off',
+      // Reminder types
+      [NotificationTypes.TASK_REMINDER]: 'clock-alert',
+      [NotificationTypes.TASK_ACTIVE]: 'clock-check',
       
       // Submission
-      'SUBMISSION_PENDING': 'clock-check',
-      'SUBMISSION_VERIFIED': 'check-circle',
-      'SUBMISSION_REJECTED': 'close-circle',
-      'SUBMISSION_DECISION': 'message-check',
+      [NotificationTypes.SUBMISSION_PENDING]: 'clock-check',
+      [NotificationTypes.SUBMISSION_VERIFIED]: 'check-circle',
+      [NotificationTypes.SUBMISSION_REJECTED]: 'close-circle',
+      [NotificationTypes.SUBMISSION_DECISION]: 'message-check',
+      
+      // Feedback
+      [NotificationTypes.FEEDBACK_SUBMITTED]: 'message',
+      [NotificationTypes.FEEDBACK_STATUS_UPDATE]: 'update',
+      
+      // Task
+      [NotificationTypes.TASK_ASSIGNED]: 'clipboard-check',
+      [NotificationTypes.TASK_COMPLETED]: 'check-circle',
+      [NotificationTypes.TASK_OVERDUE]: 'alert',
+      [NotificationTypes.TASK_CREATED]: 'plus-circle',
+      
+      // Group
+      [NotificationTypes.GROUP_INVITE]: 'account-plus',
+      [NotificationTypes.GROUP_JOINED]: 'account-group',
+      [NotificationTypes.GROUP_CREATED]: 'home',
+      [NotificationTypes.NEW_MEMBER]: 'account-plus',
+      
+      // Swap
+      [NotificationTypes.SWAP_REQUEST]: 'swap-horizontal',
+      [NotificationTypes.SWAP_ACCEPTED]: 'handshake',
+      [NotificationTypes.SWAP_REJECTED]: 'close-circle',
+      [NotificationTypes.SWAP_CANCELLED]: 'cancel',
+      [NotificationTypes.SWAP_COMPLETED]: 'check-circle',
+      [NotificationTypes.SWAP_ADMIN_NOTIFICATION]: 'shield-alert',
+      [NotificationTypes.SWAP_EXPIRED]: 'timer-off',
       
       // Points
-      'POINTS_EARNED': 'trophy',
+      [NotificationTypes.POINTS_EARNED]: 'trophy',
       
       // Other
-      'MENTION': 'at',
-      'REMINDER': 'bell',
+      [NotificationTypes.MENTION]: 'at',
+      [NotificationTypes.REMINDER]: 'bell',
     };
     return icons[type] || 'bell';
   };
 
   const getNotificationColor = (type: string): string => {
     const colors: Record<string, string> = {
-      // Feedback
-      'FEEDBACK_SUBMITTED': '#FF9500',
-      'FEEDBACK_STATUS_UPDATE': '#5856D6',
+      // Penalty types - Red/Orange
+      [NotificationTypes.POINT_DEDUCTION]: '#FF3B30',
+      [NotificationTypes.LATE_SUBMISSION]: '#FF9500',
+      [NotificationTypes.NEGLECT_DETECTED]: '#FF3B30',
       
-      // Task
-      'TASK_ASSIGNED': '#007AFF',
-      'TASK_COMPLETED': '#34C759',
-      'TASK_OVERDUE': '#FF3B30',
-      'TASK_CREATED': '#5856D6',
-      
-      // Group
-      'GROUP_INVITE': '#4CD964',
-      'GROUP_JOINED': '#4CD964',
-      'GROUP_CREATED': '#5856D6',
-      'NEW_MEMBER': '#4CD964',
-      
-      // Swap
-      'SWAP_REQUEST': '#4F46E5',
-      'SWAP_ACCEPTED': '#10B981',
-      'SWAP_REJECTED': '#EF4444',
-      'SWAP_CANCELLED': '#6B7280',
-      'SWAP_COMPLETED': '#10B981',
-      'SWAP_ADMIN_NOTIFICATION': '#8B5CF6',
-      'SWAP_EXPIRED': '#9CA3AF',
+      // Reminder types - Orange/Green
+      [NotificationTypes.TASK_REMINDER]: '#FF9500',
+      [NotificationTypes.TASK_ACTIVE]: '#34C759',
       
       // Submission
-      'SUBMISSION_PENDING': '#FF9500',
-      'SUBMISSION_VERIFIED': '#34C759',
-      'SUBMISSION_REJECTED': '#FF3B30',
-      'SUBMISSION_DECISION': '#5856D6',
+      [NotificationTypes.SUBMISSION_PENDING]: '#FF9500',
+      [NotificationTypes.SUBMISSION_VERIFIED]: '#34C759',
+      [NotificationTypes.SUBMISSION_REJECTED]: '#FF3B30',
+      [NotificationTypes.SUBMISSION_DECISION]: '#5856D6',
+      
+      // Feedback
+      [NotificationTypes.FEEDBACK_SUBMITTED]: '#FF9500',
+      [NotificationTypes.FEEDBACK_STATUS_UPDATE]: '#5856D6',
+      
+      // Task
+      [NotificationTypes.TASK_ASSIGNED]: '#007AFF',
+      [NotificationTypes.TASK_COMPLETED]: '#34C759',
+      [NotificationTypes.TASK_OVERDUE]: '#FF3B30',
+      [NotificationTypes.TASK_CREATED]: '#5856D6',
+      
+      // Group
+      [NotificationTypes.GROUP_INVITE]: '#4CD964',
+      [NotificationTypes.GROUP_JOINED]: '#4CD964',
+      [NotificationTypes.GROUP_CREATED]: '#5856D6',
+      [NotificationTypes.NEW_MEMBER]: '#4CD964',
+      
+      // Swap
+      [NotificationTypes.SWAP_REQUEST]: '#4F46E5',
+      [NotificationTypes.SWAP_ACCEPTED]: '#10B981',
+      [NotificationTypes.SWAP_REJECTED]: '#EF4444',
+      [NotificationTypes.SWAP_CANCELLED]: '#6B7280',
+      [NotificationTypes.SWAP_COMPLETED]: '#10B981',
+      [NotificationTypes.SWAP_ADMIN_NOTIFICATION]: '#8B5CF6',
+      [NotificationTypes.SWAP_EXPIRED]: '#9CA3AF',
       
       // Points
-      'POINTS_EARNED': '#FFD700',
+      [NotificationTypes.POINTS_EARNED]: '#FFD700',
       
       // Other
-      'MENTION': '#5856D6',
-      'REMINDER': '#007AFF',
+      [NotificationTypes.MENTION]: '#5856D6',
+      [NotificationTypes.REMINDER]: '#007AFF',
     };
     return colors[type] || '#8E8E93';
   };
@@ -462,6 +422,21 @@ export default function NotificationsScreen({ navigation }: any) {
           <Text style={styles.message} numberOfLines={2}>
             {item.message}
           </Text>
+          
+          {/* Show penalty info in preview if available */}
+          {item.type === NotificationTypes.POINT_DEDUCTION && item.data?.deductedPoints && (
+            <View style={styles.previewInfo}>
+              <MaterialCommunityIcons name="star-remove" size={12} color="#FF3B30" />
+              <Text style={styles.previewText}>Lost {Math.abs(item.data.deductedPoints)} points</Text>
+            </View>
+          )}
+          
+          {item.type === NotificationTypes.LATE_SUBMISSION && item.data?.finalPoints && (
+            <View style={styles.previewInfo}>
+              <MaterialCommunityIcons name="timer-alert" size={12} color="#FF9500" />
+              <Text style={styles.previewText}>Points: {item.data.finalPoints}</Text>
+            </View>
+          )}
           
           {!item.read && <View style={styles.unreadDot} />}
         </View>
@@ -664,6 +639,17 @@ const styles = StyleSheet.create({
     fontSize: 13, 
     color: '#6c757d',
     lineHeight: 18,
+  },
+  previewInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  previewText: {
+    fontSize: 11,
+    color: '#6c757d',
+    fontWeight: '500',
   },
   unreadDot: {
     position: 'absolute',

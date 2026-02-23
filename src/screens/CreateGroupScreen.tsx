@@ -14,42 +14,44 @@ import {
 import { useCreateGroup } from '../groupHook/useCreateGroup';
 
 export default function CreateGroupScreen({ navigation }: any) {
-  const [groupName, setGroupName] = useState('');
+  const [groupName, setGroupName] = useState(''); 
   const [description, setDescription] = useState('');
   
   const { loading, message, success, createGroup, reset } = useCreateGroup();
 
   const handleCreate = async () => {
-    if (!groupName.trim()) {
-      Alert.alert('Error', 'Please enter a group name');
-      return;
-    }
-    
-    console.log('Creating group:', groupName);
-    
-    const result = await createGroup(groupName.trim(), description.trim() || undefined);
-    
-    if (result.success) {
-      // Show success alert with invite code
-      Alert.alert(
-        'Success! 🎉',
-        `Group "${groupName}" created successfully!${result.inviteCode ? `\n\nInvite Code: ${result.inviteCode}` : ''}`,
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              reset();
-              navigation.goBack();
-            }
+  if (!groupName.trim()) {
+    Alert.alert('Error', 'Please enter a group name');
+    return;
+  }
+  
+  console.log('Creating group:', groupName);
+  
+  // ✅ FIX: Handle empty description properly
+  const processedDescription = description && description.trim() ? description.trim() : undefined;
+  
+  const result = await createGroup(groupName.trim(), processedDescription);
+  
+  if (result.success) {
+    // Show success alert with invite code
+    Alert.alert(
+      'Success! 🎉',
+      `Group "${groupName}" created successfully!${result.inviteCode ? `\n\nInvite Code: ${result.inviteCode}` : ''}`,
+      [
+        { 
+          text: 'OK', 
+          onPress: () => {
+            reset();
+            navigation.goBack();
           }
-        ]
-      );
-    } else {
-      // Show error alert
-      Alert.alert('Error', result.message || 'Failed to create group');
-    }
-  };
-
+        }
+      ]
+    );
+  } else {
+    // Show error alert
+    Alert.alert('Error', result.message || 'Failed to create group');
+  }
+};
   const handleCancel = () => {
     reset();
     navigation.goBack();

@@ -38,44 +38,50 @@ export class GroupService {
   }
 
   // ========== CREATE GROUP ==========
-  static async createGroup(name: string, description?: string) {
-    try {
-      if (!name.trim()) {
-        return {
-          success: false,
-          message: "Group name is required"
-        };
-      }
-
-      console.log(`GroupService: Creating group "${name}"`);
-      
-      const headers = await this.getHeaders();
-      
-      const response = await fetch(`${API_URL}/create`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          name: name.trim(),
-          description: description?.trim() || null
-        }),
-        // credentials: 'include' // Not needed with token
-      });
-
-      console.log(`GroupService: Response status: ${response.status}`);
-      
-      const result = await response.json();
-      console.log(`GroupService: Result:`, result);
-      
-      return result;
-
-    } catch (e: any) {
-      console.error("GroupService.createGroup error:", e);
+  // In GroupService.ts - createGroup method
+static async createGroup(name: string, description?: string) {
+  try {
+    if (!name.trim()) {
       return {
         success: false,
-        message: e.message || "Failed to create group"
+        message: "Group name is required"
       };
     }
+
+    console.log(`GroupService: Creating group "${name}"`);
+    
+    const headers = await this.getHeaders();
+    
+    // ✅ FIX: Only include description if it exists
+    const body: any = {
+      name: name.trim()
+    };
+    
+    if (description) {
+      body.description = description;
+    }
+    
+    const response = await fetch(`${API_URL}/create`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    console.log(`GroupService: Response status: ${response.status}`);
+    
+    const result = await response.json();
+    console.log(`GroupService: Result:`, result);
+    
+    return result;
+
+  } catch (e: any) {
+    console.error("GroupService.createGroup error:", e);
+    return {
+      success: false,
+      message: e.message || "Failed to create group"
+    };
   }
+}
 
   // ========== GET USER'S GROUPS ==========
   static async getUserGroups() {

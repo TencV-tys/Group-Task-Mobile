@@ -1,6 +1,8 @@
+// src/hooks/useFeedback.ts - UPDATED WITH TOKEN CHECK
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { FeedbackService, Feedback, FeedbackStats } from '../services/FeedbackService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED') => {
   const [loading, setLoading] = useState(false);
@@ -9,6 +11,7 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
   const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
   const [stats, setStats] = useState<FeedbackStats | null>(null);
   const [activeFilter, setActiveFilter] = useState<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | null>(initialFilter || null);
+  const [authError, setAuthError] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -17,6 +20,24 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
   });
 
   const isMounted = useRef(true);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        console.warn('useFeedback: No auth token available');
+        setAuthError(true);
+        return false;
+      }
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('useFeedback: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   // Handle stats update from polling
   const handleStatsUpdate = useCallback((newStats: FeedbackStats) => {
@@ -27,18 +48,28 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
 
   // Start/stop polling
   useEffect(() => {
-    // Start polling
-    FeedbackService.startPolling(handleStatsUpdate);
+    // Check token before starting polling
+    checkToken().then(hasToken => {
+      if (hasToken) {
+        FeedbackService.startPolling(handleStatsUpdate);
+      }
+    });
 
     return () => {
       isMounted.current = false;
       FeedbackService.stopPolling(handleStatsUpdate);
     };
-  }, [handleStatsUpdate]);
+  }, [handleStatsUpdate, checkToken]);
 
   // Submit feedback
   const submitFeedback = useCallback(async (data: { type: string; message: string; category?: string }) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) {
+        Alert.alert('Authentication Error', 'Please log in again');
+        return { success: false, authError: true };
+      }
+
       setSubmitting(true);
       const result = await FeedbackService.submitFeedback(data);
 
@@ -60,116 +91,141 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
     } finally {
       setSubmitting(false);
     }
-  }, []);
+  }, [checkToken]);
 
   // Update feedback
-const updateFeedback = useCallback(async (feedbackId: string, data: { type?: string; message?: string; category?: string | null }) => {
+  const updateFeedback = useCallback(async (feedbackId: string, data: { type?: string; message?: string; category?: string | null }) => {
+    try {
+      const hasToken = await checkToken();
+      if (!hasToken) {
+        Alert.alert('Authentication Error', 'Please log in again');
+        return { success: false, authError: true };
+      }
+
+      setLoading(true);
+      
+      const serviceData: { type?: string; message?: string; category?: string } = {};
+      if (data.type !== undefined) serviceData.type = data.type;
+      if (data.message !== undefined) serviceData.message = data.message;
+      if (data.category !== undefined) serviceData.category = data.category === null ? undefined : data.category;
+      
+      const result = await FeedbackService.updateFeedback(feedbackId, serviceData);
+
+      if (result.success) {
+        setFeedbackList(prev => prev.map(f => 
+          f.id === feedbackId ? { ...f, ...result.feedback } : f
+        ));
+        
+        setSelectedFeedback(prev => 
+          prev?.id === feedbackId ? { ...prev, ...result.feedback } : prev
+        );
+        
+        Alert.alert('Success', 'Feedback updated successfully');
+        return { success: true, feedback: result.feedback };
+      } else {
+        Alert.alert('Error', result.message || 'Failed to update feedback');
+        return { success: false };
+      }
+    } catch (error) {
+      console.error('Update feedback error:', error);
+      Alert.alert('Error', 'An unexpected error occurred');
+      return { success: false };
+    } finally {
+      setLoading(false);
+    }
+  }, [checkToken]);
+// Load feedback list (with optional filter)
+const loadFeedback = useCallback(async (page: number = 1, filter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | null) => {
   try {
+    const hasToken = await checkToken();
+    if (!hasToken) return;
+
     setLoading(true);
     
-    // Convert null to undefined for the service call
-    const serviceData: { type?: string; message?: string; category?: string } = {};
-    if (data.type !== undefined) serviceData.type = data.type;
-    if (data.message !== undefined) serviceData.message = data.message;
-    if (data.category !== undefined) serviceData.category = data.category === null ? undefined : data.category;
+    const currentFilter = filter !== undefined ? filter : activeFilter;
     
-    const result = await FeedbackService.updateFeedback(feedbackId, serviceData);
+    let result;
+    if (currentFilter) {
+      result = await FeedbackService.getFeedbackByStatus(currentFilter, page, pagination.limit);
+    } else {
+      result = await FeedbackService.getMyFeedback(page, pagination.limit);
+    }
 
     if (result.success) {
-      // Update in list if present
-      setFeedbackList(prev => prev.map(f => 
-        f.id === feedbackId ? { ...f, ...result.feedback } : f
-      ));
+      // ✅ FIX: Provide default empty array if undefined
+      setFeedbackList(result.feedback || []);
       
-      // Update selected if this is the one
-      setSelectedFeedback(prev => 
-        prev?.id === feedbackId ? { ...prev, ...result.feedback } : prev
-      );
-      
-      Alert.alert('Success', 'Feedback updated successfully');
-      return { success: true, feedback: result.feedback };
-    } else {
-      Alert.alert('Error', result.message || 'Failed to update feedback');
-      return { success: false };
+      // ✅ FIX: Provide default pagination if undefined
+      setPagination(result.pagination || {
+        page: 1,
+        limit: pagination.limit,
+        total: 0,
+        pages: 0
+      });
+    } else if (result.message?.toLowerCase().includes('token') || 
+               result.message?.toLowerCase().includes('auth')) {
+      setAuthError(true);
     }
   } catch (error) {
-    console.error('Update feedback error:', error);
-    Alert.alert('Error', 'An unexpected error occurred');
-    return { success: false };
+    console.error('Load feedback error:', error);
   } finally {
     setLoading(false);
   }
-}, []);
+}, [pagination.limit, activeFilter, checkToken]);
 
-  // Load feedback list (with optional filter)
-  const loadFeedback = useCallback(async (page: number = 1, filter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | null) => {
-    try {
-      setLoading(true);
-      
-      const currentFilter = filter !== undefined ? filter : activeFilter;
-      
-      let result;
-      if (currentFilter) {
-        result = await FeedbackService.getFeedbackByStatus(currentFilter, page, pagination.limit);
-      } else {
-        result = await FeedbackService.getMyFeedback(page, pagination.limit);
-      }
+// Load feedback details
+// Load feedback details
+const loadFeedbackDetails = useCallback(async (feedbackId: string) => {
+  try {
+    const hasToken = await checkToken();
+    if (!hasToken) return null;
 
-      if (result.success) {
-        setFeedbackList(result.feedback);
-        setPagination(result.pagination);
-      }
-    } catch (error) {
-      console.error('Load feedback error:', error);
-    } finally {
-      setLoading(false);
+    setLoading(true);
+    const result = await FeedbackService.getFeedbackDetails(feedbackId);
+
+    if (result.success) {
+      // ✅ FIX: Use feedbackItem for single item response
+      setSelectedFeedback(result.feedbackItem || null);
+      return result.feedbackItem;
     }
-  }, [pagination.limit, activeFilter]);
+    return null;
+  } catch (error) {
+    console.error('Load feedback details error:', error);
+    return null;
+  } finally {
+    setLoading(false);
+  }
+}, [checkToken]);
+// Load stats (manual refresh)
+const loadStats = useCallback(async () => {
+  try {
+    const hasToken = await checkToken();
+    if (!hasToken) return;
 
-  // Load feedback details
-  const loadFeedbackDetails = useCallback(async (feedbackId: string) => {
-    try {
-      setLoading(true);
-      const result = await FeedbackService.getFeedbackDetails(feedbackId);
-
-      if (result.success) {
-        setSelectedFeedback(result.feedback);
-        return result.feedback;
-      }
-      return null;
-    } catch (error) {
-      console.error('Load feedback details error:', error);
-      return null;
-    } finally {
-      setLoading(false);
+    const result = await FeedbackService.getMyFeedbackStats();
+    if (result.success) {
+      // ✅ FIX: Provide null if undefined
+      setStats(result.stats || null);
     }
-  }, []);
-
-  // Load stats (manual refresh)
-  const loadStats = useCallback(async () => {
-    try {
-      const result = await FeedbackService.getMyFeedbackStats();
-      if (result.success) {
-        setStats(result.stats);
-      }
-    } catch (error) {
-      console.error('Load stats error:', error);
-    }
-  }, []);
-
+  } catch (error) {
+    console.error('Load stats error:', error);
+  }
+}, [checkToken]);
   // Delete feedback
   const deleteFeedback = useCallback(async (feedbackId: string): Promise<boolean> => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) {
+        Alert.alert('Authentication Error', 'Please log in again');
+        return false;
+      }
+
       setLoading(true);
       const result = await FeedbackService.deleteFeedback(feedbackId);
 
       if (result.success) {
-        // Remove from list
         setFeedbackList(prev => prev.filter(f => f.id !== feedbackId));
-        
-        // Clear selected if this was the one
         setSelectedFeedback(prev => prev?.id === feedbackId ? null : prev);
-        
         Alert.alert('Success', 'Feedback deleted successfully');
         return true;
       } else {
@@ -183,7 +239,7 @@ const updateFeedback = useCallback(async (feedbackId: string, data: { type?: str
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [checkToken]);
 
   // Confirm delete
   const confirmDelete = useCallback((feedbackId: string) => {
@@ -221,6 +277,7 @@ const updateFeedback = useCallback(async (feedbackId: string, data: { type?: str
     stats,
     pagination,
     activeFilter,
+    authError,
 
     // Functions
     submitFeedback,

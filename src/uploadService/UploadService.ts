@@ -1,5 +1,6 @@
-// src/services/UploadService.ts
+// src/services/UploadService.ts - UPDATED WITH TOKEN AUTH
 import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = `${API_BASE_URL}/api/uploads`;
 
@@ -11,21 +12,53 @@ export interface UploadResponse {
     photoUrl?: string;
     user?: any;
     assignment?: any;
+    group?: any;
   };
 }
 
 export class UploadService {
-  // Upload avatar from file (Expo Image Picker)
+  
+  // ========== GET AUTH TOKEN ==========
+  private static async getAuthToken(): Promise<string | null> {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('🔐 UploadService: Auth token retrieved:', token ? 'Yes' : 'No');
+      return token;
+    } catch (error) {
+      console.error('UploadService: Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  // ========== GET HEADERS WITH TOKEN ==========
+  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
+    const token = await this.getAuthToken();
+    const headers: HeadersInit = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ UploadService: Added Authorization header');
+    } else {
+      console.warn('⚠️ UploadService: No auth token available - request may fail');
+    }
+    
+    if (withJsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
+  // ========== UPLOAD AVATAR FROM FILE ==========
   static async uploadAvatar(fileUri: string): Promise<UploadResponse> {
     try {
       console.log('📤 Uploading avatar from URI:', fileUri);
       
+      const token = await this.getAuthToken();
       const formData = new FormData();
       
-      // Extract filename from URI
       const filename = fileUri.split('/').pop() || 'avatar.jpg';
       
-      // Determine mime type from file extension
       const getMimeType = (uri: string): string => {
         const extension = uri.split('.').pop()?.toLowerCase();
         switch (extension) {
@@ -45,7 +78,6 @@ export class UploadService {
 
       const mimeType = getMimeType(fileUri);
       
-      // Create file object for FormData
       formData.append('file', {
         uri: fileUri,
         type: mimeType,
@@ -54,15 +86,18 @@ export class UploadService {
 
       formData.append('uploadType', 'avatar');
 
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       console.log('📦 Sending request to:', `${API_URL}/avatar`);
       
       const response = await fetch(`${API_URL}/avatar`, {
         method: 'POST',
-        headers: {
-          // Don't set Content-Type - let FormData set it automatically
-        },
+        headers,
         body: formData,
-        credentials: 'include', // Important for cookies/sessions
+        // credentials: 'include', // Not needed with token
       });
 
       const result = await response.json();
@@ -79,24 +114,23 @@ export class UploadService {
     }
   }
 
-  // Upload avatar from base64 (for camera or direct capture)
-   static async uploadAvatarBase64(base64Image: string): Promise<UploadResponse> {
+  // ========== UPLOAD AVATAR FROM BASE64 ==========
+  static async uploadAvatarBase64(base64Image: string): Promise<UploadResponse> {
     try {
       console.log('📤 Uploading avatar from base64');
-       
-      // Ensure base64 string has the proper format
+      
       let processedBase64 = base64Image;
       if (!base64Image.startsWith('data:')) {
         processedBase64 = `data:image/jpeg;base64,${base64Image}`;
       }
 
+      const headers = await this.getHeaders();
+
       const response = await fetch(`${API_URL}/avatar/base64`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ avatarBase64: processedBase64 }),
-        credentials: 'include',
+        // credentials: 'include',
       });
 
       const result = await response.json();
@@ -113,16 +147,16 @@ export class UploadService {
     }
   }
 
-  // Upload task photo
+  // ========== UPLOAD TASK PHOTO ==========
   static async uploadTaskPhoto(taskId: string, fileUri: string): Promise<UploadResponse> {
     try {
       console.log('📤 Uploading task photo for task:', taskId);
       
+      const token = await this.getAuthToken();
       const formData = new FormData();
       
       const filename = fileUri.split('/').pop() || 'task-photo.jpg';
       
-      // Determine mime type
       const getMimeType = (uri: string): string => {
         const extension = uri.split('.').pop()?.toLowerCase();
         return extension === 'png' ? 'image/png' : 'image/jpeg';
@@ -138,13 +172,16 @@ export class UploadService {
 
       formData.append('uploadType', 'task_photo');
 
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_URL}/task/${taskId}/photo`, {
         method: 'POST',
-        headers: {
-          // Don't set Content-Type
-        },
+        headers,
         body: formData,
-        credentials: 'include',
+        // credentials: 'include',
       });
 
       const result = await response.json();
@@ -161,14 +198,17 @@ export class UploadService {
     }
   }
 
-  // Delete avatar
+  // ========== DELETE AVATAR ==========
   static async deleteAvatar(): Promise<UploadResponse> {
     try {
       console.log('🗑️ Deleting avatar');
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/avatar`, {
         method: 'DELETE',
-        credentials: 'include',
+        headers,
+        // credentials: 'include',
       });
 
       const result = await response.json();
@@ -185,103 +225,110 @@ export class UploadService {
     }
   }
 
-  
+  // ========== UPLOAD GROUP AVATAR FROM BASE64 ==========
+  static async uploadGroupAvatarBase64(groupId: string, base64Image: string): Promise<UploadResponse> {
+    try {
+      console.log('📤 Uploading group avatar from base64 for group:', groupId);
+      
+      let processedBase64 = base64Image;
+      if (!base64Image.startsWith('data:')) {
+        processedBase64 = `data:image/jpeg;base64,${base64Image}`;
+      }
 
-// Upload group avatar from base64
-static async uploadGroupAvatarBase64(groupId: string, base64Image: string): Promise<UploadResponse> {
-  try {
-    console.log('📤 Uploading group avatar from base64 for group:', groupId);
-    
-    let processedBase64 = base64Image;
-    if (!base64Image.startsWith('data:')) {
-      processedBase64 = `data:image/jpeg;base64,${base64Image}`;
+      const headers = await this.getHeaders();
+
+      const response = await fetch(`${API_URL}/group/${groupId}/avatar/base64`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ avatarBase64: processedBase64 }),
+        // credentials: 'include',
+      });
+
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('❌ Base64 group avatar upload error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to upload group avatar'
+      };
     }
-
-    const response = await fetch(`${API_URL}/group/${groupId}/avatar/base64`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ avatarBase64: processedBase64 }),
-      credentials: 'include',
-    });
-
-    const result = await response.json();
-    return result;
-
-  } catch (error: any) {
-    console.error('❌ Base64 group avatar upload error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to upload group avatar'
-    };
   }
-}
 
-static async uploadGroupAvatar(groupId: string, fileUri: string): Promise<UploadResponse> {
-  try {
-    console.log('📤 Uploading group avatar for group:', groupId);
-    
-    const formData = new FormData();
-    
-    const filename = fileUri.split('/').pop() || 'group-avatar.jpg';
-    
-    const getMimeType = (uri: string): string => {
-      const extension = uri.split('.').pop()?.toLowerCase();
-      return extension === 'png' ? 'image/png' : 'image/jpeg';
-    };
+  // ========== UPLOAD GROUP AVATAR FROM FILE ==========
+  static async uploadGroupAvatar(groupId: string, fileUri: string): Promise<UploadResponse> {
+    try {
+      console.log('📤 Uploading group avatar for group:', groupId);
+      
+      const token = await this.getAuthToken();
+      const formData = new FormData();
+      
+      const filename = fileUri.split('/').pop() || 'group-avatar.jpg';
+      
+      const getMimeType = (uri: string): string => {
+        const extension = uri.split('.').pop()?.toLowerCase();
+        return extension === 'png' ? 'image/png' : 'image/jpeg';
+      };
 
-    const mimeType = getMimeType(fileUri);
-    
-    formData.append('file', {
-      uri: fileUri,
-      type: mimeType,
-      name: filename,
-    } as any);
+      const mimeType = getMimeType(fileUri);
+      
+      formData.append('file', {
+        uri: fileUri,
+        type: mimeType,
+        name: filename,
+      } as any);
 
-    formData.append('uploadType', 'group_avatar'); // Changed from 'avatar'
+      formData.append('uploadType', 'group_avatar');
 
-    const response = await fetch(`${API_URL}/group/${groupId}/avatar`, {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-    });
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
 
-    const result = await response.json();
-    return result;
+      const response = await fetch(`${API_URL}/group/${groupId}/avatar`, {
+        method: 'POST',
+        headers,
+        body: formData,
+        // credentials: 'include',
+      });
 
-  } catch (error: any) {
-    console.error('❌ Group avatar upload error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to upload group avatar'
-    };
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('❌ Group avatar upload error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to upload group avatar'
+      };
+    }
   }
-}
 
-// Add deleteGroupAvatar method
-static async deleteGroupAvatar(groupId: string): Promise<UploadResponse> {
-  try {
-    console.log('🗑️ Deleting group avatar for group:', groupId);
-    
-    const response = await fetch(`${API_URL}/group/${groupId}/avatar`, {
-      method: 'DELETE',
-      credentials: 'include',
-    });
+  // ========== DELETE GROUP AVATAR ==========
+  static async deleteGroupAvatar(groupId: string): Promise<UploadResponse> {
+    try {
+      console.log('🗑️ Deleting group avatar for group:', groupId);
+      
+      const headers = await this.getHeaders();
+      
+      const response = await fetch(`${API_URL}/group/${groupId}/avatar`, {
+        method: 'DELETE',
+        headers,
+        // credentials: 'include',
+      });
 
-    const result = await response.json();
-    console.log('📥 Delete group avatar response:', result);
-    
-    return result;
+      const result = await response.json();
+      console.log('📥 Delete group avatar response:', result);
+      
+      return result;
 
-  } catch (error: any) {
-    console.error('❌ Delete group avatar error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to delete group avatar'
-    };
+    } catch (error: any) {
+      console.error('❌ Delete group avatar error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to delete group avatar'
+      };
+    }
   }
-}
-
-
 }

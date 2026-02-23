@@ -34,31 +34,38 @@ export default function HomeScreen({ navigation }: any) {
     fetchUpcomingAssignments();
     fetchTodayAssignments();
   }, []);
-
-  const fetchUpcomingAssignments = async () => {
-    setLoadingUpcoming(true);
-    try {
-      const result = await AssignmentService.getUpcomingAssignments({ limit: 5 });
-      if (result.success && result.data) {
-        setUpcomingAssignments(result.data.assignments || []);
-      }
-    } catch (error) {
-      console.error('Error fetching upcoming assignments:', error);
-    } finally {
-      setLoadingUpcoming(false);
+   
+const fetchUpcomingAssignments = async () => {
+  setLoadingUpcoming(true);
+  try {
+    const result = await AssignmentService.getUpcomingAssignments({ limit: 5 });
+    if (result.success && result.data) {
+      setUpcomingAssignments(result.data.assignments || []);
+    } else {
+      // Handle empty response
+      setUpcomingAssignments([]);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching upcoming assignments:', error);
+    setUpcomingAssignments([]);
+  } finally {
+    setLoadingUpcoming(false);
+  }
+};
 
-  const fetchTodayAssignments = async () => {
-    try {
-      const result = await AssignmentService.getTodayAssignments();
-      if (result.success && result.data) {
-        setTodayAssignments(result.data.assignments || []);
-      }
-    } catch (error) {
-      console.error('Error fetching today assignments:', error);
+const fetchTodayAssignments = async () => {
+  try {
+    const result = await AssignmentService.getTodayAssignments();
+    if (result.success && result.data) {
+      setTodayAssignments(result.data.assignments || []);
+    } else {
+      setTodayAssignments([]);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching today assignments:', error);
+    setTodayAssignments([]);
+  }
+};
 
   const user = homeData?.user || { 
     fullName: 'User', 

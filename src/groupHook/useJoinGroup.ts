@@ -1,12 +1,33 @@
-// src/hooks/useJoinGroup.ts
+// src/hooks/useJoinGroup.ts - UPDATED WITH TOKEN CHECK
 import { useState, useCallback } from 'react';
-import { GroupService } from '../services/GroupService'; // Adjust path as needed
+import { GroupService } from '../services/GroupService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export function useJoinGroup() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
   const [joinedGroup, setJoinedGroup] = useState<any>(null);
+  const [authError, setAuthError] = useState<boolean>(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        console.warn('useJoinGroup: No auth token available');
+        setAuthError(true);
+        setError('Please log in again');
+        return false;
+      }
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('useJoinGroup: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   const joinGroup = useCallback(async (inviteCode: string) => {
     // Reset states
@@ -14,9 +35,21 @@ export function useJoinGroup() {
     setError(null);
     setSuccess(false);
     setJoinedGroup(null);
+    setAuthError(false);
 
     try {
       console.log(`useJoinGroup: Attempting to join with code: ${inviteCode}`);
+      
+      // Check token first
+      const hasToken = await checkToken();
+      if (!hasToken) {
+        setLoading(false);
+        return {
+          success: false,
+          message: 'Authentication required',
+          authError: true
+        };
+      }
       
       // Validate input
       if (!inviteCode || !inviteCode.trim()) {
@@ -60,6 +93,8 @@ export function useJoinGroup() {
         errorMessage = 'You are already a member of this group.';
       } else if (errorMessage.includes('Network')) {
         errorMessage = 'Network error. Please check your connection.';
+      } else if (errorMessage.includes('token') || errorMessage.includes('auth')) {
+        setAuthError(true);
       }
       
       setError(errorMessage);
@@ -67,19 +102,21 @@ export function useJoinGroup() {
       return {
         success: false,
         message: errorMessage,
-        error: err.message
+        error: err.message,
+        authError: errorMessage.includes('token') || errorMessage.includes('auth')
       };
 
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [checkToken]);
 
   const reset = useCallback(() => {
     setLoading(false);
     setError(null);
     setSuccess(false);
     setJoinedGroup(null);
+    setAuthError(false);
   }, []);
 
   return {
@@ -87,6 +124,7 @@ export function useJoinGroup() {
     error,
     success,
     joinedGroup,
+    authError,
     joinGroup,
     reset
   };

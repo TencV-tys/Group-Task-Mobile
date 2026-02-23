@@ -1,7 +1,8 @@
-// notificationHook/useNotifications.ts - UPDATED WITH ALL TYPES
+// notificationHook/useNotifications.ts - UPDATED WITH TOKEN CHECK
 import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { NotificationService, Notification, NotificationTypes } from '../services/NotificationService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface PaginationInfo {
   page: number;
@@ -14,6 +15,7 @@ export const useNotifications = () => {
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [authError, setAuthError] = useState(false);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
     limit: 20,
@@ -21,9 +23,30 @@ export const useNotifications = () => {
     pages: 0
   });
 
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        console.warn('useNotifications: No auth token available');
+        setAuthError(true);
+        return false;
+      }
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('useNotifications: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
+
   // Load notifications
   const loadNotifications = useCallback(async (page: number = 1) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return;
+
       setLoading(true);
       const result = await NotificationService.getNotifications(page, pagination.limit);
 
@@ -46,29 +69,39 @@ export const useNotifications = () => {
             pages: Math.ceil(notificationsData.length / prev.limit)
           }));
         }
+      } else if (result.message?.includes('token') || result.message?.includes('auth')) {
+        setAuthError(true);
       }
     } catch (error) {
       console.error('Load notifications error:', error);
     } finally {
       setLoading(false);
     }
-  }, [pagination.limit]);
+  }, [pagination.limit, checkToken]);
 
   // Load unread count only
   const loadUnreadCount = useCallback(async () => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return;
+
       const result = await NotificationService.getUnreadCount();
       if (result.success) {
         setUnreadCount(result.count);
+      } else if (result.message?.includes('token') || result.message?.includes('auth')) {
+        setAuthError(true);
       }
     } catch (error) {
       console.error('Load unread count error:', error);
     }
-  }, []);
+  }, [checkToken]);
 
   // Mark as read
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return false;
+
       const result = await NotificationService.markAsRead(notificationId);
       
       if (result.success) {
@@ -85,11 +118,14 @@ export const useNotifications = () => {
       console.error('Mark as read error:', error);
       return false;
     }
-  }, []);
+  }, [checkToken]);
 
   // Mark all as read
   const markAllAsRead = useCallback(async () => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return false;
+
       const result = await NotificationService.markAllAsRead();
       
       if (result.success) {
@@ -103,11 +139,14 @@ export const useNotifications = () => {
       console.error('Mark all as read error:', error);
       return false;
     }
-  }, []);
+  }, [checkToken]);
 
   // Delete notification
   const deleteNotification = useCallback(async (notificationId: string): Promise<boolean> => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return false;
+
       const result = await NotificationService.deleteNotification(notificationId);
       
       if (result.success) {
@@ -125,7 +164,7 @@ export const useNotifications = () => {
       console.error('Delete notification error:', error);
       return false;
     }
-  }, [notifications]);
+  }, [notifications, checkToken]);
 
   // Confirm delete
   const confirmDelete = useCallback((notificationId: string) => {
@@ -161,6 +200,7 @@ export const useNotifications = () => {
     loading,
     notifications,
     unreadCount,
+    authError,
     pagination,
 
     // Functions

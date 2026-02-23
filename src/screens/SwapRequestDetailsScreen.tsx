@@ -334,11 +334,11 @@ export const SwapRequestDetailsScreen = () => {
               <View style={styles.detailRow}>
                 <Ionicons name="repeat" size={18} color="#6B7280" />
                 <Text style={styles.detailLabel}>Frequency:</Text>
-                <Text style={styles.detailValue}>
+                <Text style={styles.detailValue}> 
                   {request.assignment.task.executionFrequency}
                 </Text>
               </View>
-            )}
+            )} 
           </View> 
         </View>
 

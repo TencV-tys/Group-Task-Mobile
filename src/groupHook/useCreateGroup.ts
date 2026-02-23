@@ -1,68 +1,124 @@
-
-
-import { useState } from "react";
+// src/hooks/useCreateGroup.ts - UPDATED WITH TOKEN CHECK
+import { useState, useCallback } from "react";
 import { GroupService } from "../services/GroupService";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export function useCreateGroup(){
-    const [loading, setLoading]  = useState<boolean>(false);
-    const [message, setMessage ] = useState<string>('');
-    const [success, setSuccess ] = useState<boolean>(false);
-    
-    const createGroup = async(name:string, description?:string)=>{
-           setLoading(true);
-           setMessage('');
-           setSuccess(false);
+export function useCreateGroup() {
+    const [loading, setLoading] = useState<boolean>(false);
+    const [message, setMessage] = useState<string>('');
+    const [success, setSuccess] = useState<boolean>(false);
+    const [authError, setAuthError] = useState<boolean>(false);
 
-           try{
-            const result = await GroupService.createGroup(name,description);
+    // Check token before making requests
+    const checkToken = useCallback(async (): Promise<boolean> => {
+        try {
+            const token = await AsyncStorage.getItem('userToken');
+            if (!token) {
+                console.warn('useCreateGroup: No auth token available');
+                setAuthError(true);
+                setMessage('❌ Please log in again');
+                return false;
+            }
+            setAuthError(false);
+            return true;
+        } catch (error) {
+            console.error('useCreateGroup: Error checking token:', error);
+            setAuthError(true);
+            return false;
+        }
+    }, []);
 
-            if(result.success){
-                setSuccess(true);
-                setMessage(result.message || "Group created successfully" );
-                return{
-                    success:true,
-                    message:result.message,
-                    group:result.group,
-                    inviteCode:result.inviteCode
-                }
+    const createGroup = async (name: string, description?: string) => {
+        setLoading(true);
+        setMessage('');
+        setSuccess(false);
+        setAuthError(false);
 
-            }else{
-                   setSuccess(false);
-        setMessage(`❌ ${result.message || 'Failed to create group'}`);
-        return {
-          success: false,
-          message: result.message
-        };
+        try {
+            // Check token first
+            const hasToken = await checkToken();
+            if (!hasToken) {
+                setLoading(false);
+                return {
+                    success: false,
+                    message: 'Authentication required',
+                    authError: true
+                };
             }
 
-           }catch(error:any){
- console.error("useCreateGroup: Error:", error);
-      setSuccess(false);
-      setMessage(`❌ ${error.message || 'Network error'}`);
-      return {
-        success: false,
-        message: error.message || 'Network error'
-      };
+            // Validate input
+            if (!name || !name.trim()) {
+                throw new Error('Group name is required');
+            }
 
-           }finally{
+            console.log(`useCreateGroup: Creating group "${name}"`);
+            const result = await GroupService.createGroup(name, description);
+
+            if (result.success) {
+                setSuccess(true);
+                setMessage(result.message || "Group created successfully");
+                return {
+                    success: true,
+                    message: result.message,
+                    group: result.group,
+                    inviteCode: result.inviteCode
+                };
+            } else {
+                setSuccess(false);
+                setMessage(`❌ ${result.message || 'Failed to create group'}`);
+                
+                // Check if error is auth-related
+                if (result.message?.toLowerCase().includes('token') || 
+                    result.message?.toLowerCase().includes('auth') ||
+                    result.message?.toLowerCase().includes('unauthorized')) {
+                    setAuthError(true);
+                }
+                
+                return {
+                    success: false,
+                    message: result.message,
+                    authError: result.message?.toLowerCase().includes('token') || 
+                              result.message?.toLowerCase().includes('auth')
+                };
+            }
+
+        } catch (error: any) {
+            console.error("useCreateGroup: Error:", error);
+            
+            let errorMessage = error.message || 'Network error';
+            
+            // User-friendly error messages
+            if (errorMessage.includes('Network')) {
+                errorMessage = 'Network error. Please check your connection.';
+            }
+            
+            setSuccess(false);
+            setMessage(`❌ ${errorMessage}`);
+            
+            return {
+                success: false,
+                message: errorMessage,
+                authError: false
+            };
+
+        } finally {
             setLoading(false);
-           }
- 
-
+        }
     };
 
-    const reset = () =>{
+    const reset = () => {
         setLoading(false);
         setMessage('');
         setSuccess(false);
-    }
+        setAuthError(false);
+    };
 
-    return{
+    return {
         loading,
         message,
         success,
+        authError,
         createGroup,
         reset
-    }
-
+    };
 }

@@ -1,14 +1,36 @@
+// homeHook/useHomeData.ts - UPDATED WITH TOKEN CHECK
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { HomeService, HomeData } from '../services/HomeService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export function useHomeData() {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [homeData, setHomeData] = useState<any>(null);
+  const [authError, setAuthError] = useState<boolean>(false);
 
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        console.warn('useHomeData: No auth token available');
+        setAuthError(true);
+        setError('Please log in again');
+        return false;
+      }
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('useHomeData: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
  
   // Process data helper
   const processData = useCallback((data: HomeData) => {
@@ -46,11 +68,20 @@ export function useHomeData() {
       const processedData = processData(data);
       setHomeData(processedData);
       setError(null);
+      setAuthError(false);
     }
   }, [processData]);
 
   // Initial data fetch
   const fetchHomeData = useCallback(async (isRefreshing = false) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (isRefreshing) {
       setRefreshing(true); 
     } else if (!initialLoadDone.current) {
@@ -66,11 +97,19 @@ export function useHomeData() {
         const processedData = processData(result.data);
         setHomeData(processedData);
         setError(null);
+        setAuthError(false);
         initialLoadDone.current = true;
       } else {
         const errorMessage = result.message || 'Failed to load home data';
         console.error("useHomeData: API error:", errorMessage);
         setError(errorMessage);
+        
+        // Check if error is auth-related
+        if (errorMessage.toLowerCase().includes('token') || 
+            errorMessage.toLowerCase().includes('auth') ||
+            errorMessage.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
       }
       
     } catch (err: any) {
@@ -80,7 +119,7 @@ export function useHomeData() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [processData]);
+  }, [processData, checkToken]);
 
   const refreshHomeData = useCallback(() => {
     fetchHomeData(true);
@@ -88,23 +127,28 @@ export function useHomeData() {
 
   // Start polling AFTER initial load
   useEffect(() => {
-    // Do initial fetch
-    fetchHomeData();
+    // Check token before starting
+    checkToken().then(hasToken => {
+      if (hasToken) {
+        // Do initial fetch
+        fetchHomeData();
 
-    // Start polling only after component mounts
-    const startPolling = () => {
-      HomeService.startPolling(handleDataUpdate);
-    };
+        // Start polling only after component mounts
+        const startPolling = () => {
+          HomeService.startPolling(handleDataUpdate);
+        };
 
-    // Small delay to ensure initial load is done
-    const timer = setTimeout(startPolling, 1000);
+        // Small delay to ensure initial load is done
+        const timer = setTimeout(startPolling, 1000);
 
-    return () => {
-      clearTimeout(timer);
-      isMounted.current = false;
-      HomeService.stopPolling(handleDataUpdate);
-    };
-  }, [fetchHomeData, handleDataUpdate]);
+        return () => {
+          clearTimeout(timer);
+          isMounted.current = false;
+          HomeService.stopPolling(handleDataUpdate);
+        };
+      }
+    });
+  }, [fetchHomeData, handleDataUpdate, checkToken]);
 
   const updateHomeData = useCallback((updates: any) => {
     setHomeData((prev: any) => ({
@@ -118,6 +162,7 @@ export function useHomeData() {
     refreshing, 
     error,
     homeData,
+    authError,
     fetchHomeData,
     refreshHomeData,
     updateHomeData

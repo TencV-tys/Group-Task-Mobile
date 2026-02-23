@@ -1,16 +1,45 @@
-// src/hooks/useMyGroups.ts
-import { useState, useCallback } from 'react';
+// src/hooks/useMyGroups.ts - UPDATED WITH TOKEN CHECK
+import { useState, useCallback, useEffect } from 'react';
 import { GroupService } from '../services/GroupService';
 import { GroupMembersService } from '../services/GroupMemberService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export function useMyGroups() {
   const [groups, setGroups] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<boolean>(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        console.warn('useMyGroups: No auth token available');
+        setAuthError(true);
+        setError('Please log in again');
+        return false;
+      }
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('useMyGroups: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   // Fetch groups from API
   const fetchGroups = useCallback(async (isRefreshing = false) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (isRefreshing) {
       setRefreshing(true);
     } else { 
@@ -45,9 +74,17 @@ export function useMyGroups() {
         }));
         
         setGroups(groupsWithAvatars);
+        setAuthError(false);
       } else {
         setError(result.message || 'Failed to load groups');
         setGroups([]);
+        
+        // Check if error is auth-related
+        if (result.message?.toLowerCase().includes('token') || 
+            result.message?.toLowerCase().includes('auth') ||
+            result.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
       }
       
     } catch (err: any) {
@@ -58,7 +95,7 @@ export function useMyGroups() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [checkToken]);
 
   // Refresh groups (pull to refresh)
   const refreshGroups = () => {
@@ -95,6 +132,9 @@ export function useMyGroups() {
   // Update group avatar
   const updateGroupAvatar = useCallback(async (groupId: string, avatarUrl: string) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
       setGroups(prev => prev.map(group => 
         group.id === groupId ? { ...group, avatarUrl } : group
       ));
@@ -106,7 +146,7 @@ export function useMyGroups() {
         message: error.message || 'Failed to update group avatar' 
       };
     }
-  }, []);
+  }, [checkToken]);
 
   // Update group information
   const updateGroup = useCallback(async (groupId: string, groupData: { 
@@ -115,6 +155,9 @@ export function useMyGroups() {
     avatarUrl?: string 
   }) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
       setGroups(prev => prev.map(group => 
         group.id === groupId ? { ...group, ...groupData } : group
       ));
@@ -126,11 +169,14 @@ export function useMyGroups() {
         message: error.message || 'Failed to update group' 
       };
     }
-  }, []);
+  }, [checkToken]);
 
   // Upload group avatar (with base64)
   const uploadGroupAvatar = useCallback(async (groupId: string, base64Image: string) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
       const result = await GroupMembersService.uploadGroupAvatar(groupId, base64Image);
       
       if (result.success && result.group) {
@@ -151,11 +197,14 @@ export function useMyGroups() {
         message: error.message || 'Failed to upload group avatar' 
       };
     }
-  }, []);
+  }, [checkToken]);
 
   // Delete group avatar
   const deleteGroupAvatar = useCallback(async (groupId: string) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
       const result = await GroupMembersService.deleteGroupAvatar(groupId);
       
       if (result.success) {
@@ -173,7 +222,7 @@ export function useMyGroups() {
         message: error.message || 'Failed to delete group avatar' 
       };
     }
-  }, []);
+  }, [checkToken]);
 
   // Get a specific group by ID
   const getGroupById = useCallback((groupId: string) => {
@@ -188,11 +237,17 @@ export function useMyGroups() {
     );
   }, [groups]);
 
+  // Load groups on mount
+  useEffect(() => {
+    fetchGroups();
+  }, []);
+
   return {
     groups,
     loading,
     refreshing,
     error,
+    authError,
     fetchGroups,
     refreshGroups,
     addGroup,

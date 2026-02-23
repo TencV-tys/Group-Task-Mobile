@@ -96,7 +96,7 @@ useEffect(() => {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId]); 
 
   // Load pending requests for current user
   const loadPendingForMe = useCallback(async (groupId?: string) => {

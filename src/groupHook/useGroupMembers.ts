@@ -1,6 +1,8 @@
+// src/hooks/useGroupMembers.ts - UPDATED WITH TOKEN CHECK
 import { useState, useCallback } from 'react';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export function useGroupMembers() {
   const [loading, setLoading] = useState(false);
@@ -8,32 +10,58 @@ export function useGroupMembers() {
   const [error, setError] = useState<string | null>(null);
   const [members, setMembers] = useState<any[]>([]);
   const [groupInfo, setGroupInfo] = useState<any>(null);
+  const [authError, setAuthError] = useState(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        console.warn('useGroupMembers: No auth token available');
+        setAuthError(true);
+        setError('Please log in again');
+        return false;
+      }
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('useGroupMembers: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   // Helper to ensure URLs are complete
   const ensureFullUrl = useCallback((url: string): string => {
     if (!url) return url;
     
-    // If it's already a full URL, return as-is
     if (url.startsWith('http://') || url.startsWith('https://')) {
       return url;
     }
     
-    // If it starts with /uploads, prepend base URL
     if (url.startsWith('/uploads/')) {
       return `${API_BASE_URL}${url}`;
     }
     
-    // Default case
     return url;
   }, []);
 
   const fetchGroupMembers = useCallback(async (groupId: string, isRefreshing = false) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (isRefreshing) {
       setRefreshing(true);
     } else {
       setLoading(true);
     }
     setError(null);
+    setAuthError(false);
 
     try {
       // Fetch members
@@ -43,19 +71,21 @@ export function useGroupMembers() {
         const formattedMembers = (membersResult.members || []).map((member: any) => ({
           ...member,
           role: member.groupRole || member.role || 'MEMBER',
-          // Ensure avatarUrl is complete
           avatarUrl: member.avatarUrl ? ensureFullUrl(member.avatarUrl) : null
         }));
         setMembers(formattedMembers);
       } else {
         setError(membersResult.message || 'Failed to load members');
+        if (membersResult.message?.toLowerCase().includes('token') || 
+            membersResult.message?.toLowerCase().includes('auth')) {
+          setAuthError(true);
+        }
       }
 
       // Get group info
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
         const groupData = groupResult.group || {};
-        // Ensure group avatar URL is complete
         if (groupData.avatarUrl) {
           groupData.avatarUrl = ensureFullUrl(groupData.avatarUrl);
         }
@@ -71,7 +101,7 @@ export function useGroupMembers() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [ensureFullUrl]);
+  }, [ensureFullUrl, checkToken]);
 
   // Method to update group avatar locally
   const updateGroupAvatar = useCallback((avatarUrl: string) => {
@@ -89,28 +119,38 @@ export function useGroupMembers() {
     }));
   }, []);
 
-  // ✅ NEW: Update group info after editing
-  const updateGroupInfo = useCallback((updatedGroup: any) => {
-    setGroupInfo((prev: any) => ({
-      ...prev,
-      ...updatedGroup,
-      avatarUrl: updatedGroup.avatarUrl ? ensureFullUrl(updatedGroup.avatarUrl) : prev?.avatarUrl
-    }));
-  }, [ensureFullUrl]);
+  // Update group info after editing
+  const updateGroupInfo = useCallback(async (groupId: string, updatedGroup: any) => {
+    try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
 
-  // ✅ NEW: Transfer ownership
+      setGroupInfo((prev: any) => ({
+        ...prev,
+        ...updatedGroup,
+        avatarUrl: updatedGroup.avatarUrl ? ensureFullUrl(updatedGroup.avatarUrl) : prev?.avatarUrl
+      }));
+      return { success: true };
+    } catch (err: any) {
+      console.error('Error updating group info:', err);
+      return { success: false, message: err.message };
+    }
+  }, [ensureFullUrl, checkToken]);
+
+  // Transfer ownership
   const transferOwnership = useCallback(async (groupId: string, newAdminId: string) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
       const result = await GroupMembersService.transferOwnership(groupId, newAdminId);
       
       if (result.success) {
-        // Update members list to reflect role changes
         setMembers((prevMembers: any[]) => 
           prevMembers.map(member => {
             if (member.userId === newAdminId) {
               return { ...member, role: 'ADMIN' };
             }
-            // Find current user ID from groupInfo or members
             const currentUserId = groupInfo?.userId || members.find(m => m.role === 'ADMIN')?.userId;
             if (member.userId === currentUserId) {
               return { ...member, role: 'MEMBER' };
@@ -119,7 +159,6 @@ export function useGroupMembers() {
           })
         );
         
-        // Update groupInfo userRole if needed
         if (groupInfo) {
           setGroupInfo((prev: any) => ({
             ...prev,
@@ -133,11 +172,14 @@ export function useGroupMembers() {
       console.error('Error transferring ownership:', err);
       return { success: false, message: err.message };
     }
-  }, [groupInfo, members]);
+  }, [groupInfo, members, checkToken]);
 
-  // ✅ NEW: Regenerate invite code
+  // Regenerate invite code
   const regenerateInviteCode = useCallback(async (groupId: string) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
       const result = await GroupMembersService.regenerateInviteCode(groupId);
       
       if (result.success) {
@@ -152,33 +194,42 @@ export function useGroupMembers() {
       console.error('Error regenerating invite code:', err);
       return { success: false, message: err.message };
     }
-  }, []);
+  }, [checkToken]);
 
-  // ✅ NEW: Delete group
+  // Delete group
   const deleteGroup = useCallback(async (groupId: string) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
       const result = await GroupMembersService.deleteGroup(groupId);
       return result;
     } catch (err: any) {
       console.error('Error deleting group:', err);
       return { success: false, message: err.message };
     }
-  }, []);
+  }, [checkToken]);
 
-  // ✅ NEW: Get group settings
+  // Get group settings
   const getGroupSettings = useCallback(async (groupId: string) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
       const result = await GroupMembersService.getGroupSettings(groupId);
       return result;
     } catch (err: any) {
       console.error('Error getting group settings:', err);
       return { success: false, message: err.message };
     }
-  }, []);
+  }, [checkToken]);
 
-  // ✅ NEW: Update member role with automatic state update
+  // Update member role with automatic state update
   const updateMemberRole = useCallback(async (groupId: string, memberId: string, newRole: string) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
       const result = await GroupMembersService.updateMemberRole(groupId, memberId, newRole);
       
       if (result.success) {
@@ -194,11 +245,14 @@ export function useGroupMembers() {
       console.error('Error updating member role:', err);
       return { success: false, message: err.message };
     }
-  }, []);
+  }, [checkToken]);
 
-  // ✅ NEW: Remove member with automatic state update
+  // Remove member with automatic state update
   const removeMember = useCallback(async (groupId: string, memberId: string) => {
     try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
       const result = await GroupMembersService.removeMember(groupId, memberId);
       
       if (result.success) {
@@ -212,7 +266,7 @@ export function useGroupMembers() {
       console.error('Error removing member:', err);
       return { success: false, message: err.message };
     }
-  }, []);
+  }, [checkToken]);
 
   return {
     // State
@@ -221,6 +275,7 @@ export function useGroupMembers() {
     error,
     members,
     groupInfo,
+    authError,
     
     // Core methods
     fetchGroupMembers,
@@ -230,7 +285,7 @@ export function useGroupMembers() {
     setGroupInfo,
     setError,
     
-    // ✅ NEW: Additional methods
+    // Additional methods
     updateGroupInfo,
     transferOwnership,
     regenerateInviteCode,

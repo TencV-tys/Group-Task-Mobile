@@ -1,5 +1,6 @@
-// src/services/TaskService.ts
+// src/services/TaskService.ts - UPDATED WITH TOKEN AUTH
 import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = `${API_BASE_URL}/api/tasks`;
 
@@ -49,7 +50,39 @@ export interface CreateTaskData {
 export type UpdateTaskData = Partial<CreateTaskData>;
 
 export class TaskService {
-  // Create a new task with time slots support and initial assignee option
+  
+  // ========== GET AUTH TOKEN ==========
+  private static async getAuthToken(): Promise<string | null> {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('🔐 TaskService: Auth token retrieved:', token ? 'Yes' : 'No');
+      return token;
+    } catch (error) {
+      console.error('TaskService: Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  // ========== GET HEADERS WITH TOKEN ==========
+  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
+    const token = await this.getAuthToken();
+    const headers: HeadersInit = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ TaskService: Added Authorization header');
+    } else {
+      console.warn('⚠️ TaskService: No auth token available - request may fail');
+    }
+    
+    if (withJsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
+  // ========== CREATE TASK ==========
   static async createTask(groupId: string, taskData: CreateTaskData) {
     try {
       // Deep clean the data - remove all undefined values
@@ -57,14 +90,13 @@ export class TaskService {
       
       console.log(`TaskService: Creating task for group ${groupId}`, cleanedData);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/group/${groupId}/create`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
+        headers,
         body: JSON.stringify(cleanedData),
-        credentials: 'include'
+        // credentials: 'include' // Not needed with token
       });
 
       console.log(`TaskService: Response status: ${response.status}`);
@@ -97,6 +129,7 @@ export class TaskService {
     }
   }
 
+  // ========== GET GROUP TASKS ==========
   static async getGroupTasks(groupId: string, week?: number) {
     try {
       const url = week !== undefined 
@@ -105,9 +138,12 @@ export class TaskService {
       
       console.log(`TaskService: Fetching tasks for group ${groupId}`, week ? `week ${week}` : '');
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -122,15 +158,19 @@ export class TaskService {
     }
   }
 
+  // ========== GET MY TASKS ==========
   static async getMyTasks(groupId: string, week?: number) {
     try {
       const url = week !== undefined 
         ? `${API_URL}/group/${groupId}/my-tasks?week=${week}`
         : `${API_URL}/group/${groupId}/my-tasks`;
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
  
       const result = await response.json();
@@ -145,11 +185,15 @@ export class TaskService {
     }
   }
 
+  // ========== GET TASK DETAILS ==========
   static async getTaskDetails(taskId: string) {
     try {
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -164,11 +208,15 @@ export class TaskService {
     }
   }
 
+  // ========== DELETE TASK ==========
   static async deleteTask(taskId: string) {
     try {
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'DELETE',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -183,18 +231,19 @@ export class TaskService {
     }
   }
 
+  // ========== UPDATE TASK ==========
   static async updateTask(taskId: string, taskData: UpdateTaskData) {
     try {
       // Clean the data for updates too
       const cleanedData = cleanTaskData(taskData);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(cleanedData),
-        credentials: 'include'
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -209,11 +258,15 @@ export class TaskService {
     }
   }
 
+  // ========== GET ROTATION SCHEDULE ==========
   static async getRotationSchedule(groupId: string, weeks: number = 4) {
     try {
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/group/${groupId}/schedule?weeks=${weeks}`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -228,11 +281,15 @@ export class TaskService {
     }
   }
  
+  // ========== ROTATE TASKS ==========
   static async rotateTasks(groupId: string) {
     try {
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/group/${groupId}/rotate`, {
         method: 'POST',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -247,18 +304,18 @@ export class TaskService {
     }
   }
  
+  // ========== REASSIGN TASK ==========
   static async reassignTask(taskId: string, targetUserId: string) {
     try {
       console.log(`TaskService: Reassigning task ${taskId} to user ${targetUserId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${taskId}/reassign`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers,
         body: JSON.stringify({ targetUserId }),
-        credentials: 'include'
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -273,13 +330,17 @@ export class TaskService {
     }
   }
  
- static async getTaskStatistics(groupId: string) {
+  // ========== GET TASK STATISTICS ==========
+  static async getTaskStatistics(groupId: string) {
     try {
       console.log(`TaskService: Getting statistics for group ${groupId}`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/group/${groupId}/statistics`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -293,6 +354,4 @@ export class TaskService {
       };
     }
   }
-
-
 }

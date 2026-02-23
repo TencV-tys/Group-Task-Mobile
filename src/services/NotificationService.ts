@@ -1,5 +1,6 @@
-// services/NotificationService.ts - UPDATED WITH ALL NOTIFICATION TYPES
+// services/NotificationService.ts - UPDATED WITH TOKEN AUTH
 import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = `${API_BASE_URL}/api/notifications`;
 
@@ -101,12 +102,46 @@ export interface UnreadCountResponse {
 
 export class NotificationService {
   
-  // Get user's notifications
+  // ========== GET AUTH TOKEN ==========
+  private static async getAuthToken(): Promise<string | null> {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('🔐 NotificationService: Auth token retrieved:', token ? 'Yes' : 'No');
+      return token;
+    } catch (error) {
+      console.error('NotificationService: Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  // ========== GET HEADERS WITH TOKEN ==========
+  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
+    const token = await this.getAuthToken();
+    const headers: HeadersInit = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ NotificationService: Added Authorization header');
+    } else {
+      console.warn('⚠️ NotificationService: No auth token available - request may fail');
+    }
+    
+    if (withJsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
+  // ========== GET NOTIFICATIONS ==========
   static async getNotifications(page: number = 1, limit: number = 20): Promise<NotificationsResponse> {
     try {
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/?page=${page}&limit=${limit}`, {
         method: "GET",
-        credentials: 'include'
+        headers,
+        // credentials: 'include' // Not needed with token
       });
 
       const result = await response.json();
@@ -123,12 +158,15 @@ export class NotificationService {
     }
   }
 
-  // Get unread count
+  // ========== GET UNREAD COUNT ==========
   static async getUnreadCount(): Promise<UnreadCountResponse> {
     try {
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/unread-count`, {
         method: "GET",
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -150,12 +188,15 @@ export class NotificationService {
     }
   }
 
-  // Mark notification as read
+  // ========== MARK NOTIFICATION AS READ ==========
   static async markAsRead(notificationId: string): Promise<{ success: boolean; message?: string }> {
     try {
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${notificationId}/read`, {
         method: "PATCH",
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -170,12 +211,15 @@ export class NotificationService {
     }
   }
 
-  // Mark all as read
+  // ========== MARK ALL AS READ ==========
   static async markAllAsRead(): Promise<{ success: boolean; message?: string }> {
     try {
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/mark-all-read`, {
         method: "PATCH",
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -190,12 +234,15 @@ export class NotificationService {
     }
   }
 
-  // Delete notification
+  // ========== DELETE NOTIFICATION ==========
   static async deleteNotification(notificationId: string): Promise<{ success: boolean; message?: string }> {
     try {
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${notificationId}`, {
         method: "DELETE",
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -210,7 +257,7 @@ export class NotificationService {
     }
   }
   
-  // Helper method to check for specific notification types
+  // ========== CHECK FOR SPECIFIC NOTIFICATION TYPES ==========
   static async hasUnreadNotificationsOfType(type: string): Promise<boolean> {
     try {
       const response = await this.getNotifications(1, 20);
@@ -228,7 +275,7 @@ export class NotificationService {
     }
   }
 
-  // Helper to check for penalty notifications
+  // ========== CHECK FOR PENALTY NOTIFICATIONS ==========
   static async hasPenaltyNotifications(): Promise<boolean> {
     try {
       const response = await this.getNotifications(1, 20);

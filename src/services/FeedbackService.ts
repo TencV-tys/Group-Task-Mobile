@@ -1,4 +1,6 @@
+// services/FeedbackService.ts - UPDATED WITH TOKEN AUTH
 import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = `${API_BASE_URL}/api/feedback`;
 
@@ -16,24 +18,75 @@ export interface Feedback {
   category?: string | null;
   createdAt: string;
   updatedAt: string;
+  user?: {
+    id: string;
+    fullName: string;
+    avatarUrl?: string;
+  };
 }
 
 export interface FeedbackStats {
   total: number;
   open: number;
+  inProgress: number;
   resolved: number;
+  closed: number;
   byType: Record<string, number>;
 }
 
+export interface FeedbackResponse {
+  success: boolean;
+  message?: string;
+  feedback?: Feedback[];        // For list responses
+  feedbackItem?: Feedback;       // For single item responses (renamed from duplicate)
+  stats?: FeedbackStats;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
 class FeedbackServiceClass {
-  // FIXED: Use ReturnType<typeof setTimeout> instead of NodeJS.Timeout
   private pollInterval: ReturnType<typeof setTimeout> | null = null;
   private pollCallbacks: Set<(stats: FeedbackStats) => void> = new Set();
   private lastStats: FeedbackStats | null = null;
   private isPolling = false;
 
-  // Submit feedback
-  async submitFeedback(data: FeedbackData) {
+  // ========== GET AUTH TOKEN ==========
+  private static async getAuthToken(): Promise<string | null> {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  // ========== GET HEADERS WITH TOKEN ==========
+  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
+    const token = await this.getAuthToken();
+    const headers: HeadersInit = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ Added Authorization header');
+    } else {
+      console.warn('⚠️ No auth token available - request may fail');
+    }
+    
+    if (withJsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
+  // ========== SUBMIT FEEDBACK ==========
+  async submitFeedback(data: FeedbackData): Promise<FeedbackResponse> {
     try {
       if (!data.type || !data.message) {
         return {
@@ -42,16 +95,17 @@ class FeedbackServiceClass {
         };
       }
 
+      const headers = await FeedbackServiceClass.getHeaders();
+      
       const response = await fetch(`${API_URL}/submit`, {
         method: "POST",
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(data),
-        credentials: 'include'
+        // credentials: 'include' // Not needed with token
       });
 
       const result = await response.json();
       
-      // Trigger poll after submission to update stats
       if (result.success) {
         this.pollStats();
       }
@@ -67,19 +121,20 @@ class FeedbackServiceClass {
     }
   }
 
-  // Update feedback
-  async updateFeedback(feedbackId: string, data: Partial<FeedbackData>) {
+  // ========== UPDATE FEEDBACK ==========
+  async updateFeedback(feedbackId: string, data: Partial<FeedbackData>): Promise<FeedbackResponse> {
     try {
+      const headers = await FeedbackServiceClass.getHeaders();
+      
       const response = await fetch(`${API_URL}/${feedbackId}`, {
         method: "PUT",
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(data),
-        credentials: 'include'
+        // credentials: 'include'
       });
 
       const result = await response.json();
       
-      // Trigger poll after update
       if (result.success) {
         this.pollStats();
       }
@@ -95,12 +150,15 @@ class FeedbackServiceClass {
     }
   }
 
-  // Get user's feedback history
-  async getMyFeedback(page: number = 1, limit: number = 20) {
+  // ========== GET MY FEEDBACK ==========
+  async getMyFeedback(page: number = 1, limit: number = 20): Promise<FeedbackResponse> {
     try {
+      const headers = await FeedbackServiceClass.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/my-feedback?page=${page}&limit=${limit}`, {
         method: "GET",
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -115,12 +173,15 @@ class FeedbackServiceClass {
     }
   }
 
-  // Get feedback details
-  async getFeedbackDetails(feedbackId: string) {
+  // ========== GET FEEDBACK DETAILS ==========
+  async getFeedbackDetails(feedbackId: string): Promise<FeedbackResponse> {
     try {
+      const headers = await FeedbackServiceClass.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${feedbackId}`, {
         method: "GET",
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -135,17 +196,19 @@ class FeedbackServiceClass {
     }
   }
 
-  // Delete feedback
-  async deleteFeedback(feedbackId: string) {
+  // ========== DELETE FEEDBACK ==========
+  async deleteFeedback(feedbackId: string): Promise<FeedbackResponse> {
     try {
+      const headers = await FeedbackServiceClass.getHeaders();
+      
       const response = await fetch(`${API_URL}/${feedbackId}`, {
         method: "DELETE",
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
       
-      // Trigger poll after deletion
       if (result.success) {
         this.pollStats();
       }
@@ -161,17 +224,19 @@ class FeedbackServiceClass {
     }
   }
 
-  // Get feedback stats
-  async getMyFeedbackStats() {
+  // ========== GET MY FEEDBACK STATS ==========
+  async getMyFeedbackStats(): Promise<FeedbackResponse> {
     try {
+      const headers = await FeedbackServiceClass.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/my-stats`, {
         method: "GET",
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
       
-      // Cache the stats
       if (result.success) {
         this.lastStats = result.stats;
       }
@@ -187,72 +252,15 @@ class FeedbackServiceClass {
     }
   }
 
-  // ============= POLLING METHODS =============
-
-  // Start polling for stats updates (every 30 seconds)
-  startPolling(callback: (stats: FeedbackStats) => void) {
-    // Add callback to set
-    this.pollCallbacks.add(callback);
-    
-    // If we have cached stats, send immediately
-    if (this.lastStats) {
-      callback(this.lastStats);
-    }
-    
-    // Start polling if not already started
-    if (!this.isPolling) {
-      this.isPolling = true;
-      this.pollStats(); // Immediate first poll
-      
-      this.pollInterval = setInterval(() => {
-        this.pollStats();
-      }, 30000); // 30 seconds
-      
-      console.log("📊 Feedback stats polling started (30s interval)");
-    }
-  }
-
-  // Stop polling
-  stopPolling(callback: (stats: FeedbackStats) => void) {
-    // Remove callback
-    this.pollCallbacks.delete(callback);
-    
-    // If no more callbacks, stop polling
-    if (this.pollCallbacks.size === 0 && this.pollInterval) {
-      clearInterval(this.pollInterval);
-      this.pollInterval = null;
-      this.isPolling = false;
-      console.log("📊 Feedback stats polling stopped");
-    }
-  }
-
-  // Manual poll for stats
-  async pollStats() {
-    try {
-      const result = await this.getMyFeedbackStats();
-      if (result.success && result.stats) {
-        this.lastStats = result.stats;
-        // Notify all callbacks
-        this.pollCallbacks.forEach(callback => {
-          callback(result.stats);
-        });
-      }
-    } catch (error) {
-      console.error("Error polling feedback stats:", error);
-    }
-  }
-
-  // Get feedback by status (for filtering)
-  async getFeedbackByStatus(status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED', page: number = 1, limit: number = 20) {
+  // ========== GET FEEDBACK BY STATUS ==========
+  async getFeedbackByStatus(status: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED', page: number = 1, limit: number = 20): Promise<FeedbackResponse> {
     try {
       // First get all feedback
-      const result = await this.getMyFeedback(page, 100); // Get more items for filtering
+      const result = await this.getMyFeedback(page, 100);
       
       if (result.success && result.feedback) {
-        // Filter by status
         const filtered = result.feedback.filter((f: Feedback) => f.status === status);
         
-        // Manual pagination
         const start = (page - 1) * limit;
         const paginated = filtered.slice(start, start + limit);
         
@@ -275,6 +283,55 @@ class FeedbackServiceClass {
         success: false,
         message: "Cannot connect to the server"
       };
+    }
+  }
+
+  // ============= POLLING METHODS =============
+
+  // Start polling for stats updates (every 30 seconds)
+  startPolling(callback: (stats: FeedbackStats) => void) {
+    this.pollCallbacks.add(callback);
+    
+    if (this.lastStats) {
+      callback(this.lastStats);
+    }
+    
+    if (!this.isPolling) {
+      this.isPolling = true;
+      this.pollStats();
+      
+      this.pollInterval = setInterval(() => {
+        this.pollStats();
+      }, 30000);
+      
+      console.log("📊 Feedback stats polling started (30s interval)");
+    }
+  }
+
+  // Stop polling
+  stopPolling(callback: (stats: FeedbackStats) => void) {
+    this.pollCallbacks.delete(callback);
+    
+    if (this.pollCallbacks.size === 0 && this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
+      this.isPolling = false;
+      console.log("📊 Feedback stats polling stopped");
+    }
+  }
+
+  // Manual poll for stats
+  async pollStats() {
+    try {
+      const result = await this.getMyFeedbackStats();
+      if (result.success && result.stats) {
+        this.lastStats = result.stats;
+        this.pollCallbacks.forEach(callback => {
+          callback(result.stats!);
+        });
+      }
+    } catch (error) {
+      console.error("Error polling feedback stats:", error);
     }
   }
 }

@@ -1,5 +1,6 @@
-// services/AssignmentService.ts - SIMPLE VERSION (LIKE TASKSERVICE)
+// services/AssignmentService.ts - COMPLETE UPDATED WITH TOKEN AUTH
 import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NotificationService } from './NotificationService';
 
 const API_URL = `${API_BASE_URL}/api/assignments`;
@@ -213,6 +214,37 @@ export interface TodayAssignment {
 
 export class AssignmentService {
   
+  // ========== GET AUTH TOKEN ==========
+  private static async getAuthToken(): Promise<string | null> {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  // ========== GET HEADERS WITH TOKEN ==========
+  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
+    const token = await this.getAuthToken();
+    const headers: HeadersInit = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ Added Authorization header');
+    } else {
+      console.warn('⚠️ No auth token available - request may fail');
+    }
+    
+    if (withJsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
   // ========== COMPLETE ASSIGNMENT ==========
   static async completeAssignment(
     assignmentId: string, 
@@ -232,10 +264,17 @@ export class AssignmentService {
           type: 'image/jpeg',
         } as any);
         
+        const token = await this.getAuthToken();
+        const headers: HeadersInit = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
           method: 'POST',
+          headers,
           body: formData,
-          credentials: 'include'
+          // credentials: 'include' // Optional, not needed with token
         });
 
         const result = await response.json();
@@ -250,11 +289,13 @@ export class AssignmentService {
         
         return result;
       } else {
+        const headers = await this.getHeaders();
+        
         const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({ notes: data.notes }),
-          credentials: 'include'
+          // credentials: 'include' // Optional, not needed with token
         });
 
         const result = await response.json();
@@ -285,11 +326,13 @@ export class AssignmentService {
     data: { verified: boolean; adminNotes?: string; }
   ): Promise<VerifyAssignmentResponse> {
     try {
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${assignmentId}/verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(data),
-        credentials: 'include'
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -313,9 +356,12 @@ export class AssignmentService {
   // ========== GET ASSIGNMENT DETAILS ==========
   static async getAssignmentDetails(assignmentId: string) {
     try {
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${assignmentId}`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -347,9 +393,12 @@ export class AssignmentService {
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
 
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -370,9 +419,12 @@ export class AssignmentService {
       let url = `${API_URL}/today`;
       if (groupId) url += `?groupId=${groupId}`;
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -411,9 +463,12 @@ export class AssignmentService {
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
 
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -431,9 +486,12 @@ export class AssignmentService {
   // ========== GET ASSIGNMENT STATISTICS ==========
   static async getAssignmentStats(groupId: string) {
     try {
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/group/${groupId}/stats`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -451,9 +509,12 @@ export class AssignmentService {
   // ========== CHECK SUBMISSION TIME ==========
   static async checkSubmissionTime(assignmentId: string): Promise<TimeValidationResponse> {
     try {
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${assignmentId}/check-time`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -501,9 +562,12 @@ export class AssignmentService {
 
       console.log('AssignmentService: Getting upcoming assignments', url);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(url, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       if (!response.ok) {

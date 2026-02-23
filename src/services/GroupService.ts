@@ -1,13 +1,43 @@
 // src/services/GroupService.ts (React Native - FRONTEND)
-
-
-import {API_BASE_URL} from '../config/api';
+import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = `${API_BASE_URL}/api/group`;
 
-
 export class GroupService {
-  // Create a new group
+  
+  // ========== GET AUTH TOKEN ==========
+  private static async getAuthToken(): Promise<string | null> {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  // ========== GET HEADERS WITH TOKEN ==========
+  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
+    const token = await this.getAuthToken();
+    const headers: HeadersInit = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ Added Authorization header');
+    } else {
+      console.warn('⚠️ No auth token available - request may fail');
+    }
+    
+    if (withJsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
+  // ========== CREATE GROUP ==========
   static async createGroup(name: string, description?: string) {
     try {
       if (!name.trim()) {
@@ -19,17 +49,16 @@ export class GroupService {
 
       console.log(`GroupService: Creating group "${name}"`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/create`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
+        headers,
         body: JSON.stringify({
           name: name.trim(),
           description: description?.trim() || null
         }),
-        credentials: 'include'
+        // credentials: 'include' // Not needed with token
       });
 
       console.log(`GroupService: Response status: ${response.status}`);
@@ -48,14 +77,17 @@ export class GroupService {
     }
   }
 
-  // Get user's groups
+  // ========== GET USER'S GROUPS ==========
   static async getUserGroups() {
     try {
       console.log("GroupService: Getting user groups...");
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/my-groups`, {
         method: "GET",
-        credentials: "include"
+        headers,
+        // credentials: "include"
       });
 
       const result = await response.json();
@@ -73,7 +105,7 @@ export class GroupService {
     }
   }
 
-  // Join a group with invite code
+  // ========== JOIN GROUP ==========
   static async joinGroup(inviteCode: string) {
     try {
       if (!inviteCode || !inviteCode.trim()) {
@@ -86,14 +118,13 @@ export class GroupService {
       const cleanInviteCode = inviteCode.trim().toUpperCase();
       console.log(`GroupService: Joining group with code ${cleanInviteCode}`);
 
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/join`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
+        headers,
         body: JSON.stringify({ inviteCode: cleanInviteCode }),
-        credentials: "include"
+        // credentials: "include"
       });
 
       const result = await response.json();
@@ -110,7 +141,7 @@ export class GroupService {
     }
   }
 
-  // Get group members with rotation info (NEW)
+  // ========== GET GROUP MEMBERS ==========
   static async getGroupMembers(groupId: string) {
     try {
       if (!groupId) {
@@ -122,9 +153,12 @@ export class GroupService {
 
       console.log(`GroupService: Getting members for group ${groupId}`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${groupId}/members`, {
         method: "GET",
-        credentials: "include"
+        headers,
+        // credentials: "include"
       });
 
       const result = await response.json();
@@ -139,7 +173,7 @@ export class GroupService {
     }
   }
 
-  // Update member rotation order (NEW)
+  // ========== UPDATE MEMBER ROTATION ==========
   static async updateMemberRotation(
     groupId: string,
     memberId: string,
@@ -156,17 +190,16 @@ export class GroupService {
 
       console.log(`GroupService: Updating member ${memberId} rotation in group ${groupId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/members/${memberId}/rotation`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
+        headers,
         body: JSON.stringify({
           rotationOrder,
           isActive
         }),
-        credentials: "include"
+        // credentials: "include"
       });
 
       const result = await response.json();
@@ -181,7 +214,7 @@ export class GroupService {
     }
   }
 
-  // Reorder rotation sequence (NEW)
+  // ========== REORDER ROTATION SEQUENCE ==========
   static async reorderRotationSequence(groupId: string, newOrder: Array<{ memberId: string, rotationOrder: number }>) {
     try {
       if (!groupId || !newOrder || !Array.isArray(newOrder)) {
@@ -193,14 +226,13 @@ export class GroupService {
 
       console.log(`GroupService: Reordering rotation for group ${groupId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/reorder-rotation`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json"
-        },
+        headers,
         body: JSON.stringify({ newOrder }),
-        credentials: "include"
+        // credentials: "include"
       });
 
       const result = await response.json();
@@ -215,7 +247,7 @@ export class GroupService {
     }
   }
 
-  // Get rotation schedule preview (NEW)
+  // ========== GET ROTATION SCHEDULE PREVIEW ==========
   static async getRotationSchedulePreview(groupId: string, weeks: number = 4) {
     try {
       if (!groupId) {
@@ -227,9 +259,12 @@ export class GroupService {
 
       console.log(`GroupService: Getting rotation schedule for group ${groupId} (${weeks} weeks)`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${groupId}/rotation-schedule?weeks=${weeks}`, {
         method: "GET",
-        credentials: "include"
+        headers,
+        // credentials: "include"
       });
 
       const result = await response.json();
@@ -244,7 +279,7 @@ export class GroupService {
     }
   }
 
-  // Get group details (NEW)
+  // ========== GET GROUP DETAILS ==========
   static async getGroupDetails(groupId: string) {
     try {
       if (!groupId) {
@@ -256,9 +291,12 @@ export class GroupService {
 
       console.log(`GroupService: Getting details for group ${groupId}`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${groupId}/details`, {
         method: "GET",
-        credentials: "include"
+        headers,
+        // credentials: "include"
       });
 
       const result = await response.json();
@@ -273,7 +311,7 @@ export class GroupService {
     }
   }
 
-  // Leave group (NEW)
+  // ========== LEAVE GROUP ==========
   static async leaveGroup(groupId: string) {
     try {
       if (!groupId) {
@@ -285,9 +323,12 @@ export class GroupService {
 
       console.log(`GroupService: Leaving group ${groupId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/leave`, {
         method: "POST",
-        credentials: "include"
+        headers,
+        // credentials: "include"
       });
 
       const result = await response.json();

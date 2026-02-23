@@ -1,16 +1,53 @@
-import {API_BASE_URL} from '../config/api';
+// services/GroupMembersService.ts - UPDATED WITH TOKEN AUTH
+import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = `${API_BASE_URL}/api/group`; 
+const API_URL = `${API_BASE_URL}/api/group`;
 
 export class GroupMembersService {
-  // Get all members of a group with rotation info
+  
+  // ========== GET AUTH TOKEN ==========
+  private static async getAuthToken(): Promise<string | null> {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
+      return token;
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  // ========== GET HEADERS WITH TOKEN ==========
+  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
+    const token = await this.getAuthToken();
+    const headers: HeadersInit = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ Added Authorization header');
+    } else {
+      console.warn('⚠️ No auth token available - request may fail');
+    }
+    
+    if (withJsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
+  // ========== GET GROUP MEMBERS ==========
   static async getGroupMembers(groupId: string) {
     try {
       console.log(`GroupMembersService: Getting members for group ${groupId}`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${groupId}/members`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include' // Not needed with token
       });
 
       const result = await response.json();
@@ -27,14 +64,17 @@ export class GroupMembersService {
     }
   }
 
-  // Get group members with detailed rotation info
+  // ========== GET GROUP MEMBERS WITH ROTATION ==========
   static async getGroupMembersWithRotation(groupId: string) {
     try {
       console.log(`GroupMembersService: Getting members with rotation for group ${groupId}`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${groupId}/members-rotation`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -49,14 +89,17 @@ export class GroupMembersService {
     }
   }
 
-  // Get group info including invite code and rotation stats
+  // ========== GET GROUP INFO ==========
   static async getGroupInfo(groupId: string) {
     try {
       console.log(`GroupMembersService: Getting info for group ${groupId}`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${groupId}/info`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -71,14 +114,17 @@ export class GroupMembersService {
     }
   }
 
-  // ✅ NEW: Get full group settings (admin only)
+  // ========== GET GROUP SETTINGS ==========
   static async getGroupSettings(groupId: string) {
     try {
       console.log(`GroupMembersService: Getting settings for group ${groupId}`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${groupId}/settings`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -93,14 +139,17 @@ export class GroupMembersService {
     }
   }
 
-  // Remove a member from group (admin only)
+  // ========== REMOVE MEMBER ==========
   static async removeMember(groupId: string, memberId: string) {
     try {
       console.log(`GroupMembersService: Removing member ${memberId} from group ${groupId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/members/${memberId}`, {
         method: 'DELETE',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -115,7 +164,7 @@ export class GroupMembersService {
     }
   }
 
-  // Update member role (admin only)
+  // ========== UPDATE MEMBER ROLE ==========
   static async updateMemberRole(groupId: string, memberId: string, newRole: string) {
     try {
       if (!['ADMIN', 'MEMBER'].includes(newRole)) {
@@ -127,14 +176,13 @@ export class GroupMembersService {
 
       console.log(`GroupMembersService: Updating member ${memberId} role to ${newRole} in group ${groupId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/members/${memberId}/role`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers,
         body: JSON.stringify({ newRole }),
-        credentials: 'include'
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -149,7 +197,7 @@ export class GroupMembersService {
     }
   }
 
-  // Update member rotation settings (admin only)
+  // ========== UPDATE MEMBER ROTATION ==========
   static async updateMemberRotation(
     groupId: string,
     memberId: string,
@@ -162,17 +210,13 @@ export class GroupMembersService {
         isActive
       });
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/members/${memberId}/rotation`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          rotationOrder,
-          isActive
-        }),
-        credentials: 'include'
+        headers,
+        body: JSON.stringify({ rotationOrder, isActive }),
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -187,7 +231,7 @@ export class GroupMembersService {
     }
   }
 
-  // Reorder rotation sequence (admin only)
+  // ========== REORDER ROTATION SEQUENCE ==========
   static async reorderRotationSequence(groupId: string, newOrder: Array<{ memberId: string, rotationOrder: number }>) {
     try {
       if (!newOrder || !Array.isArray(newOrder)) {
@@ -199,14 +243,13 @@ export class GroupMembersService {
 
       console.log(`GroupMembersService: Reordering rotation for group ${groupId}`, newOrder);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/reorder-rotation`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers,
         body: JSON.stringify({ newOrder }),
-        credentials: 'include'
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -221,14 +264,17 @@ export class GroupMembersService {
     }
   }
 
-  // Leave group
+  // ========== LEAVE GROUP ==========
   static async leaveGroup(groupId: string) {
     try {
       console.log(`GroupMembersService: Leaving group ${groupId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/leave`, {
-        method: 'DELETE', // Changed from POST to DELETE to match backend
-        credentials: 'include'
+        method: 'DELETE',
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -243,14 +289,17 @@ export class GroupMembersService {
     }
   }
 
-  // Get rotation schedule preview
+  // ========== GET ROTATION SCHEDULE PREVIEW ==========
   static async getRotationSchedulePreview(groupId: string, weeks: number = 4) {
     try {
       console.log(`GroupMembersService: Getting rotation schedule for group ${groupId} (${weeks} weeks)`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${groupId}/rotation-preview?weeks=${weeks}`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -265,14 +314,17 @@ export class GroupMembersService {
     }
   }
 
-  // Get group details including rotation info
+  // ========== GET GROUP DETAILS ==========
   static async getGroupDetails(groupId: string) {
     try {
       console.log(`GroupMembersService: Getting group details for ${groupId}`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${groupId}`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -287,19 +339,22 @@ export class GroupMembersService {
     }
   }
 
-  // Get current week rotation assignments
+  // ========== GET CURRENT WEEK ASSIGNMENTS ==========
   static async getCurrentWeekAssignments(groupId: string) {
     try {
       console.log(`GroupMembersService: Getting current week assignments for group ${groupId}`);
       
+      const headers = await this.getHeaders(false);
+      
       const response = await fetch(`${API_URL}/${groupId}/current-assignments`, {
         method: 'GET',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
       return result;
- 
+
     } catch (error: any) {
       console.error('GroupMembersService.getCurrentWeekAssignments error:', error);
       return {
@@ -309,22 +364,21 @@ export class GroupMembersService {
     }
   }
 
-  // ✅ UPDATED: Update group (name, description) - admin only
+  // ========== UPDATE GROUP ==========
   static async updateGroup(groupId: string, groupData: { name?: string, description?: string }) {
     try {
       console.log(`GroupMembersService: Updating group ${groupId} with data:`, groupData);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/update`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers,
         body: JSON.stringify(groupData),
-        credentials: 'include'
+        // credentials: 'include'
       });
 
-      const result = await response.json(); 
+      const result = await response.json();
       return result;
 
     } catch (error: any) {
@@ -336,19 +390,18 @@ export class GroupMembersService {
     }
   }
 
-  // ✅ NEW: Transfer ownership (admin only)
+  // ========== TRANSFER OWNERSHIP ==========
   static async transferOwnership(groupId: string, newAdminId: string) {
     try {
       console.log(`GroupMembersService: Transferring ownership of group ${groupId} to user ${newAdminId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/transfer-ownership`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers,
         body: JSON.stringify({ newAdminId }),
-        credentials: 'include'
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -363,14 +416,17 @@ export class GroupMembersService {
     }
   }
 
-  // ✅ NEW: Regenerate invite code (admin only)
+  // ========== REGENERATE INVITE CODE ==========
   static async regenerateInviteCode(groupId: string) {
     try {
       console.log(`GroupMembersService: Regenerating invite code for group ${groupId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/regenerate-invite`, {
         method: 'POST',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -385,14 +441,17 @@ export class GroupMembersService {
     }
   }
 
-  // ✅ NEW: Delete group (admin only)
+  // ========== DELETE GROUP ==========
   static async deleteGroup(groupId: string) {
     try {
       console.log(`GroupMembersService: Deleting group ${groupId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/delete`, {
         method: 'DELETE',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -407,14 +466,17 @@ export class GroupMembersService {
     }
   }
 
-  // ✅ NEW: Delete group avatar
+  // ========== DELETE GROUP AVATAR ==========
   static async deleteGroupAvatar(groupId: string) {
     try {
       console.log(`GroupMembersService: Deleting avatar for group ${groupId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/${groupId}/avatar`, {
         method: 'DELETE',
-        credentials: 'include'
+        headers,
+        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -429,19 +491,18 @@ export class GroupMembersService {
     }
   }
 
-  // Upload group avatar - use the upload service endpoint
+  // ========== UPLOAD GROUP AVATAR ==========
   static async uploadGroupAvatar(groupId: string, base64Image: string) {
     try {
       console.log(`GroupMembersService: Uploading avatar for group ${groupId}`);
       
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_BASE_URL}/api/uploads/group/${groupId}/avatar/base64`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers,
         body: JSON.stringify({ avatarBase64: base64Image }),
-        credentials: 'include'
+        // credentials: 'include'
       });
 
       const result = await response.json();

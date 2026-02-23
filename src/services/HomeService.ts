@@ -1,11 +1,13 @@
+// src/services/HomeService.ts - UPDATED WITH TOKEN AUTH
 import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = `${API_BASE_URL}/api/home`;
 
 export interface HomeData {
   user: any;
   stats: any;
-  currentWeekTasks: any[]; 
+  currentWeekTasks: any[];
   upcomingTasks: any[];
   groups: any[];
   leaderboard: any[];
@@ -19,17 +21,48 @@ class HomeServiceClass {
   private lastData: HomeData | null = null;
   private isPolling = false;
 
-  // Get home data
+  // ========== GET AUTH TOKEN ==========
+  private async getAuthToken(): Promise<string | null> {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('🔐 HomeService: Auth token retrieved:', token ? 'Yes' : 'No');
+      return token;
+    } catch (error) {
+      console.error('HomeService: Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  // ========== GET HEADERS WITH TOKEN ==========
+  private async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
+    const token = await this.getAuthToken();
+    const headers: HeadersInit = {};
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('✅ HomeService: Added Authorization header');
+    } else {
+      console.warn('⚠️ HomeService: No auth token available - request may fail');
+    }
+    
+    if (withJsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    
+    return headers;
+  }
+
+  // ========== GET HOME DATA ==========
   async getHomeData() {
     try {
       console.log("HomeService: Fetching home data from:", `${API_URL}/`);
+      
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/`, {
         method: "GET",
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-        credentials: "include"
+        headers,
+        // credentials: "include" // Not needed with token
       });
 
       console.log("HomeService: Response status:", response.status);
@@ -42,7 +75,6 @@ class HomeServiceClass {
 
       const result = await response.json();
       
-      // Cache the data
       if (result.success && result.data) {
         this.lastData = result.data;
       }
@@ -60,11 +92,15 @@ class HomeServiceClass {
     }
   }
 
+  // ========== GET WEEKLY SUMMARY ==========
   async getWeeklySummary() {
     try {
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/weekly-summary`, {
         method: "GET",
-        credentials: "include"
+        headers,
+        // credentials: "include"
       });
 
       if (!response.ok) {
@@ -83,11 +119,15 @@ class HomeServiceClass {
     }
   }
 
+  // ========== GET DASHBOARD STATS ==========
   async getDashboardStats() {
     try {
+      const headers = await this.getHeaders();
+      
       const response = await fetch(`${API_URL}/dashboard-stats`, {
         method: "GET",
-        credentials: "include"
+        headers,
+        // credentials: "include"
       });
 
       if (!response.ok) {
@@ -110,22 +150,19 @@ class HomeServiceClass {
 
   // Start polling for home data updates (every 30 seconds)
   startPolling(callback: (data: HomeData) => void) {
-    // Add callback to set
     this.pollCallbacks.add(callback);
     
-    // If we have cached data, send immediately
     if (this.lastData) {
       callback(this.lastData);
     }
     
-    // Start polling if not already started
     if (!this.isPolling) {
       this.isPolling = true;
-      this.pollData(); // Immediate first poll
+      this.pollData();
       
       this.pollInterval = setInterval(() => {
         this.pollData();
-      }, 30000); // 30 seconds
+      }, 30000);
       
       console.log("🏠 Home data polling started (30s interval)");
     }
@@ -133,10 +170,8 @@ class HomeServiceClass {
 
   // Stop polling
   stopPolling(callback: (data: HomeData) => void) {
-    // Remove callback
     this.pollCallbacks.delete(callback);
     
-    // If no more callbacks, stop polling
     if (this.pollCallbacks.size === 0 && this.pollInterval) {
       clearInterval(this.pollInterval);
       this.pollInterval = null;
@@ -151,7 +186,6 @@ class HomeServiceClass {
       const result = await this.getHomeData();
       if (result.success && result.data) {
         this.lastData = result.data;
-        // Notify all callbacks
         this.pollCallbacks.forEach(callback => {
           callback(result.data);
         });

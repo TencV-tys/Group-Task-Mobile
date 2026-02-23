@@ -120,30 +120,30 @@ export const CreateSwapRequestScreen = () => {
     }
   };
 
-  const checkSwapAvailability = async () => {
-    setChecking(true);
-    try {
-      const result = await SwapRequestService.checkCanSwap(assignmentId);
-      console.log('📦 Check swap result:', result);
+  // In checkSwapAvailability function
+const checkSwapAvailability = async () => {
+  setChecking(true);
+  try {
+    // Pass the scope to the backend
+    const result = await SwapRequestService.checkCanSwap(assignmentId, swapScope);
+    console.log('📦 Check swap result:', result);
+    
+    if (result.success) {
+      setCanSwap({
+        canSwap: result.canSwap || false,
+        reason: result.reason
+      });
       
-      if (result.success) {
-        setCanSwap({
-          canSwap: result.canSwap || false,
-          reason: result.reason
-        });
-        
-        // If there's an existing request, store it
-        if (result.existingRequestId) {
-          setExistingRequest({ id: result.existingRequestId });
-        }
+      if (result.existingRequestId) {
+        setExistingRequest({ id: result.existingRequestId });
       }
-    } catch (error) {
-      console.error('Failed to check swap availability:', error);
-    } finally {
-      setChecking(false);
     }
-  };
-
+  } catch (error) {
+    console.error('Failed to check swap availability:', error);
+  } finally {
+    setChecking(false);
+  }
+};
   const calculateExpiryDate = (): string | undefined => {
     if (expiresIn === 'never') return undefined;
     

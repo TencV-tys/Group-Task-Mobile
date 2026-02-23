@@ -178,35 +178,38 @@ export class SwapRequestService {
     }
   }
 
-  // CHECK: Check if assignment can be swapped
-  static async checkCanSwap(assignmentId: string) {
-    try {
-      console.log('SwapRequestService: Checking if assignment can be swapped', assignmentId);
-      
-      const headers = await this.getHeaders(false);
-      
-      const response = await fetch(`${API_URL}/check/${assignmentId}`, {
-        method: 'GET',
-        headers,
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to check swap status: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      return result;
-
-    } catch (error: any) {
-      console.error('SwapRequestService.checkCanSwap error:', error);
-      return {
-        success: false,
-        canSwap: false,
-        message: error.message || 'Failed to check swap status'
-      };
+  // In SwapRequestService.ts
+static async checkCanSwap(assignmentId: string, scope?: 'week' | 'day') {
+  try {
+    let url = `${API_URL}/check/${assignmentId}`;
+    if (scope) {
+      url += `?scope=${scope}`;
     }
+    
+    const headers = await this.getHeaders(false);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to check swap status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('SwapRequestService.checkCanSwap error:', error);
+    return {
+      success: false,
+      canSwap: false,
+      message: error.message || 'Failed to check swap status'
+    };
   }
+}
 static async getMySwapRequests(filters?: SwapRequestFilters) {
   try {
     let url = `${API_URL}/my-requests`;

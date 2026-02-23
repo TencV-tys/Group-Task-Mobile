@@ -1,4 +1,4 @@
-// HomeScreen.tsx - UPDATED for simplified hook
+// HomeScreen.tsx - UPDATED without upcoming tasks
 import React, { useEffect, useState } from 'react';
 import { 
   View, 
@@ -17,7 +17,6 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useHomeData } from '../homeHook/useHomeHook';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { useNotifications } from '../notificationHook/useNotifications';
-import { AssignmentService } from '../services/AssignmentService';
 
 const { width } = Dimensions.get('window');
 
@@ -25,15 +24,10 @@ export default function HomeScreen({ navigation }: any) {
   const { loading, refreshing, error, homeData, refreshHomeData, authError } = useHomeData();
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
   const { unreadCount, loadUnreadCount } = useNotifications();
-  const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
-  const [todayAssignments, setTodayAssignments] = useState<any[]>([]);
-  const [loadingUpcoming, setLoadingUpcoming] = useState(false);
 
   useEffect(() => {
     loadPendingForMe();
     loadUnreadCount();
-    fetchUpcomingAssignments();
-    fetchTodayAssignments();
   }, []);
 
   // Show auth error if needed
@@ -49,47 +43,6 @@ export default function HomeScreen({ navigation }: any) {
     }
   }, [authError, navigation]);
 
-  const fetchUpcomingAssignments = async () => {
-    setLoadingUpcoming(true);
-    try {
-      console.log("🔍 Fetching upcoming...");
-      const result = await AssignmentService.getUpcomingAssignments({ limit: 5 });
-      console.log("📦 Upcoming result:", JSON.stringify(result, null, 2));
-      
-      if (result.success && result.data) {
-        console.log("✅ Upcoming assignments count:", result.data.assignments?.length);
-        setUpcomingAssignments(result.data.assignments || []);
-      } else {
-        console.log("⚠️ No upcoming data");
-        setUpcomingAssignments([]);
-      }
-    } catch (error) {
-      console.error('❌ Error:', error);
-      setUpcomingAssignments([]);
-    } finally {
-      setLoadingUpcoming(false);
-    } 
-  };
-
-  const fetchTodayAssignments = async () => {
-    try {
-      console.log("🔍 Fetching today...");
-      const result = await AssignmentService.getTodayAssignments();
-      console.log("📦 Today result:", JSON.stringify(result, null, 2));
-      
-      if (result.success && result.data) {
-        console.log("✅ Today assignments count:", result.data.assignments?.length);
-        setTodayAssignments(result.data.assignments || []);
-      } else {
-        console.log("⚠️ No today data");
-        setTodayAssignments([]);
-      }
-    } catch (error) {
-      console.error('❌ Error:', error);
-      setTodayAssignments([]);
-    }
-  };
-
   const user = homeData?.user || { 
     fullName: 'User', 
     groupsCount: 0, 
@@ -101,16 +54,15 @@ export default function HomeScreen({ navigation }: any) {
   };
   
   const stats = homeData?.stats || { 
-  groupsCount: 0, 
-  tasksDue: 0, 
-  completedTasks: 0,
-  totalTasks: 0,
-  completionRate: 0,
-  overdueTasks: 0,
-  swapRequests: 0,
-  pointsThisWeek: 0
-};
-
+    groupsCount: 0, 
+    tasksDue: 0, 
+    completedTasks: 0,
+    totalTasks: 0,
+    completionRate: 0,
+    overdueTasks: 0,
+    swapRequests: 0,
+    pointsThisWeek: 0
+  };
   
   const recentActivity = homeData?.recentActivity || [];
   const groups = homeData?.groups || [];
@@ -164,167 +116,6 @@ export default function HomeScreen({ navigation }: any) {
 
   const handleViewNotifications = () => {
     navigation.navigate('Notifications');
-  };
-
-  const handleAssignmentPress = (assignmentId: string) => {
-    navigation.navigate('AssignmentDetails', {
-      assignmentId,
-      isAdmin: false
-    });
-  };
-
-  const formatTimeLeft = (seconds: number) => {
-    if (seconds >= 3600) {
-      const hours = Math.floor(seconds / 3600);
-      const mins = Math.floor((seconds % 3600) / 60);
-      return `${hours}h ${mins}m`;
-    } else if (seconds >= 60) {
-      const mins = Math.floor(seconds / 60);
-      return `${mins}m`;
-    } else {
-      return `${seconds}s`;
-    }
-  };
-
-  const renderUpcomingTasks = () => {
-    if (loadingUpcoming) {
-      return (
-        <View style={styles.upcomingLoading}>
-          <ActivityIndicator size="small" color="#007AFF" />
-          <Text style={styles.upcomingLoadingText}>Loading upcoming tasks...</Text>
-        </View>
-      );
-    }
-
-    if (upcomingAssignments.length === 0 && todayAssignments.length === 0) {
-      return (
-        <View style={styles.upcomingEmpty}>
-          <MaterialCommunityIcons name="calendar-clock" size={48} color="#dee2e6" />
-          <Text style={styles.upcomingEmptyText}>No upcoming tasks</Text>
-          <Text style={styles.upcomingEmptySubtext}>
-            Your scheduled tasks will appear here
-          </Text>
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.upcomingContainer}>
-        {/* Today's Assignments - Priority */}
-        {todayAssignments.length > 0 && (
-          <View style={styles.todaySection}>
-            <Text style={styles.todaySectionTitle}>📅 Due Today</Text>
-            {todayAssignments.map((assignment: any) => (
-              <TouchableOpacity
-                key={assignment.id}
-                style={[
-                  styles.upcomingCard,
-                  assignment.canSubmit && styles.submittableCard,
-                  assignment.willBePenalized && styles.penaltyCard
-                ]}
-                onPress={() => handleAssignmentPress(assignment.id)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.upcomingHeader}>
-                  <View style={[
-                    styles.upcomingIcon,
-                    assignment.canSubmit ? { backgroundColor: '#2b8a3e' } :
-                    assignment.willBePenalized ? { backgroundColor: '#e67700' } :
-                    { backgroundColor: '#FF9500' }
-                  ]}>
-                    <MaterialCommunityIcons 
-                      name={assignment.canSubmit ? "clock-check" : "clock"} 
-                      size={16} 
-                      color="white" 
-                    />
-                  </View>
-                  <View style={styles.upcomingContent}>
-                    <Text style={styles.upcomingTitle} numberOfLines={1}>
-                      {assignment.taskTitle}
-                    </Text>
-                    <Text style={styles.upcomingGroup}>
-                      {assignment.group?.name || 'Group'}
-                    </Text>
-                  </View>
-                  {assignment.timeLeft && (
-                    <View style={[
-                      styles.timeLeftPill,
-                      assignment.timeLeft < 300 ? styles.urgentPill : styles.normalPill
-                    ]}>
-                      <Text style={[
-                        styles.timeLeftPillText,
-                        assignment.timeLeft < 300 ? styles.urgentPillText : styles.normalPillText
-                      ]}>
-                        {formatTimeLeft(assignment.timeLeft)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.upcomingFooter}>
-                  <Text style={styles.upcomingTime}>
-                    {assignment.timeSlot ? 
-                      `${assignment.timeSlot.startTime} - ${assignment.timeSlot.endTime}` : 
-                      'Anytime'}
-                  </Text>
-                  {assignment.canSubmit && (
-                    <View style={styles.availableBadge}>
-                      <Text style={styles.availableBadgeText}>Available Now</Text>
-                    </View>
-                  )}
-                  {assignment.willBePenalized && (
-                    <View style={styles.penaltyBadge}>
-                      <Text style={styles.penaltyBadgeText}>Late</Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* Future Assignments */}
-        {upcomingAssignments.filter((a: any) => !a.isToday).length > 0 && (
-          <View style={styles.futureSection}>
-            <Text style={styles.futureSectionTitle}>📋 Coming Up</Text>
-            {upcomingAssignments
-              .filter((a: any) => !a.isToday)
-              .slice(0, 3)
-              .map((assignment: any) => (
-                <TouchableOpacity
-                  key={assignment.id}
-                  style={styles.futureCard}
-                  onPress={() => handleAssignmentPress(assignment.id)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.futureHeader}>
-                    <View style={[styles.futureIcon, { backgroundColor: '#6c757d' }]}>
-                      <MaterialCommunityIcons name="calendar" size={14} color="white" />
-                    </View>
-                    <View style={styles.futureContent}>
-                      <Text style={styles.futureTitle} numberOfLines={1}>
-                        {assignment.taskTitle}
-                      </Text>
-                      <Text style={styles.futureDate}>
-                        {new Date(assignment.dueDate).toLocaleDateString()} • {assignment.timeSlot?.startTime || 'Anytime'}
-                      </Text>
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
-          </View>
-        )}
-
-        {upcomingAssignments.length > 5 && (
-          <TouchableOpacity 
-            style={styles.viewAllButton}
-            onPress={() => navigation.navigate('UpcomingTasks')}
-          >
-            <Text style={styles.viewAllText}>View All Upcoming Tasks</Text>
-            <MaterialCommunityIcons name="arrow-right" size={16} color="#007AFF" />
-          </TouchableOpacity>
-        )}
-      </View>
-    );
   };
 
   if (loading && !refreshing) {
@@ -420,8 +211,6 @@ export default function HomeScreen({ navigation }: any) {
             refreshing={refreshing}
             onRefresh={() => {
               refreshHomeData();
-              fetchUpcomingAssignments();
-              fetchTodayAssignments();
               loadPendingForMe();
               loadUnreadCount();
             }}
@@ -445,17 +234,6 @@ export default function HomeScreen({ navigation }: any) {
             <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
             <Text style={styles.pointsText}>{user.totalPoints || 0}</Text>
           </View>
-        </View>
-
-        {/* UPCOMING TASKS SECTION */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
-            <TouchableOpacity onPress={fetchUpcomingAssignments}>
-              <MaterialCommunityIcons name="refresh" size={20} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
-          {renderUpcomingTasks()}
         </View>
 
         <View style={styles.section}>
@@ -702,6 +480,8 @@ export default function HomeScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
+// Keep all styles exactly the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -864,215 +644,6 @@ const styles = StyleSheet.create({
     color: '#212529',
   },
   seeAllText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  // Upcoming Tasks Styles
-  upcomingLoading: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  upcomingLoadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#6c757d',
-  },
-  upcomingEmpty: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  upcomingEmptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6c757d',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  upcomingEmptySubtext: {
-    fontSize: 14,
-    color: '#adb5bd',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  upcomingContainer: {
-    gap: 16,
-  },
-  todaySection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  todaySectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FF3B30',
-    marginBottom: 12,
-  },
-  futureSection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  futureSectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6c757d',
-    marginBottom: 12,
-  },
-  upcomingCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  submittableCard: {
-    backgroundColor: '#d3f9d8',
-    borderColor: '#2b8a3e',
-    borderWidth: 2,
-  },
-  penaltyCard: {
-    backgroundColor: '#fff3bf',
-    borderColor: '#e67700',
-    borderWidth: 2,
-  },
-  upcomingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  upcomingIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  upcomingContent: {
-    flex: 1,
-  },
-  upcomingTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 2,
-  },
-  upcomingGroup: {
-    fontSize: 12,
-    color: '#6c757d',
-  },
-  timeLeftPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  normalPill: {
-    backgroundColor: '#d3f9d8',
-  },
-  urgentPill: {
-    backgroundColor: '#ffc9c9',
-  },
-  timeLeftPillText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  normalPillText: {
-    color: '#2b8a3e',
-  },
-  urgentPillText: {
-    color: '#fa5252',
-  },
-  upcomingFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginLeft: 38,
-  },
-  upcomingTime: {
-    fontSize: 12,
-    color: '#6c757d',
-  },
-  availableBadge: {
-    backgroundColor: '#2b8a3e',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  availableBadgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  penaltyBadge: {
-    backgroundColor: '#e67700',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  penaltyBadgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  futureCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 6,
-  },
-  futureHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  futureIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  futureContent: {
-    flex: 1,
-  },
-  futureTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#212529',
-    marginBottom: 2,
-  },
-  futureDate: {
-    fontSize: 11,
-    color: '#6c757d',
-  },
-  viewAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 12,
-  },
-  viewAllText: {
     fontSize: 14,
     color: '#007AFF',
     fontWeight: '500',

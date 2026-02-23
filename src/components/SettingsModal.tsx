@@ -1,5 +1,4 @@
-// components/SettingsModal.tsx - UPDATED with task-based week start
-
+// components/SettingsModal.tsx - FIXED swap week availability
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -109,12 +108,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           if (earliestDate) {
             setFirstTaskDate(earliestDate);
             
-            // Calculate week start (7 days before the earliest task)
-            const weekStart = new Date(earliestDate);
-            weekStart.setDate(weekStart.getDate() - 6); // Go back 6 days to get week start
+            // ✅ FIXED: Now TypeScript knows earliestDate is Date
+            const firstTaskDate = earliestDate as Date;
+            
+            // Calculate week start (Monday of the week containing the first task)
+            const dayOfWeek = firstTaskDate.getDay(); // 0 = Sunday, 1 = Monday
+            const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            
+            const weekStart = new Date(firstTaskDate);
+            weekStart.setDate(firstTaskDate.getDate() - daysToMonday);
             weekStart.setHours(0, 0, 0, 0);
             
-            const weekEnd = new Date(earliestDate);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
             weekEnd.setHours(23, 59, 59, 999);
             
             setWeekStartDate(weekStart);
@@ -135,34 +141,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // Check if week swap is available (only on the first day of the task's week)
+  // ✅ FIXED: Check if week swap is available (first 24 hours of the week)
   const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
     const now = new Date();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     
-    // Week start day (the day the first task is due)
+    // Week start is Monday at 00:00
     const weekStartDay = new Date(weekStart);
     weekStartDay.setHours(0, 0, 0, 0);
     
-    // Check if today is the first day of the week (when the first task is due)
-    const isFirstDayOfWeek = today.getTime() === weekEnd.getTime();
-    
-    // Check if we're still within the first 24 hours of the week start
+    // Calculate hours since week started
     const hoursSinceWeekStart = (now.getTime() - weekStartDay.getTime()) / (1000 * 60 * 60);
+    
+    // Week swap is available within the first 24 hours of the week
     const isWithinFirst24Hours = hoursSinceWeekStart >= 0 && hoursSinceWeekStart <= 24;
     
-    // For week swap, we want it available on the FIRST day of the week (when tasks start)
-    if (!isFirstDayOfWeek) {
+    console.log('📅 Week swap check:', {
+      weekStart: weekStartDay.toISOString(),
+      now: now.toISOString(),
+      hoursSinceWeekStart,
+      isWithinFirst24Hours
+    });
+    
+    if (!isWithinFirst24Hours) {
       setCanSwapWeek(false);
-      const weekStartDayName = weekEnd.toLocaleDateString('en-US', { weekday: 'long' });
-      setWeekSwapReason(`Week swaps are only available on the first day of the task week (${weekStartDayName})`);
-    } else if (!isWithinFirst24Hours) {
-      setCanSwapWeek(false);
-      setWeekSwapReason('Week swap window has closed (only available within first 24 hours)');
+      if (hoursSinceWeekStart < 0) {
+        setWeekSwapReason('Week hasn\'t started yet');
+      } else {
+        setWeekSwapReason('Week swap window has closed (only available within first 24 hours of the week)');
+      }
     } else {
       setCanSwapWeek(true);
-      setWeekSwapReason('');
+      const hoursLeft = Math.ceil(24 - hoursSinceWeekStart);
+      setWeekSwapReason(`${hoursLeft} hour(s) left to swap the entire week`);
     }
   };
 
@@ -225,15 +235,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       return;
     }
 
-    const firstTaskDay = firstTask.assignment.dueDate 
-      ? new Date(firstTask.assignment.dueDate).toLocaleDateString('en-US', { weekday: 'long' })
-      : 'the first day';
-
     Alert.alert(
       'Swap Entire Week',
       `Are you sure you want to swap ALL your tasks for week ${rotationWeek}?\n\n` +
       `You have ${incompleteAssignments.length} incomplete task(s) this week.\n\n` +
-      `⚠️ This action is only available on the first day of the task week (${firstTaskDay}) and within the first 24 hours.`,
+      `⚠️ This action is only available within the first 24 hours of the week (Monday 00:00 - Tuesday 00:00).`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -351,10 +357,27 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     t.assignment && !t.assignment.completed
   ).length;
 
-  // Get the first task day name for display
-  const firstTaskDayName = firstTaskDate 
-    ? firstTaskDate.toLocaleDateString('en-US', { weekday: 'long' })
-    : 'N/A';
+  // Get week day name for display
+  const getWeekDayName = (date: Date | null) => {
+    if (!date) return 'N/A';
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+  };
+
+  // Format hours left
+  const getHoursLeftText = () => {
+    if (!weekStartDate) return '';
+    
+    const now = new Date();
+    const weekStart = new Date(weekStartDate);
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const hoursSinceWeekStart = (now.getTime() - weekStart.getTime()) / (1000 * 60 * 60);
+    const hoursLeft = Math.max(0, 24 - hoursSinceWeekStart);
+    
+    if (hoursLeft <= 0) return '';
+    if (hoursLeft < 1) return `${Math.round(hoursLeft * 60)} minutes left`;
+    return `${Math.ceil(hoursLeft)} hour(s) left`;
+  };
 
   return (
     <Modal
@@ -391,9 +414,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       {weekStartDate.toLocaleDateString()} - {weekEndDate.toLocaleDateString()}
                     </Text>
                   )}
-                  {firstTaskDate && (
-                    <Text style={styles.firstTaskDay}>
-                      First task day: {firstTaskDayName}
+                  {weekStartDate && (
+                    <Text style={styles.weekStartDay}>
+                      Week starts: {getWeekDayName(weekStartDate)}
                     </Text>
                   )}
                 </View>
@@ -419,7 +442,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Swap Entire Week Section - Only available on first day of task week */}
+            {/* Swap Entire Week Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <MaterialCommunityIcons name="swap-horizontal" size={20} color="#4F46E5" />
@@ -441,7 +464,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <View style={styles.weekAvailability}>
                       <MaterialCommunityIcons 
                         name={canSwapWeek ? "check-circle" : "clock-alert"} 
-                        size={14} 
+                        size={16} 
                         color={canSwapWeek ? "#2b8a3e" : "#fa5252"} 
                       />
                       <Text style={[
@@ -449,8 +472,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         canSwapWeek ? styles.availableText : styles.unavailableText
                       ]}>
                         {canSwapWeek 
-                          ? `Available today (${firstTaskDayName} - First day of task week)` 
-                          : weekSwapReason || `Only available on ${firstTaskDayName} (first day of task week)`}
+                          ? `✅ Available now - ${getHoursLeftText()}` 
+                          : weekSwapReason || 'Week swap window is closed'}
                       </Text>
                     </View>
 
@@ -461,6 +484,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                           {incompleteCount} incomplete task(s) this week
                         </Text>
                       </View>
+                    )}
+
+                    {weekStartDate && (
+                      <Text style={styles.weekInfo}>
+                        Week started: {weekStartDate.toLocaleDateString()} at 00:00
+                      </Text>
                     )}
                   </View>
 
@@ -484,16 +513,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </View>
               )}
 
-              {!canSwapWeek && !loadingMyTasks && firstTaskDate && (
-                <Text style={styles.infoUnavailableText}>
-                  ⓘ Week swaps are only available on the first day of the task week ({firstTaskDayName}) within the first 24 hours.
-                </Text>
+              {!canSwapWeek && !loadingMyTasks && weekStartDate && (
+                <View style={styles.infoBox}>
+                  <MaterialCommunityIcons name="information" size={20} color="#fa5252" />
+                  <Text style={styles.infoUnavailableText}>
+                    Week swaps are only available within the first 24 hours after the week starts.
+                    {'\n\n'}
+                    Week started: {weekStartDate.toLocaleDateString()} at 00:00
+                  </Text>
+                </View>
               )}
 
-              {incompleteCount === 0 && canSwapWeek && !loadingMyTasks && (
-                <Text style={styles.infoText}>
-                  ✓ You have no pending tasks to swap this week
-                </Text>
+              {canSwapWeek && incompleteCount === 0 && !loadingMyTasks && (
+                <View style={styles.successBox}>
+                  <MaterialCommunityIcons name="check-circle" size={20} color="#2b8a3e" />
+                  <Text style={styles.successText}>
+                    ✓ All tasks completed! No pending tasks to swap.
+                  </Text>
+                </View>
               )}
             </View>
 
@@ -634,7 +671,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   );
 };
 
-// Add these new styles
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
@@ -724,7 +760,7 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 4
   },
-  firstTaskDay: {
+  weekStartDay: {
     fontSize: 12,
     color: '#4F46E5',
     marginTop: 4,
@@ -942,8 +978,9 @@ const styles = StyleSheet.create({
     gap: 6
   },
   weekAvailabilityText: {
-    fontSize: 12,
-    flex: 1
+    fontSize: 13,
+    flex: 1,
+    fontWeight: '500'
   },
   availableText: {
     color: '#2b8a3e'
@@ -966,6 +1003,12 @@ const styles = StyleSheet.create({
     color: '#4F46E5',
     fontWeight: '600'
   },
+  weekInfo: {
+    fontSize: 11,
+    color: '#6B7280',
+    marginTop: 6,
+    fontStyle: 'italic'
+  },
   swapActionButton: {
     backgroundColor: '#4F46E5',
     paddingHorizontal: 16,
@@ -984,18 +1027,36 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14
   },
-  infoText: {
-    fontSize: 13,
-    color: '#2b8a3e',
-    fontStyle: 'italic',
-    marginTop: 4,
-    paddingLeft: 8
+  infoBox: {
+    flexDirection: 'row',
+    backgroundColor: '#fff5f5',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#ffc9c9'
   },
   infoUnavailableText: {
+    flex: 1,
     fontSize: 13,
     color: '#fa5252',
-    fontStyle: 'italic',
-    marginTop: 4,
-    paddingLeft: 8
+    lineHeight: 18
+  },
+  successBox: {
+    flexDirection: 'row',
+    backgroundColor: '#d3f9d8',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#b2f2bb'
+  },
+  successText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#2b8a3e',
+    fontWeight: '500'
   }
 });

@@ -53,210 +53,219 @@ export default function NotificationsScreen({ navigation }: any) {
   };
 
   const handleNavigation = (type: string, data: any) => {
-    console.log('Navigating with type:', type, 'data:', data);
+  console.log('Navigating with type:', type, 'data:', data);
+  
+  // ============= EXPIRED SWAP REQUEST - SHOW ALERT =============
+  if (type === NotificationTypes.SWAP_EXPIRED) {
+    Alert.alert(
+      '⚠️ Request Expired',
+      'This swap request has expired and is no longer available.',
+      [{ text: 'OK' }]
+    );
+    return; // Don't navigate
+  }
+  
+  switch (type) {
+    // ============= PENALTY & NEGLECT TYPES =============
+    case NotificationTypes.POINT_DEDUCTION:
+    case NotificationTypes.LATE_SUBMISSION:
+      if (data?.assignmentId) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: false 
+        });
+      } else if (data?.taskId) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      }
+      break;
     
-    switch (type) {
-      // ============= PENALTY & NEGLECT TYPES =============
-      case NotificationTypes.POINT_DEDUCTION:
-      case NotificationTypes.LATE_SUBMISSION:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: false 
-          });
-        } else if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        }
-        break;
-      
-      case NotificationTypes.NEGLECT_DETECTED:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: true 
-          });
-        } else if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        }
-        break;
-      
-      // ============= REMINDER TYPES =============
-      case NotificationTypes.TASK_REMINDER:
-      case NotificationTypes.TASK_ACTIVE:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: false 
-          });
-        } else if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        }
-        break;
-      
-      // ============= SUBMISSION TYPES =============
-      case NotificationTypes.SUBMISSION_PENDING:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: true 
-          });
-        } else if (data?.taskId) {
-          navigation.navigate('PendingVerifications', { 
-            groupId: data.groupId,
-            groupName: data.groupName,
-            userRole: 'ADMIN'
-          });
-        }
-        break;
-      
-      case NotificationTypes.SUBMISSION_VERIFIED:
-      case NotificationTypes.SUBMISSION_REJECTED:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: false 
-          });
-        }
-        break;
-      
-      case NotificationTypes.SUBMISSION_DECISION:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: true 
-          });
-        }
-        break;
-      
-      // ============= FEEDBACK TYPES =============
-      case NotificationTypes.FEEDBACK_SUBMITTED:
-      case NotificationTypes.FEEDBACK_STATUS_UPDATE:
-        if (data?.feedbackId) {
-          navigation.navigate('FeedbackDetails', { feedbackId: data.feedbackId });
-        } else {
-          navigation.navigate('Feedback');
-        }
-        break;
-      
-      // ============= TASK RELATED TYPES =============
-      case NotificationTypes.TASK_ASSIGNED:
-      case NotificationTypes.TASK_COMPLETED:
-      case NotificationTypes.TASK_OVERDUE:
-      case NotificationTypes.TASK_CREATED:
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        }
-        break;
-      
-      // ============= GROUP RELATED TYPES =============
-      case NotificationTypes.GROUP_INVITE:
-        if (data?.groupId) {
-          navigation.navigate('GroupDetails', { 
-            groupId: data.groupId,
-            inviteCode: data.inviteCode 
-          });
-        }
-        break;
-      
-      case NotificationTypes.GROUP_JOINED:
-      case NotificationTypes.GROUP_CREATED:
-        if (data?.groupId) {
-          navigation.navigate('GroupTasks', { 
-            groupId: data.groupId, 
-            groupName: data.groupName,
-            userRole: data.userRole || 'MEMBER'
-          });
-        }
-        break;
-      
-      case NotificationTypes.NEW_MEMBER:
-        if (data?.groupId) {
-          navigation.navigate('GroupMembers', { 
-            groupId: data.groupId,
-            groupName: data.groupName 
-          });
-        }
-        break;
-      
-      // ============= SWAP REQUEST TYPES =============
-      case NotificationTypes.SWAP_REQUEST:
-      case NotificationTypes.SWAP_ACCEPTED:
-      case NotificationTypes.SWAP_REJECTED:
-      case NotificationTypes.SWAP_CANCELLED:
-      case NotificationTypes.SWAP_COMPLETED:
-      case NotificationTypes.SWAP_ADMIN_NOTIFICATION:
-      case NotificationTypes.SWAP_EXPIRED:
-        if (data?.swapRequestId) {
-          navigation.navigate('SwapRequestDetails', { 
-            requestId: data.swapRequestId 
-          });
-        } else if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId 
-          });
-        }
-        break;
-      
-      // ============= POINTS AND ACHIEVEMENTS =============
-      case NotificationTypes.POINTS_EARNED:
-        if (data?.groupId) {
-          navigation.navigate('Leaderboard', { 
-            groupId: data.groupId,
-            groupName: data.groupName 
-          });
-        }
-        break;
-      
-      // ============= MENTIONS AND REMINDERS =============
-      case NotificationTypes.MENTION:
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        } else if (data?.commentId) {
-          navigation.navigate('CommentDetails', { 
-            commentId: data.commentId 
-          });
-        }
-        break;
-      
-      case NotificationTypes.REMINDER:
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        }
-        break;
-      
-      // ============= DEFAULT =============
-      default:
-        console.log('Unhandled notification type:', type);
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { taskId: data.taskId });
-        } else if (data?.groupId) {
-          navigation.navigate('GroupTasks', { 
-            groupId: data.groupId,
-            groupName: data.groupName || 'Group'
-          });
-        } else {
-          navigation.goBack();
-        }
-    }
-  };
+    case NotificationTypes.NEGLECT_DETECTED:
+      if (data?.assignmentId) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: true 
+        });
+      } else if (data?.taskId) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      }
+      break;
+    
+    // ============= REMINDER TYPES =============
+    case NotificationTypes.TASK_REMINDER:
+    case NotificationTypes.TASK_ACTIVE:
+      if (data?.assignmentId) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: false 
+        });
+      } else if (data?.taskId) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      }
+      break;
+    
+    // ============= SUBMISSION TYPES =============
+    case NotificationTypes.SUBMISSION_PENDING:
+      if (data?.assignmentId) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: true 
+        });
+      } else if (data?.taskId) {
+        navigation.navigate('PendingVerifications', { 
+          groupId: data.groupId,
+          groupName: data.groupName,
+          userRole: 'ADMIN'
+        });
+      }
+      break;
+    
+    case NotificationTypes.SUBMISSION_VERIFIED:
+    case NotificationTypes.SUBMISSION_REJECTED:
+      if (data?.assignmentId) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: false 
+        });
+      }
+      break;
+    
+    case NotificationTypes.SUBMISSION_DECISION:
+      if (data?.assignmentId) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: true 
+        });
+      }
+      break;
+    
+    // ============= FEEDBACK TYPES =============
+    case NotificationTypes.FEEDBACK_SUBMITTED:
+    case NotificationTypes.FEEDBACK_STATUS_UPDATE:
+      if (data?.feedbackId) {
+        navigation.navigate('FeedbackDetails', { feedbackId: data.feedbackId });
+      } else {
+        navigation.navigate('Feedback');
+      }
+      break;
+    
+    // ============= TASK RELATED TYPES =============
+    case NotificationTypes.TASK_ASSIGNED:
+    case NotificationTypes.TASK_COMPLETED:
+    case NotificationTypes.TASK_OVERDUE:
+    case NotificationTypes.TASK_CREATED:
+      if (data?.taskId) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      }
+      break;
+    
+    // ============= GROUP RELATED TYPES =============
+    case NotificationTypes.GROUP_INVITE:
+      if (data?.groupId) {
+        navigation.navigate('GroupDetails', { 
+          groupId: data.groupId,
+          inviteCode: data.inviteCode 
+        });
+      }
+      break;
+    
+    case NotificationTypes.GROUP_JOINED:
+    case NotificationTypes.GROUP_CREATED:
+      if (data?.groupId) {
+        navigation.navigate('GroupTasks', { 
+          groupId: data.groupId, 
+          groupName: data.groupName,
+          userRole: data.userRole || 'MEMBER'
+        });
+      }
+      break;
+    
+    case NotificationTypes.NEW_MEMBER:
+      if (data?.groupId) {
+        navigation.navigate('GroupMembers', { 
+          groupId: data.groupId,
+          groupName: data.groupName 
+        });
+      }
+      break;
+    
+    // ============= SWAP REQUEST TYPES (EXCLUDING EXPIRED) =============
+    case NotificationTypes.SWAP_REQUEST:
+    case NotificationTypes.SWAP_ACCEPTED:
+    case NotificationTypes.SWAP_REJECTED:
+    case NotificationTypes.SWAP_CANCELLED:
+    case NotificationTypes.SWAP_COMPLETED:
+    case NotificationTypes.SWAP_ADMIN_NOTIFICATION:
+      if (data?.swapRequestId) {
+        navigation.navigate('SwapRequestDetails', { 
+          requestId: data.swapRequestId 
+        });
+      } else if (data?.assignmentId) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId 
+        });
+      }
+      break;
+    
+    // ============= POINTS AND ACHIEVEMENTS =============
+    case NotificationTypes.POINTS_EARNED:
+      if (data?.groupId) {
+        navigation.navigate('Leaderboard', { 
+          groupId: data.groupId,
+          groupName: data.groupName 
+        });
+      }
+      break;
+    
+    // ============= MENTIONS AND REMINDERS =============
+    case NotificationTypes.MENTION:
+      if (data?.taskId) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      } else if (data?.commentId) {
+        navigation.navigate('CommentDetails', { 
+          commentId: data.commentId 
+        });
+      }
+      break;
+    
+    case NotificationTypes.REMINDER:
+      if (data?.taskId) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      }
+      break;
+    
+    // ============= DEFAULT =============
+    default:
+      console.log('Unhandled notification type:', type);
+      if (data?.taskId) {
+        navigation.navigate('TaskDetails', { taskId: data.taskId });
+      } else if (data?.groupId) {
+        navigation.navigate('GroupTasks', { 
+          groupId: data.groupId,
+          groupName: data.groupName || 'Group'
+        });
+      } else {
+        navigation.goBack();
+      }
+  }
+};
 
   const handleMarkAllAsRead = () => {
     if (unreadCount === 0) {

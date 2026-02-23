@@ -1,4 +1,4 @@
-// src/screens/TaskDetailsScreen.tsx - UPDATED WITH CURRENT DAY PRIORITY
+// src/screens/TaskDetailsScreen.tsx - UPDATED FOR ALL USERS
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -27,7 +27,8 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const [currentTimeSlot, setCurrentTimeSlot] = useState<any>(null);
   const [submissionStatus, setSubmissionStatus] = useState<'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed'>('waiting');
   const [currentWeekSubmissions, setCurrentWeekSubmissions] = useState<any[]>([]);
-  const [todayAssignment, setTodayAssignment] = useState<any>(null); // NEW: Track today's assignment
+  const [todayAssignment, setTodayAssignment] = useState<any>(null);
+  const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
   
   const isAdmin = userRole === 'ADMIN';
 
@@ -51,15 +52,22 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         const processedTask = processTaskData(result.task);
         setTask(processedTask);
         
-        // Find today's assignment
         findTodayAssignment(processedTask);
-        
         checkTimeValidity(processedTask);
         
-        // Get current week number from group
         const currentWeek = processedTask.group?.currentRotationWeek || 1;
         
-        // Filter ONLY current week submissions for the current user
+        // Get upcoming assignments (other people's tasks this week)
+        if (processedTask.assignments) {
+          const upcoming = processedTask.assignments.filter(
+            (a: any) => 
+              a.rotationWeek === currentWeek &&
+              a.userId !== processedTask.userId
+          );
+          setUpcomingAssignments(upcoming);
+        }
+        
+        // Get current week submissions for the current user
         if (processedTask.assignments && processedTask.userId) {
           const myCurrentWeekSubmissions = processedTask.assignments.filter(
             (a: any) => 
@@ -80,7 +88,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  // NEW: Function to find today's assignment
   const findTodayAssignment = (taskData: any) => {
     if (!taskData.assignments || !taskData.userId) {
       setTodayAssignment(null);
@@ -93,7 +100,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // Find assignments due today for current user
     const todayAssignments = taskData.assignments.filter((a: any) => {
       if (a.userId !== taskData.userId) return false;
       
@@ -103,7 +109,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       return dueDate.getTime() === today.getTime();
     });
 
-    // If multiple today assignments, sort by time
     if (todayAssignments.length > 0) {
       todayAssignments.sort((a: any, b: any) => {
         const timeA = new Date(a.dueDate).getTime();
@@ -111,14 +116,13 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         return timeA - timeB;
       });
       
-      setTodayAssignment(todayAssignments[0]); // Set the earliest one
+      setTodayAssignment(todayAssignments[0]);
     } else {
       setTodayAssignment(null);
     }
   };
 
   const processTaskData = (taskData: any) => {
-    // Sort time slots
     if (taskData.timeSlots && taskData.timeSlots.length > 0) {
       taskData.timeSlots.sort((a: any, b: any) => {
         const timeA = convertTimeToMinutes(a.startTime);
@@ -127,7 +131,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       });
     }
     
-    // Sort selected days
     if (taskData.selectedDays && taskData.selectedDays.length > 0) {
       const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       taskData.selectedDays.sort((a: string, b: string) => 
@@ -135,7 +138,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       );
     }
     
-    // SORT ASSIGNMENTS - Current day first, then future, then past
     if (taskData.assignments && taskData.assignments.length > 0) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -147,39 +149,32 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         const dateA = new Date(a.dueDate);
         const dateB = new Date(b.dueDate);
         
-        // Normalize to start of day for comparison
         const dayA = new Date(dateA);
         dayA.setHours(0, 0, 0, 0);
         
         const dayB = new Date(dateB);
         dayB.setHours(0, 0, 0, 0);
         
-        // Check if each assignment is due today
         const isAToday = dayA.getTime() === today.getTime();
         const isBToday = dayB.getTime() === today.getTime();
         
-        // Today's assignments come first
         if (isAToday && !isBToday) return -1;
         if (!isAToday && isBToday) return 1;
         
-        // If both are today, sort by time (earlier first)
         if (isAToday && isBToday) {
           return dateA.getTime() - dateB.getTime();
         }
         
-        // Future assignments come next (sorted by date)
         const isAFuture = dayA.getTime() >= today.getTime();
         const isBFuture = dayB.getTime() >= today.getTime();
         
         if (isAFuture && !isBFuture) return -1;
         if (!isAFuture && isBFuture) return 1;
         
-        // Both future - sort ascending
         if (isAFuture && isBFuture) {
           return dateA.getTime() - dateB.getTime();
         }
         
-        // Both past - sort descending (most recent first)
         return dateB.getTime() - dateA.getTime();
       });
     }
@@ -279,7 +274,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         clearInterval(timer);
       }
     }, 1000);
-
     return timer;
   };
 
@@ -519,8 +513,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   };
 
   const isAdminAssignedToTask = () => isAdmin && task?.userAssignment;
-
-  // Helper to check if assignment is due today
   const isDueToday = (dueDate: string) => {
     const today = new Date().toDateString();
     const due = new Date(dueDate).toDateString();
@@ -555,8 +547,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         <View style={styles.headerSpacer} />
       )}
     </View>
-  );// src/screens/TaskDetailsScreen.tsx - FIXED to show ONLY today's assignment
-
+  );
 const renderMemberAssignmentSection = () => {
   if (!task?.userAssignment) {
     return (
@@ -572,8 +563,18 @@ const renderMemberAssignmentSection = () => {
     );
   }
 
-  // Check if today's assignment exists
+  // Find today's assignment
   if (!todayAssignment) {
+    // Find the next future assignment
+    const futureAssignments = task?.assignments?.filter((a: any) => 
+      a.userId === task?.userId && 
+      new Date(a.dueDate) > new Date()
+    ).sort((a: any, b: any) => 
+      new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+    );
+
+    const nextAssignment = futureAssignments?.[0];
+
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>My Assignment</Text>
@@ -582,14 +583,26 @@ const renderMemberAssignmentSection = () => {
           <Text style={styles.notAssignedText}>
             No assignment due today
           </Text>
-          <Text style={styles.notAssignedSubtext}>
-            Your next assignment is on {new Date(task.userAssignment.dueDate).toLocaleDateString()}
-          </Text>
+          {nextAssignment ? (
+            <Text style={styles.notAssignedSubtext}>
+              Your next assignment is on {new Date(nextAssignment.dueDate).toLocaleDateString()}
+            </Text>
+          ) : (
+            <Text style={styles.notAssignedSubtext}>
+              No upcoming assignments found
+            </Text>
+          )}
         </View>
       </View>
     );
   }
 
+  // Check if today's assignment is neglected (overdue and not completed)
+  const now = new Date();
+  const dueDate = new Date(todayAssignment.dueDate);
+  const isOverdue = now > dueDate && !todayAssignment.completed;
+  
+  // Check if it's within submission window
   const submissionStatusInfo = getSubmissionStatusInfo();
 
   return (
@@ -600,21 +613,50 @@ const renderMemberAssignmentSection = () => {
     >
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>Today's Assignment</Text>
-        <View style={styles.todayAssignmentBadge}>
-          <MaterialCommunityIcons name="clock-alert" size={12} color="#fff" />
-          <Text style={styles.todayAssignmentBadgeText}>Due Today</Text>
+        <View style={[
+          styles.todayAssignmentBadge,
+          isOverdue && styles.overdueBadge,
+          todayAssignment.completed && styles.completedBadge
+        ]}>
+          <MaterialCommunityIcons 
+            name={
+              todayAssignment.completed ? "check-circle" :
+              isOverdue ? "alert-circle" : "clock-alert"
+            } 
+            size={12} 
+            color="#fff" 
+          />
+          <Text style={styles.todayAssignmentBadgeText}>
+            {todayAssignment.completed ? 'Completed' : 
+             isOverdue ? 'Overdue' : 'Due Today'}
+          </Text>
         </View>
       </View>
       
-      <View style={[styles.assignmentCard, styles.todayAssignmentCard]}>
+      <View style={[
+        styles.assignmentCard, 
+        styles.todayAssignmentCard,
+        isOverdue && styles.overdueCard,
+        todayAssignment.completed && styles.completedCard
+      ]}>
         <View style={styles.assignmentHeader}>
           <MaterialCommunityIcons 
-            name="clock-alert" 
+            name={
+              todayAssignment.completed ? "check-circle" :
+              isOverdue ? "alert-circle" : "clock-alert"
+            } 
             size={24} 
-            color="#fa5252" 
+            color={
+              todayAssignment.completed ? "#2b8a3e" :
+              isOverdue ? "#fa5252" : "#fa5252"
+            } 
           />
           <View style={styles.assignmentInfo}>
-            <Text style={styles.todayAssignmentTitle}>
+            <Text style={[
+              styles.todayAssignmentTitle,
+              todayAssignment.completed && styles.completedTitle,
+              isOverdue && styles.overdueTitle
+            ]}>
               {task.title}
             </Text>
             <Text style={styles.assignmentDate}>
@@ -624,7 +666,7 @@ const renderMemberAssignmentSection = () => {
           </View>
         </View>
         
-        {!todayAssignment.completed && (
+        {!todayAssignment.completed && !isOverdue && (
           <View style={[styles.submissionStatusCard, { 
             backgroundColor: submissionStatusInfo.bgColor,
             borderColor: submissionStatusInfo.borderColor 
@@ -677,6 +719,23 @@ const renderMemberAssignmentSection = () => {
             )}
           </View>
         )}
+
+        {isOverdue && !todayAssignment.completed && (
+          <View style={styles.overdueInfoCard}>
+            <MaterialCommunityIcons name="alert-circle" size={20} color="#fa5252" />
+            <View style={styles.overdueInfoText}>
+              <Text style={styles.overdueTitle}>Overdue</Text>
+              <Text style={styles.overdueDate}>
+                Was due on {new Date(todayAssignment.dueDate).toLocaleDateString()}
+              </Text>
+              {todayAssignment.notes?.includes('NEGLECTED') && (
+                <Text style={styles.neglectedText}>
+                  ⚠️ Point deduction applied
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
         
         {todayAssignment.completed && (
           <View style={styles.completedInfoCard}>
@@ -686,6 +745,11 @@ const renderMemberAssignmentSection = () => {
               <Text style={styles.completedDate}>
                 Submitted on: {new Date(todayAssignment.completedAt).toLocaleDateString()}
               </Text>
+              {todayAssignment.notes?.includes('LATE') && (
+                <Text style={styles.lateText}>
+                  ⚠️ Late submission (points reduced)
+                </Text>
+              )}
             </View>
           </View>
         )}
@@ -698,6 +762,7 @@ const renderMemberAssignmentSection = () => {
     </TouchableOpacity>
   );
 };
+
   const renderMySubmissionsSection = () => {
     if (currentWeekSubmissions.length === 0) {
       return (
@@ -713,7 +778,6 @@ const renderMemberAssignmentSection = () => {
       );
     }
 
-    // Sort submissions: today's first, then recent
     const sortedSubmissions = [...currentWeekSubmissions].sort((a: any, b: any) => {
       const isAToday = isDueToday(a.dueDate);
       const isBToday = isDueToday(b.dueDate);
@@ -721,12 +785,10 @@ const renderMemberAssignmentSection = () => {
       if (isAToday && !isBToday) return -1;
       if (!isAToday && isBToday) return 1;
       
-      // If both today, sort by time
       if (isAToday && isBToday) {
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
       }
       
-      // Otherwise sort by most recent first
       return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
     });
 
@@ -806,6 +868,106 @@ const renderMemberAssignmentSection = () => {
                   </Text>
                 </View>
               )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  };
+
+  // ========== NEW: Current Week Info - Visible to ALL USERS ==========
+  const renderWeekInfo = () => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <MaterialCommunityIcons name="calendar-week" size={20} color="#007AFF" />
+        <Text style={styles.sectionTitle}>Current Week</Text>
+      </View>
+      <View style={styles.weekInfoCard}>
+        <View style={styles.weekInfoRow}>
+          <MaterialCommunityIcons name="counter" size={18} color="#6c757d" />
+          <Text style={styles.weekInfoLabel}>Week:</Text>
+          <Text style={styles.weekInfoValue}>{task.group?.currentRotationWeek || 1}</Text>
+        </View>
+        {task.group?.weekStart && task.group?.weekEnd && (
+          <View style={styles.weekInfoRow}>
+            <MaterialCommunityIcons name="calendar-range" size={18} color="#6c757d" />
+            <Text style={styles.weekInfoLabel}>Dates:</Text>
+            <Text style={styles.weekInfoValue}>
+              {new Date(task.group.weekStart).toLocaleDateString()} - {new Date(task.group.weekEnd).toLocaleDateString()}
+            </Text>
+          </View>
+        )}
+      </View>
+    </View>
+  );
+
+  // ========== NEW: Upcoming Assignments - Visible to ALL USERS ==========
+  const renderUpcomingAssignments = () => {
+    if (upcomingAssignments.length === 0) return null;
+
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <MaterialCommunityIcons name="calendar-clock" size={20} color="#e67700" />
+          <Text style={styles.sectionTitle}>Others' Tasks This Week</Text>
+        </View>
+        {upcomingAssignments.slice(0, 5).map((assignment: any) => {
+          const dueToday = isDueToday(assignment.dueDate);
+          const status = getVerificationStatus(assignment);
+          
+          return (
+            <TouchableOpacity
+              key={assignment.id}
+              style={[
+                styles.upcomingCard,
+                dueToday && styles.todayUpcomingCard
+              ]}
+              onPress={() => handleViewAssignmentDetails(assignment)}
+              activeOpacity={0.7}
+            >
+              {dueToday && (
+                <View style={styles.upcomingTodayBadge}>
+                  <Text style={styles.upcomingTodayBadgeText}>Today</Text>
+                </View>
+              )}
+              <View style={styles.upcomingCardHeader}>
+                <View style={styles.upcomingUserInfo}>
+                  <View style={styles.upcomingAvatar}>
+                    <Text style={styles.upcomingAvatarText}>
+                      {assignment.user?.fullName?.charAt(0) || '?'}
+                    </Text>
+                  </View>
+                  <View style={styles.upcomingUserDetails}>
+                    <Text style={styles.upcomingUserName}>
+                      {assignment.user?.fullName || 'Unknown'}
+                    </Text>
+                    <Text style={styles.upcomingTaskName}>
+                      {task.title}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.upcomingStatusBadge, { backgroundColor: status.color + '20' }]}>
+                  <MaterialCommunityIcons name={status.icon as any} size={12} color={status.color} />
+                  <Text style={[styles.upcomingStatusText, { color: status.color }]}>
+                    {status.text}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.upcomingDetails}>
+                <View style={styles.upcomingDetailRow}>
+                  <MaterialCommunityIcons name="calendar" size={14} color="#6c757d" />
+                  <Text style={styles.upcomingDetailText}>
+                    Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                    {assignment.timeSlot && ` at ${assignment.timeSlot.startTime}`}
+                  </Text>
+                </View>
+                <View style={styles.upcomingDetailRow}>
+                  <MaterialCommunityIcons name="star" size={14} color="#e67700" />
+                  <Text style={styles.upcomingDetailText}>
+                    {assignment.points} points
+                  </Text>
+                </View>
+              </View>
             </TouchableOpacity>
           );
         })}
@@ -969,16 +1131,17 @@ const renderMemberAssignmentSection = () => {
               <Text style={styles.detailLabel}>Recurring</Text>
               <Text style={styles.detailValue}>{task.isRecurring ? 'Yes' : 'No'}</Text>
             </View>
-            
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Current Week</Text>
-              <Text style={styles.detailValue}>Week {task.group?.currentRotationWeek || 1}</Text>
-            </View>
           </View>
+
+          {/* ✅ WEEK INFO - VISIBLE TO EVERYONE */}
+          {renderWeekInfo()}
 
           {renderMemberAssignmentSection()}
           
           {!isAdmin && renderMySubmissionsSection()}
+
+          {/* ✅ UPCOMING ASSIGNMENTS - VISIBLE TO EVERYONE */}
+          {!isAdmin && renderUpcomingAssignments()}
 
           {task.executionFrequency === 'WEEKLY' && task.selectedDays?.length > 0 && (
             <View style={styles.section}>
@@ -1069,9 +1232,13 @@ const renderMemberAssignmentSection = () => {
             </View>
           )}
 
+          {/* ADMIN SECTION - ONLY FOR ADMINS */}
           {isAdmin && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Assignments & Rotation</Text>
+              <View style={styles.sectionHeader}>
+                <MaterialCommunityIcons name="shield-account" size={20} color="#007AFF" />
+                <Text style={styles.sectionTitle}>Admin: Full Assignments View</Text>
+              </View>
               
               <View style={styles.adminInfoBox}>
                 <MaterialCommunityIcons name="shield-account" size={20} color="#007AFF" />
@@ -1121,7 +1288,7 @@ const renderMemberAssignmentSection = () => {
 
               {task.assignments?.length > 0 ? (
                 <View style={styles.assignmentsContainer}>
-                  <Text style={styles.assignmentsSubtitle}>Recent Assignments (Current Week):</Text>
+                  <Text style={styles.assignmentsSubtitle}>All Assignments (Current Week):</Text>
                   {task.assignments
                     .filter((a: any) => a.rotationWeek === (task.group?.currentRotationWeek || 1))
                     .slice(0, 5)
@@ -1172,7 +1339,6 @@ const renderMemberAssignmentSection = () => {
   );
 }
 
-// [ALL STYLES FROM YOUR ORIGINAL FILE PLUS THESE NEW STYLES]
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1326,11 +1492,16 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#495057',
-    marginBottom: 12
+    color: '#495057'
   },
   description: {
     fontSize: 15,
@@ -1355,6 +1526,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#212529'
+  },
+  // Week Info Styles
+  weekInfoCard: {
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    gap: 8
+  },
+  weekInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  weekInfoLabel: {
+    fontSize: 14,
+    color: '#6c757d',
+    width: 45
+  },
+  weekInfoValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#212529',
+    flex: 1
   },
   daysContainer: {
     flexDirection: 'row',
@@ -1464,7 +1660,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 8
   },
-  // Assignment Section
   assignmentCard: {
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
@@ -1481,17 +1676,10 @@ const styles = StyleSheet.create({
   assignmentInfo: {
     flex: 1
   },
-  assignmentTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1864ab',
-    marginBottom: 4
-  },
   assignmentDate: {
     fontSize: 14,
     color: '#495057'
   },
-  // Submission Status Styles
   submissionStatusCard: {
     borderRadius: 12,
     padding: 16,
@@ -1658,7 +1846,6 @@ const styles = StyleSheet.create({
     color: '#868e96',
     textAlign: 'center'
   },
-  // Submission History Styles
   submissionHistoryCard: {
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
@@ -1781,7 +1968,99 @@ const styles = StyleSheet.create({
     flex: 1,
     fontStyle: 'italic'
   },
-  // Admin View Styles
+  // Upcoming Assignments Styles (for regular users)
+  upcomingCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    position: 'relative'
+  },
+  todayUpcomingCard: {
+    backgroundColor: '#fff3e0',
+    borderColor: '#e67700',
+    borderWidth: 2
+  },
+  upcomingTodayBadge: {
+    position: 'absolute',
+    top: -8,
+    right: 8,
+    backgroundColor: '#e67700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    zIndex: 1
+  },
+  upcomingTodayBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '600'
+  },
+  upcomingCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  upcomingUserInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1
+  },
+  upcomingAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#6c757d',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  upcomingAvatarText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold'
+  },
+  upcomingUserDetails: {
+    flex: 1
+  },
+  upcomingUserName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 2
+  },
+  upcomingTaskName: {
+    fontSize: 12,
+    color: '#6c757d'
+  },
+  upcomingStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4
+  },
+  upcomingStatusText: {
+    fontSize: 10,
+    fontWeight: '600'
+  },
+  upcomingDetails: {
+    gap: 4,
+    marginLeft: 40
+  },
+  upcomingDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6
+  },
+  upcomingDetailText: {
+    fontSize: 12,
+    color: '#6c757d'
+  },
   adminInfoBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2063,12 +2342,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fa5252'
   },
-   sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12
-  },
   todayAssignmentBadge: {
     backgroundColor: '#fa5252',
     flexDirection: 'row',
@@ -2127,14 +2400,65 @@ const styles = StyleSheet.create({
     color: '#007AFF'
   },
   todayAssignmentCard: {
+    borderWidth: 2,
+    borderColor: '#fa5252',
+    backgroundColor: '#fff5f5'
+  },
+  notAssignedSubtext: {
+    fontSize: 13,
+    color: '#adb5bd',
+    textAlign: 'center',
+    marginTop: 8
+  },overdueBadge: {
+  backgroundColor: '#fa5252',
+},
+completedBadge: {
+  backgroundColor: '#2b8a3e',
+},
+overdueCard: {
   borderWidth: 2,
   borderColor: '#fa5252',
-  backgroundColor: '#fff5f5'
+  backgroundColor: '#fff5f5',
 },
-notAssignedSubtext: {
-  fontSize: 13,
-  color: '#adb5bd',
-  textAlign: 'center',
-  marginTop: 8
-}
-}); 
+completedCard: {
+  borderWidth: 2,
+  borderColor: '#2b8a3e',
+  backgroundColor: '#f0f9f0',
+},
+overdueInfoCard: {
+  flexDirection: 'row',
+  backgroundColor: '#fff5f5',
+  padding: 12,
+  borderRadius: 8,
+  marginTop: 12,
+  gap: 12,
+  alignItems: 'center',
+  borderWidth: 1,
+  borderColor: '#ffc9c9',
+},
+overdueInfoText: {
+  flex: 1,
+},
+overdueTitle: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: '#fa5252',
+  marginBottom: 2,
+},
+overdueDate: {
+  fontSize: 12,
+  color: '#fa5252',
+},
+neglectedText: {
+  fontSize: 11,
+  color: '#fa5252',
+  fontStyle: 'italic',
+  marginTop: 4,
+},
+lateText: {
+  fontSize: 11,
+  color: '#e67700',
+  fontStyle: 'italic',
+  marginTop: 4,
+},
+});

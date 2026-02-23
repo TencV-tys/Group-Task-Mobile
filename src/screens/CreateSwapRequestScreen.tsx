@@ -1,4 +1,4 @@
-// src/screens/CreateSwapRequestScreen.tsx - UPDATED with auto day selection
+// src/screens/CreateSwapRequestScreen.tsx - UPDATED with fixes
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
-import { useGroupMembers } from '../groupHook/useGroupMembers';
+import { GroupMembersService } from '../services/GroupMemberService';
 
 type CreateSwapRequestRouteParams = {
   assignmentId: string;
@@ -34,10 +34,9 @@ type CreateSwapRequestRouteParams = {
     endTime: string;
     label?: string;
   }>;
-  // NEW: Add these for better context
-  selectedDay?: string; // The day this assignment is for
-  assignmentDay?: string; // Alternative field name
-  selectedTimeSlotId?: string; // The time slot this assignment is for
+  selectedDay?: string;
+  assignmentDay?: string;
+  selectedTimeSlotId?: string;
 };
 
 const DAYS_OF_WEEK = [
@@ -56,26 +55,25 @@ export const CreateSwapRequestScreen = () => {
     timeSlot,
     executionFrequency,
     timeSlots,
-    // NEW: Get the assignment's day
     selectedDay: propSelectedDay,
     assignmentDay,
     selectedTimeSlotId: propSelectedTimeSlotId
   } = route.params;
   
   const { createSwapRequest, loading } = useSwapRequests();
-  const { members, fetchGroupMembers } = useGroupMembers();
   
+  const [members, setMembers] = useState<any[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(true);
   const [reason, setReason] = useState('');
   const [targetUserId, setTargetUserId] = useState<string | undefined>(undefined);
   const [expiresIn, setExpiresIn] = useState<'24h' | '48h' | '72h' | 'never'>('48h');
   const [showMemberSelector, setShowMemberSelector] = useState(false);
   const [canSwap, setCanSwap] = useState<{ canSwap: boolean; reason?: string }>({ canSwap: true });
   const [checking, setChecking] = useState(true);
+  const [existingRequest, setExistingRequest] = useState<any>(null);
   
-  // ✅ AUTO-SET based on the assignment's day
-  const [swapScope, setSwapScope] = useState<'week' | 'day'>('day'); // Default to 'day' now
+  const [swapScope, setSwapScope] = useState<'week' | 'day'>('day');
   const [selectedDay, setSelectedDay] = useState<string | null>(
-    // Auto-set from the assignment's day
     propSelectedDay || assignmentDay || null
   );
   const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(
@@ -89,27 +87,55 @@ export const CreateSwapRequestScreen = () => {
       const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
       const dayFromDate = dayNames[date.getDay()];
       
-      // If no day was passed but we have a due date, set it from the date
       if (!selectedDay && dueDate) {
         setSelectedDay(dayFromDate);
       }
     }
   }, [dueDate]);
 
+  // Load group members
   useEffect(() => {
-    fetchGroupMembers(groupId);
+    loadGroupMembers();
     checkSwapAvailability();
   }, [groupId, assignmentId]);
+
+  const loadGroupMembers = async () => {
+    setLoadingMembers(true);
+    try {
+      console.log('📥 Loading members for group:', groupId);
+      const result = await GroupMembersService.getGroupMembers(groupId);
+      
+      if (result.success) {
+        // Filter only active members
+        const activeMembers = (result.members || []).filter((m: any) => m.isActive !== false);
+        setMembers(activeMembers);
+        console.log(`✅ Loaded ${activeMembers.length} active members`);
+      } else {
+        console.error('Failed to load members:', result.message);
+      }
+    } catch (error) {
+      console.error('Error loading members:', error);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
 
   const checkSwapAvailability = async () => {
     setChecking(true);
     try {
       const result = await SwapRequestService.checkCanSwap(assignmentId);
+      console.log('📦 Check swap result:', result);
+      
       if (result.success) {
         setCanSwap({
           canSwap: result.canSwap || false,
           reason: result.reason
         });
+        
+        // If there's an existing request, store it
+        if (result.existingRequestId) {
+          setExistingRequest({ id: result.existingRequestId });
+        }
       }
     } catch (error) {
       console.error('Failed to check swap availability:', error);
@@ -136,16 +162,12 @@ export const CreateSwapRequestScreen = () => {
     return now.toISOString();
   };
 
-
-// In CreateSwapRequestScreen.tsx - Update handleSubmit with better error handling
-
-const handleSubmit = async () => {
+  const handleSubmit = async () => {
   if (!canSwap.canSwap) {
     Alert.alert('Cannot Swap', canSwap.reason || 'This assignment cannot be swapped');
     return;
   }
 
-  // For day scope, we MUST have a selected day
   if (swapScope === 'day') {
     if (!selectedDay) {
       Alert.alert('Error', 'Cannot determine which day to swap. Please try again.');
@@ -154,7 +176,7 @@ const handleSubmit = async () => {
   }
 
   try {
-    console.log('Submitting swap request with data:', {
+    console.log('📝 Submitting swap request:', {
       assignmentId,
       reason: reason.trim() || undefined,
       targetUserId,
@@ -174,46 +196,103 @@ const handleSubmit = async () => {
       selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
     });
 
-    console.log('Swap request result:', result);
+    console.log('📦 Swap request result:', result);
 
     if (result.success) {
       Alert.alert(
-        'Success',
+        '✅ Success',
         swapScope === 'day' 
           ? `Swap request created for ${selectedDay}!` 
           : 'Swap request created for the entire week!',
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     } else {
-      Alert.alert('Error', result.message || 'Failed to create swap request');
+      // Handle specific error messages
+      if (result.message?.includes('already exists') || result.message?.includes('pending')) {
+        Alert.alert(
+          '⚠️ Request Already Exists',
+          'You already have a pending swap request for this assignment. Would you like to view it?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'View Request', 
+              onPress: () => {
+                if (existingRequest?.id) {
+                  // ✅ FIXED: Use navigation.getParent() or direct navigation
+                  // This is the simplest fix - go back first then navigate
+                  navigation.goBack();
+                  setTimeout(() => {
+                    // @ts-ignore - Ignore TypeScript error for navigation
+                    navigation.navigate('SwapRequestDetails', { requestId: existingRequest.id });
+                  }, 100);
+                } else {
+                  navigation.goBack();
+                }
+              }
+            }
+          ]
+        );
+      } else {
+        Alert.alert('❌ Error', result.message || 'Failed to create swap request');
+      }
     }
   } catch (error: any) {
-    console.error('Error in handleSubmit:', error);
+    console.error('❌ Error in handleSubmit:', error);
     Alert.alert('Error', error.message || 'Failed to create swap request');
   }
 };
 
+const getSelectedMemberName = () => {
+  if (!targetUserId) return 'Anyone can accept';
+  const member = members.find(m => m.userId === targetUserId);
+  return member?.user?.fullName || 'Selected user';
+};
 
-  const getSelectedMemberName = () => {
-    if (!targetUserId) return 'Anyone can accept';
-    const member = members.find(m => m.userId === targetUserId);
-    return member?.user?.fullName || 'Selected user';
-  };
+if (checking || loadingMembers) {
+  return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#4F46E5" />
+      <Text style={styles.loadingText}>Checking availability...</Text>
+    </View>
+  );
+}
 
-  if (checking) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Checking swap availability...</Text>
+const isDailyTask = executionFrequency === 'DAILY';
+const hasMultipleTimeSlots = timeSlots && timeSlots.length > 1;
+const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A';
+
+// If there's an existing pending request, show a message
+if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pending')) {
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Request Swap</Text>
+        <View style={{ width: 40 }} />
       </View>
-    );
-  }
-
-  const isDailyTask = executionFrequency === 'DAILY';
-  const hasMultipleTimeSlots = timeSlots && timeSlots.length > 1;
-
-  // Format the due date for display
-  const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A';
+      <View style={styles.centerContainer}>
+        <Ionicons name="time" size={64} color="#F59E0B" />
+        <Text style={styles.pendingTitle}>Pending Request Exists</Text>
+        <Text style={styles.pendingText}>
+          You already have a pending swap request for this assignment.
+        </Text>
+        <TouchableOpacity
+          style={styles.viewRequestButton}
+          onPress={() => {
+            if (existingRequest?.id) {
+              // ✅ FIXED: Cast navigation to any
+              (navigation as any).navigate('SwapRequestDetails', { requestId: existingRequest.id });
+            }
+          }}
+        >
+          <Text style={styles.viewRequestButtonText}>View Request</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
 
   return (
     <SafeAreaView style={styles.container}>
@@ -261,7 +340,6 @@ const handleSubmit = async () => {
               </View>
             </View>
 
-            {/* Show the day this assignment is for */}
             {selectedDay && (
               <View style={styles.assignmentDayBadge}>
                 <Ionicons name="today" size={14} color="#4F46E5" />
@@ -296,7 +374,7 @@ const handleSubmit = async () => {
 
           {canSwap.canSwap && (
             <>
-              {/* Info Banner - Show what's being swapped */}
+              {/* Info Banner */}
               <View style={styles.infoBanner}>
                 <Ionicons name="information-circle" size={24} color="#4F46E5" />
                 <View style={styles.infoBannerContent}>
@@ -353,43 +431,41 @@ const handleSubmit = async () => {
                       )}
                     </TouchableOpacity>
                     
-                    {members && members.length > 0 ? (
-                      members
-                        .filter(m => m.userId)
-                        .map(member => (
-                          <TouchableOpacity
-                            key={member.userId}
-                            style={styles.memberItem}
-                            onPress={() => {
-                              setTargetUserId(member.userId);
-                              setShowMemberSelector(false);
-                            }}
-                          >
-                            <View style={styles.memberInfo}>
-                              <View style={styles.avatar}>
-                                {member.user?.avatarUrl ? (
-                                  <Image 
-                                    source={{ uri: member.user.avatarUrl }} 
-                                    style={styles.avatarImage} 
-                                  />
-                                ) : (
-                                  <Text style={styles.avatarText}>
-                                    {member.user?.fullName?.charAt(0).toUpperCase() || '?'}
-                                  </Text>
-                                )}
-                              </View>
-                              <View>
-                                <Text style={styles.memberName}>{member.user?.fullName || 'Unknown'}</Text>
-                                <Text style={styles.memberRole}>
-                                  {member.groupRole === 'ADMIN' ? 'Admin' : 'Member'}
+                    {members.length > 0 ? (
+                      members.map(member => (
+                        <TouchableOpacity
+                          key={member.userId}
+                          style={styles.memberItem}
+                          onPress={() => {
+                            setTargetUserId(member.userId);
+                            setShowMemberSelector(false);
+                          }}
+                        >
+                          <View style={styles.memberInfo}>
+                            <View style={styles.avatar}>
+                              {member.user?.avatarUrl ? (
+                                <Image 
+                                  source={{ uri: member.user.avatarUrl }} 
+                                  style={styles.avatarImage} 
+                                />
+                              ) : (
+                                <Text style={styles.avatarText}>
+                                  {member.user?.fullName?.charAt(0).toUpperCase() || '?'}
                                 </Text>
-                              </View>
+                              )}
                             </View>
-                            {targetUserId === member.userId && (
-                              <Ionicons name="checkmark-circle" size={24} color="#4F46E5" />
-                            )}
-                          </TouchableOpacity>
-                        ))
+                            <View>
+                              <Text style={styles.memberName}>{member.user?.fullName || 'Unknown'}</Text>
+                              <Text style={styles.memberRole}>
+                                {member.groupRole === 'ADMIN' ? 'Admin' : 'Member'}
+                              </Text>
+                            </View>
+                          </View>
+                          {targetUserId === member.userId && (
+                            <Ionicons name="checkmark-circle" size={24} color="#4F46E5" />
+                          )}
+                        </TouchableOpacity>
+                      ))
                     ) : (
                       <View style={styles.noMembersContainer}>
                         <Text style={styles.noMembersText}>No active members found</Text>
@@ -520,6 +596,36 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  pendingTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#F59E0B',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  pendingText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  viewRequestButton: {
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  viewRequestButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   assignmentCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -579,6 +685,26 @@ const styles = StyleSheet.create({
   pointsValue: {
     color: '#F59E0B',
   },
+  assignmentDayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  assignmentDayText: {
+    fontSize: 13,
+    color: '#4B5563',
+  },
+  assignmentDayBold: {
+    fontWeight: '700',
+    color: '#4F46E5',
+  },
   frequencyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -617,6 +743,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#EF4444',
   },
+  infoBanner: {
+    flexDirection: 'row',
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    gap: 12,
+  },
+  infoBannerContent: {
+    flex: 1,
+  },
+  infoBannerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4F46E5',
+    marginBottom: 4,
+  },
+  infoBannerText: {
+    fontSize: 14,
+    color: '#1F2937',
+    lineHeight: 20,
+  },
   section: {
     marginBottom: 24,
   },
@@ -625,107 +773,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: 12,
-  },
-  sectionSubtext: {
-    fontSize: 13,
-    color: '#6B7280',
-    marginBottom: 12,
-    fontStyle: 'italic',
-  },
-  // ✅ NEW: Scope Option Styles
-  scopeOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  scopeOptionActive: {
-    borderColor: '#4F46E5',
-    backgroundColor: '#EEF2FF',
-    borderWidth: 2,
-  },
-  scopeIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F9FAFB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  scopeContent: {
-    flex: 1,
-  },
-  scopeTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  scopeTitleActive: {
-    color: '#4F46E5',
-  },
-  scopeDescription: {
-    fontSize: 13,
-    color: '#6B7280',
-  },
-  // ✅ NEW: Day Selection Styles
-  daysContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  dayChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  dayChipActive: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
-  },
-  dayChipText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#4B5563',
-  },
-  dayChipTextActive: {
-    color: '#FFFFFF',
-  },
-  // ✅ NEW: Time Slot Styles
-  timeSlotsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  timeSlotChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  timeSlotChipActive: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
-  },
-  timeSlotChipText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#4B5563',
-  },
-  timeSlotChipTextActive: {
-    color: '#FFFFFF',
   },
   selectorButton: {
     backgroundColor: '#FFFFFF',
@@ -855,6 +902,10 @@ const styles = StyleSheet.create({
     color: '#4F46E5',
     lineHeight: 20,
   },
+  infoBold: {
+    fontWeight: '700',
+    color: '#4F46E5',
+  },
   footer: {
     padding: 16,
     backgroundColor: '#FFFFFF',
@@ -877,51 +928,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-   assignmentDayBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
-    gap: 6,
-    marginTop: 12,
-    marginBottom: 8,
-  },
-  assignmentDayText: {
-    fontSize: 13,
-    color: '#4B5563',
-  },
-  assignmentDayBold: {
-    fontWeight: '700',
-    color: '#4F46E5',
-  },
-  infoBanner: {
-    flexDirection: 'row',
-    backgroundColor: '#EEF2FF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    gap: 12,
-  },
-  infoBannerContent: {
-    flex: 1,
-  },
-  infoBannerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4F46E5',
-    marginBottom: 4,
-  },
-  infoBannerText: {
-    fontSize: 14,
-    color: '#1F2937',
-    lineHeight: 20,
-  },
-  infoBold: {
-    fontWeight: '700',
-    color: '#4F46E5',
   },
 });

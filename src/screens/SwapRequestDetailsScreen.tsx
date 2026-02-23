@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type SwapRequestDetailsRouteParams = {
   requestId: string;
@@ -34,21 +35,45 @@ export const SwapRequestDetailsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
+    loadCurrentUser();
     loadRequestDetails();
   }, [requestId]);
+
+  const loadCurrentUser = async () => {
+    try {
+      // Try to get user from storage
+      let userStr = await AsyncStorage.getItem('user');
+      if (!userStr) {
+        userStr = await AsyncStorage.getItem('userData');
+      }
+      
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setCurrentUserId(user.id || user._id);
+        console.log('✅ Current user ID:', user.id || user._id);
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+    }
+  };
 
   const loadRequestDetails = async () => {
     setLoading(true);
     try {
+      console.log('📥 Loading swap request details:', requestId);
       const response = await SwapRequestService.getSwapRequestDetails(requestId);
+      console.log('📦 Swap request response:', response);
+      
       if (response.success) {
         setRequest(response.data);
       } else {
         setError(response.message || 'Failed to load request details');
       }
     } catch (err: any) {
+      console.error('❌ Error loading request:', err);
       setError(err.message || 'Failed to load request details');
     } finally {
       setLoading(false);
@@ -127,22 +152,40 @@ export const SwapRequestDetailsScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Loading request details...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Swap Request</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#4F46E5" />
+          <Text style={styles.loadingText}>Loading request details...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (error || !request) {
     return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="alert-circle" size={48} color="#EF4444" />
-        <Text style={styles.errorText}>{error || 'Request not found'}</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Swap Request</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.centerContainer}>
+          <Ionicons name="alert-circle" size={48} color="#EF4444" />
+          <Text style={styles.errorText}>{error || 'Request not found'}</Text>
+          <TouchableOpacity style={styles.goBackButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.goBackButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -150,9 +193,15 @@ export const SwapRequestDetailsScreen = () => {
   const statusLabel = SwapRequestService.getStatusLabel(request.status);
   const statusIcon = SwapRequestService.getStatusIcon(request.status);
   const isPending = request.status === 'PENDING';
-  const isRequester = request.requestedBy === request.requester?.id;
-  const canAccept = isPending && !isRequester && (!request.targetUserId || request.targetUserId === request.requester?.id);
-  const canReject = isPending && (request.targetUserId === request.requester?.id || isRequester);
+  
+  // ✅ CORRECT PERMISSION LOGIC
+  const isRequester = request.requestedBy === currentUserId;
+  const isTarget = request.targetUserId === currentUserId;
+  const isOpenToAnyone = !request.targetUserId;
+  
+  // Who can do what:
+  const canAccept = isPending && !isRequester && (isTarget || isOpenToAnyone);
+  const canReject = isPending && !isRequester && (isTarget || isOpenToAnyone);
   const canCancel = isPending && isRequester;
 
   return (
@@ -181,7 +230,7 @@ export const SwapRequestDetailsScreen = () => {
           </View>
         </View>
 
-        {/* ✅ NEW: Swap Scope Info */}
+        {/* Swap Scope Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Swap Details</Text>
           <View style={styles.scopeCard}>
@@ -263,12 +312,17 @@ export const SwapRequestDetailsScreen = () => {
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{request.requester?.fullName || 'Unknown User'}</Text>
               <Text style={styles.userRole}>Requester</Text>
+              {isRequester && (
+                <View style={styles.youBadge}>
+                  <Text style={styles.youBadgeText}>You</Text>
+                </View>
+              )}
             </View>
           </View>
         </View>
 
         {/* Target User */}
-        {request.targetUser && (
+        {request.targetUser ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Requested To</Text>
             <View style={styles.userCard}>
@@ -284,7 +338,20 @@ export const SwapRequestDetailsScreen = () => {
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{request.targetUser.fullName}</Text>
                 <Text style={styles.userRole}>Target User</Text>
+                {request.targetUserId === currentUserId && (
+                  <View style={styles.youBadge}>
+                    <Text style={styles.youBadgeText}>You</Text>
+                  </View>
+                )}
               </View>
+            </View>
+          </View>
+        ) : (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Open To</Text>
+            <View style={styles.openToCard}>
+              <Ionicons name="people" size={24} color="#10B981" />
+              <Text style={styles.openToText}>Anyone in the group can accept</Text>
             </View>
           </View>
         )}
@@ -329,7 +396,6 @@ export const SwapRequestDetailsScreen = () => {
               </Text>
             </View>
 
-            {/* ✅ Show task frequency */}
             {request.assignment?.task?.executionFrequency && (
               <View style={styles.detailRow}>
                 <Ionicons name="repeat" size={18} color="#6B7280" />
@@ -338,8 +404,8 @@ export const SwapRequestDetailsScreen = () => {
                   {request.assignment.task.executionFrequency}
                 </Text>
               </View>
-            )} 
-          </View> 
+            )}
+          </View>
         </View>
 
         {/* Reason */}
@@ -366,7 +432,7 @@ export const SwapRequestDetailsScreen = () => {
         )}
       </ScrollView>
 
-      {/* Action Buttons */}
+      {/* Action Buttons - Only show if user has permission */}
       {isPending && (
         <View style={styles.footer}>
           {canAccept && (
@@ -430,23 +496,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9FAFB',
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center', 
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#6B7280',
-  },
-  errorText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#EF4444',
-    textAlign: 'center',
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -460,16 +509,39 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4F46E5',
-    marginTop: 12,
-  },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1F2937',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#6B7280',
+  },
+  errorText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  goBackButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#4F46E5',
+    borderRadius: 8,
+  },
+  goBackButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   scrollContent: {
     padding: 16,
@@ -510,7 +582,6 @@ const styles = StyleSheet.create({
     color: '#1F2937',
     marginBottom: 12,
   },
-  // ✅ NEW: Scope Card Styles
   scopeCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -635,6 +706,35 @@ const styles = StyleSheet.create({
   userRole: {
     fontSize: 14,
     color: '#6B7280',
+  },
+  youBadge: {
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  youBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  openToCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 2,
+    borderColor: '#10B981',
+    borderStyle: 'dashed',
+  },
+  openToText: {
+    fontSize: 16,
+    color: '#10B981',
+    fontWeight: '600',
   },
   assignmentCard: {
     backgroundColor: '#FFFFFF',

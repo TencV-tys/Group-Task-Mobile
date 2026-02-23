@@ -1,4 +1,4 @@
-// homeHook/useHomeData.ts - UPDATED WITH TOKEN CHECK
+// homeHook/useHomeData.ts - SIMPLIFIED (NO POLLING)
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { HomeService, HomeData } from '../services/HomeService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -13,7 +13,6 @@ export function useHomeData() {
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
 
-  // Check token before making requests
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -31,8 +30,7 @@ export function useHomeData() {
       return false;
     }
   }, []);
- 
-  // Process data helper
+
   const processData = useCallback((data: HomeData) => {
     return {
       user: data.user || {
@@ -62,19 +60,7 @@ export function useHomeData() {
     };
   }, []);
 
-  // Handle data update from polling
-  const handleDataUpdate = useCallback((data: HomeData) => {
-    if (isMounted.current) {
-      const processedData = processData(data);
-      setHomeData(processedData);
-      setError(null);
-      setAuthError(false);
-    }
-  }, [processData]);
-
-  // Initial data fetch
   const fetchHomeData = useCallback(async (isRefreshing = false) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -103,13 +89,6 @@ export function useHomeData() {
         const errorMessage = result.message || 'Failed to load home data';
         console.error("useHomeData: API error:", errorMessage);
         setError(errorMessage);
-        
-        // Check if error is auth-related
-        if (errorMessage.toLowerCase().includes('token') || 
-            errorMessage.toLowerCase().includes('auth') ||
-            errorMessage.toLowerCase().includes('unauthorized')) {
-          setAuthError(true);
-        }
       }
       
     } catch (err: any) {
@@ -125,30 +104,18 @@ export function useHomeData() {
     fetchHomeData(true);
   }, [fetchHomeData]);
 
-  // Start polling AFTER initial load
+  // Just load once on mount - NO POLLING
   useEffect(() => {
-    // Check token before starting
     checkToken().then(hasToken => {
       if (hasToken) {
-        // Do initial fetch
         fetchHomeData();
-
-        // Start polling only after component mounts
-        const startPolling = () => {
-          HomeService.startPolling(handleDataUpdate);
-        };
-
-        // Small delay to ensure initial load is done
-        const timer = setTimeout(startPolling, 1000);
-
-        return () => {
-          clearTimeout(timer);
-          isMounted.current = false;
-          HomeService.stopPolling(handleDataUpdate);
-        };
       }
     });
-  }, [fetchHomeData, handleDataUpdate, checkToken]);
+    
+    return () => {
+      isMounted.current = false;
+    };
+  }, [fetchHomeData, checkToken]);
 
   const updateHomeData = useCallback((updates: any) => {
     setHomeData((prev: any) => ({

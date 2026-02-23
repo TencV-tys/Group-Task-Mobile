@@ -94,14 +94,14 @@ export const MySwapRequestsScreen = () => {
     }
   };
 
-  const handleCancel = (requestId: string) => {
+   const handleCancel = (requestId: string) => {
     Alert.alert(
       'Cancel Swap Request',
       'Are you sure you want to cancel this swap request?',
       [
         { text: 'No', style: 'cancel' },
         {
-          text: 'Yes, Cancel',
+          text: 'Yes, Cancel', 
           style: 'destructive',
           onPress: async () => {
             setProcessingId(requestId);

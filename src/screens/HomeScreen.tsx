@@ -1,3 +1,4 @@
+// HomeScreen.tsx - UPDATED for simplified hook
 import React, { useEffect, useState } from 'react';
 import { 
   View, 
@@ -21,7 +22,7 @@ import { AssignmentService } from '../services/AssignmentService';
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
-  const { loading, refreshing, error, homeData, refreshHomeData } = useHomeData();
+  const { loading, refreshing, error, homeData, refreshHomeData, authError } = useHomeData();
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
   const { unreadCount, loadUnreadCount } = useNotifications();
   const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
@@ -34,46 +35,60 @@ export default function HomeScreen({ navigation }: any) {
     fetchUpcomingAssignments();
     fetchTodayAssignments();
   }, []);
-   const fetchUpcomingAssignments = async () => {
-  setLoadingUpcoming(true);
-  try {
-    console.log("🔍 Fetching upcoming...");
-    const result = await AssignmentService.getUpcomingAssignments({ limit: 5 });
-    console.log("📦 Upcoming result:", JSON.stringify(result, null, 2));
-    
-    if (result.success && result.data) {
-      console.log("✅ Upcoming assignments count:", result.data.assignments?.length);
-      setUpcomingAssignments(result.data.assignments || []);
-    } else {
-      console.log("⚠️ No upcoming data");
-      setUpcomingAssignments([]);
-    }
-  } catch (error) {
-    console.error('❌ Error:', error);
-    setUpcomingAssignments([]);
-  } finally {
-    setLoadingUpcoming(false);
-  } 
-};
 
-const fetchTodayAssignments = async () => {
-  try {
-    console.log("🔍 Fetching today...");
-    const result = await AssignmentService.getTodayAssignments();
-    console.log("📦 Today result:", JSON.stringify(result, null, 2));
-    
-    if (result.success && result.data) {
-      console.log("✅ Today assignments count:", result.data.assignments?.length);
-      setTodayAssignments(result.data.assignments || []);
-    } else {
-      console.log("⚠️ No today data");
+  // Show auth error if needed
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { text: 'OK', onPress: () => navigation.navigate('Login') }
+        ]
+      );
+    }
+  }, [authError, navigation]);
+
+  const fetchUpcomingAssignments = async () => {
+    setLoadingUpcoming(true);
+    try {
+      console.log("🔍 Fetching upcoming...");
+      const result = await AssignmentService.getUpcomingAssignments({ limit: 5 });
+      console.log("📦 Upcoming result:", JSON.stringify(result, null, 2));
+      
+      if (result.success && result.data) {
+        console.log("✅ Upcoming assignments count:", result.data.assignments?.length);
+        setUpcomingAssignments(result.data.assignments || []);
+      } else {
+        console.log("⚠️ No upcoming data");
+        setUpcomingAssignments([]);
+      }
+    } catch (error) {
+      console.error('❌ Error:', error);
+      setUpcomingAssignments([]);
+    } finally {
+      setLoadingUpcoming(false);
+    } 
+  };
+
+  const fetchTodayAssignments = async () => {
+    try {
+      console.log("🔍 Fetching today...");
+      const result = await AssignmentService.getTodayAssignments();
+      console.log("📦 Today result:", JSON.stringify(result, null, 2));
+      
+      if (result.success && result.data) {
+        console.log("✅ Today assignments count:", result.data.assignments?.length);
+        setTodayAssignments(result.data.assignments || []);
+      } else {
+        console.log("⚠️ No today data");
+        setTodayAssignments([]);
+      }
+    } catch (error) {
+      console.error('❌ Error:', error);
       setTodayAssignments([]);
     }
-  } catch (error) {
-    console.error('❌ Error:', error);
-    setTodayAssignments([]);
-  }
-};
+  };
 
   const user = homeData?.user || { 
     fullName: 'User', 
@@ -86,15 +101,16 @@ const fetchTodayAssignments = async () => {
   };
   
   const stats = homeData?.stats || { 
-    groupsCount: 0, 
-    tasksDue: 0, 
-    completedTasks: 0,
-    totalTasks: 0,
-    completionRate: 0,
-    overdueTasks: 0,
-    swapRequests: 0,
-    pointsThisWeek: 0
-  };
+  groupsCount: 0, 
+  tasksDue: 0, 
+  completedTasks: 0,
+  totalTasks: 0,
+  completionRate: 0,
+  overdueTasks: 0,
+  swapRequests: 0,
+  pointsThisWeek: 0
+};
+
   
   const recentActivity = homeData?.recentActivity || [];
   const groups = homeData?.groups || [];
@@ -267,7 +283,7 @@ const fetchTodayAssignments = async () => {
         )}
 
         {/* Future Assignments */}
-        {upcomingAssignments.filter(a => !a.isToday).length > 0 && (
+        {upcomingAssignments.filter((a: any) => !a.isToday).length > 0 && (
           <View style={styles.futureSection}>
             <Text style={styles.futureSectionTitle}>📋 Coming Up</Text>
             {upcomingAssignments
@@ -431,7 +447,7 @@ const fetchTodayAssignments = async () => {
           </View>
         </View>
 
-        {/* UPCOMING TASKS SECTION - NEW */}
+        {/* UPCOMING TASKS SECTION */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
@@ -686,7 +702,6 @@ const fetchTodayAssignments = async () => {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

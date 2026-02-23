@@ -222,8 +222,8 @@ export class AssignmentService {
     } catch (error) {
       console.error('Error getting auth token:', error);
       return null;
-    }
-  }
+    } 
+  } 
 
   // Get request headers with auth
   private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
@@ -619,65 +619,57 @@ export class AssignmentService {
       };
     }
   }
+// ========== GET UPCOMING ASSIGNMENTS ==========
+static async getUpcomingAssignments(options?: {
+  groupId?: string;
+  limit?: number;
+}) {
+  try {
+    let url = `${API_URL}/upcoming`;
+    const params = new URLSearchParams();
+    
+    if (options?.groupId) params.append('groupId', options.groupId);
+    if (options?.limit) params.append('limit', options.limit?.toString() || '10');
+    
+    const queryString = params.toString();
+    if (queryString) url += `?${queryString}`;
 
-  // ========== GET UPCOMING ASSIGNMENTS ==========
-  static async getUpcomingAssignments(options?: {
-    groupId?: string;
-    limit?: number;
-  }): Promise<{
-    success: boolean;
-    message: string;
-    data: {
-      assignments: UpcomingAssignment[];
-      currentTime: string;
-      total: number;
-    };
-  }> {
-    try {
-      let url = `${API_URL}/upcoming`;
-      const params = new URLSearchParams();
-      
-      if (options?.groupId) params.append('groupId', options.groupId);
-      if (options?.limit) params.append('limit', options.limit?.toString() || '10');
-      
-      const queryString = params.toString();
-      if (queryString) url += `?${queryString}`;
+    console.log('AssignmentService: Getting upcoming assignments', url);
+    
+    const token = await this.getAuthToken();
+    console.log('Token present:', !!token);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': token ? `Bearer ${token}` : '',
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include' // ← THIS IS IMPORTANT
+    });
 
-      console.log('AssignmentService: Getting upcoming assignments', url);
-      
-      const headers = await this.getHeaders(false);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to load upcoming assignments: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        console.error('AssignmentService.getUpcomingAssignments API error:', result.message);
-      }
-      
-      return result;
-
-    } catch (error: any) {
-      console.error('AssignmentService.getUpcomingAssignments error:', error);
-      return {
-        success: false,
-        message: error.message || 'Failed to load upcoming assignments',
-        data: {
-          assignments: [],
-          currentTime: new Date().toISOString(),
-          total: 0
-        }
-      };
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Response error:', response.status, errorText);
+      throw new Error(`Failed to load upcoming assignments: ${response.status}`);
     }
-  }
+    
+    const result = await response.json();
+    return result;
 
+  } catch (error: any) {
+    console.error('AssignmentService.getUpcomingAssignments error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to load upcoming assignments',
+      data: {
+        assignments: [],
+        currentTime: new Date().toISOString(),
+        total: 0
+      }
+    };
+  }
+}
   // ========== LOCAL TIME VALIDATION HELPER ==========
   static validateLocalSubmissionTime(
     dueDate: string,

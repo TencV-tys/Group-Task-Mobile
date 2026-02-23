@@ -28,41 +28,62 @@ const storeUserData = async (userData: any) => {
 };
 
 export class AuthService {
-    static async login(data: {email: string, password: string}) {
-        try {
-            if (!data.email || !data.password) {
-                return {
-                    success: false,
-                    message: "Please fill all required fields"
-                };
-            }
-
-            const response = await fetch(`${API_URL}/login`, {
-                method: "POST",
-                headers: {'Content-Type': "application/json"},
-                body: JSON.stringify(data),
-                credentials: 'include'
-            });
-
-            const result = await response.json();
-            
-            // Store user data if login is successful
-            if (result.success && result.user) {
-                await storeUserData(result.user);
-                console.log('🔐 Login successful, user stored:', result.user.id || result.user._id);
-            }
-
-            return result;
-
-        } catch (e: any) {
-            console.error("Error login response: ", e);
+ static async login(data: {email: string, password: string}) {
+    try {
+        if (!data.email || !data.password) {
             return {
                 success: false,
-                message: "Cannot connect to the server"
+                message: "Please fill all required fields"
             };
         }
-    }
 
+        const response = await fetch(`${API_URL}/login`, {
+            method: "POST",
+            headers: {'Content-Type': "application/json"},
+            body: JSON.stringify(data),
+            credentials: 'include'
+        });
+
+        const result = await response.json();
+        
+        // 🔍 DEBUG: Log the FULL result to see what the backend returns
+        console.log("🔍 FULL LOGIN RESPONSE:", JSON.stringify(result, null, 2));
+        
+        // Store user data if login is successful
+        if (result.success && result.user) {
+            // Store user data
+            await storeUserData(result.user);
+            
+            // 🔍 Check if token exists in the response
+            console.log("🔍 Token in response:", result.token ? "YES" : "NO");
+            
+            // STORE THE TOKEN - but where is it?
+            if (result.token) {
+                await AsyncStorage.setItem('userToken', result.token);
+                console.log('🔐 Token stored successfully');
+            } else if (result.accessToken) {
+                await AsyncStorage.setItem('userToken', result.accessToken);
+                console.log('🔐 Access token stored successfully');
+            } else if (result.data?.token) {
+                await AsyncStorage.setItem('userToken', result.data.token);
+                console.log('🔐 Data.token stored successfully');
+            } else {
+                console.log('⚠️ No token found in response!');
+            }
+            
+            console.log('🔐 Login successful, user stored:', result.user.id || result.user._id);
+        }
+
+        return result;
+
+    } catch (e: any) {
+        console.error("Error login response: ", e);
+        return {
+            success: false,
+            message: "Cannot connect to the server"
+        };
+    }
+}
     static async signup(data: {fullName: string, email: string, password: string, confirmPassword: string, gender: string, avatarBase64?: string}) {
         try {
             if (!data.email || !data.fullName || !data.password || !data.confirmPassword || !data.gender) {

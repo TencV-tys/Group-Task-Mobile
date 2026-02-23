@@ -9,7 +9,7 @@ export function useHomeData() {
 
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
-
+ 
   // Process data helper
   const processData = useCallback((data: HomeData) => {
     return {

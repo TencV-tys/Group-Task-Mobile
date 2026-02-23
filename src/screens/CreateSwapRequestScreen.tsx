@@ -1,4 +1,4 @@
-// src/screens/CreateSwapRequestScreen.tsx - UPDATED with fixes
+// src/screens/CreateSwapRequestScreen.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -37,6 +37,7 @@ type CreateSwapRequestRouteParams = {
   selectedDay?: string;
   assignmentDay?: string;
   selectedTimeSlotId?: string;
+  scope?: 'week' | 'day';
 };
 
 const DAYS_OF_WEEK = [
@@ -57,7 +58,8 @@ export const CreateSwapRequestScreen = () => {
     timeSlots,
     selectedDay: propSelectedDay,
     assignmentDay,
-    selectedTimeSlotId: propSelectedTimeSlotId
+    selectedTimeSlotId: propSelectedTimeSlotId,
+    scope: propScope
   } = route.params;
   
   const { createSwapRequest, loading } = useSwapRequests();
@@ -72,7 +74,7 @@ export const CreateSwapRequestScreen = () => {
   const [checking, setChecking] = useState(true);
   const [existingRequest, setExistingRequest] = useState<any>(null);
   
-  const [swapScope, setSwapScope] = useState<'week' | 'day'>('day');
+  const [swapScope, setSwapScope] = useState<'week' | 'day'>(propScope || 'day');
   const [selectedDay, setSelectedDay] = useState<string | null>(
     propSelectedDay || assignmentDay || null
   );
@@ -82,22 +84,25 @@ export const CreateSwapRequestScreen = () => {
 
   // Get the current day of the week for this assignment
   useEffect(() => {
-    if (dueDate) {
+    if (dueDate && !selectedDay) {
       const date = new Date(dueDate);
       const dayNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
       const dayFromDate = dayNames[date.getDay()];
-      
-      if (!selectedDay && dueDate) {
-        setSelectedDay(dayFromDate);
-      }
+      setSelectedDay(dayFromDate);
     }
   }, [dueDate]);
 
   // Load group members
   useEffect(() => {
     loadGroupMembers();
-    checkSwapAvailability();
-  }, [groupId, assignmentId]);
+  }, [groupId]);
+
+  // Check swap availability when scope changes
+  useEffect(() => {
+    if (assignmentId) {
+      checkSwapAvailability();
+    }
+  }, [assignmentId, swapScope]);
 
   const loadGroupMembers = async () => {
     setLoadingMembers(true);
@@ -105,8 +110,13 @@ export const CreateSwapRequestScreen = () => {
       console.log('📥 Loading members for group:', groupId);
       const result = await GroupMembersService.getGroupMembers(groupId);
       
+      console.log('📦 Raw members result:', JSON.stringify(result, null, 2));
+      
       if (result.success) {
-        // Filter only active members
+        if (result.members && result.members.length > 0) {
+          console.log('📋 First member structure:', JSON.stringify(result.members[0], null, 2));
+        }
+        
         const activeMembers = (result.members || []).filter((m: any) => m.isActive !== false);
         setMembers(activeMembers);
         console.log(`✅ Loaded ${activeMembers.length} active members`);
@@ -120,30 +130,29 @@ export const CreateSwapRequestScreen = () => {
     }
   };
 
-  // In checkSwapAvailability function
-const checkSwapAvailability = async () => {
-  setChecking(true);
-  try {
-    // Pass the scope to the backend
-    const result = await SwapRequestService.checkCanSwap(assignmentId, swapScope);
-    console.log('📦 Check swap result:', result);
-    
-    if (result.success) {
-      setCanSwap({
-        canSwap: result.canSwap || false,
-        reason: result.reason
-      });
+  const checkSwapAvailability = async () => {
+    setChecking(true);
+    try {
+      const result = await SwapRequestService.checkCanSwap(assignmentId, swapScope);
+      console.log('📦 Check swap result:', result);
       
-      if (result.existingRequestId) {
-        setExistingRequest({ id: result.existingRequestId });
+      if (result.success) {
+        setCanSwap({
+          canSwap: result.canSwap || false,
+          reason: result.reason
+        });
+        
+        if (result.existingRequestId) {
+          setExistingRequest({ id: result.existingRequestId });
+        }
       }
+    } catch (error) {
+      console.error('Failed to check swap availability:', error);
+    } finally {
+      setChecking(false);
     }
-  } catch (error) {
-    console.error('Failed to check swap availability:', error);
-  } finally {
-    setChecking(false);
-  }
-};
+  };
+
   const calculateExpiryDate = (): string | undefined => {
     if (expiresIn === 'never') return undefined;
     
@@ -163,136 +172,132 @@ const checkSwapAvailability = async () => {
   };
 
   const handleSubmit = async () => {
-  if (!canSwap.canSwap) {
-    Alert.alert('Cannot Swap', canSwap.reason || 'This assignment cannot be swapped');
-    return;
-  }
-
-  if (swapScope === 'day') {
-    if (!selectedDay) {
-      Alert.alert('Error', 'Cannot determine which day to swap. Please try again.');
+    if (!canSwap.canSwap) {
+      Alert.alert('Cannot Swap', canSwap.reason || 'This assignment cannot be swapped');
       return;
     }
-  }
 
-  try {
-    console.log('📝 Submitting swap request:', {
-      assignmentId,
-      reason: reason.trim() || undefined,
-      targetUserId,
-      expiresAt: calculateExpiryDate(),
-      scope: swapScope,
-      selectedDay: swapScope === 'day' ? (selectedDay || undefined) : undefined,
-      selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
-    });
-
-    const result = await createSwapRequest({
-      assignmentId,
-      reason: reason.trim() || undefined,
-      targetUserId, 
-      expiresAt: calculateExpiryDate(),
-      scope: swapScope,
-      selectedDay: swapScope === 'day' ? (selectedDay || undefined) : undefined,
-      selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
-    });
-
-    console.log('📦 Swap request result:', result);
-
-    if (result.success) {
-      Alert.alert(
-        '✅ Success',
-        swapScope === 'day' 
-          ? `Swap request created for ${selectedDay}!` 
-          : 'Swap request created for the entire week!',
-        [{ text: 'OK', onPress: () => navigation.goBack() }]
-      );
-    } else {
-      // Handle specific error messages
-      if (result.message?.includes('already exists') || result.message?.includes('pending')) {
-        Alert.alert(
-          '⚠️ Request Already Exists',
-          'You already have a pending swap request for this assignment. Would you like to view it?',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { 
-              text: 'View Request', 
-              onPress: () => {
-                if (existingRequest?.id) {
-                  // ✅ FIXED: Use navigation.getParent() or direct navigation
-                  // This is the simplest fix - go back first then navigate
-                  navigation.goBack();
-                  setTimeout(() => {
-                    // @ts-ignore - Ignore TypeScript error for navigation
-                    navigation.navigate('SwapRequestDetails', { requestId: existingRequest.id });
-                  }, 100);
-                } else {
-                  navigation.goBack();
-                }
-              }
-            }
-          ]
-        );
-      } else {
-        Alert.alert('❌ Error', result.message || 'Failed to create swap request');
+    if (swapScope === 'day') {
+      if (!selectedDay) {
+        Alert.alert('Error', 'Cannot determine which day to swap. Please try again.');
+        return;
       }
     }
-  } catch (error: any) {
-    console.error('❌ Error in handleSubmit:', error);
-    Alert.alert('Error', error.message || 'Failed to create swap request');
+
+    try {
+      console.log('📝 Submitting swap request:', {
+        assignmentId,
+        reason: reason.trim() || undefined,
+        targetUserId,
+        expiresAt: calculateExpiryDate(),
+        scope: swapScope,
+        selectedDay: swapScope === 'day' ? (selectedDay || undefined) : undefined,
+        selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
+      });
+
+      const result = await createSwapRequest({
+        assignmentId,
+        reason: reason.trim() || undefined,
+        targetUserId, 
+        expiresAt: calculateExpiryDate(),
+        scope: swapScope,
+        selectedDay: swapScope === 'day' ? (selectedDay || undefined) : undefined,
+        selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
+      });
+
+      console.log('📦 Swap request result:', result);
+
+      if (result.success) {
+        Alert.alert(
+          '✅ Success',
+          swapScope === 'day' 
+            ? `Swap request created for ${selectedDay}!` 
+            : 'Swap request created for the entire week!',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      } else {
+        if (result.message?.includes('already exists') || result.message?.includes('pending')) {
+          Alert.alert(
+            '⚠️ Request Already Exists',
+            'You already have a pending swap request for this assignment. Would you like to view it?',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'View Request', 
+                onPress: () => {
+                  if (existingRequest?.id) {
+                    navigation.goBack();
+                    setTimeout(() => {
+                      // @ts-ignore
+                      navigation.navigate('SwapRequestDetails', { requestId: existingRequest.id });
+                    }, 100);
+                  } else {
+                    navigation.goBack();
+                  }
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert('❌ Error', result.message || 'Failed to create swap request');
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Error in handleSubmit:', error);
+      Alert.alert('Error', error.message || 'Failed to create swap request');
+    }
+  };
+
+  const getSelectedMemberName = () => {
+    if (!targetUserId) return 'Anyone can accept';
+    const member = members.find(m => m.userId === targetUserId || m.id === targetUserId);
+    return member?.fullName || 'Selected user';
+  };
+
+  if (checking || loadingMembers) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4F46E5" />
+        <Text style={styles.loadingText}>Checking availability...</Text>
+      </View>
+    );
   }
-};
 
-const getSelectedMemberName = () => {
-  if (!targetUserId) return 'Anyone can accept';
-  const member = members.find(m => m.userId === targetUserId);
-  return member?.user?.fullName || 'Selected user';
-};
+  const isDailyTask = executionFrequency === 'DAILY';
+  const hasMultipleTimeSlots = timeSlots && timeSlots.length > 1;
+  const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A';
 
-if (checking || loadingMembers) {
-  return (
-    <View style={styles.loadingContainer}>
-      <ActivityIndicator size="large" color="#4F46E5" />
-      <Text style={styles.loadingText}>Checking availability...</Text>
-    </View>
-  );
-}
-
-const isDailyTask = executionFrequency === 'DAILY';
-const hasMultipleTimeSlots = timeSlots && timeSlots.length > 1;
-const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A';
-
-// If there's an existing pending request, show a message
-if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pending')) {
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Request Swap</Text>
-        <View style={{ width: 40 }} />
-      </View>
-      <View style={styles.centerContainer}>
-        <Ionicons name="time" size={64} color="#F59E0B" />
-        <Text style={styles.pendingTitle}>Pending Request Exists</Text>
-        <Text style={styles.pendingText}>
-          You already have a pending swap request for this assignment.
-        </Text>
-        <TouchableOpacity
-          style={styles.viewRequestButton}
-          onPress={() => {
-            if (existingRequest?.id) {
-              // ✅ FIXED: Cast navigation to any
-              (navigation as any).navigate('SwapRequestDetails', { requestId: existingRequest.id });
-            }
-          }}
-        >
-          <Text style={styles.viewRequestButtonText}>View Request</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
-  );
-}
+  if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pending')) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Request Swap</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.centerContainer}>
+          <Ionicons name="time" size={64} color="#F59E0B" />
+          <Text style={styles.pendingTitle}>Pending Request Exists</Text>
+          <Text style={styles.pendingText}>
+            You already have a pending swap request for this assignment.
+          </Text>
+          <TouchableOpacity
+            style={styles.viewRequestButton}
+            onPress={() => {
+              if (existingRequest?.id) {
+                // @ts-ignore
+                navigation.navigate('SwapRequestDetails', { requestId: existingRequest.id });
+              }
+            }}
+          >
+            <Text style={styles.viewRequestButtonText}>View Request</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -340,7 +345,7 @@ if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pe
               </View>
             </View>
 
-            {selectedDay && (
+            {selectedDay && swapScope === 'day' && (
               <View style={styles.assignmentDayBadge}>
                 <Ionicons name="today" size={14} color="#4F46E5" />
                 <Text style={styles.assignmentDayText}>
@@ -359,9 +364,25 @@ if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pe
                 {isDailyTask ? 'Daily Task' : 'Weekly Task'}
               </Text>
             </View>
+
+            <View style={[
+              styles.scopeBadge,
+              swapScope === 'week' ? styles.weekScopeBadge : styles.dayScopeBadge
+            ]}>
+              <Ionicons 
+                name={swapScope === 'week' ? 'calendar' : 'today'} 
+                size={14} 
+                color={swapScope === 'week' ? '#6B7280' : '#4F46E5'} 
+              />
+              <Text style={[
+                styles.scopeBadgeText,
+                swapScope === 'day' && styles.dayScopeBadgeText
+              ]}>
+                {swapScope === 'week' ? 'Swapping entire week' : `Swapping ${selectedDay || 'specific day'}`}
+              </Text>
+            </View>
           </View>
 
-          {/* Swap Status */}
           {!canSwap.canSwap && (
             <View style={styles.warningCard}>
               <Ionicons name="warning" size={24} color="#EF4444" />
@@ -374,19 +395,20 @@ if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pe
 
           {canSwap.canSwap && (
             <>
-              {/* Info Banner */}
               <View style={styles.infoBanner}>
                 <Ionicons name="information-circle" size={24} color="#4F46E5" />
                 <View style={styles.infoBannerContent}>
-                  <Text style={styles.infoBannerTitle}>Swap this specific day</Text>
+                  <Text style={styles.infoBannerTitle}>
+                    {swapScope === 'week' ? 'Swap Entire Week' : 'Swap Specific Day'}
+                  </Text>
                   <Text style={styles.infoBannerText}>
-                    You're swapping the assignment for {selectedDay || 'this day'}. 
-                    The person who accepts will take over this day only.
+                    {swapScope === 'week' 
+                      ? 'You\'re swapping ALL your tasks for the entire week. The person who accepts will take over all your assignments this week.'
+                      : `You're swapping the assignment for ${selectedDay || 'this day'}. The person who accepts will take over this day only.`}
                   </Text>
                 </View>
               </View>
 
-              {/* Target User Selection */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Swap With</Text>
                 <TouchableOpacity
@@ -434,34 +456,34 @@ if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pe
                     {members.length > 0 ? (
                       members.map(member => (
                         <TouchableOpacity
-                          key={member.userId}
+                          key={member.userId || member.id}
                           style={styles.memberItem}
                           onPress={() => {
-                            setTargetUserId(member.userId);
+                            setTargetUserId(member.userId || member.id);
                             setShowMemberSelector(false);
                           }}
                         >
                           <View style={styles.memberInfo}>
                             <View style={styles.avatar}>
-                              {member.user?.avatarUrl ? (
+                              {member.avatarUrl ? (
                                 <Image 
-                                  source={{ uri: member.user.avatarUrl }} 
+                                  source={{ uri: member.avatarUrl }} 
                                   style={styles.avatarImage} 
                                 />
                               ) : (
                                 <Text style={styles.avatarText}>
-                                  {member.user?.fullName?.charAt(0).toUpperCase() || '?'}
+                                  {member.fullName?.charAt(0).toUpperCase() || '?'}
                                 </Text>
                               )}
                             </View>
                             <View>
-                              <Text style={styles.memberName}>{member.user?.fullName || 'Unknown'}</Text>
+                              <Text style={styles.memberName}>{member.fullName || 'Unknown'}</Text>
                               <Text style={styles.memberRole}>
-                                {member.groupRole === 'ADMIN' ? 'Admin' : 'Member'}
+                                {member.role === 'ADMIN' ? 'Admin' : 'Member'}
                               </Text>
                             </View>
                           </View>
-                          {targetUserId === member.userId && (
+                          {targetUserId === (member.userId || member.id) && (
                             <Ionicons name="checkmark-circle" size={24} color="#4F46E5" />
                           )}
                         </TouchableOpacity>
@@ -475,7 +497,6 @@ if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pe
                 )}
               </View>
 
-              {/* Expiry Setting */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Request Expires</Text>
                 <View style={styles.expiryOptions}>
@@ -501,7 +522,6 @@ if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pe
                 </View>
               </View>
 
-              {/* Reason Input */}
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Reason (Optional)</Text>
                 <TextInput
@@ -516,19 +536,18 @@ if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pe
                 />
               </View>
 
-              {/* Info Note */}
               <View style={styles.infoNote}>
                 <Ionicons name="information-circle" size={20} color="#4F46E5" />
                 <Text style={styles.infoText}>
-                  You're swapping the assignment for <Text style={styles.infoBold}>{selectedDay || 'this day'}</Text>. 
-                  The rest of your week's assignments remain yours.
+                  {swapScope === 'week' 
+                    ? 'This will swap ALL your tasks for the current week. After the swap, you will have no assignments for this week.'
+                    : `You're swapping the assignment for ${selectedDay || 'this day'}. The rest of your week's assignments remain yours.`}
                 </Text>
               </View>
             </>
           )}
         </ScrollView>
 
-        {/* Submit Button */}
         {canSwap.canSwap && (
           <View style={styles.footer}>
             <TouchableOpacity
@@ -542,9 +561,11 @@ if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pe
                 <>
                   <Ionicons name="swap-horizontal" size={20} color="#FFFFFF" />
                   <Text style={styles.submitButtonText}>
-                    {selectedDay
-                      ? `Swap ${selectedDay.slice(0, 3)}'s Assignment`
-                      : 'Create Swap Request'}
+                    {swapScope === 'week' 
+                      ? 'Swap Entire Week' 
+                      : selectedDay
+                        ? `Swap ${selectedDay.slice(0, 3)}'s Assignment`
+                        : 'Create Swap Request'}
                   </Text>
                 </>
               )}
@@ -720,6 +741,30 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#4B5563',
     fontWeight: '500',
+  },
+  scopeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 12,
+  },
+  dayScopeBadge: {
+    backgroundColor: '#EEF2FF',
+  },
+  weekScopeBadge: {
+    backgroundColor: '#F3F4F6',
+  },
+  scopeBadgeText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  dayScopeBadgeText: {
+    color: '#4F46E5',
   },
   warningCard: {
     backgroundColor: '#FEF2F2',
@@ -901,10 +946,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#4F46E5',
     lineHeight: 20,
-  },
-  infoBold: {
-    fontWeight: '700',
-    color: '#4F46E5',
   },
   footer: {
     padding: 16,

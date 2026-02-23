@@ -141,40 +141,40 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // ✅ FIXED: Check if week swap is available (first 24 hours of the week)
-  const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
-    const now = new Date();
-    
-    // Week start is Monday at 00:00
-    const weekStartDay = new Date(weekStart);
-    weekStartDay.setHours(0, 0, 0, 0);
-    
-    // Calculate hours since week started
-    const hoursSinceWeekStart = (now.getTime() - weekStartDay.getTime()) / (1000 * 60 * 60);
-    
-    // Week swap is available within the first 24 hours of the week
-    const isWithinFirst24Hours = hoursSinceWeekStart >= 0 && hoursSinceWeekStart <= 24;
-    
-    console.log('📅 Week swap check:', {
-      weekStart: weekStartDay.toISOString(),
-      now: now.toISOString(),
-      hoursSinceWeekStart,
-      isWithinFirst24Hours
-    });
-    
-    if (!isWithinFirst24Hours) {
-      setCanSwapWeek(false);
-      if (hoursSinceWeekStart < 0) {
-        setWeekSwapReason('Week hasn\'t started yet');
-      } else {
-        setWeekSwapReason('Week swap window has closed (only available within first 24 hours of the week)');
-      }
+ // In SettingsModal.tsx - checkWeekSwapAvailability
+const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
+  const now = new Date();
+  
+  // Week start is Monday at 00:00
+  const weekStartDay = new Date(weekStart);
+  weekStartDay.setHours(0, 0, 0, 0);
+  
+  // Calculate hours since week started
+  const hoursSinceWeekStart = (now.getTime() - weekStartDay.getTime()) / (1000 * 60 * 60);
+  
+  // Week swap is available within the first 24 hours of the week
+  const isWithinFirst24Hours = hoursSinceWeekStart >= 0 && hoursSinceWeekStart <= 24;
+  
+  console.log('📅 Week swap check:', {
+    weekStart: weekStartDay.toISOString(),
+    now: now.toISOString(),
+    hoursSinceWeekStart,
+    isWithinFirst24Hours
+  });
+  
+  if (!isWithinFirst24Hours) {
+    setCanSwapWeek(false);
+    if (hoursSinceWeekStart < 0) {
+      setWeekSwapReason('Week hasn\'t started yet');
     } else {
-      setCanSwapWeek(true);
-      const hoursLeft = Math.ceil(24 - hoursSinceWeekStart);
-      setWeekSwapReason(`${hoursLeft} hour(s) left to swap the entire week`);
+      setWeekSwapReason('Week swap window has closed (only available within first 24 hours of the week)');
     }
-  };
+  } else {
+    setCanSwapWeek(true);
+    const hoursLeft = Math.ceil(24 - hoursSinceWeekStart);
+    setWeekSwapReason(`${hoursLeft} hour(s) left to swap the entire week`);
+  }
+};
 
   useEffect(() => {
     if (visible) {

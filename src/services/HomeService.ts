@@ -5,7 +5,7 @@ const API_URL = `${API_BASE_URL}/api/home`;
 export interface HomeData {
   user: any;
   stats: any;
-  currentWeekTasks: any[];
+  currentWeekTasks: any[]; 
   upcomingTasks: any[];
   groups: any[];
   leaderboard: any[];

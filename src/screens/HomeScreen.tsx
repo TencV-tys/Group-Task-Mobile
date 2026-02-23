@@ -34,35 +34,43 @@ export default function HomeScreen({ navigation }: any) {
     fetchUpcomingAssignments();
     fetchTodayAssignments();
   }, []);
-   
-const fetchUpcomingAssignments = async () => {
+   const fetchUpcomingAssignments = async () => {
   setLoadingUpcoming(true);
   try {
+    console.log("🔍 Fetching upcoming...");
     const result = await AssignmentService.getUpcomingAssignments({ limit: 5 });
+    console.log("📦 Upcoming result:", JSON.stringify(result, null, 2));
+    
     if (result.success && result.data) {
+      console.log("✅ Upcoming assignments count:", result.data.assignments?.length);
       setUpcomingAssignments(result.data.assignments || []);
     } else {
-      // Handle empty response
+      console.log("⚠️ No upcoming data");
       setUpcomingAssignments([]);
     }
   } catch (error) {
-    console.error('Error fetching upcoming assignments:', error);
+    console.error('❌ Error:', error);
     setUpcomingAssignments([]);
   } finally {
     setLoadingUpcoming(false);
-  }
+  } 
 };
 
 const fetchTodayAssignments = async () => {
   try {
+    console.log("🔍 Fetching today...");
     const result = await AssignmentService.getTodayAssignments();
+    console.log("📦 Today result:", JSON.stringify(result, null, 2));
+    
     if (result.success && result.data) {
+      console.log("✅ Today assignments count:", result.data.assignments?.length);
       setTodayAssignments(result.data.assignments || []);
     } else {
+      console.log("⚠️ No today data");
       setTodayAssignments([]);
     }
   } catch (error) {
-    console.error('Error fetching today assignments:', error);
+    console.error('❌ Error:', error);
     setTodayAssignments([]);
   }
 };

@@ -1,7 +1,7 @@
-// homeHook/useHomeData.ts - SIMPLIFIED (NO POLLING)
+// homeHook/useHomeData.ts - UPDATED WITH SECURESTORE
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { HomeService, HomeData } from '../services/HomeService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 export function useHomeData() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -15,17 +15,18 @@ export function useHomeData() {
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
-        console.warn('useHomeData: No auth token available');
+        console.warn('🔐 useHomeData: No auth token available in SecureStore');
         setAuthError(true);
         setError('Please log in again');
         return false;
       }
+      console.log('✅ useHomeData: Auth token found in SecureStore');
       setAuthError(false);
       return true;
     } catch (error) {
-      console.error('useHomeData: Error checking token:', error);
+      console.error('❌ useHomeData: Error checking token:', error);
       setAuthError(true);
       return false;
     }
@@ -76,7 +77,7 @@ export function useHomeData() {
     setError(null);
 
     try {
-      console.log("useHomeData: Fetching home data...");
+      console.log("📥 useHomeData: Fetching home data...");
       const result = await HomeService.getHomeData();
       
       if (result.success && result.data) {
@@ -85,14 +86,15 @@ export function useHomeData() {
         setError(null);
         setAuthError(false);
         initialLoadDone.current = true;
+        console.log("✅ useHomeData: Home data loaded successfully");
       } else {
         const errorMessage = result.message || 'Failed to load home data';
-        console.error("useHomeData: API error:", errorMessage);
+        console.error("❌ useHomeData: API error:", errorMessage);
         setError(errorMessage);
       }
       
     } catch (err: any) {
-      console.error("useHomeData: Network error:", err);
+      console.error("❌ useHomeData: Network error:", err);
       setError(err.message || 'Network error. Please check your connection.');
     } finally {
       setLoading(false);

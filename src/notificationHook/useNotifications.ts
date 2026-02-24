@@ -1,8 +1,8 @@
-// notificationHook/useNotifications.ts - UPDATED WITH TOKEN CHECK
+// notificationHook/useNotifications.ts - UPDATED WITH SECURESTORE
 import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { NotificationService, Notification, NotificationTypes } from '../services/NotificationService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 interface PaginationInfo {
   page: number;
@@ -23,19 +23,20 @@ export const useNotifications = () => {
     pages: 0
   });
 
-  // Check token before making requests
+  // Check token before making requests from SecureStore
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
-        console.warn('useNotifications: No auth token available');
+        console.warn('🔐 useNotifications: No auth token available in SecureStore');
         setAuthError(true);
         return false;
       }
+      console.log('✅ useNotifications: Auth token found in SecureStore');
       setAuthError(false);
       return true;
     } catch (error) {
-      console.error('useNotifications: Error checking token:', error);
+      console.error('❌ useNotifications: Error checking token:', error);
       setAuthError(true);
       return false;
     }
@@ -73,7 +74,7 @@ export const useNotifications = () => {
         setAuthError(true);
       }
     } catch (error) {
-      console.error('Load notifications error:', error);
+      console.error('❌ Load notifications error:', error);
     } finally {
       setLoading(false);
     }
@@ -92,7 +93,7 @@ export const useNotifications = () => {
         setAuthError(true);
       }
     } catch (error) {
-      console.error('Load unread count error:', error);
+      console.error('❌ Load unread count error:', error);
     }
   }, [checkToken]);
 
@@ -115,7 +116,7 @@ export const useNotifications = () => {
       }
       return false;
     } catch (error) {
-      console.error('Mark as read error:', error);
+      console.error('❌ Mark as read error:', error);
       return false;
     }
   }, [checkToken]);
@@ -136,7 +137,7 @@ export const useNotifications = () => {
       }
       return false;
     } catch (error) {
-      console.error('Mark all as read error:', error);
+      console.error('❌ Mark all as read error:', error);
       return false;
     }
   }, [checkToken]);
@@ -161,7 +162,7 @@ export const useNotifications = () => {
       }
       return false;
     } catch (error) {
-      console.error('Delete notification error:', error);
+      console.error('❌ Delete notification error:', error);
       return false;
     }
   }, [notifications, checkToken]);

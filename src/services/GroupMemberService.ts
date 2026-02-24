@@ -1,15 +1,15 @@
-// services/GroupMembersService.ts - UPDATED WITH TOKEN AUTH
+// services/GroupMembersService.ts - UPDATED WITH SECURESTORE
 import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = `${API_BASE_URL}/api/group`;
 
 export class GroupMembersService {
   
-  // ========== GET AUTH TOKEN ==========
+  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
   private static async getAuthToken(): Promise<string | null> {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
       return token;
     } catch (error) {
@@ -47,7 +47,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/members`, {
         method: 'GET',
         headers,
-        // credentials: 'include' // Not needed with token
       });
 
       const result = await response.json();
@@ -74,7 +73,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/members-rotation`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -99,7 +97,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/info`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -124,7 +121,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/settings`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -149,7 +145,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/members/${memberId}`, {
         method: 'DELETE',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -182,7 +177,6 @@ export class GroupMembersService {
         method: 'PUT',
         headers,
         body: JSON.stringify({ newRole }),
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -216,7 +210,6 @@ export class GroupMembersService {
         method: 'PUT',
         headers,
         body: JSON.stringify({ rotationOrder, isActive }),
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -249,7 +242,6 @@ export class GroupMembersService {
         method: 'POST',
         headers,
         body: JSON.stringify({ newOrder }),
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -274,7 +266,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/leave`, {
         method: 'DELETE',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -299,7 +290,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/rotation-preview?weeks=${weeks}`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -324,7 +314,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -349,7 +338,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/current-assignments`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -375,7 +363,6 @@ export class GroupMembersService {
         method: 'PUT',
         headers,
         body: JSON.stringify(groupData),
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -401,7 +388,6 @@ export class GroupMembersService {
         method: 'POST',
         headers,
         body: JSON.stringify({ newAdminId }),
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -426,7 +412,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/regenerate-invite`, {
         method: 'POST',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -451,7 +436,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/delete`, {
         method: 'DELETE',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -476,7 +460,6 @@ export class GroupMembersService {
       const response = await fetch(`${API_URL}/${groupId}/avatar`, {
         method: 'DELETE',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -502,7 +485,6 @@ export class GroupMembersService {
         method: 'POST',
         headers,
         body: JSON.stringify({ avatarBase64: base64Image }),
-        // credentials: 'include'
       });
 
       const result = await response.json();

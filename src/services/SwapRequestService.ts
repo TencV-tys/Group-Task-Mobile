@@ -1,6 +1,6 @@
-// services/SwapRequestService.ts - UPDATED with better auth handling
+// services/SwapRequestService.ts - UPDATED WITH SECURESTORE
 import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { NotificationService } from './NotificationService';
 
 const API_URL = `${API_BASE_URL}/api/swap-requests`;
@@ -101,26 +101,28 @@ export interface SwapRequestResponse {
 
 export class SwapRequestService {
   
+  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
   private static async getAuthToken(): Promise<string | null> {
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      console.log('Auth token retrieved:', token ? 'Yes' : 'No');
+      const token = await SecureStore.getItemAsync('userToken');
+      console.log('🔐 SwapRequestService: Auth token retrieved:', token ? 'Yes' : 'No');
       return token;
     } catch (error) {
-      console.error('Error getting auth token:', error);
+      console.error('SwapRequestService: Error getting auth token:', error);
       return null;
     }
   }
 
+  // ========== GET HEADERS WITH TOKEN ==========
   private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
     const token = await this.getAuthToken();
     const headers: HeadersInit = {};
     
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
-      console.log('Added Authorization header');
+      console.log('✅ SwapRequestService: Added Authorization header');
     } else {
-      console.warn('No auth token available');
+      console.warn('⚠️ SwapRequestService: No auth token available - request may fail');
     }
     
     if (withJsonContent) {
@@ -178,191 +180,193 @@ export class SwapRequestService {
     }
   }
 
-  // In SwapRequestService.ts
-static async checkCanSwap(assignmentId: string, scope?: 'week' | 'day') {
-  try {
-    let url = `${API_URL}/check/${assignmentId}`;
-    if (scope) {
-      url += `?scope=${scope}`;
-    }
-    
-    const headers = await this.getHeaders(false);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to check swap status: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    return result;
-
-  } catch (error: any) {
-    console.error('SwapRequestService.checkCanSwap error:', error);
-    return {
-      success: false,
-      canSwap: false,
-      message: error.message || 'Failed to check swap status'
-    };
-  }
-}
-static async getMySwapRequests(filters?: SwapRequestFilters) {
-  try {
-    let url = `${API_URL}/my-requests`;
-    const params = new URLSearchParams();
-    
-    if (filters?.status) params.append('status', filters.status);
-    if (filters?.groupId) params.append('groupId', filters.groupId);
-    if (filters?.limit) params.append('limit', filters.limit.toString());
-    if (filters?.offset) params.append('offset', filters.offset.toString());
-    
-    const queryString = params.toString();
-    if (queryString) url += `?${queryString}`;
-
-    console.log('SwapRequestService: Getting my swap requests', url);
-    
-    const headers = await this.getHeaders(false);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to load swap requests: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log('SwapRequestService: Get my requests response:', result);
-    
-    // Handle different response structures
-    if (result.success) {
-      // Check if data is directly in result or in result.data
-      const requests = result.data?.requests || result.requests || [];
-      const total = result.data?.total || result.total || requests.length;
+  // CHECK: Check if assignment can be swapped
+  static async checkCanSwap(assignmentId: string, scope?: 'week' | 'day') {
+    try {
+      let url = `${API_URL}/check/${assignmentId}`;
+      if (scope) {
+        url += `?scope=${scope}`;
+      }
       
+      const headers = await this.getHeaders(false);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to check swap status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('SwapRequestService.checkCanSwap error:', error);
       return {
-        success: true,
-        data: {
-          requests,
-          total
-        }
+        success: false,
+        canSwap: false,
+        message: error.message || 'Failed to check swap status'
       };
     }
-    
-    return result;
-
-  } catch (error: any) {
-    console.error('SwapRequestService.getMySwapRequests error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to load swap requests',
-      data: { requests: [], total: 0 }
-    };
   }
-}
 
-// GET: Get pending swap requests for me
-static async getPendingForMe(filters?: { groupId?: string; limit?: number; offset?: number }) {
-  try {
-    let url = `${API_URL}/pending-for-me`;
-    const params = new URLSearchParams();
-    
-    if (filters?.groupId) params.append('groupId', filters.groupId);
-    if (filters?.limit) params.append('limit', filters.limit.toString());
-    if (filters?.offset) params.append('offset', filters.offset.toString());
-    
-    const queryString = params.toString();
-    if (queryString) url += `?${queryString}`;
+  // GET: Get my swap requests
+  static async getMySwapRequests(filters?: SwapRequestFilters) {
+    try {
+      let url = `${API_URL}/my-requests`;
+      const params = new URLSearchParams();
+      
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.groupId) params.append('groupId', filters.groupId);
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset) params.append('offset', filters.offset.toString());
+      
+      const queryString = params.toString();
+      if (queryString) url += `?${queryString}`;
 
-    console.log('SwapRequestService: Getting pending requests for me', url);
-    
-    const headers = await this.getHeaders(false);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
-      credentials: 'include'
-    });
+      console.log('SwapRequestService: Getting my swap requests', url);
+      
+      const headers = await this.getHeaders(false);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load swap requests: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('SwapRequestService: Get my requests response:', result);
+      
+      // Handle different response structures
+      if (result.success) {
+        // Check if data is directly in result or in result.data
+        const requests = result.data?.requests || result.requests || [];
+        const total = result.data?.total || result.total || requests.length;
+        
+        return {
+          success: true,
+          data: {
+            requests,
+            total
+          }
+        };
+      }
+      
+      return result;
+
+    } catch (error: any) {
+      console.error('SwapRequestService.getMySwapRequests error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load swap requests',
+        data: { requests: [], total: 0 }
+      };
+    }
+  }
+
+  // GET: Get pending swap requests for me
+  static async getPendingForMe(filters?: { groupId?: string; limit?: number; offset?: number }) {
+    try {
+      let url = `${API_URL}/pending-for-me`;
+      const params = new URLSearchParams();
+      
+      if (filters?.groupId) params.append('groupId', filters.groupId);
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset) params.append('offset', filters.offset.toString());
+      
+      const queryString = params.toString();
+      if (queryString) url += `?${queryString}`;
+
+      console.log('SwapRequestService: Getting pending requests for me', url);
+      
+      const headers = await this.getHeaders(false);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
  
-    if (!response.ok) {
-      throw new Error(`Failed to load pending requests: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log('SwapRequestService: Get pending for me response:', result);
-    
-    // Handle different response structures
-    if (result.success) {
-      const requests = result.data?.requests || result.requests || [];
-      const total = result.data?.total || result.total || requests.length;
+      if (!response.ok) {
+        throw new Error(`Failed to load pending requests: ${response.status}`);
+      }
       
+      const result = await response.json();
+      console.log('SwapRequestService: Get pending for me response:', result);
+      
+      // Handle different response structures
+      if (result.success) {
+        const requests = result.data?.requests || result.requests || [];
+        const total = result.data?.total || result.total || requests.length;
+        
+        return {
+          success: true,
+          data: {
+            requests,
+            total
+          }
+        };
+      }
+      
+      return result;
+
+    } catch (error: any) {
+      console.error('SwapRequestService.getPendingForMe error:', error);
       return {
-        success: true,
-        data: {
-          requests,
-          total
-        }
+        success: false,
+        message: error.message || 'Failed to load pending requests',
+        data: { requests: [], total: 0 }
       };
     }
-    
-    return result;
-
-  } catch (error: any) {
-    console.error('SwapRequestService.getPendingForMe error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to load pending requests',
-      data: { requests: [], total: 0 }
-    };
   }
-}
-  // In services/SwapRequestService.ts - ADD this method
 
-// GET: Get swap request details by ID
-static async getSwapRequestDetails(requestId: string): Promise<{ success: boolean; message: string; data?: any }> {
-  try {
-    console.log('SwapRequestService: Getting swap request details', requestId);
-    
-    const headers = await this.getHeaders(false);
-    
-    const response = await fetch(`${API_URL}/${requestId}`, {
-      method: 'GET',
-      headers,
-      credentials: 'include'
-    });
+  // GET: Get swap request details by ID
+  static async getSwapRequestDetails(requestId: string): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      console.log('SwapRequestService: Getting swap request details', requestId);
+      
+      const headers = await this.getHeaders(false);
+      
+      const response = await fetch(`${API_URL}/${requestId}`, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to load swap request: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log('SwapRequestService: Get details response:', result);
-    
-    // Handle different response structures
-    if (result.success) {
+      if (!response.ok) {
+        throw new Error(`Failed to load swap request: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('SwapRequestService: Get details response:', result);
+      
+      // Handle different response structures
+      if (result.success) {
+        return {
+          success: true,
+          data: result.data || result.swapRequest || result,
+          message: result.message || 'Request details loaded'
+        };
+      }
+      
+      return result;
+
+    } catch (error: any) {
+      console.error('SwapRequestService.getSwapRequestDetails error:', error);
       return {
-        success: true,
-        data: result.data || result.swapRequest || result,
-        message: result.message || 'Request details loaded'
+        success: false,
+        message: error.message || 'Failed to load swap request details',
       };
     }
-    
-    return result;
-
-  } catch (error: any) {
-    console.error('SwapRequestService.getSwapRequestDetails error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to load swap request details',
-    };
   }
-}
+
   // ACCEPT: Accept a swap request
   static async acceptSwapRequest(requestId: string): Promise<SwapRequestResponse> {
     try {

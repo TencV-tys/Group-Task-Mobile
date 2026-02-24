@@ -1,6 +1,6 @@
-// services/NotificationService.ts - UPDATED WITH TOKEN AUTH
+// services/NotificationService.ts - UPDATED WITH SECURESTORE
 import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = `${API_BASE_URL}/api/notifications`;
 
@@ -102,10 +102,10 @@ export interface UnreadCountResponse {
 
 export class NotificationService {
   
-  // ========== GET AUTH TOKEN ==========
+  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
   private static async getAuthToken(): Promise<string | null> {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       console.log('🔐 NotificationService: Auth token retrieved:', token ? 'Yes' : 'No');
       return token;
     } catch (error) {
@@ -141,7 +141,6 @@ export class NotificationService {
       const response = await fetch(`${API_URL}/?page=${page}&limit=${limit}`, {
         method: "GET",
         headers,
-        // credentials: 'include' // Not needed with token
       });
 
       const result = await response.json();
@@ -166,7 +165,6 @@ export class NotificationService {
       const response = await fetch(`${API_URL}/unread-count`, {
         method: "GET",
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -196,7 +194,6 @@ export class NotificationService {
       const response = await fetch(`${API_URL}/${notificationId}/read`, {
         method: "PATCH",
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -219,7 +216,6 @@ export class NotificationService {
       const response = await fetch(`${API_URL}/mark-all-read`, {
         method: "PATCH",
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -242,7 +238,6 @@ export class NotificationService {
       const response = await fetch(`${API_URL}/${notificationId}`, {
         method: "DELETE",
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();

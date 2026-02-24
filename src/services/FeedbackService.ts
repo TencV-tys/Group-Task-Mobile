@@ -1,6 +1,6 @@
-// services/FeedbackService.ts - UPDATED WITH TOKEN AUTH
+// services/FeedbackService.ts - UPDATED WITH SECURESTORE
 import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = `${API_BASE_URL}/api/feedback`;
 
@@ -38,7 +38,7 @@ export interface FeedbackResponse {
   success: boolean;
   message?: string;
   feedback?: Feedback[];        // For list responses
-  feedbackItem?: Feedback;       // For single item responses (renamed from duplicate)
+  feedbackItem?: Feedback;       // For single item responses
   stats?: FeedbackStats;
   pagination?: {
     page: number;
@@ -54,10 +54,10 @@ class FeedbackServiceClass {
   private lastStats: FeedbackStats | null = null;
   private isPolling = false;
 
-  // ========== GET AUTH TOKEN ==========
+  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
   private static async getAuthToken(): Promise<string | null> {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
       return token;
     } catch (error) {
@@ -101,7 +101,6 @@ class FeedbackServiceClass {
         method: "POST",
         headers,
         body: JSON.stringify(data),
-        // credentials: 'include' // Not needed with token
       });
 
       const result = await response.json();
@@ -130,7 +129,6 @@ class FeedbackServiceClass {
         method: "PUT",
         headers,
         body: JSON.stringify(data),
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -158,7 +156,6 @@ class FeedbackServiceClass {
       const response = await fetch(`${API_URL}/my-feedback?page=${page}&limit=${limit}`, {
         method: "GET",
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -181,7 +178,6 @@ class FeedbackServiceClass {
       const response = await fetch(`${API_URL}/${feedbackId}`, {
         method: "GET",
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -204,7 +200,6 @@ class FeedbackServiceClass {
       const response = await fetch(`${API_URL}/${feedbackId}`, {
         method: "DELETE",
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -232,7 +227,6 @@ class FeedbackServiceClass {
       const response = await fetch(`${API_URL}/my-stats`, {
         method: "GET",
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();

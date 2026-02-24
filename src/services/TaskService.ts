@@ -1,6 +1,6 @@
-// src/services/TaskService.ts - UPDATED WITH TOKEN AUTH
+// src/services/TaskService.ts - UPDATED WITH SECURESTORE
 import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = `${API_BASE_URL}/api/tasks`;
 
@@ -51,10 +51,10 @@ export type UpdateTaskData = Partial<CreateTaskData>;
 
 export class TaskService {
   
-  // ========== GET AUTH TOKEN ==========
+  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
   private static async getAuthToken(): Promise<string | null> {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       console.log('🔐 TaskService: Auth token retrieved:', token ? 'Yes' : 'No');
       return token;
     } catch (error) {
@@ -96,7 +96,6 @@ export class TaskService {
         method: 'POST',
         headers,
         body: JSON.stringify(cleanedData),
-        // credentials: 'include' // Not needed with token
       });
 
       console.log(`TaskService: Response status: ${response.status}`);
@@ -143,7 +142,6 @@ export class TaskService {
       const response = await fetch(url, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -170,7 +168,6 @@ export class TaskService {
       const response = await fetch(url, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
  
       const result = await response.json();
@@ -193,7 +190,6 @@ export class TaskService {
       const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -216,7 +212,6 @@ export class TaskService {
       const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'DELETE',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -243,7 +238,6 @@ export class TaskService {
         method: 'PUT',
         headers,
         body: JSON.stringify(cleanedData),
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -266,7 +260,6 @@ export class TaskService {
       const response = await fetch(`${API_URL}/group/${groupId}/schedule?weeks=${weeks}`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -289,7 +282,6 @@ export class TaskService {
       const response = await fetch(`${API_URL}/group/${groupId}/rotate`, {
         method: 'POST',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -315,7 +307,6 @@ export class TaskService {
         method: 'POST',
         headers,
         body: JSON.stringify({ targetUserId }),
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -340,7 +331,6 @@ export class TaskService {
       const response = await fetch(`${API_URL}/group/${groupId}/statistics`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       const result = await response.json();

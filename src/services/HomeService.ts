@@ -1,6 +1,6 @@
-// services/HomeService.ts - SIMPLIFIED (NO POLLING)
+// services/HomeService.ts - UPDATED WITH SECURESTORE (NO POLLING)
 import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = `${API_BASE_URL}/api/home`;
 
@@ -21,7 +21,9 @@ class HomeServiceClass {
     try {
       console.log("HomeService: Fetching home data from:", `${API_URL}/`);
       
-      const token = await AsyncStorage.getItem('userToken');
+      // Get token from SecureStore
+      const token = await SecureStore.getItemAsync('userToken');
+      
       const headers: HeadersInit = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
@@ -29,6 +31,9 @@ class HomeServiceClass {
       
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        console.log('✅ Added Authorization header');
+      } else {
+        console.warn('⚠️ No auth token available - request may fail');
       }
       
       const response = await fetch(`${API_URL}/`, {

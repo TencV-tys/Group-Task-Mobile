@@ -1,15 +1,15 @@
-// src/services/GroupService.ts (React Native - FRONTEND)
+// src/services/GroupService.ts (React Native - FRONTEND) - UPDATED WITH SECURESTORE
 import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = `${API_BASE_URL}/api/group`;
 
 export class GroupService {
   
-  // ========== GET AUTH TOKEN ==========
+  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
   private static async getAuthToken(): Promise<string | null> {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
       return token;
     } catch (error) {
@@ -38,50 +38,49 @@ export class GroupService {
   }
 
   // ========== CREATE GROUP ==========
-  // In GroupService.ts - createGroup method
-static async createGroup(name: string, description?: string) {
-  try {
-    if (!name.trim()) {
+  static async createGroup(name: string, description?: string) {
+    try {
+      if (!name.trim()) {
+        return {
+          success: false,
+          message: "Group name is required"
+        };
+      }
+
+      console.log(`GroupService: Creating group "${name}"`);
+      
+      const headers = await this.getHeaders();
+      
+      // Only include description if it exists
+      const body: any = {
+        name: name.trim()
+      };
+      
+      if (description && description.trim()) {
+        body.description = description.trim();
+      }
+      
+      const response = await fetch(`${API_URL}/create`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      console.log(`GroupService: Response status: ${response.status}`);
+      
+      const result = await response.json();
+      console.log(`GroupService: Result:`, result);
+      
+      return result;
+
+    } catch (e: any) {
+      console.error("GroupService.createGroup error:", e);
       return {
         success: false,
-        message: "Group name is required"
+        message: e.message || "Failed to create group"
       };
     }
-
-    console.log(`GroupService: Creating group "${name}"`);
-    
-    const headers = await this.getHeaders();
-    
-    // ✅ FIX: Only include description if it exists
-    const body: any = {
-      name: name.trim()
-    };
-    
-    if (description) {
-      body.description = description;
-    }
-    
-    const response = await fetch(`${API_URL}/create`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    console.log(`GroupService: Response status: ${response.status}`);
-    
-    const result = await response.json();
-    console.log(`GroupService: Result:`, result);
-    
-    return result;
-
-  } catch (e: any) {
-    console.error("GroupService.createGroup error:", e);
-    return {
-      success: false,
-      message: e.message || "Failed to create group"
-    };
   }
-}
 
   // ========== GET USER'S GROUPS ==========
   static async getUserGroups() {
@@ -93,7 +92,6 @@ static async createGroup(name: string, description?: string) {
       const response = await fetch(`${API_URL}/my-groups`, {
         method: "GET",
         headers,
-        // credentials: "include"
       });
 
       const result = await response.json();
@@ -130,7 +128,6 @@ static async createGroup(name: string, description?: string) {
         method: "POST",
         headers,
         body: JSON.stringify({ inviteCode: cleanInviteCode }),
-        // credentials: "include"
       });
 
       const result = await response.json();
@@ -164,7 +161,6 @@ static async createGroup(name: string, description?: string) {
       const response = await fetch(`${API_URL}/${groupId}/members`, {
         method: "GET",
         headers,
-        // credentials: "include"
       });
 
       const result = await response.json();
@@ -205,7 +201,6 @@ static async createGroup(name: string, description?: string) {
           rotationOrder,
           isActive
         }),
-        // credentials: "include"
       });
 
       const result = await response.json();
@@ -238,7 +233,6 @@ static async createGroup(name: string, description?: string) {
         method: "POST",
         headers,
         body: JSON.stringify({ newOrder }),
-        // credentials: "include"
       });
 
       const result = await response.json();
@@ -270,7 +264,6 @@ static async createGroup(name: string, description?: string) {
       const response = await fetch(`${API_URL}/${groupId}/rotation-schedule?weeks=${weeks}`, {
         method: "GET",
         headers,
-        // credentials: "include"
       });
 
       const result = await response.json();
@@ -302,7 +295,6 @@ static async createGroup(name: string, description?: string) {
       const response = await fetch(`${API_URL}/${groupId}/details`, {
         method: "GET",
         headers,
-        // credentials: "include"
       });
 
       const result = await response.json();
@@ -334,7 +326,6 @@ static async createGroup(name: string, description?: string) {
       const response = await fetch(`${API_URL}/${groupId}/leave`, {
         method: "POST",
         headers,
-        // credentials: "include"
       });
 
       const result = await response.json();

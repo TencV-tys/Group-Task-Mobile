@@ -1,21 +1,22 @@
-// src/authServices/AuthService.ts - UPDATED with token storage
-import {API_BASE_URL} from '../config/api';
+// src/authServices/AuthService.ts - UPDATED with SecureStore
+import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = `${API_BASE_URL}/api/auth/users`;
 
 const storeUserData = async (userData: any, token?: string) => {
     try {
-        // Store user data
+        // Store user data in AsyncStorage (non-sensitive)
         await AsyncStorage.setItem('user', JSON.stringify(userData));
         if (userData.id) {
             await AsyncStorage.setItem('userId', userData.id);
         }
         
-        // ✅ Store token if provided
+        // ✅ Store token in SecureStore (encrypted)
         if (token) {
-            await AsyncStorage.setItem('userToken', token);
-            console.log('🔐 Token stored successfully');
+            await SecureStore.setItemAsync('userToken', token);
+            console.log('🔐 Token stored securely in SecureStore');
         }
         
         console.log('✅ User data stored successfully');
@@ -40,7 +41,7 @@ export class AuthService {
             console.log("🔍 Login response:", result);
             
             if (result.success && result.user) {
-                // ✅ Store both user data AND token
+                // ✅ Store user data in AsyncStorage, token in SecureStore
                 await storeUserData(result.user, result.token);
                 console.log('🔐 Login successful, user stored:', result.user.id);
             }
@@ -71,7 +72,7 @@ export class AuthService {
             console.log("🔍 Signup response:", result);
             
             if (result.success && result.user) {
-                // ✅ Store both user data AND token
+                // ✅ Store user data in AsyncStorage, token in SecureStore
                 await storeUserData(result.user, result.token);
                 console.log('🔐 Signup successful, user stored:', result.user.id);
             }
@@ -89,12 +90,14 @@ export class AuthService {
 
     static async logout() {
         try {
-            // Clear ALL stored data including token
+            // Clear AsyncStorage data
             await AsyncStorage.multiRemove([
                 'user', 
-                'userId', 
-                'userToken'  // ← Clear token too!
+                'userId'
             ]);
+            
+            // ✅ Clear SecureStore token
+            await SecureStore.deleteItemAsync('userToken');
             
             const response = await fetch(`${API_URL}/logout`, {
                 method: "POST",
@@ -107,8 +110,9 @@ export class AuthService {
             };
 
         } catch (e: any) {
-            // Still clear local storage even if network fails
-            await AsyncStorage.multiRemove(['user', 'userId', 'userToken']);
+            // Still clear storage even if network fails
+            await AsyncStorage.multiRemove(['user', 'userId']);
+            await SecureStore.deleteItemAsync('userToken');
             return {
                 success: false,
                 message: "Cannot connect to the server"
@@ -116,10 +120,10 @@ export class AuthService {
         }
     }
 
-    // ✅ NEW: Get stored token
+    // ✅ Get token from SecureStore
     static async getToken(): Promise<string | null> {
         try {
-            return await AsyncStorage.getItem('userToken');
+            return await SecureStore.getItemAsync('userToken');
         } catch (error) {
             console.error('Error getting token:', error);
             return null;
@@ -144,7 +148,7 @@ export class AuthService {
         }
     }
 
-    // ✅ NEW: Check if user is authenticated (has token)
+    // Check if user is authenticated (has token)
     static async isAuthenticated(): Promise<boolean> {
         const token = await this.getToken();
         return !!token;

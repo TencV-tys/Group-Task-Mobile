@@ -1,6 +1,6 @@
-// services/AssignmentService.ts - COMPLETE UPDATED WITH TOKEN AUTH
+// services/AssignmentService.ts - COMPLETE UPDATED WITH SECURESTORE
 import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { NotificationService } from './NotificationService';
 
 const API_URL = `${API_BASE_URL}/api/assignments`;
@@ -214,10 +214,10 @@ export interface TodayAssignment {
 
 export class AssignmentService {
   
-  // ========== GET AUTH TOKEN ==========
+  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
   private static async getAuthToken(): Promise<string | null> {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
       return token;
     } catch (error) {
@@ -274,7 +274,6 @@ export class AssignmentService {
           method: 'POST',
           headers,
           body: formData,
-          // credentials: 'include' // Optional, not needed with token
         });
 
         const result = await response.json();
@@ -295,7 +294,6 @@ export class AssignmentService {
           method: 'POST',
           headers,
           body: JSON.stringify({ notes: data.notes }),
-          // credentials: 'include' // Optional, not needed with token
         });
 
         const result = await response.json();
@@ -332,7 +330,6 @@ export class AssignmentService {
         method: 'POST',
         headers,
         body: JSON.stringify(data),
-        // credentials: 'include'
       });
 
       const result = await response.json();
@@ -361,7 +358,6 @@ export class AssignmentService {
       const response = await fetch(`${API_URL}/${assignmentId}`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -398,7 +394,6 @@ export class AssignmentService {
       const response = await fetch(url, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -424,7 +419,6 @@ export class AssignmentService {
       const response = await fetch(url, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -468,7 +462,6 @@ export class AssignmentService {
       const response = await fetch(url, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -491,7 +484,6 @@ export class AssignmentService {
       const response = await fetch(`${API_URL}/group/${groupId}/stats`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -514,7 +506,6 @@ export class AssignmentService {
       const response = await fetch(`${API_URL}/${assignmentId}/check-time`, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       if (!response.ok) {
@@ -567,7 +558,6 @@ export class AssignmentService {
       const response = await fetch(url, {
         method: 'GET',
         headers,
-        // credentials: 'include'
       });
 
       if (!response.ok) {

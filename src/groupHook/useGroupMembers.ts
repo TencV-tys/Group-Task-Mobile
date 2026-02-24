@@ -1,8 +1,8 @@
-// src/hooks/useGroupMembers.ts - UPDATED WITH TOKEN CHECK
+// src/hooks/useGroupMembers.ts - UPDATED WITH SECURESTORE
 import { useState, useCallback } from 'react';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 export function useGroupMembers() {
   const [loading, setLoading] = useState(false);
@@ -12,20 +12,21 @@ export function useGroupMembers() {
   const [groupInfo, setGroupInfo] = useState<any>(null);
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests
+  // Check token before making requests from SecureStore
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
-        console.warn('useGroupMembers: No auth token available');
+        console.warn('🔐 useGroupMembers: No auth token available in SecureStore');
         setAuthError(true);
         setError('Please log in again');
         return false;
       }
+      console.log('✅ useGroupMembers: Auth token found in SecureStore');
       setAuthError(false);
       return true;
     } catch (error) {
-      console.error('useGroupMembers: Error checking token:', error);
+      console.error('❌ useGroupMembers: Error checking token:', error);
       setAuthError(true);
       return false;
     }
@@ -64,6 +65,8 @@ export function useGroupMembers() {
     setAuthError(false);
 
     try {
+      console.log(`📥 useGroupMembers: Fetching members for group ${groupId}`);
+      
       // Fetch members
       const membersResult = await GroupMembersService.getGroupMembers(groupId);
       
@@ -74,6 +77,7 @@ export function useGroupMembers() {
           avatarUrl: member.avatarUrl ? ensureFullUrl(member.avatarUrl) : null
         }));
         setMembers(formattedMembers);
+        console.log(`✅ useGroupMembers: Loaded ${formattedMembers.length} members`);
       } else {
         setError(membersResult.message || 'Failed to load members');
         if (membersResult.message?.toLowerCase().includes('token') || 
@@ -90,12 +94,13 @@ export function useGroupMembers() {
           groupData.avatarUrl = ensureFullUrl(groupData.avatarUrl);
         }
         setGroupInfo(groupData);
+        console.log(`✅ useGroupMembers: Loaded group info for ${groupData.name}`);
       } else {
-        console.warn('Could not load group info:', groupResult.message);
+        console.warn('⚠️ Could not load group info:', groupResult.message);
       }
 
     } catch (err: any) {
-      console.error('Error fetching group members:', err);
+      console.error('❌ Error fetching group members:', err);
       setError(err.message || 'Network error');
     } finally {
       setLoading(false);
@@ -132,7 +137,7 @@ export function useGroupMembers() {
       }));
       return { success: true };
     } catch (err: any) {
-      console.error('Error updating group info:', err);
+      console.error('❌ Error updating group info:', err);
       return { success: false, message: err.message };
     }
   }, [ensureFullUrl, checkToken]);
@@ -169,7 +174,7 @@ export function useGroupMembers() {
       
       return result;
     } catch (err: any) {
-      console.error('Error transferring ownership:', err);
+      console.error('❌ Error transferring ownership:', err);
       return { success: false, message: err.message };
     }
   }, [groupInfo, members, checkToken]);
@@ -191,7 +196,7 @@ export function useGroupMembers() {
       
       return result;
     } catch (err: any) {
-      console.error('Error regenerating invite code:', err);
+      console.error('❌ Error regenerating invite code:', err);
       return { success: false, message: err.message };
     }
   }, [checkToken]);
@@ -205,7 +210,7 @@ export function useGroupMembers() {
       const result = await GroupMembersService.deleteGroup(groupId);
       return result;
     } catch (err: any) {
-      console.error('Error deleting group:', err);
+      console.error('❌ Error deleting group:', err);
       return { success: false, message: err.message };
     }
   }, [checkToken]);
@@ -219,7 +224,7 @@ export function useGroupMembers() {
       const result = await GroupMembersService.getGroupSettings(groupId);
       return result;
     } catch (err: any) {
-      console.error('Error getting group settings:', err);
+      console.error('❌ Error getting group settings:', err);
       return { success: false, message: err.message };
     }
   }, [checkToken]);
@@ -242,7 +247,7 @@ export function useGroupMembers() {
       
       return result;
     } catch (err: any) {
-      console.error('Error updating member role:', err);
+      console.error('❌ Error updating member role:', err);
       return { success: false, message: err.message };
     }
   }, [checkToken]);
@@ -263,7 +268,7 @@ export function useGroupMembers() {
       
       return result;
     } catch (err: any) {
-      console.error('Error removing member:', err);
+      console.error('❌ Error removing member:', err);
       return { success: false, message: err.message };
     }
   }, [checkToken]);

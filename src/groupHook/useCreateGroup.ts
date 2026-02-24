@@ -1,28 +1,29 @@
-// src/hooks/useCreateGroup.ts - UPDATED WITH TOKEN CHECK
+// src/hooks/useCreateGroup.ts - UPDATED WITH SECURESTORE
 import { useState, useCallback } from "react";
 import { GroupService } from "../services/GroupService";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 export function useCreateGroup() {
     const [loading, setLoading] = useState<boolean>(false);
-    const [message, setMessage] = useState<string>('');
+    const [message, setMessage] = useState<string>(''); 
     const [success, setSuccess] = useState<boolean>(false);
     const [authError, setAuthError] = useState<boolean>(false);
 
-    // Check token before making requests
+    // Check token before making requests from SecureStore
     const checkToken = useCallback(async (): Promise<boolean> => {
         try {
-            const token = await AsyncStorage.getItem('userToken');
+            const token = await SecureStore.getItemAsync('userToken');
             if (!token) {
-                console.warn('useCreateGroup: No auth token available');
+                console.warn('🔐 useCreateGroup: No auth token available in SecureStore');
                 setAuthError(true);
                 setMessage('❌ Please log in again');
                 return false;
             }
+            console.log('✅ useCreateGroup: Auth token found in SecureStore');
             setAuthError(false);
             return true;
         } catch (error) {
-            console.error('useCreateGroup: Error checking token:', error);
+            console.error('❌ useCreateGroup: Error checking token:', error);
             setAuthError(true);
             return false;
         }
@@ -51,12 +52,13 @@ export function useCreateGroup() {
                 throw new Error('Group name is required');
             }
 
-            console.log(`useCreateGroup: Creating group "${name}"`);
+            console.log(`📥 useCreateGroup: Creating group "${name}"`);
             const result = await GroupService.createGroup(name, description);
 
             if (result.success) {
                 setSuccess(true);
-                setMessage(result.message || "Group created successfully");
+                setMessage(result.message || "✅ Group created successfully");
+                console.log('✅ useCreateGroup: Group created successfully');
                 return {
                     success: true,
                     message: result.message,
@@ -83,7 +85,7 @@ export function useCreateGroup() {
             }
 
         } catch (error: any) {
-            console.error("useCreateGroup: Error:", error);
+            console.error("❌ useCreateGroup: Error:", error);
             
             let errorMessage = error.message || 'Network error';
             

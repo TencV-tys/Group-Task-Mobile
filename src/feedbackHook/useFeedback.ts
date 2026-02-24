@@ -1,8 +1,8 @@
-// src/hooks/useFeedback.ts - UPDATED WITH TOKEN CHECK
+// src/hooks/useFeedback.ts - UPDATED WITH SECURESTORE
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { FeedbackService, Feedback, FeedbackStats } from '../services/FeedbackService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED') => {
   const [loading, setLoading] = useState(false);
@@ -21,19 +21,20 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
 
   const isMounted = useRef(true);
 
-  // Check token before making requests
+  // Check token before making requests from SecureStore
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
-        console.warn('useFeedback: No auth token available');
+        console.warn('🔐 useFeedback: No auth token available in SecureStore');
         setAuthError(true);
         return false;
       }
+      console.log('✅ useFeedback: Auth token found in SecureStore');
       setAuthError(false);
       return true;
     } catch (error) {
-      console.error('useFeedback: Error checking token:', error);
+      console.error('❌ useFeedback: Error checking token:', error);
       setAuthError(true);
       return false;
     }
@@ -85,7 +86,7 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
         return { success: false };
       }
     } catch (error) {
-      console.error('Submit feedback error:', error);
+      console.error('❌ Submit feedback error:', error);
       Alert.alert('Error', 'An unexpected error occurred');
       return { success: false };
     } finally {
@@ -127,90 +128,94 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
         return { success: false };
       }
     } catch (error) {
-      console.error('Update feedback error:', error);
+      console.error('❌ Update feedback error:', error);
       Alert.alert('Error', 'An unexpected error occurred');
       return { success: false };
     } finally {
       setLoading(false);
     }
   }, [checkToken]);
-// Load feedback list (with optional filter)
-const loadFeedback = useCallback(async (page: number = 1, filter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | null) => {
-  try {
-    const hasToken = await checkToken();
-    if (!hasToken) return;
 
-    setLoading(true);
-    
-    const currentFilter = filter !== undefined ? filter : activeFilter;
-    
-    let result;
-    if (currentFilter) {
-      result = await FeedbackService.getFeedbackByStatus(currentFilter, page, pagination.limit);
-    } else {
-      result = await FeedbackService.getMyFeedback(page, pagination.limit);
-    }
+  // Load feedback list (with optional filter)
+  const loadFeedback = useCallback(async (page: number = 1, filter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | null) => {
+    try {
+      const hasToken = await checkToken();
+      if (!hasToken) return;
 
-    if (result.success) {
-      // ✅ FIX: Provide default empty array if undefined
-      setFeedbackList(result.feedback || []);
+      setLoading(true);
       
-      // ✅ FIX: Provide default pagination if undefined
-      setPagination(result.pagination || {
-        page: 1,
-        limit: pagination.limit,
-        total: 0,
-        pages: 0
-      });
-    } else if (result.message?.toLowerCase().includes('token') || 
-               result.message?.toLowerCase().includes('auth')) {
-      setAuthError(true);
+      const currentFilter = filter !== undefined ? filter : activeFilter;
+      
+      let result;
+      if (currentFilter) {
+        result = await FeedbackService.getFeedbackByStatus(currentFilter, page, pagination.limit);
+      } else {
+        result = await FeedbackService.getMyFeedback(page, pagination.limit);
+      }
+
+      if (result.success) {
+        // ✅ FIX: Provide default empty array if undefined
+        setFeedbackList(result.feedback || []);
+        
+        // ✅ FIX: Provide default pagination if undefined
+        setPagination(result.pagination || {
+          page: 1,
+          limit: pagination.limit,
+          total: 0,
+          pages: 0
+        });
+        console.log(`✅ useFeedback: Loaded ${result.feedback?.length || 0} feedback items`);
+      } else if (result.message?.toLowerCase().includes('token') || 
+                 result.message?.toLowerCase().includes('auth')) {
+        setAuthError(true);
+      }
+    } catch (error) {
+      console.error('❌ Load feedback error:', error);
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('Load feedback error:', error);
-  } finally {
-    setLoading(false);
-  }
-}, [pagination.limit, activeFilter, checkToken]);
+  }, [pagination.limit, activeFilter, checkToken]);
 
-// Load feedback details
-// Load feedback details
-const loadFeedbackDetails = useCallback(async (feedbackId: string) => {
-  try {
-    const hasToken = await checkToken();
-    if (!hasToken) return null;
+  // Load feedback details
+  const loadFeedbackDetails = useCallback(async (feedbackId: string) => {
+    try {
+      const hasToken = await checkToken();
+      if (!hasToken) return null;
 
-    setLoading(true);
-    const result = await FeedbackService.getFeedbackDetails(feedbackId);
+      setLoading(true);
+      const result = await FeedbackService.getFeedbackDetails(feedbackId);
 
-    if (result.success) {
-      // ✅ FIX: Use feedbackItem for single item response
-      setSelectedFeedback(result.feedbackItem || null);
-      return result.feedbackItem;
+      if (result.success) {
+        // ✅ FIX: Use feedbackItem for single item response
+        setSelectedFeedback(result.feedbackItem || null);
+        return result.feedbackItem;
+      }
+      return null;
+    } catch (error) {
+      console.error('❌ Load feedback details error:', error);
+      return null;
+    } finally {
+      setLoading(false);
     }
-    return null;
-  } catch (error) {
-    console.error('Load feedback details error:', error);
-    return null;
-  } finally {
-    setLoading(false);
-  }
-}, [checkToken]);
-// Load stats (manual refresh)
-const loadStats = useCallback(async () => {
-  try {
-    const hasToken = await checkToken();
-    if (!hasToken) return;
+  }, [checkToken]);
 
-    const result = await FeedbackService.getMyFeedbackStats();
-    if (result.success) {
-      // ✅ FIX: Provide null if undefined
-      setStats(result.stats || null);
+  // Load stats (manual refresh)
+  const loadStats = useCallback(async () => {
+    try {
+      const hasToken = await checkToken();
+      if (!hasToken) return;
+
+      const result = await FeedbackService.getMyFeedbackStats();
+      if (result.success) {
+        // ✅ FIX: Provide null if undefined
+        setStats(result.stats || null);
+        console.log('✅ useFeedback: Stats loaded');
+      }
+    } catch (error) {
+      console.error('❌ Load stats error:', error);
     }
-  } catch (error) {
-    console.error('Load stats error:', error);
-  }
-}, [checkToken]);
+  }, [checkToken]);
+
   // Delete feedback
   const deleteFeedback = useCallback(async (feedbackId: string): Promise<boolean> => {
     try {
@@ -233,7 +238,7 @@ const loadStats = useCallback(async () => {
         return false;
       }
     } catch (error) {
-      console.error('Delete feedback error:', error);
+      console.error('❌ Delete feedback error:', error);
       Alert.alert('Error', 'An unexpected error occurred');
       return false;
     } finally {

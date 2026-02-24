@@ -1,7 +1,7 @@
-// src/hooks/useJoinGroup.ts - UPDATED WITH TOKEN CHECK
+// src/hooks/useJoinGroup.ts - UPDATED WITH SECURESTORE
 import { useState, useCallback } from 'react';
 import { GroupService } from '../services/GroupService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 export function useJoinGroup() {
   const [loading, setLoading] = useState<boolean>(false);
@@ -10,20 +10,21 @@ export function useJoinGroup() {
   const [joinedGroup, setJoinedGroup] = useState<any>(null);
   const [authError, setAuthError] = useState<boolean>(false);
 
-  // Check token before making requests
+  // Check token before making requests from SecureStore
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
-        console.warn('useJoinGroup: No auth token available');
+        console.warn('🔐 useJoinGroup: No auth token available in SecureStore');
         setAuthError(true);
         setError('Please log in again');
         return false;
       }
+      console.log('✅ useJoinGroup: Auth token found in SecureStore');
       setAuthError(false);
       return true;
     } catch (error) {
-      console.error('useJoinGroup: Error checking token:', error);
+      console.error('❌ useJoinGroup: Error checking token:', error);
       setAuthError(true);
       return false;
     }
@@ -38,7 +39,7 @@ export function useJoinGroup() {
     setAuthError(false);
 
     try {
-      console.log(`useJoinGroup: Attempting to join with code: ${inviteCode}`);
+      console.log(`📥 useJoinGroup: Attempting to join with code: ${inviteCode}`);
       
       // Check token first
       const hasToken = await checkToken();
@@ -65,7 +66,7 @@ export function useJoinGroup() {
 
       // Call the service
       const result = await GroupService.joinGroup(cleanInviteCode);
-      console.log('useJoinGroup: API result:', result);
+      console.log('📦 useJoinGroup: API result:', result);
 
       if (result.success) {
         setSuccess(true);
@@ -82,7 +83,7 @@ export function useJoinGroup() {
       }
 
     } catch (err: any) {
-      console.error('useJoinGroup: Error:', err);
+      console.error('❌ useJoinGroup: Error:', err);
       
       let errorMessage = err.message || 'Failed to join group';
       

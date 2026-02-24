@@ -1,8 +1,8 @@
-// src/hooks/useMyGroups.ts - UPDATED WITH TOKEN CHECK
+// src/hooks/useMyGroups.ts - UPDATED WITH SECURESTORE
 import { useState, useCallback, useEffect } from 'react';
 import { GroupService } from '../services/GroupService';
 import { GroupMembersService } from '../services/GroupMemberService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 export function useMyGroups() {
   const [groups, setGroups] = useState<any[]>([]);
@@ -11,20 +11,21 @@ export function useMyGroups() {
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<boolean>(false);
 
-  // Check token before making requests
+  // Check token before making requests from SecureStore
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
-        console.warn('useMyGroups: No auth token available');
+        console.warn('🔐 useMyGroups: No auth token available in SecureStore');
         setAuthError(true);
         setError('Please log in again');
         return false;
       }
+      console.log('✅ useMyGroups: Auth token found in SecureStore');
       setAuthError(false);
       return true;
     } catch (error) {
-      console.error('useMyGroups: Error checking token:', error);
+      console.error('❌ useMyGroups: Error checking token:', error);
       setAuthError(true);
       return false;
     }
@@ -48,10 +49,10 @@ export function useMyGroups() {
     setError(null);
     
     try {
-      console.log("useMyGroups: Fetching groups...");
+      console.log("📥 useMyGroups: Fetching groups...");
       const result = await GroupService.getUserGroups();
       
-      console.log("useMyGroups: Fetch result:", result);
+      console.log("📦 useMyGroups: Fetch result:", result);
       
       if (result.success) {
         // Handle different response structures
@@ -75,6 +76,7 @@ export function useMyGroups() {
         
         setGroups(groupsWithAvatars);
         setAuthError(false);
+        console.log(`✅ useMyGroups: Loaded ${groupsWithAvatars.length} groups`);
       } else {
         setError(result.message || 'Failed to load groups');
         setGroups([]);
@@ -88,7 +90,7 @@ export function useMyGroups() {
       }
       
     } catch (err: any) {
-      console.error("useMyGroups: Error:", err);
+      console.error("❌ useMyGroups: Error:", err);
       setError(err.message || 'Network error');
       setGroups([]);
     } finally {
@@ -140,7 +142,7 @@ export function useMyGroups() {
       ));
       return { success: true };
     } catch (error: any) {
-      console.error("useMyGroups: Error updating group avatar:", error);
+      console.error("❌ useMyGroups: Error updating group avatar:", error);
       return { 
         success: false, 
         message: error.message || 'Failed to update group avatar' 
@@ -163,7 +165,7 @@ export function useMyGroups() {
       ));
       return { success: true };
     } catch (error: any) {
-      console.error("useMyGroups: Error updating group:", error);
+      console.error("❌ useMyGroups: Error updating group:", error);
       return { 
         success: false, 
         message: error.message || 'Failed to update group' 
@@ -191,7 +193,7 @@ export function useMyGroups() {
       
       return result;
     } catch (error: any) {
-      console.error("useMyGroups: Error uploading group avatar:", error);
+      console.error("❌ useMyGroups: Error uploading group avatar:", error);
       return { 
         success: false, 
         message: error.message || 'Failed to upload group avatar' 
@@ -216,7 +218,7 @@ export function useMyGroups() {
       
       return result;
     } catch (error: any) {
-      console.error("useMyGroups: Error deleting group avatar:", error);
+      console.error("❌ useMyGroups: Error deleting group avatar:", error);
       return { 
         success: false, 
         message: error.message || 'Failed to delete group avatar' 

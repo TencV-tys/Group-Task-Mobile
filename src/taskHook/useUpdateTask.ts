@@ -1,11 +1,32 @@
-// src/hooks/useUpdateTask.ts
-import { useState } from 'react';
+// src/hooks/useUpdateTask.ts - UPDATED WITH TOKEN CHECK
+import { useState, useCallback } from 'react';
 import { TaskService, type UpdateTaskData } from '../services/TaskService';
+import * as SecureStore from 'expo-secure-store';
 
 export function useUpdateTask() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [authError, setAuthError] = useState(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        console.warn('🔐 useUpdateTask: No auth token available');
+        setAuthError(true);
+        setError('Please log in again');
+        return false;
+      }
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('❌ useUpdateTask: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   const updateTask = async (
     taskId: string,
@@ -26,8 +47,20 @@ export function useUpdateTask() {
     setLoading(true);
     setError(null);
     setSuccess(false);
+    setAuthError(false);
 
     try {
+      // Check token first - critical for authentication
+      const hasToken = await checkToken();
+      if (!hasToken) {
+        setLoading(false);
+        return {
+          success: false,
+          message: 'Authentication required',
+          authError: true
+        };
+      }
+
       // Validate
       if (taskData.title && !taskData.title.trim()) {
         throw new Error('Task title cannot be empty');
@@ -82,27 +115,37 @@ export function useUpdateTask() {
         }
       }
 
-      console.log("Updating task with data:", requestData);
+      console.log("📥 useUpdateTask: Updating task with data:", requestData);
 
       const result = await TaskService.updateTask(taskId, requestData);
       
       if (result.success) {
         setSuccess(true);
+        console.log("✅ useUpdateTask: Task updated successfully");
         return {
           success: true,
           message: result.message || 'Task updated successfully',
           task: result.task
         };
       } else {
+        // Check if error is auth-related
+        if (result.message?.toLowerCase().includes('token') || 
+            result.message?.toLowerCase().includes('auth') ||
+            result.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
         throw new Error(result.message || 'Failed to update task');
       }
 
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to update task';
       setError(errorMessage);
+      console.error("❌ useUpdateTask: Error:", errorMessage);
       return { 
         success: false,
-        message: errorMessage
+        message: errorMessage,
+        authError: errorMessage.toLowerCase().includes('token') || 
+                  errorMessage.toLowerCase().includes('auth')
       };
     } finally {
       setLoading(false);
@@ -113,12 +156,14 @@ export function useUpdateTask() {
     setLoading(false);
     setError(null);
     setSuccess(false);
+    setAuthError(false);
   };
 
   return {
     loading,
     error,
     success,
+    authError,
     updateTask,
     reset
   };

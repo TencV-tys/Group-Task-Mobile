@@ -1,11 +1,32 @@
-// src/taskHook/useCreateTask.ts
-import { useState } from 'react';
+// src/taskHook/useCreateTask.ts - UPDATED WITH TOKEN CHECK
+import { useState, useCallback } from 'react';
 import { TaskService, type CreateTaskData } from '../services/TaskService';
+import * as SecureStore from 'expo-secure-store';
 
 export function useCreateTask() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [authError, setAuthError] = useState(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        console.warn('🔐 useCreateTask: No auth token available');
+        setAuthError(true);
+        setError('Please log in again');
+        return false;
+      }
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('❌ useCreateTask: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   const createTask = async (
     groupId: string,
@@ -29,8 +50,20 @@ export function useCreateTask() {
     setLoading(true);
     setError(null);
     setSuccess(false);
+    setAuthError(false);
 
     try {
+      // Check token first - critical for authentication
+      const hasToken = await checkToken();
+      if (!hasToken) {
+        setLoading(false);
+        return {
+          success: false,
+          message: 'Authentication required',
+          authError: true
+        };
+      }
+
       // Validate
       if (!taskData.title.trim()) {
         throw new Error('Task title is required');
@@ -60,7 +93,7 @@ export function useCreateTask() {
         executionFrequency = 'WEEKLY';
       }
       
-      console.log("useCreateTask: Determined execution frequency:", executionFrequency);
+      console.log("📥 useCreateTask: Determined execution frequency:", executionFrequency);
       
       // For DAILY tasks, time slots are required
       if (executionFrequency === 'DAILY' && (!taskData.timeSlots || taskData.timeSlots.length === 0)) {
@@ -101,30 +134,39 @@ export function useCreateTask() {
         }
       }
 
-      console.log("useCreateTask: Creating task with data:", requestData);
+      console.log("📦 useCreateTask: Creating task with data:", requestData);
 
       const result = await TaskService.createTask(groupId, requestData);
       
-      console.log("useCreateTask: Result from server:", result);
+      console.log("📥 useCreateTask: Result from server:", result);
       
       if (result.success) {
         setSuccess(true);
+        console.log("✅ useCreateTask: Task created successfully");
         return {
           success: true,
           message: result.message || 'Task created successfully',
           task: result.task || result.data?.task
         };
       } else {
+        // Check if error is auth-related
+        if (result.message?.toLowerCase().includes('token') || 
+            result.message?.toLowerCase().includes('auth') ||
+            result.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
         throw new Error(result.message || 'Failed to create task');
       }
 
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to create task';
-      console.error("useCreateTask error:", err);
+      console.error("❌ useCreateTask error:", err);
       setError(errorMessage);
       return {
         success: false,
-        message: errorMessage
+        message: errorMessage,
+        authError: errorMessage.toLowerCase().includes('token') || 
+                  errorMessage.toLowerCase().includes('auth')
       };
     } finally {
       setLoading(false);
@@ -135,12 +177,14 @@ export function useCreateTask() {
     setLoading(false);
     setError(null);
     setSuccess(false);
+    setAuthError(false);
   };
 
   return {
     loading,
     error,
-    success, 
+    success,
+    authError,
     createTask,
     reset
   };

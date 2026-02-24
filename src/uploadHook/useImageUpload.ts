@@ -1,9 +1,9 @@
-// src/hooks/useImageUpload.ts - UPDATED WITH TOKEN CHECK
+// src/hooks/useImageUpload.ts - UPDATED WITH SECURESTORE
 import { useState, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { UploadService } from '../uploadService/UploadService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 interface UseImageUploadProps {
   onSuccess?: (result: any) => void;
@@ -15,20 +15,21 @@ export const useImageUpload = ({ onSuccess, onError }: UseImageUploadProps = {})
   const [progress, setProgress] = useState(0);
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests
+  // Check token before making requests from SecureStore
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
-        console.warn('useImageUpload: No auth token available');
+        console.warn('🔐 useImageUpload: No auth token available in SecureStore');
         setAuthError(true);
         Alert.alert('Authentication Error', 'Please log in again');
         return false;
       }
+      console.log('✅ useImageUpload: Auth token found in SecureStore');
       setAuthError(false);
       return true;
     } catch (error) {
-      console.error('useImageUpload: Error checking token:', error);
+      console.error('❌ useImageUpload: Error checking token:', error);
       setAuthError(true);
       return false;
     }

@@ -1,6 +1,6 @@
-// src/services/UploadService.ts - UPDATED WITH TOKEN AUTH
+// src/services/UploadService.ts - UPDATED WITH SECURESTORE
 import { API_BASE_URL } from '../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const API_URL = `${API_BASE_URL}/api/uploads`;
 
@@ -18,10 +18,10 @@ export interface UploadResponse {
 
 export class UploadService {
   
-  // ========== GET AUTH TOKEN ==========
+  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
   private static async getAuthToken(): Promise<string | null> {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       console.log('🔐 UploadService: Auth token retrieved:', token ? 'Yes' : 'No');
       return token;
     } catch (error) {
@@ -97,7 +97,6 @@ export class UploadService {
         method: 'POST',
         headers,
         body: formData,
-        // credentials: 'include', // Not needed with token
       });
 
       const result = await response.json();
@@ -130,7 +129,6 @@ export class UploadService {
         method: 'POST',
         headers,
         body: JSON.stringify({ avatarBase64: processedBase64 }),
-        // credentials: 'include',
       });
 
       const result = await response.json();
@@ -181,7 +179,6 @@ export class UploadService {
         method: 'POST',
         headers,
         body: formData,
-        // credentials: 'include',
       });
 
       const result = await response.json();
@@ -208,7 +205,6 @@ export class UploadService {
       const response = await fetch(`${API_URL}/avatar`, {
         method: 'DELETE',
         headers,
-        // credentials: 'include',
       });
 
       const result = await response.json();
@@ -241,7 +237,6 @@ export class UploadService {
         method: 'POST',
         headers,
         body: JSON.stringify({ avatarBase64: processedBase64 }),
-        // credentials: 'include',
       });
 
       const result = await response.json();
@@ -290,7 +285,6 @@ export class UploadService {
         method: 'POST',
         headers,
         body: formData,
-        // credentials: 'include',
       });
 
       const result = await response.json();
@@ -315,7 +309,6 @@ export class UploadService {
       const response = await fetch(`${API_URL}/group/${groupId}/avatar`, {
         method: 'DELETE',
         headers,
-        // credentials: 'include',
       });
 
       const result = await response.json();

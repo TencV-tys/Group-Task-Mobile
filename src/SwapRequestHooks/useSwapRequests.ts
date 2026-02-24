@@ -1,7 +1,7 @@
-// SwapRequestHooks/useSwapRequests.ts - UPDATED with better logging
+// SwapRequestHooks/useSwapRequests.ts - UPDATED WITH SECURESTORE
 import { useState, useEffect, useCallback } from 'react';
 import { SwapRequestFilters, SwapRequest, SwapRequestService } from '../services/SwapRequestService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 
 export const useSwapRequests = () => {
@@ -13,49 +13,46 @@ export const useSwapRequests = () => {
   const [totalMyRequests, setTotalMyRequests] = useState(0);
   const [totalPendingForMe, setTotalPendingForMe] = useState(0);
 
-  // Load user ID from storage on mount
-// SwapRequestHooks/useSwapRequests.ts - FIX storage key
-
-// Load user ID from storage on mount
-useEffect(() => {
-  const loadUserId = async () => {
-    try {
-      // Try to get userData first (since AuthService stores as 'userData')
-      let userStr = await AsyncStorage.getItem('userData');
-      
-      // If not found, try 'user' as fallback
-      if (!userStr) {
-        userStr = await AsyncStorage.getItem('user');
-      }
-      
-      // If still not found, try 'userId' directly
-      if (!userStr) {
-        const userId = await AsyncStorage.getItem('userId');
-        if (userId) {
-          setUserId(userId);
-          console.log('✅ User ID loaded directly from userId key:', userId);
-          return;
-        }
-      }
-      
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        setUserId(user.id || user._id); // Handle both id and _id formats
-        console.log('✅ User ID loaded:', user.id || user._id);
-        console.log('📦 User data:', user);
-      } else {
-        console.warn('⚠️ No user found in storage');
+  // Load user ID from SecureStore on mount
+  useEffect(() => {
+    const loadUserId = async () => {
+      try {
+        // Try to get userData from SecureStore first
+        let userStr = await SecureStore.getItemAsync('userData');
         
-        // Debug: List all keys
-        const allKeys = await AsyncStorage.getAllKeys();
-        console.log('📋 All AsyncStorage keys:', allKeys);
+        // If not found, try 'user' as fallback
+        if (!userStr) {
+          userStr = await SecureStore.getItemAsync('user');
+        }
+        
+        // If still not found, try 'userId' directly
+        if (!userStr) {
+          const userId = await SecureStore.getItemAsync('userId');
+          if (userId) {
+            setUserId(userId);
+            console.log('✅ User ID loaded directly from userId key:', userId);
+            return;
+          }
+        }
+        
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setUserId(user.id || user._id); // Handle both id and _id formats
+          console.log('✅ User ID loaded from SecureStore:', user.id || user._id);
+          console.log('📦 User data loaded from SecureStore');
+        } else {
+          console.warn('⚠️ No user found in SecureStore');
+          
+          // Debug: Check if token exists
+          const token = await SecureStore.getItemAsync('userToken');
+          console.log('🔐 Token exists in SecureStore:', token ? 'Yes' : 'No');
+        }
+      } catch (error) {
+        console.error('❌ Error loading user ID from SecureStore:', error);
       }
-    } catch (error) {
-      console.error('❌ Error loading user ID:', error);
-    }
-  };
-  loadUserId();
-}, []);
+    };
+    loadUserId();
+  }, []);
 
   // Load my swap requests
   const loadMyRequests = useCallback(async (filters?: SwapRequestFilters) => {
@@ -167,7 +164,7 @@ useEffect(() => {
         };
       }
       
-      // Create the swap request - service will add auth token
+      // Create the swap request - service will add auth token from SecureStore
       const response = await SwapRequestService.createSwapRequest(data);
       
       console.log('📦 Create swap request response:', response);

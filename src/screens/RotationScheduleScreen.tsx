@@ -1,3 +1,4 @@
+// src/screens/RotationScheduleScreen.tsx - UPDATED with clean UI and consistent colors
 import React, { useEffect } from 'react';
 import {
   View,
@@ -12,6 +13,7 @@ import {
   FlatList,
   Dimensions
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRotationSchedule } from '../taskHook/useRotationSchedule';
 
@@ -70,7 +72,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
   };
 
   const handleTaskPress = (taskId: string) => {
-    navigation.navigate('TaskDetails', { taskId, groupId });
+    navigation.navigate('TaskDetails', { taskId, groupId, userRole });
   };
 
   const renderWeekTab = (week: any) => {
@@ -86,26 +88,37 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         style={[
           styles.weekTab,
           isSelected && styles.weekTabSelected,
-          isCurrentWeek && styles.currentWeekTab
         ]}
         onPress={() => setSelectedWeek(week.weekNumber)}
       >
-        <Text style={[
-          styles.weekTabText,
-          isSelected && styles.weekTabTextSelected
-        ]}>
-          W{week.weekNumber}
-        </Text>
-        {isCurrentWeek && (
-          <View style={styles.currentIndicator}>
-            <MaterialCommunityIcons name="circle-small" size={8} color="#007AFF" />
-          </View>
-        )}
-        {hasTasks && (
-          <View style={styles.taskIndicator}>
-            <Text style={styles.taskIndicatorText}>{week.tasks.length}</Text>
-          </View>
-        )}
+        <LinearGradient
+          colors={isSelected ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.weekTabGradient}
+        >
+          <Text style={[
+            styles.weekTabText,
+            isSelected && styles.weekTabTextSelected
+          ]}>
+            W{week.weekNumber}
+          </Text>
+          {isCurrentWeek && (
+            <View style={styles.currentIndicator}>
+              <MaterialCommunityIcons name="circle-small" size={8} color="#2b8a3e" />
+            </View>
+          )}
+          {hasTasks && (
+            <LinearGradient
+              colors={['#fa5252', '#e03131']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.taskIndicator}
+            >
+              <Text style={styles.taskIndicatorText}>{week.tasks.length}</Text>
+            </LinearGradient>
+          )}
+        </LinearGradient>
       </TouchableOpacity>
     );
   };
@@ -122,44 +135,56 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         onPress={() => handleTaskPress(item.taskId)}
         activeOpacity={0.7}
       >
-        <View style={styles.taskHeader}>
-          <View style={styles.taskTitleContainer}>
-            <Text style={styles.taskTitle} numberOfLines={2}>
-              {item.taskTitle}
-            </Text>
-          </View>
-          <View style={styles.pointsBadge}>
-            <Text style={styles.pointsText}>{item.points} pts</Text>
-          </View>
-        </View>
-        
-        <View style={styles.taskDetails}>
-          <View style={styles.assigneeContainer}>
-            <MaterialCommunityIcons name="account" size={16} color="#6c757d" />
-            <Text style={styles.assigneeText} numberOfLines={1}>
-              {item.assigneeName || 'Unassigned'}
-            </Text>
+        <LinearGradient
+          colors={isCurrentWeek ? ['#e7f5ff', '#d0ebff'] : ['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.taskGradient}
+        >
+          <View style={styles.taskHeader}>
+            <View style={styles.taskTitleContainer}>
+              <Text style={styles.taskTitle} numberOfLines={2}>
+                {item.taskTitle}
+              </Text>
+            </View>
+            <LinearGradient
+              colors={['#fff3bf', '#ffec99']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.pointsBadge}
+            >
+              <Text style={styles.pointsText}>{item.points} pts</Text>
+            </LinearGradient>
           </View>
           
-          <View style={styles.timeContainer}>
-            {item.dayOfWeek && (
-              <>
-                <MaterialCommunityIcons name="calendar" size={14} color="#6c757d" />
-                <Text style={styles.timeText}>
-                  {item.dayOfWeek}
-                  {item.scheduledTime ? ` • ${item.scheduledTime}` : ''}
-                </Text>
-              </>
-            )}
+          <View style={styles.taskDetails}>
+            <View style={styles.assigneeContainer}>
+              <MaterialCommunityIcons name="account" size={14} color="#868e96" />
+              <Text style={styles.assigneeText} numberOfLines={1}>
+                {item.assigneeName || 'Unassigned'}
+              </Text>
+            </View>
+            
+            <View style={styles.timeContainer}>
+              {item.dayOfWeek && (
+                <>
+                  <MaterialCommunityIcons name="calendar" size={12} color="#868e96" />
+                  <Text style={styles.timeText}>
+                    {item.dayOfWeek}
+                    {item.scheduledTime ? ` • ${item.scheduledTime}` : ''}
+                  </Text>
+                </>
+              )}
+            </View>
           </View>
-        </View>
-        
-        {item.category && (
-          <View style={styles.categoryContainer}>
-            <MaterialCommunityIcons name="tag" size={12} color="#868e96" />
-            <Text style={styles.categoryText}>{item.category}</Text>
-          </View>
-        )}
+          
+          {item.category && (
+            <View style={styles.categoryContainer}>
+              <MaterialCommunityIcons name="tag" size={10} color="#868e96" />
+              <Text style={styles.categoryText}>{item.category}</Text>
+            </View>
+          )}
+        </LinearGradient>
       </TouchableOpacity>
     );
   };
@@ -167,10 +192,15 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
   const renderDayDistribution = () => {
     const distribution = getTaskDistributionByDay();
     const days = Object.keys(distribution);
-    const maxTasks = Math.max(...Object.values(distribution));
+    const maxTasks = Math.max(...Object.values(distribution), 1);
     
     return (
-      <View style={styles.distributionCard}>
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.distributionCard}
+      >
         <Text style={styles.distributionTitle}>Tasks by Day</Text>
         <View style={styles.distributionGrid}>
           {days.map((day) => (
@@ -181,9 +211,8 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
                   style={[
                     styles.dayBar,
                     { 
-                      height: maxTasks > 0 
-                        ? (distribution[day] / maxTasks) * 40 
-                        : 0 
+                      height: (distribution[day] / maxTasks) * 40,
+                      backgroundColor: distribution[day] > 0 ? '#2b8a3e' : '#e9ecef'
                     }
                   ]} 
                 />
@@ -192,7 +221,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             </View>
           ))}
         </View>
-      </View>
+      </LinearGradient>
     );
   };
 
@@ -203,7 +232,12 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     const weekPoints = selectedWeekData.tasks.reduce((sum: number, task: any) => sum + (task.points || 0), 0);
     
     return (
-      <View style={styles.statsCard}>
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.statsCard}
+      >
         <Text style={styles.statsTitle}>Week {selectedWeek} Statistics</Text>
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
@@ -225,7 +259,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             <Text style={styles.statLabel}>Fairness</Text>
           </View>
         </View>
-      </View>
+      </LinearGradient>
     );
   };
 
@@ -233,7 +267,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading rotation schedule...</Text>
         </View>
       </SafeAreaView>
@@ -244,14 +278,21 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="calendar-remove" size={64} color="#FF3B30" />
+          <MaterialCommunityIcons name="calendar-remove" size={64} color="#fa5252" />
           <Text style={styles.errorText}>Failed to Load Schedule</Text>
           <Text style={styles.errorSubText}>{error}</Text>
           <TouchableOpacity 
             style={styles.retryButton}
             onPress={loadRotationSchedule}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -266,7 +307,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Text style={styles.backButtonText}>←</Text>
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
@@ -280,16 +321,21 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
           style={styles.refreshButton}
         >
           {refreshing ? (
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color="#2b8a3e" />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
+            <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
           )}
         </TouchableOpacity>
       </View>
 
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={refresh}
+            colors={['#2b8a3e']}
+            tintColor="#2b8a3e"
+          />
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
@@ -308,12 +354,17 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
 
         {/* Current Week Info */}
         {currentWeek === selectedWeek && (
-          <View style={styles.currentWeekBanner}>
-            <MaterialCommunityIcons name="information" size={20} color="#007AFF" />
+          <LinearGradient
+            colors={['#e7f5ff', '#d0ebff']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.currentWeekBanner}
+          >
+            <MaterialCommunityIcons name="information" size={18} color="#2b8a3e" />
             <Text style={styles.currentWeekText}>
-              This is the current week. Tasks are active and can be completed.
+              Current week • Tasks are active and can be completed
             </Text>
-          </View>
+          </LinearGradient>
         )}
 
         {/* Statistics */}
@@ -326,11 +377,18 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         <View style={styles.tasksSection}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>
-              Tasks for Week {selectedWeek}
+              Week {selectedWeek} Tasks
             </Text>
-            <Text style={styles.taskCount}>
-              {getSelectedWeekTasks().length} tasks
-            </Text>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.taskCountBadge}
+            >
+              <Text style={styles.taskCount}>
+                {getSelectedWeekTasks().length}
+              </Text>
+            </LinearGradient>
           </View>
 
           {getSelectedWeekTasks().length > 0 ? (
@@ -344,10 +402,10 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
           ) : (
             <View style={styles.emptyTasks}>
               <MaterialCommunityIcons name="calendar-blank" size={48} color="#dee2e6" />
-              <Text style={styles.emptyTasksText}>No tasks scheduled for this week</Text>
+              <Text style={styles.emptyTasksText}>No tasks scheduled</Text>
               <Text style={styles.emptyTasksSubtext}>
                 {selectedWeek === currentWeek 
-                  ? "Tasks will appear here once they're assigned to the current week"
+                  ? "Tasks will appear here once they're assigned"
                   : "No tasks were scheduled for this week"}
               </Text>
             </View>
@@ -358,15 +416,20 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         {isAdmin && (
           <View style={styles.adminSection}>
             <Text style={styles.adminTitle}>Admin Actions</Text>
-            <View style={styles.adminActions}>
-              <TouchableOpacity 
-                style={styles.adminButton}
-                onPress={handleRotateTasks}
+            <TouchableOpacity 
+              style={styles.adminButton}
+              onPress={handleRotateTasks}
+            >
+              <LinearGradient
+                colors={['#fff5f5', '#ffe3e3']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.adminButtonGradient}
               >
-                <MaterialCommunityIcons name="rotate-right" size={20} color="#007AFF" />
+                <MaterialCommunityIcons name="rotate-right" size={18} color="#fa5252" />
                 <Text style={styles.adminButtonText}>Rotate to Next Week</Text>
-              </TouchableOpacity>
-            </View>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         )}
       </ScrollView>
@@ -385,23 +448,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 5,
+    paddingVertical: 12,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
-    minHeight: 56,
+    minHeight: 60,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#007AFF',
-    fontWeight: '400',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   titleContainer: {
     flex: 1,
@@ -410,24 +474,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212529',
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#868e96',
     marginTop: 2,
     textAlign: 'center',
   },
   refreshButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#f1f3f5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   // Scroll Content
   scrollContent: {
@@ -441,8 +510,8 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   loadingText: {
-    fontSize: 16,
-    color: '#6c757d',
+    fontSize: 14,
+    color: '#868e96',
     marginTop: 16,
   },
   errorContainer: {
@@ -452,27 +521,29 @@ const styles = StyleSheet.create({
     padding: 40,
   },
   errorText: {
-    fontSize: 18,
-    color: '#FF3B30',
+    fontSize: 16,
+    color: '#fa5252',
     textAlign: 'center',
     marginVertical: 10,
     fontWeight: '600',
   },
   errorSubText: {
     fontSize: 14,
-    color: '#6c757d',
+    color: '#868e96',
     textAlign: 'center',
     marginBottom: 20,
   },
   retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  retryButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
   },
   retryButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   // Week Tabs
@@ -486,28 +557,26 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   weekTab: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
     minWidth: 60,
+  },
+  weekTabGradient: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: '#f1f3f5',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'transparent',
     position: 'relative',
   },
   weekTabSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  currentWeekTab: {
-    borderColor: '#007AFF',
+    borderColor: '#2b8a3e',
   },
   weekTabText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#6c757d',
+    color: '#495057',
   },
   weekTabTextSelected: {
     color: 'white',
@@ -521,7 +590,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: '#FF3B30',
     width: 16,
     height: 16,
     borderRadius: 8,
@@ -530,42 +598,37 @@ const styles = StyleSheet.create({
   },
   taskIndicatorText: {
     color: 'white',
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 'bold',
   },
   // Current Week Banner
   currentWeekBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e7f5ff',
     marginHorizontal: 16,
     marginVertical: 8,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#a5d8ff',
+    borderColor: '#b2f2bb',
     gap: 8,
   },
   currentWeekText: {
     flex: 1,
-    fontSize: 14,
-    color: '#1971c2',
+    fontSize: 13,
+    color: '#2b8a3e',
   },
   // Statistics Card
   statsCard: {
-    backgroundColor: 'white',
     marginHorizontal: 16,
     marginVertical: 8,
     padding: 16,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   statsTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#212529',
     marginBottom: 12,
@@ -573,41 +636,37 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
   },
   statItem: {
     flex: 1,
     minWidth: '45%',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
   },
   statNumber: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 4,
+    color: '#2b8a3e',
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#6c757d',
+    fontSize: 11,
+    color: '#868e96',
   },
   // Distribution Card
   distributionCard: {
-    backgroundColor: 'white',
     marginHorizontal: 16,
     marginVertical: 8,
     padding: 16,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   distributionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#212529',
     marginBottom: 16,
@@ -621,8 +680,8 @@ const styles = StyleSheet.create({
     width: (width - 64) / 7,
   },
   dayLabel: {
-    fontSize: 11,
-    color: '#6c757d',
+    fontSize: 10,
+    color: '#868e96',
     marginBottom: 8,
   },
   dayBarContainer: {
@@ -631,14 +690,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   dayBar: {
-    width: 8,
-    backgroundColor: '#007AFF',
-    borderRadius: 4,
+    width: 6,
+    borderRadius: 3,
   },
   dayCount: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
-    color: '#212529',
+    color: '#495057',
   },
   // Tasks Section
   tasksSection: {
@@ -652,38 +710,41 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#212529',
   },
+  taskCountBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
   taskCount: {
-    fontSize: 14,
-    color: '#6c757d',
+    fontSize: 12,
+    color: '#495057',
+    fontWeight: '600',
   },
   tasksList: {
     paddingHorizontal: 16,
     gap: 8,
   },
   taskCard: {
-    backgroundColor: 'white',
-    padding: 16,
     borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  taskGradient: {
+    padding: 14,
   },
   currentWeekTask: {
-    backgroundColor: '#e7f5ff',
-    borderWidth: 1,
-    borderColor: '#a5d8ff',
+    borderColor: '#b2f2bb',
   },
   taskHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   taskTitleContainer: {
     flex: 1,
@@ -692,21 +753,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   taskTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#212529',
     flex: 1,
   },
   pointsBadge: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
     borderRadius: 12,
   },
   pointsText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#e67700',
   },
   taskDetails: {
     flexDirection: 'row',
@@ -716,12 +776,12 @@ const styles = StyleSheet.create({
   assigneeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
     flex: 1,
   },
   assigneeText: {
-    fontSize: 14,
-    color: '#6c757d',
+    fontSize: 13,
+    color: '#868e96',
     flex: 1,
   },
   timeContainer: {
@@ -730,8 +790,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   timeText: {
-    fontSize: 12,
-    color: '#6c757d',
+    fontSize: 11,
+    color: '#868e96',
+  },
+  categoryContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  categoryText: {
+    fontSize: 11,
+    color: '#868e96',
   },
   // Empty Tasks
   emptyTasks: {
@@ -740,13 +810,14 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   emptyTasksText: {
-    fontSize: 16,
-    color: '#6c757d',
+    fontSize: 15,
+    color: '#868e96',
     marginTop: 12,
     marginBottom: 4,
+    fontWeight: '600',
   },
   emptyTasksSubtext: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#adb5bd',
     textAlign: 'center',
   },
@@ -756,37 +827,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   adminTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#212529',
     marginBottom: 12,
-  },
-  adminActions: {
-    gap: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   adminButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#ffc9c9',
+  },
+  adminButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#e7f5ff',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#a5d8ff',
+    padding: 14,
   },
   adminButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#007AFF',
-  },
-  categoryContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 8,
-  },
-  categoryText: {
-    fontSize: 12,
-    color: '#868e96',
+    color: '#fa5252',
   },
 });

@@ -1,4 +1,4 @@
-// src/screens/MySwapRequestsScreen.tsx - COMPLETE FIXED VERSION
+// src/screens/MySwapRequestsScreen.tsx - UPDATED with clean UI and consistent colors
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -11,13 +11,14 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 type FilterStatus = 'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
 
@@ -39,15 +40,15 @@ export const MySwapRequestsScreen = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const limit = 20;
 
-  // Load user ID on mount
+  // Load user ID on mount from SecureStore
   useEffect(() => {
     const loadUserId = async () => {
       try {
         setUserLoading(true);
-        // Try to get userData first
-        let userStr = await AsyncStorage.getItem('userData');
+        // Try to get userData from SecureStore
+        let userStr = await SecureStore.getItemAsync('userData');
         if (!userStr) {
-          userStr = await AsyncStorage.getItem('user');
+          userStr = await SecureStore.getItemAsync('user');
         }
         
         if (userStr) {
@@ -127,14 +128,21 @@ export const MySwapRequestsScreen = () => {
       style={[styles.filterButton, activeFilter === filter && styles.filterButtonActive]}
       onPress={() => setActiveFilter(filter)}
     >
-      <Text
-        style={[
-          styles.filterButtonText,
-          activeFilter === filter && styles.filterButtonTextActive,
-        ]}
+      <LinearGradient
+        colors={activeFilter === filter ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.filterButtonGradient}
       >
-        {label}
-      </Text>
+        <Text
+          style={[
+            styles.filterButtonText,
+            activeFilter === filter && styles.filterButtonTextActive,
+          ]}
+        >
+          {label}
+        </Text>
+      </LinearGradient>
     </TouchableOpacity>
   );
 
@@ -160,12 +168,17 @@ export const MySwapRequestsScreen = () => {
         activeOpacity={0.7}
       >
         <View style={styles.cardHeader}>
-          <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
-            <Ionicons name={statusIcon as any} size={14} color={statusColor} />
+          <LinearGradient
+            colors={[statusColor + '20', statusColor + '10']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.statusBadge}
+          >
+            <MaterialCommunityIcons name={statusIcon as any} size={12} color={statusColor} />
             <Text style={[styles.statusText, { color: statusColor }]}>
               {statusLabel}
             </Text>
-          </View>
+          </LinearGradient>
           <Text style={styles.dateText}>
             {new Date(item.createdAt).toLocaleDateString()}
           </Text>
@@ -175,58 +188,64 @@ export const MySwapRequestsScreen = () => {
           {taskTitle}
         </Text>
         
-        <Text style={styles.groupName}>
-          <Ionicons name="people" size={14} color="#6B7280" /> {groupName}
-        </Text>
+        <View style={styles.groupContainer}>
+          <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
+          <Text style={styles.groupName}>{groupName}</Text>
+        </View>
 
         <View style={styles.detailsContainer}>
           <View style={styles.detailRow}>
-            <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+            <MaterialCommunityIcons name="calendar-outline" size={14} color="#868e96" />
             <Text style={styles.detailText}>
-              Due: {dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A'}
+              {dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A'}
             </Text>
           </View>
 
           {timeSlot && (
             <View style={styles.detailRow}>
-              <Ionicons name="time-outline" size={16} color="#6B7280" />
+              <MaterialCommunityIcons name="clock-outline" size={14} color="#868e96" />
               <Text style={styles.detailText}>{timeSlot}</Text>
             </View>
           )}
 
           <View style={styles.detailRow}>
-            <Ionicons name="star-outline" size={16} color="#F59E0B" />
+            <MaterialCommunityIcons name="star" size={14} color="#e67700" />
             <Text style={styles.detailText}>{points} pts</Text>
           </View>
 
           {targetUser ? (
             <View style={styles.detailRow}>
-              <Ionicons name="person" size={16} color="#4F46E5" />
+              <MaterialCommunityIcons name="account" size={14} color="#4F46E5" />
               <Text style={styles.detailText}>
                 To: {targetUser.fullName}
               </Text>
             </View>
           ) : (
             <View style={styles.detailRow}>
-              <Ionicons name="people" size={16} color="#10B981" />
+              <MaterialCommunityIcons name="earth" size={14} color="#2b8a3e" />
               <Text style={styles.detailText}>Anyone can accept</Text>
             </View>
           )}
 
           {item.reason && (
-            <View style={styles.reasonContainer}>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.reasonContainer}
+            >
               <Text style={styles.reasonLabel}>Reason:</Text>
               <Text style={styles.reasonText} numberOfLines={2}>
                 {item.reason}
               </Text>
-            </View>
+            </LinearGradient>
           )}
 
           {item.expiresAt && item.status === 'PENDING' && (
             <View style={styles.expiryContainer}>
-              <Ionicons name="hourglass-outline" size={14} color="#F59E0B" />
+              <MaterialCommunityIcons name="clock-outline" size={12} color="#e67700" />
               <Text style={styles.expiryText}>
-                Expires: {new Date(item.expiresAt).toLocaleString()}
+                Expires: {new Date(item.expiresAt).toLocaleDateString()}
               </Text>
             </View>
           )}
@@ -242,14 +261,21 @@ export const MySwapRequestsScreen = () => {
               }}
               disabled={isProcessing}
             >
-              {isProcessing ? (
-                <ActivityIndicator size="small" color="#EF4444" />
-              ) : (
-                <>
-                  <Ionicons name="close-circle" size={18} color="#EF4444" />
-                  <Text style={styles.cancelButtonText}>Cancel Request</Text>
-                </>
-              )}
+              <LinearGradient
+                colors={['#fff5f5', '#ffe3e3']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.cancelButtonGradient}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator size="small" color="#fa5252" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="close-circle" size={16} color="#fa5252" />
+                    <Text style={styles.cancelButtonText}>Cancel Request</Text>
+                  </>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         )}
@@ -263,13 +289,13 @@ export const MySwapRequestsScreen = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>My Swap Requests</Text>
-          <View style={{ width: 40 }} />
+          <View style={{ width: 36 }} />
         </View>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#4F46E5" />
+          <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading user data...</Text>
         </View>
       </SafeAreaView>
@@ -282,19 +308,26 @@ export const MySwapRequestsScreen = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>My Swap Requests</Text>
-          <View style={{ width: 40 }} />
+          <View style={{ width: 36 }} />
         </View>
         <View style={styles.centerContainer}>
-          <Ionicons name="alert-circle" size={48} color="#EF4444" />
+          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
           <Text style={styles.errorText}>User not authenticated</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={() => navigation.navigate('Login' as never)}
           >
-            <Text style={styles.retryButtonText}>Go to Login</Text>
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Go to Login</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -307,10 +340,10 @@ export const MySwapRequestsScreen = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>My Swap Requests</Text>
-          <View style={{ width: 40 }} />
+          <View style={{ width: 36 }} />
         </View>
         <View style={styles.filterContainer}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -323,7 +356,7 @@ export const MySwapRequestsScreen = () => {
           </ScrollView>
         </View>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#4F46E5" />
+          <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading swap requests...</Text>
         </View>
       </SafeAreaView>
@@ -332,19 +365,21 @@ export const MySwapRequestsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Swap Requests</Text>
         <TouchableOpacity
-          style={styles.historyButton}
+          style={styles.filterIconButton}
           onPress={() => setActiveFilter('ALL')}
         >
-          <Ionicons name="funnel" size={22} color="#4F46E5" />
+          <MaterialCommunityIcons name="filter" size={20} color="#495057" />
         </TouchableOpacity>
       </View>
 
+      {/* Filter Tabs */}
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {renderFilterButton('ALL', 'All')}
@@ -362,15 +397,25 @@ export const MySwapRequestsScreen = () => {
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={handleRefresh}
+            colors={['#2b8a3e']}
+            tintColor="#2b8a3e"
+          />
         }
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-              <Ionicons name="swap-horizontal" size={48} color="#D1D5DB" />
-            </View>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.emptyIconContainer}
+            >
+              <MaterialCommunityIcons name="swap-horizontal" size={40} color="#adb5bd" />
+            </LinearGradient>
             <Text style={styles.emptyTitle}>No Swap Requests</Text>
             <Text style={styles.emptyText}>
               {activeFilter === 'ALL'
@@ -382,14 +427,21 @@ export const MySwapRequestsScreen = () => {
                 style={styles.clearFilterButton}
                 onPress={() => setActiveFilter('ALL')}
               >
-                <Text style={styles.clearFilterText}>Clear Filter</Text>
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.clearFilterGradient}
+                >
+                  <Text style={styles.clearFilterText}>Clear Filter</Text>
+                </LinearGradient>
               </TouchableOpacity>
             )}
           </View>
         }
         ListFooterComponent={
           loading && myRequests.length > 0 ? (
-            <ActivityIndicator style={styles.loader} color="#4F46E5" />
+            <ActivityIndicator style={styles.loader} color="#2b8a3e" />
           ) : null
         }
       />
@@ -400,36 +452,37 @@ export const MySwapRequestsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#f8f9fa',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
     paddingBottom: 80,
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 14,
+    color: '#868e96',
   },
   errorText: {
     fontSize: 16,
-    color: '#EF4444',
+    color: '#fa5252',
     marginTop: 12,
     marginBottom: 20,
     textAlign: 'center',
   },
   retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  retryButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#4F46E5',
-    borderRadius: 8,
   },
   retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: 'white',
+    fontSize: 14,
     fontWeight: '600',
   },
   header: {
@@ -438,60 +491,87 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#e9ecef',
+    minHeight: 60,
   },
   backButton: {
-    padding: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
   },
-  historyButton: {
-    padding: 8,
+  filterIconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   filterContainer: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#e9ecef',
   },
   filterButton: {
+    borderRadius: 20,
+    marginRight: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  filterButtonGradient: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F3F4F6',
-    marginRight: 8,
   },
   filterButtonActive: {
-    backgroundColor: '#4F46E5',
+    borderColor: '#2b8a3e',
   },
   filterButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
-    color: '#4B5563',
+    color: '#495057',
   },
   filterButtonTextActive: {
-    color: '#FFFFFF',
+    color: 'white',
   },
   listContent: {
     padding: 16,
     flexGrow: 1,
   },
   requestCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -503,85 +583,110 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 4,
     borderRadius: 20,
-    gap: 6,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
   dateText: {
-    fontSize: 12,
-    color: '#9CA3AF',
+    fontSize: 11,
+    color: '#868e96',
   },
   taskTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: '#212529',
     marginBottom: 4,
   },
-  groupName: {
-    fontSize: 14,
-    color: '#6B7280',
+  groupContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginBottom: 12,
+  },
+  groupName: {
+    fontSize: 13,
+    color: '#868e96',
   },
   detailsContainer: {
     marginBottom: 12,
+    gap: 8,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
     gap: 8,
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
   },
   detailText: {
-    fontSize: 14,
-    color: '#4B5563',
+    fontSize: 12,
+    color: '#495057',
   },
   reasonContainer: {
     marginTop: 8,
     padding: 12,
-    backgroundColor: '#F9FAFB',
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   reasonLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
-    color: '#6B7280',
+    color: '#868e96',
     marginBottom: 4,
   },
   reasonText: {
-    fontSize: 14,
-    color: '#1F2937',
+    fontSize: 13,
+    color: '#212529',
   },
   expiryContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginTop: 12,
+    gap: 4,
+    marginTop: 8,
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
   },
   expiryText: {
-    fontSize: 12,
-    color: '#F59E0B',
+    fontSize: 11,
+    color: '#e67700',
+    fontWeight: '500',
   },
   footer: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopColor: '#f1f3f5',
   },
   cancelButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#ffc9c9',
+  },
+  cancelButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    gap: 8,
+    gap: 6,
   },
   cancelButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#EF4444',
+    color: '#fa5252',
   },
   emptyContainer: {
     flex: 1,
@@ -590,37 +695,43 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
   },
   emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#F3F4F6',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#868e96',
     textAlign: 'center',
     paddingHorizontal: 32,
     marginBottom: 16,
+    lineHeight: 20,
   },
   clearFilterButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  clearFilterGradient: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    backgroundColor: '#EEF2FF',
-    borderRadius: 8,
   },
   clearFilterText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#4F46E5',
+    color: '#495057',
   },
   loader: {
     marginVertical: 20,

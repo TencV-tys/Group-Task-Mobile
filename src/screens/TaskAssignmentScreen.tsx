@@ -1,4 +1,4 @@
-// src/screens/TaskAssignmentScreen.tsx - UPDATED WITH NO DUPLICATE ASSIGNMENTS
+// src/screens/TaskAssignmentScreen.tsx - UPDATED with clean UI and consistent colors
 import React, { useState } from 'react';
 import {
   View,
@@ -13,6 +13,7 @@ import {
   ScrollView,
   RefreshControl
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTaskAssignment } from '../taskHook/useTaskAssignment';
   
@@ -43,7 +44,6 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
         assignedMemberIds.add(task.currentAssignee);
       }
       
-      // Also check assignments for current week
       if (task.assignments && Array.isArray(task.assignments)) {
         task.assignments.forEach((assignment: any) => {
           if (assignment.user && assignment.user.id) {
@@ -64,7 +64,6 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   const handleAssignToMember = async (memberId: string, memberName: string) => {
     if (!selectedTask) return;
 
-    // Check if trying to assign to same user
     if (selectedTask.currentAssignee === memberId) {
       Alert.alert('Already Assigned', `This task is already assigned to ${memberName}`);
       return;
@@ -81,13 +80,10 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
           onPress: async () => {
             setIsReassigning(true);
             try {
-              // Use the reassignTask method
               const result = await reassignTask(selectedTask.id, memberId);
               
               if (result.success) {
                 Alert.alert('Success', `Task reassigned to ${memberName}`);
-                
-                // Refresh the data to show updated assignments
                 await loadData(true);
                 setShowAssigneeModal(false);
               } else {
@@ -110,33 +106,48 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     const hasTimeSlots = item.timeSlots && item.timeSlots.length > 0;
 
     return (
-      <View style={styles.taskCard}>
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.taskCard}
+      >
         <View style={styles.taskHeader}>
           <View style={styles.taskTitleContainer}>
             <Text style={styles.taskTitle} numberOfLines={2}>
               {item.title}
             </Text>
             {isRecurring && (
-              <View style={styles.recurringBadge}>
-                <MaterialCommunityIcons name="repeat" size={12} color="#007AFF" />
+              <LinearGradient
+                colors={['#e7f5ff', '#d0ebff']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.recurringBadge}
+              >
+                <MaterialCommunityIcons name="repeat" size={12} color="#2b8a3e" />
                 <Text style={styles.recurringText}>Recurring</Text>
-              </View>
+              </LinearGradient>
             )}
           </View>
-          <View style={styles.pointsBadge}>
+          <LinearGradient
+            colors={['#fff3bf', '#ffec99']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.pointsBadge}
+          >
             <Text style={styles.pointsText}>{item.points} pts</Text>
-          </View>
+          </LinearGradient>
         </View>
 
         {item.description && (
           <Text style={styles.taskDescription} numberOfLines={2}>
             {item.description}
           </Text>
-        )} 
+        )}
 
         <View style={styles.taskDetails}>
           <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="calendar-clock" size={14} color="#666" />
+            <MaterialCommunityIcons name="calendar-clock" size={14} color="#868e96" />
             <Text style={styles.detailText}>
               {item.executionFrequency === 'DAILY' ? 'Daily' : 'Weekly'}
               {item.selectedDays?.length > 0 && ` (${item.selectedDays.join(', ')})`}
@@ -145,7 +156,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
           
           {hasTimeSlots && (
             <View style={styles.detailRow}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color="#666" />
+              <MaterialCommunityIcons name="clock-outline" size={14} color="#868e96" />
               <Text style={styles.detailText}>
                 {item.timeSlots.length} time slot{item.timeSlots.length > 1 ? 's' : ''}
               </Text>
@@ -158,14 +169,22 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
           <View style={styles.assigneeRow}>
             {currentAssignee ? (
               <View style={styles.currentAssignee}>
-                <View style={[
-                  styles.assigneeAvatar,
-                  currentAssignee.role === 'ADMIN' && styles.adminAvatar
-                ]}>
-                  <Text style={styles.assigneeInitial}>
+                <LinearGradient
+                  colors={currentAssignee.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[
+                    styles.assigneeAvatar,
+                    currentAssignee.role === 'ADMIN' && styles.adminAvatar
+                  ]}
+                >
+                  <Text style={[
+                    styles.assigneeInitial,
+                    { color: currentAssignee.role === 'ADMIN' ? 'white' : '#495057' }
+                  ]}>
                     {currentAssignee.fullName?.charAt(0) || '?'}
                   </Text>
-                </View>
+                </LinearGradient>
                 <View style={styles.assigneeInfo}>
                   <Text style={styles.assigneeName}>
                     {currentAssignee.fullName}
@@ -173,21 +192,28 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                   <View style={styles.assigneeMeta}>
                     {currentAssignee.role === 'ADMIN' && (
                       <View style={styles.adminIndicator}>
-                        <MaterialCommunityIcons name="crown" size={10} color="#FFD700" />
+                        <MaterialCommunityIcons name="crown" size={10} color="#2b8a3e" />
                         <Text style={styles.adminText}>Admin</Text>
                       </View>
                     )}
                     {currentAssignee.rotationOrder && (
-                      <Text style={styles.rotationOrder}>
-                        Rotation #{currentAssignee.rotationOrder}
-                      </Text>
+                      <LinearGradient
+                        colors={['#f8f9fa', '#e9ecef']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.rotationBadge}
+                      >
+                        <Text style={styles.rotationOrder}>
+                          #{currentAssignee.rotationOrder}
+                        </Text>
+                      </LinearGradient>
                     )}
                   </View>
                 </View>
               </View>
             ) : (
               <View style={styles.unassignedContainer}>
-                <MaterialCommunityIcons name="account-question" size={20} color="#999" />
+                <MaterialCommunityIcons name="account-question" size={20} color="#adb5bd" />
                 <Text style={styles.unassignedText}>Not assigned</Text>
               </View>
             )}
@@ -196,14 +222,22 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
               <TouchableOpacity
                 style={styles.changeButton}
                 onPress={() => handleOpenAssigneeModal(item)}
+                activeOpacity={0.8}
               >
-                <MaterialCommunityIcons name="account-switch" size={16} color="#fff" />
-                <Text style={styles.changeButtonText}>Change</Text>
+                <LinearGradient
+                  colors={['#2b8a3e', '#1e6b2c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.changeButtonGradient}
+                >
+                  <MaterialCommunityIcons name="account-switch" size={14} color="white" />
+                  <Text style={styles.changeButtonText}>Change</Text>
+                </LinearGradient>
               </TouchableOpacity>
             )}
           </View>
         </View>
-      </View>
+      </LinearGradient>
     );
   };
 
@@ -211,7 +245,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading assignments...</Text>
         </View>
       </SafeAreaView>
@@ -221,42 +255,71 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#000" />
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <MaterialCommunityIcons name="arrow-left" size={20} color="#495057" />
         </TouchableOpacity>
+        
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerTitle}>
             {groupName || 'Task Assignments'}
           </Text>
-          <Text style={styles.headerSubtitle}>
-            {groupInfo?.currentRotationWeek ? `Week ${groupInfo.currentRotationWeek}` : ''}
-          </Text>
-          <Text style={styles.headerSubtitle}>
-            {tasks.length} tasks • {members.length} members
-          </Text>
+          <View style={styles.headerStats}>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.headerStat}
+            >
+              <MaterialCommunityIcons name="format-list-checks" size={12} color="#495057" />
+              <Text style={styles.headerStatText}>{tasks.length} tasks</Text>
+            </LinearGradient>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.headerStat}
+            >
+              <MaterialCommunityIcons name="account-group" size={12} color="#495057" />
+              <Text style={styles.headerStatText}>{members.length} members</Text>
+            </LinearGradient>
+          </View>
         </View>
+        
         <TouchableOpacity 
           onPress={() => loadData(true)}
           disabled={refreshing}
+          style={styles.refreshButton}
         >
-          <MaterialCommunityIcons 
-            name="refresh" 
-            size={24} 
-            color={refreshing ? "#ccc" : "#007AFF"} 
-          />
+          {refreshing ? (
+            <ActivityIndicator size="small" color="#2b8a3e" />
+          ) : (
+            <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+          )}
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       {error ? (
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#dc3545" />
+          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={() => loadData()}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       ) : (
@@ -268,13 +331,14 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => loadData(true)}
-              colors={['#007AFF']}
+              colors={['#2b8a3e']}
+              tintColor="#2b8a3e"
             />
           }
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons name="clipboard" size={48} color="#ccc" />
+              <MaterialCommunityIcons name="clipboard" size={48} color="#dee2e6" />
               <Text style={styles.emptyText}>No tasks found</Text>
               <Text style={styles.emptySubtext}>
                 Create tasks in the Tasks screen first
@@ -292,35 +356,42 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
         onRequestClose={() => !isReassigning && setShowAssigneeModal(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <LinearGradient
+            colors={['#ffffff', '#f8f9fa']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.modalContent}
+          >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle} numberOfLines={1}>
-                Assign "{selectedTask?.title}"
+                {selectedTask?.title}
               </Text>
               <TouchableOpacity 
                 onPress={() => !isReassigning && setShowAssigneeModal(false)}
                 disabled={isReassigning}
+                style={styles.closeButton}
               >
-                <MaterialCommunityIcons 
-                  name="close" 
-                  size={24} 
-                  color={isReassigning ? "#ccc" : "#000"} 
-                />
+                <MaterialCommunityIcons name="close" size={18} color="#868e96" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               <Text style={styles.modalSubtitle}>
-                Select a member to assign this task to for the current week:
+                Select a member to assign this task for this week:
               </Text>
               
               {/* Assignment Rules Info */}
-              <View style={styles.infoBox}>
-                <MaterialCommunityIcons name="information-outline" size={16} color="#007AFF" />
+              <LinearGradient
+                colors={['#e7f5ff', '#d0ebff']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.infoBox}
+              >
+                <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
                 <Text style={styles.infoText}>
                   Each member can only be assigned to one task per week
                 </Text>
-              </View>
+              </LinearGradient>
 
               {/* Available Members Section */}
               <Text style={styles.sectionHeader}>Available Members</Text>
@@ -334,7 +405,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 if (availableMembers.length === 0) {
                   return (
                     <View style={styles.emptyMembers}>
-                      <MaterialCommunityIcons name="account-group" size={48} color="#ccc" />
+                      <MaterialCommunityIcons name="account-group" size={48} color="#dee2e6" />
                       <Text style={styles.emptyMembersText}>
                         No available members
                       </Text>
@@ -354,28 +425,32 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                       style={[
                         styles.memberOption,
                         isCurrentAssignee && styles.currentAssigneeOption,
-                        isCurrentAssignee && styles.disabledOption
                       ]}
                       onPress={() => {
-                        if (!isCurrentAssignee) {
+                        if (!isCurrentAssignee && !isReassigning) {
                           handleAssignToMember(member.userId, member.fullName);
                         }
                       }}
                       disabled={isReassigning || isCurrentAssignee}
+                      activeOpacity={0.7}
                     >
                       <View style={styles.memberInfo}>
-                        <View style={[
-                          styles.memberAvatar,
-                          member.role === 'ADMIN' && styles.adminMemberAvatar,
-                          isCurrentAssignee && styles.currentAssigneeAvatar
-                        ]}>
+                        <LinearGradient
+                          colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={[
+                            styles.memberAvatar,
+                            isCurrentAssignee && styles.currentAssigneeAvatar
+                          ]}
+                        >
                           <Text style={[
                             styles.memberInitial,
-                            isCurrentAssignee && styles.currentAssigneeInitial
+                            { color: member.role === 'ADMIN' ? 'white' : '#495057' }
                           ]}>
                             {member.fullName?.charAt(0) || '?'}
                           </Text>
-                        </View>
+                        </LinearGradient>
                         <View style={styles.memberDetails}>
                           <Text style={[
                             styles.memberName,
@@ -387,36 +462,44 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                           <View style={styles.memberMeta}>
                             <Text style={[
                               styles.memberRole,
-                              member.role === 'ADMIN' && styles.adminRoleText,
-                              isCurrentAssignee && styles.currentAssigneeText
+                              member.role === 'ADMIN' && styles.adminRoleText
                             ]}>
                               {member.role === 'ADMIN' ? 'Admin' : 'Member'}
                             </Text>
                             {member.rotationOrder && (
-                              <Text style={[
-                                styles.memberOrder,
-                                isCurrentAssignee && styles.currentAssigneeText
-                              ]}>
-                                Rotation #{member.rotationOrder}
-                              </Text>
+                              <LinearGradient
+                                colors={['#f8f9fa', '#e9ecef']}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.memberOrderBadge}
+                              >
+                                <Text style={styles.memberOrder}>
+                                  #{member.rotationOrder}
+                                </Text>
+                              </LinearGradient>
                             )}
                           </View>
                         </View>
                       </View>
                       {isCurrentAssignee ? (
-                        <View style={styles.currentBadge}>
-                          <MaterialCommunityIcons name="check-circle" size={20} color="#28a745" />
+                        <LinearGradient
+                          colors={['#d3f9d8', '#b2f2bb']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.currentBadge}
+                        >
+                          <MaterialCommunityIcons name="check-circle" size={14} color="#2b8a3e" />
                           <Text style={styles.currentBadgeText}>Current</Text>
-                        </View>
+                        </LinearGradient>
                       ) : (
-                        <MaterialCommunityIcons name="chevron-right" size={20} color="#6c757d" />
+                        <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
                       )}
                     </TouchableOpacity>
                   );
                 });
               })()}
 
-              {/* Already Assigned Members Section (for reference) */}
+              {/* Already Assigned Members Section */}
               {(() => {
                 const assignedMemberIds = getAssignedMembersForWeek();
                 const assignedMembers = members.filter(member => 
@@ -428,7 +511,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 
                 return (
                   <>
-                    <Text style={styles.sectionHeader}>Already Assigned (Cannot Select)</Text>
+                    <Text style={styles.sectionHeader}>Already Assigned</Text>
                     {assignedMembers.map(member => {
                       const assignedTask = tasks.find((task: any) => 
                         task.currentAssignee === member.userId
@@ -440,18 +523,16 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                           style={[styles.memberOption, styles.disabledOption]}
                         >
                           <View style={styles.memberInfo}>
-                            <View style={[
-                              styles.memberAvatar,
-                              member.role === 'ADMIN' && styles.adminMemberAvatar,
-                              styles.disabledAvatar
-                            ]}>
-                              <Text style={[
-                                styles.memberInitial,
-                                styles.disabledInitial
-                              ]}>
+                            <LinearGradient
+                              colors={['#f8f9fa', '#e9ecef']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={[styles.memberAvatar, styles.disabledAvatar]}
+                            >
+                              <Text style={[styles.memberInitial, styles.disabledInitial]}>
                                 {member.fullName?.charAt(0) || '?'}
                               </Text>
-                            </View>
+                            </LinearGradient>
                             <View style={styles.memberDetails}>
                               <Text style={[styles.memberName, styles.disabledText]}>
                                 {member.fullName}
@@ -462,16 +543,21 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                                 </Text>
                                 {assignedTask && (
                                   <Text style={[styles.memberOrder, styles.disabledText]}>
-                                    Assigned to: {assignedTask.title}
+                                    {assignedTask.title}
                                   </Text>
                                 )}
                               </View>
                             </View>
                           </View>
-                          <View style={styles.alreadyAssignedBadge}>
-                            <MaterialCommunityIcons name="clock" size={20} color="#ff6b35" />
-                            <Text style={styles.alreadyAssignedText}>Busy</Text>
-                          </View>
+                          <LinearGradient
+                            colors={['#fff5f5', '#ffe3e3']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.assignedBadge}
+                          >
+                            <MaterialCommunityIcons name="clock" size={14} color="#fa5252" />
+                            <Text style={styles.assignedText}>Busy</Text>
+                          </LinearGradient>
                         </View>
                       );
                     })}
@@ -487,13 +573,13 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 disabled={isReassigning}
               >
                 {isReassigning ? (
-                  <ActivityIndicator size="small" color="#666" />
+                  <ActivityIndicator size="small" color="#2b8a3e" />
                 ) : (
                   <Text style={styles.cancelButtonText}>Cancel</Text>
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </LinearGradient>
         </View>
       </Modal>
     </SafeAreaView>
@@ -501,9 +587,20 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: '#666', fontSize: 16 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#f8f9fa' 
+  },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  loadingText: { 
+    marginTop: 12, 
+    color: '#868e96', 
+    fontSize: 14 
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -511,7 +608,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0'
+    borderBottomColor: '#e9ecef'
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   headerTitleContainer: {
     flex: 1,
@@ -519,15 +629,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   headerTitle: { 
-    fontSize: 18, 
-    fontWeight: 'bold', 
-    color: '#000',
-    textAlign: 'center'
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: '#212529',
+    textAlign: 'center',
+    marginBottom: 4
   },
-  headerSubtitle: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2
+  headerStats: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  headerStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  headerStatText: {
+    fontSize: 11,
+    color: '#495057',
+    fontWeight: '500',
+  },
+  refreshButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   errorContainer: {
     flex: 1,
@@ -536,28 +672,36 @@ const styles = StyleSheet.create({
     padding: 20
   },
   errorText: {
-    color: '#dc3545',
+    color: '#fa5252',
     textAlign: 'center',
     marginVertical: 16,
     fontSize: 16
   },
   retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  retryButtonGradient: {
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8
+    paddingVertical: 12
   },
   retryButtonText: {
-    color: '#fff',
+    color: 'white',
     fontWeight: '600',
     fontSize: 16
   },
-  listContainer: { padding: 16 },
+  listContainer: { 
+    padding: 16 
+  },
   taskCard: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
     borderWidth: 1,
     borderColor: '#e9ecef'
   },
@@ -574,13 +718,12 @@ const styles = StyleSheet.create({
   taskTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: '#212529',
     marginBottom: 4
   },
   recurringBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e7f5ff',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -588,12 +731,11 @@ const styles = StyleSheet.create({
     gap: 4
   },
   recurringText: {
-    fontSize: 12,
-    color: '#007AFF',
+    fontSize: 11,
+    color: '#2b8a3e',
     fontWeight: '500'
   },
   pointsBadge: {
-    backgroundColor: '#fff3bf',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12
@@ -605,7 +747,7 @@ const styles = StyleSheet.create({
   },
   taskDescription: {
     fontSize: 14,
-    color: '#666',
+    color: '#868e96',
     marginBottom: 12,
     lineHeight: 20
   },
@@ -620,7 +762,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 13,
-    color: '#666'
+    color: '#495057'
   },
   assignmentSection: {
     borderTopWidth: 1,
@@ -628,9 +770,9 @@ const styles = StyleSheet.create({
     paddingTop: 12
   },
   sectionLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
-    color: '#666',
+    color: '#868e96',
     marginBottom: 8
   },
   assigneeRow: {
@@ -648,15 +790,15 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#6c757d',
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef'
   },
   adminAvatar: {
-    backgroundColor: '#007AFF'
+    borderColor: '#2b8a3e'
   },
   assigneeInitial: {
-    color: '#fff',
     fontWeight: 'bold',
     fontSize: 14
   },
@@ -664,9 +806,9 @@ const styles = StyleSheet.create({
     flex: 1
   },
   assigneeName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
-    color: '#000',
+    color: '#212529',
     marginBottom: 2
   },
   assigneeMeta: {
@@ -677,24 +819,22 @@ const styles = StyleSheet.create({
   adminIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFD70020',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
     gap: 2
   },
   adminText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#FFD700'
+    color: '#2b8a3e'
+  },
+  rotationBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
   rotationOrder: {
     fontSize: 10,
-    color: '#6c757d',
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4
+    color: '#495057',
+    fontWeight: '500'
   },
   unassignedContainer: {
     flexDirection: 'row',
@@ -703,23 +843,25 @@ const styles = StyleSheet.create({
     flex: 1
   },
   unassignedText: {
-    fontSize: 15,
-    color: '#999',
+    fontSize: 14,
+    color: '#adb5bd',
     fontStyle: 'italic'
   },
   changeButton: {
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  changeButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#007AFF',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6
+    paddingVertical: 6,
+    gap: 4,
   },
   changeButtonText: {
-    color: '#fff',
+    color: 'white',
     fontWeight: '600',
-    fontSize: 14
+    fontSize: 12
   },
   emptyContainer: {
     alignItems: 'center',
@@ -727,13 +869,14 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
+    color: '#868e96',
     marginTop: 12,
-    marginBottom: 4
+    marginBottom: 4,
+    fontWeight: '600'
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#ccc',
+    color: '#adb5bd',
     textAlign: 'center'
   },
   // Modal Styles
@@ -743,9 +886,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end'
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     maxHeight: '80%'
   },
   modalHeader: {
@@ -754,18 +896,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0'
+    borderBottomColor: '#e9ecef'
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212529',
     flex: 1,
     marginRight: 12
   },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
   modalSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: '#868e96',
     marginBottom: 12,
     lineHeight: 20
   },
@@ -775,27 +925,27 @@ const styles = StyleSheet.create({
   modalFooter: {
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0'
+    borderTopColor: '#e9ecef'
   },
-  // New Styles for Filtering
   infoBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e7f5ff',
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
-    gap: 8
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#b2f2bb'
   },
   infoText: {
     fontSize: 13,
-    color: '#1864ab',
+    color: '#2b8a3e',
     flex: 1
   },
   sectionHeader: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
+    color: '#212529',
     marginTop: 16,
     marginBottom: 12,
     paddingBottom: 8,
@@ -806,20 +956,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 30,
     backgroundColor: '#f8f9fa',
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e9ecef',
     marginVertical: 16
   },
   emptyMembersText: {
-    fontSize: 16,
-    color: '#6c757d',
+    fontSize: 15,
+    color: '#868e96',
     marginTop: 12,
     marginBottom: 4,
     fontWeight: '500'
   },
   emptyMembersSubtext: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#adb5bd',
     textAlign: 'center'
   },
@@ -837,10 +987,12 @@ const styles = StyleSheet.create({
   },
   currentAssigneeOption: {
     backgroundColor: '#f1f3f5',
-    borderColor: '#dee2e6'
+    borderColor: '#2b8a3e',
+    borderWidth: 1,
   },
   disabledOption: {
-    opacity: 0.6
+    opacity: 0.6,
+    backgroundColor: '#f8f9fa'
   },
   memberInfo: {
     flexDirection: 'row',
@@ -852,41 +1004,37 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#6c757d',
     justifyContent: 'center',
-    alignItems: 'center'
-  },
-  adminMemberAvatar: {
-    backgroundColor: '#007AFF'
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef'
   },
   currentAssigneeAvatar: {
-    backgroundColor: '#28a745'
+    borderColor: '#2b8a3e',
+    borderWidth: 2,
   },
   disabledAvatar: {
-    backgroundColor: '#adb5bd'
+    opacity: 0.5
   },
   memberInitial: {
-    color: '#fff',
     fontWeight: 'bold',
     fontSize: 16
   },
-  currentAssigneeInitial: {
-    color: '#fff'
-  },
   disabledInitial: {
-    color: '#e9ecef'
+    color: '#adb5bd'
   },
   memberDetails: {
     flex: 1
   },
   memberName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
-    color: '#000',
+    color: '#212529',
     marginBottom: 2
   },
   currentAssigneeText: {
-    color: '#6c757d'
+    color: '#2b8a3e',
+    fontWeight: '600'
   },
   disabledText: {
     color: '#adb5bd'
@@ -898,38 +1046,46 @@ const styles = StyleSheet.create({
   },
   memberRole: {
     fontSize: 12,
-    color: '#666'
+    color: '#868e96'
   },
   adminRoleText: {
-    color: '#007AFF',
+    color: '#2b8a3e',
     fontWeight: '600'
   },
-  memberOrder: {
-    fontSize: 11,
-    color: '#6c757d',
-    backgroundColor: '#f1f3f5',
+  memberOrderBadge: {
     paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  memberOrder: {
+    fontSize: 10,
+    color: '#495057',
+    fontWeight: '500'
   },
   currentBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     gap: 4
   },
   currentBadgeText: {
-    fontSize: 12,
-    color: '#28a745',
+    fontSize: 11,
+    color: '#2b8a3e',
     fontWeight: '600'
   },
-  alreadyAssignedBadge: {
+  assignedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     gap: 4
   },
-  alreadyAssignedText: {
-    fontSize: 12,
-    color: '#ff6b35',
+  assignedText: {
+    fontSize: 11,
+    color: '#fa5252',
     fontWeight: '600'
   },
   cancelButton: {
@@ -944,8 +1100,8 @@ const styles = StyleSheet.create({
     opacity: 0.5  
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#666'
+    color: '#868e96'
   }
 });

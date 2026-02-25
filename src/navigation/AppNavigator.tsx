@@ -23,6 +23,9 @@ import FeedbackScreen from '../screens/FeedbackScreen';
 import FeedbackDetailsScreen from '../screens/FeedbackDetailsScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import FeedbackHistoryScreen from '../screens/FeedbackHistoryScreen';
+import GroupActivityScreen from '../screens/GroupActivityScreen';
+import MemberContributionsScreen from '../screens/MemberContributionsScreen';
+import TaskCompletionHistoryScreen from '../screens/TaskCompletionHistoryScreen';
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
 import { MySwapRequestsScreen } from '../screens/MySwapRequestScreen';
@@ -235,6 +238,24 @@ export default function AppNavigator() {
         component={FeedbackHistoryScreen} 
         options={{ headerShown: false }} 
       />
+
+      <Stack.Screen 
+  name="GroupActivity" 
+  component={GroupActivityScreen}
+  options={{ headerShown: false }}
+/>
+
+<Stack.Screen 
+  name="MemberContributions" 
+  component={MemberContributionsScreen}
+  options={{ headerShown: false }}
+/>
+
+<Stack.Screen 
+  name="TaskCompletionHistory" 
+  component={TaskCompletionHistoryScreen}
+  options={{ headerShown: false }}
+/>
 
     </Stack.Navigator>
   );

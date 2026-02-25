@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,9 @@ import {
   StatusBar
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { GroupActivityService } from '../services/GroupActivityService';
+import * as SecureStore from 'expo-secure-store';
 
 export default function MemberContributionsScreen({ navigation, route }: any) {
   const { groupId, groupName, memberId, userRole } = route.params || {};
@@ -20,18 +22,48 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  const [authError, setAuthError] = useState(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        console.warn('🔐 MemberContributionsScreen: No auth token available');
+        setAuthError(true);
+        setError('Please log in again');
+        return false;
+      }
+      console.log('✅ MemberContributionsScreen: Auth token found');
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('❌ MemberContributionsScreen: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     fetchData();
   }, [groupId, memberId]);
 
   const fetchData = async (isRefreshing = false) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (isRefreshing) {
       setRefreshing(true);
     } else {
       setLoading(true);
     }
     setError(null);
+    setAuthError(false);
 
     try {
       const result = await GroupActivityService.getMemberContributions(groupId, memberId);
@@ -40,6 +72,10 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         setData(result.data);
       } else {
         setError(result.message || 'Failed to load member data');
+        if (result.message?.toLowerCase().includes('token') || 
+            result.message?.toLowerCase().includes('auth')) {
+          setAuthError(true);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching member data:', err);
@@ -54,34 +90,110 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     return new Date(dateString).toLocaleDateString();
   };
 
+  // Helper function for status badge gradient
+  const getStatusGradient = (assignment: any): [string, string] => {
+    if (!assignment.completed) return ['#f1f3f5', '#e9ecef']; // Light gray
+    if (assignment.verified === true) return ['#d3f9d8', '#b2f2bb']; // Light green
+    if (assignment.verified === false) return ['#fff5f5', '#ffe3e3']; // Light red
+    return ['#fff3bf', '#ffec99']; // Light orange for pending
+  };
+
+  // Helper function for status icon color
+  const getStatusIconColor = (assignment: any): string => {
+    if (!assignment.completed) return '#868e96';
+    if (assignment.verified === true) return '#2b8a3e';
+    if (assignment.verified === false) return '#fa5252';
+    return '#e67700';
+  };
+
+  // Helper function for status icon name
+  const getStatusIcon = (assignment: any): string => {
+    if (!assignment.completed) return 'clock-outline';
+    if (assignment.verified === true) return 'check-circle';
+    if (assignment.verified === false) return 'close-circle';
+    return 'clock-check';
+  };
+
+  // Helper function for status text
+  const getStatusText = (assignment: any): string => {
+    if (!assignment.completed) return 'Not Completed';
+    if (assignment.verified === true) return 'Verified';
+    if (assignment.verified === false) return 'Rejected';
+    return 'Pending';
+  };
+
+  // Helper function for status text color
+  const getStatusTextColor = (assignment: any): string => {
+    if (!assignment.completed) return '#868e96';
+    if (assignment.verified === true) return '#2b8a3e';
+    if (assignment.verified === false) return '#fa5252';
+    return '#e67700';
+  };
+
   const renderSummary = () => {
     if (!data?.summary) return null;
 
     const summary = data.summary;
 
     return (
-      <View style={styles.summaryCard}>
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.summaryCard}
+      >
         <Text style={styles.summaryTitle}>Overall Statistics</Text>
         
         <View style={styles.statsGrid}>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{summary.totalAssignments}</Text>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statCircle}
+            >
+              <Text style={styles.statValue}>{summary.totalAssignments}</Text>
+            </LinearGradient>
             <Text style={styles.statLabel}>Total Tasks</Text>
           </View>
+          
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{summary.completedAssignments}</Text>
+            <LinearGradient
+              colors={['#d3f9d8', '#b2f2bb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statCircle}
+            >
+              <Text style={styles.statValue}>{summary.completedAssignments}</Text>
+            </LinearGradient>
             <Text style={styles.statLabel}>Completed</Text>
           </View>
+          
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{Math.round(summary.completionRate)}%</Text>
+            <LinearGradient
+              colors={['#fff3bf', '#ffec99']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statCircle}
+            >
+              <Text style={styles.statValue}>{Math.round(summary.completionRate)}%</Text>
+            </LinearGradient>
             <Text style={styles.statLabel}>Completion</Text>
           </View>
+          
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{summary.earnedPoints}</Text>
+            <LinearGradient
+              colors={['#ffec99', '#ffe066']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.statCircle}
+            >
+              <Text style={styles.statValue}>{summary.earnedPoints}</Text>
+            </LinearGradient>
             <Text style={styles.statLabel}>Points</Text>
           </View>
         </View>
-      </View>
+      </LinearGradient>
     );
   };
 
@@ -89,13 +201,26 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     const isExpanded = selectedWeek === week.week;
 
     return (
-      <View key={week.week} style={styles.weekCard}>
+      <LinearGradient
+        key={week.week}
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.weekCard}
+      >
         <TouchableOpacity
           style={styles.weekHeader}
           onPress={() => setSelectedWeek(isExpanded ? null : week.week)}
         >
           <View style={styles.weekTitleContainer}>
-            <MaterialCommunityIcons name="calendar-week" size={20} color="#007AFF" />
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.weekIcon}
+            >
+              <MaterialCommunityIcons name="calendar-week" size={16} color="#495057" />
+            </LinearGradient>
             <Text style={styles.weekTitle}>Week {week.week}</Text>
           </View>
           
@@ -111,7 +236,7 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
             <MaterialCommunityIcons 
               name={isExpanded ? "chevron-up" : "chevron-down"} 
               size={20} 
-              color="#6c757d" 
+              color="#868e96" 
             />
           </View>
         </TouchableOpacity>
@@ -139,64 +264,41 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
                   </Text>
                   
                   <View style={styles.assignmentMeta}>
-                    <View style={[
-                      styles.statusBadge,
-                      assignment.completed 
-                        ? assignment.verified 
-                          ? styles.verifiedBadge
-                          : assignment.verified === false
-                            ? styles.rejectedBadge
-                            : styles.pendingBadge
-                        : styles.notCompletedBadge
-                    ]}>
+                    <LinearGradient
+                      colors={getStatusGradient(assignment)}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.statusBadge}
+                    >
                       <MaterialCommunityIcons 
-                        name={
-                          assignment.completed 
-                            ? assignment.verified 
-                              ? "check-circle"
-                              : assignment.verified === false
-                                ? "close-circle"
-                                : "clock-check"
-                            : "clock-outline"
-                        } 
+                        name={getStatusIcon(assignment) as any}
                         size={12} 
-                        color={
-                          assignment.completed 
-                            ? assignment.verified 
-                              ? "#2b8a3e"
-                              : assignment.verified === false
-                                ? "#fa5252"
-                                : "#e67700"
-                            : "#6c757d"
-                        } 
+                        color={getStatusIconColor(assignment)} 
                       />
-                      <Text style={[
-                        styles.statusText,
-                        assignment.completed 
-                          ? assignment.verified 
-                            ? styles.verifiedText
-                            : assignment.verified === false
-                              ? styles.rejectedText
-                              : styles.pendingText
-                          : styles.notCompletedText
-                      ]}>
-                        {assignment.completed 
-                          ? assignment.verified 
-                            ? 'Verified'
-                            : assignment.verified === false
-                              ? 'Rejected'
-                              : 'Pending'
-                          : 'Not Completed'}
+                      <Text style={[styles.statusText, { color: getStatusTextColor(assignment) }]}>
+                        {getStatusText(assignment)}
                       </Text>
-                    </View>
+                    </LinearGradient>
 
-                    <Text style={styles.assignmentPoints}>+{assignment.points} pts</Text>
+                    <LinearGradient
+                      colors={['#fff3bf', '#ffec99']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.pointsBadge}
+                    >
+                      <Text style={styles.pointsText}>+{assignment.points} pts</Text>
+                    </LinearGradient>
                     
                     {assignment.isLate && (
-                      <View style={styles.lateBadge}>
+                      <LinearGradient
+                        colors={['#fff3bf', '#ffec99']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.lateBadge}
+                      >
                         <MaterialCommunityIcons name="timer-alert" size={10} color="#e67700" />
                         <Text style={styles.lateText}>Late</Text>
-                      </View>
+                      </LinearGradient>
                     )}
                   </View>
 
@@ -210,14 +312,19 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
             ))}
           </View>
         )}
-      </View>
+      </LinearGradient>
     );
   };
 
   const renderHeader = () => (
-    <View style={styles.header}>
+    <LinearGradient
+      colors={['#ffffff', '#f8f9fa']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.header}
+    >
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Text style={styles.backButtonText}>←</Text>
+        <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
       </TouchableOpacity>
       <View style={styles.titleContainer}>
         <Text style={styles.title} numberOfLines={1}>
@@ -232,19 +339,44 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         <MaterialCommunityIcons 
           name="refresh" 
           size={24} 
-          color="#007AFF" 
+          color="#495057" 
           style={refreshing && styles.rotating} 
         />
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#495057" />
           <Text style={styles.loadingText}>Loading member data...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (authError) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons name="lock-alert" size={64} color="#fa5252" />
+          <Text style={styles.errorText}>Authentication Error</Text>
+          <Text style={styles.errorSubtext}>Please log in again</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <LinearGradient
+              colors={['#fa5252', '#e03131']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Go to Login</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -263,10 +395,17 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
       >
         {error ? (
           <View style={styles.errorContainer}>
-            <MaterialCommunityIcons name="alert-circle" size={48} color="#dc3545" />
+            <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={() => fetchData()}>
-              <Text style={styles.retryButtonText}>Retry</Text>
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.retryButtonGradient}
+              >
+                <Text style={[styles.retryButtonText, { color: '#495057' }]}>Retry</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : (
@@ -294,7 +433,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef'
   },
@@ -303,10 +441,6 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center'
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#007AFF'
   },
   titleContainer: {
     flex: 1,
@@ -333,33 +467,43 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#6c757d'
+    color: '#868e96'
+  },
+  errorContainer: {
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 40
+  },
+  errorText: {
+    color: '#fa5252',
+    textAlign: 'center',
+    marginVertical: 12,
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  errorSubtext: {
+    color: '#868e96',
+    textAlign: 'center',
+    marginBottom: 20
+  },
+  retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginTop: 8
+  },
+  retryButtonGradient: {
+    paddingHorizontal: 24,
+    paddingVertical: 12
+  },
+  retryButtonText: {
+    fontWeight: '600',
+    fontSize: 16
   },
   content: {
     flex: 1,
     padding: 16
   },
-  errorContainer: {
-    alignItems: 'center',
-    padding: 20
-  },
-  errorText: {
-    color: '#dc3545',
-    textAlign: 'center',
-    marginVertical: 12
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: '600'
-  },
   summaryCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -385,15 +529,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16
   },
+  statCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8
+  },
   statValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 4
+    color: '#212529'
   },
   statLabel: {
     fontSize: 12,
-    color: '#6c757d'
+    color: '#868e96'
   },
   weeksContainer: {
     marginTop: 8
@@ -405,7 +556,6 @@ const styles = StyleSheet.create({
     marginBottom: 12
   },
   weekCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     marginBottom: 8,
     overflow: 'hidden',
@@ -420,12 +570,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: '#f8f9fa'
+    backgroundColor: 'rgba(255,255,255,0.5)'
   },
   weekTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8
+  },
+  weekIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   weekTitle: {
     fontSize: 16,
@@ -447,7 +604,7 @@ const styles = StyleSheet.create({
   },
   weekStatLabel: {
     fontSize: 10,
-    color: '#6c757d'
+    color: '#868e96'
   },
   weekDetails: {
     padding: 16,
@@ -473,14 +630,15 @@ const styles = StyleSheet.create({
   },
   assignmentDate: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#868e96',
     marginBottom: 8
   },
   assignmentMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4
+    marginBottom: 4,
+    flexWrap: 'wrap'
   },
   statusBadge: {
     flexDirection: 'row',
@@ -490,43 +648,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 4
   },
-  verifiedBadge: {
-    backgroundColor: '#d3f9d8'
-  },
-  pendingBadge: {
-    backgroundColor: '#fff3bf'
-  },
-  rejectedBadge: {
-    backgroundColor: '#ffc9c9'
-  },
-  notCompletedBadge: {
-    backgroundColor: '#f1f3f5'
-  },
   statusText: {
     fontSize: 11,
     fontWeight: '600'
   },
-  verifiedText: {
-    color: '#2b8a3e'
+  pointsBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12
   },
-  pendingText: {
-    color: '#e67700'
-  },
-  rejectedText: {
-    color: '#fa5252'
-  },
-  notCompletedText: {
-    color: '#6c757d'
-  },
-  assignmentPoints: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#e67700'
+  pointsText: {
+    fontSize: 11,
+    color: '#e67700',
+    fontWeight: '600'
   },
   lateBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3bf',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -539,7 +677,7 @@ const styles = StyleSheet.create({
   },
   assignmentNotes: {
     fontSize: 11,
-    color: '#6c757d',
+    color: '#868e96',
     fontStyle: 'italic',
     marginTop: 4
   }

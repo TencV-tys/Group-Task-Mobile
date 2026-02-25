@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,8 +13,10 @@ import {
   Image
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { GroupActivityService } from '../services/GroupActivityService';
 import { TaskService } from '../services/TaskService';
+import * as SecureStore from 'expo-secure-store';
 
 export default function TaskCompletionHistoryScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
@@ -27,10 +29,37 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [showTaskDropdown, setShowTaskDropdown] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [authError, setAuthError] = useState(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        console.warn('🔐 TaskCompletionHistoryScreen: No auth token available');
+        setAuthError(true);
+        setError('Please log in again');
+        return false;
+      }
+      console.log('✅ TaskCompletionHistoryScreen: Auth token found');
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('❌ TaskCompletionHistoryScreen: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
-    fetchTasks();
-    fetchHistory();
+    const initialize = async () => {
+      const hasToken = await checkToken();
+      if (hasToken) {
+        await fetchTasks();
+        await fetchHistory();
+      }
+    };
+    initialize();
   }, [groupId]);
 
   useEffect(() => {
@@ -51,12 +80,21 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   };
 
   const fetchHistory = async (isRefreshing = false) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (isRefreshing) {
       setRefreshing(true);
     } else {
       setLoading(true);
     }
     setError(null);
+    setAuthError(false);
 
     try {
       const result = await GroupActivityService.getTaskCompletionHistory(groupId, {
@@ -68,6 +106,10 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
         setHistoryData(result.data);
       } else {
         setError(result.message || 'Failed to load completion history');
+        if (result.message?.toLowerCase().includes('token') || 
+            result.message?.toLowerCase().includes('auth')) {
+          setAuthError(true);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching history:', err);
@@ -95,10 +137,43 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     task.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Helper function for status badge gradient
+  const getVerifiedGradient = (verified: boolean | null): [string, string] => {
+    if (verified === true) return ['#d3f9d8', '#b2f2bb']; // Light green
+    if (verified === false) return ['#fff5f5', '#ffe3e3']; // Light red
+    return ['#fff3bf', '#ffec99']; // Light orange for pending
+  };
+
+  // Helper function for status icon color
+  const getVerifiedIconColor = (verified: boolean | null): string => {
+    if (verified === true) return '#2b8a3e';
+    if (verified === false) return '#fa5252';
+    return '#e67700';
+  };
+
+  // Helper function for status icon name
+  const getVerifiedIcon = (verified: boolean | null): string => {
+    if (verified === true) return 'check-circle';
+    if (verified === false) return 'close-circle';
+    return 'clock-outline';
+  };
+
+  // Helper function for status text
+  const getVerifiedText = (verified: boolean | null): string => {
+    if (verified === true) return 'Verified';
+    if (verified === false) return 'Rejected';
+    return 'Pending';
+  };
+
   const renderHeader = () => (
-    <View style={styles.header}>
+    <LinearGradient
+      colors={['#ffffff', '#f8f9fa']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.header}
+    >
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <Text style={styles.backButtonText}>←</Text>
+        <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
       </TouchableOpacity>
       <View style={styles.titleContainer}>
         <Text style={styles.title} numberOfLines={1}>
@@ -113,15 +188,20 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
         <MaterialCommunityIcons 
           name="refresh" 
           size={24} 
-          color="#007AFF" 
+          color="#495057" 
           style={refreshing && styles.rotating} 
         />
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 
   const renderFilters = () => (
-    <View style={styles.filtersContainer}>
+    <LinearGradient
+      colors={['#ffffff', '#f8f9fa']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.filtersContainer}
+    >
       {/* Task Filter */}
       <View style={styles.filterSection}>
         <Text style={styles.filterLabel}>Filter by Task:</Text>
@@ -140,14 +220,19 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
           <MaterialCommunityIcons 
             name={showTaskDropdown ? 'chevron-up' : 'chevron-down'} 
             size={20} 
-            color="#6c757d" 
+            color="#868e96" 
           />
         </TouchableOpacity>
 
         {showTaskDropdown && (
           <View style={styles.dropdownMenu}>
-            <View style={styles.searchContainer}>
-              <MaterialCommunityIcons name="magnify" size={18} color="#6c757d" />
+            <LinearGradient
+              colors={['#ffffff', '#f8f9fa']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.searchContainer}
+            >
+              <MaterialCommunityIcons name="magnify" size={18} color="#868e96" />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search tasks..."
@@ -155,7 +240,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
                 onChangeText={setSearchQuery}
                 placeholderTextColor="#adb5bd"
               />
-            </View>
+            </LinearGradient>
             <ScrollView style={styles.dropdownList} nestedScrollEnabled>
               <TouchableOpacity
                 style={styles.dropdownItem}
@@ -188,31 +273,53 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
       </View>
 
       {/* Week Filter */}
-      <View style={styles.filterSection}>
-        <Text style={styles.filterLabel}>Filter by Week:</Text>
-        <View style={styles.weekButtons}>
-          <TouchableOpacity
-            style={[styles.weekButton, !selectedWeek && styles.activeWeekButton]}
-            onPress={() => setSelectedWeek(null)}
-          >
-            <Text style={[styles.weekButtonText, !selectedWeek && styles.activeWeekText]}>
-              All
-            </Text>
-          </TouchableOpacity>
-          {getWeekOptions().map(week => (
-            <TouchableOpacity
-              key={week}
-              style={[styles.weekButton, selectedWeek === week && styles.activeWeekButton]}
-              onPress={() => setSelectedWeek(week)}
-            >
-              <Text style={[styles.weekButtonText, selectedWeek === week && styles.activeWeekText]}>
-                W{week}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-    </View>
+     {/* Week Filter */}
+<View style={styles.filterSection}>
+  <Text style={styles.filterLabel}>Filter by Week:</Text>
+  <View style={styles.weekButtons}>
+    <TouchableOpacity
+      style={styles.weekButton}
+      onPress={() => setSelectedWeek(null)}
+    >
+      <LinearGradient
+        colors={!selectedWeek ? ['#495057', '#212529'] : ['#f8f9fa', '#e9ecef']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.weekButtonGradient}
+      >
+        <Text style={[
+          styles.weekButtonText,
+          !selectedWeek && styles.activeWeekText
+        ]}>
+          All
+        </Text>
+      </LinearGradient>
+    </TouchableOpacity>
+    
+    {getWeekOptions().map(week => (
+      <TouchableOpacity
+        key={week}
+        style={styles.weekButton}
+        onPress={() => setSelectedWeek(week)}
+      >
+        <LinearGradient
+          colors={selectedWeek === week ? ['#495057', '#212529'] : ['#f8f9fa', '#e9ecef']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.weekButtonGradient}
+        >
+          <Text style={[
+            styles.weekButtonText,
+            selectedWeek === week && styles.activeWeekText
+          ]}>
+            W{week}
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    ))}
+  </View>
+</View>
+    </LinearGradient>
   );
 
   const renderTaskCompletions = () => {
@@ -229,96 +336,147 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     }
 
     return historyData.tasks.map((taskGroup: any) => (
-      <View key={taskGroup.taskId} style={styles.taskGroup}>
+      <LinearGradient
+        key={taskGroup.taskId}
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.taskGroup}
+      >
         <View style={styles.taskGroupHeader}>
-          <MaterialCommunityIcons name="format-list-checks" size={20} color="#007AFF" />
+          <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.taskGroupIcon}
+          >
+            <MaterialCommunityIcons name="format-list-checks" size={16} color="#495057" />
+          </LinearGradient>
           <Text style={styles.taskGroupTitle}>{taskGroup.taskTitle}</Text>
-          <View style={styles.taskGroupBadge}>
+          <LinearGradient
+            colors={['#e7f5ff', '#d0ebff']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.taskGroupBadge}
+          >
             <Text style={styles.taskGroupBadgeText}>
               {taskGroup.completions.length} completion{taskGroup.completions.length !== 1 ? 's' : ''}
             </Text>
-          </View>
+          </LinearGradient>
         </View>
 
         {taskGroup.completions.map((completion: any, index: number) => (
           <TouchableOpacity
             key={index}
-            style={styles.completionCard}
             onPress={() => navigation.navigate('AssignmentDetails', {
               assignmentId: completion.assignmentId,
               isAdmin: userRole === 'ADMIN'
             })}
             activeOpacity={0.7}
           >
-            <View style={styles.completionHeader}>
-              <View style={styles.userInfo}>
-                <View style={styles.userAvatar}>
-                  {completion.userAvatar ? (
-                    <Image source={{ uri: completion.userAvatar }} style={styles.avatarImage} />
-                  ) : (
-                    <Text style={styles.userInitial}>
-                      {completion.userName?.charAt(0) || '?'}
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.completionCard}
+            >
+              <View style={styles.completionHeader}>
+                <View style={styles.userInfo}>
+                  <LinearGradient
+                    colors={['#f8f9fa', '#e9ecef']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.userAvatar}
+                  >
+                    {completion.userAvatar ? (
+                      <Image source={{ uri: completion.userAvatar }} style={styles.avatarImage} />
+                    ) : (
+                      <Text style={styles.userInitial}>
+                        {completion.userName?.charAt(0) || '?'}
+                      </Text>
+                    )} 
+                  </LinearGradient>
+                  <View style={styles.userDetails}>
+                    <Text style={styles.userName}>{completion.userName}</Text>
+                    <Text style={styles.completionDate}>
+                      {formatDate(completion.completedAt)}
                     </Text>
-                  )} 
+                  </View>
                 </View>
-                <View style={styles.userDetails}>
-                  <Text style={styles.userName}>{completion.userName}</Text>
-                  <Text style={styles.completionDate}>
-                    {formatDate(completion.completedAt)}
-                  </Text>
+
+                <View style={styles.completionMeta}>
+                  <LinearGradient
+                    colors={completion.week === selectedWeek 
+                      ? ['#495057', '#212529'] 
+                      : ['#e7f5ff', '#d0ebff']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.weekBadge}
+                  >
+                    <Text style={[
+                      styles.weekBadgeText,
+                      completion.week === selectedWeek && styles.activeWeekBadgeText
+                    ]}>
+                      Week {completion.week}
+                    </Text>
+                  </LinearGradient>
+
+                  <LinearGradient
+                    colors={getVerifiedGradient(completion.verified)}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.verifiedBadge}
+                  >
+                    <MaterialCommunityIcons 
+                      name={getVerifiedIcon(completion.verified) as any}
+                      size={12} 
+                      color={getVerifiedIconColor(completion.verified)} 
+                    />
+                    <Text style={[styles.verifiedText, { color: getVerifiedIconColor(completion.verified) }]}>
+                      {getVerifiedText(completion.verified)}
+                    </Text>
+                  </LinearGradient>
                 </View>
               </View>
 
-              <View style={styles.completionMeta}>
-                <View style={[
-                  styles.weekBadge,
-                  completion.week === selectedWeek && styles.activeWeekBadge
-                ]}>
-                  <Text style={styles.weekBadgeText}>Week {completion.week}</Text>
-                </View>
-
-                <View style={[
-                  styles.verifiedBadge,
-                  completion.verified ? styles.verifiedTrue : styles.verifiedFalse
-                ]}>
-                  <MaterialCommunityIcons 
-                    name={completion.verified ? "check-circle" : "clock-outline"} 
-                    size={12} 
-                    color={completion.verified ? "#2b8a3e" : "#e67700"} 
-                  />
-                  <Text style={[
-                    styles.verifiedText,
-                    completion.verified ? styles.verifiedTrueText : styles.verifiedFalseText
-                  ]}>
-                    {completion.verified ? 'Verified' : 'Pending'}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.completionDetails}>
-              <View style={styles.detailRow}>
-                <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-                <Text style={styles.detailText}>Points: {completion.points}</Text>
-              </View>
-              
-              {completion.completedAt && (
+              <View style={styles.completionDetails}>
                 <View style={styles.detailRow}>
-                  <MaterialCommunityIcons name="clock-check" size={14} color="#6c757d" />
-                  <Text style={styles.detailText}>
-                    Completed: {new Date(completion.completedAt).toLocaleTimeString()}
-                  </Text>
+                  <LinearGradient
+                    colors={['#fff3bf', '#ffec99']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.detailIcon}
+                  >
+                    <MaterialCommunityIcons name="star" size={12} color="#e67700" />
+                  </LinearGradient>
+                  <Text style={styles.detailText}>Points: {completion.points}</Text>
                 </View>
-              )}
-            </View>
+                
+                {completion.completedAt && (
+                  <View style={styles.detailRow}>
+                    <LinearGradient
+                      colors={['#f8f9fa', '#e9ecef']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.detailIcon}
+                    >
+                      <MaterialCommunityIcons name="clock-check" size={12} color="#868e96" />
+                    </LinearGradient>
+                    <Text style={styles.detailText}>
+                      {new Date(completion.completedAt).toLocaleTimeString()}
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-            <View style={styles.completionFooter}>
-              <Text style={styles.viewDetails}>Tap to view full details</Text>
-              <MaterialCommunityIcons name="arrow-right" size={16} color="#007AFF" />
-            </View>
+              <View style={styles.completionFooter}>
+                <Text style={styles.viewDetails}>Tap to view full details</Text>
+                <MaterialCommunityIcons name="arrow-right" size={16} color="#495057" />
+              </View>
+            </LinearGradient>
           </TouchableOpacity>
         ))}
-      </View>
+      </LinearGradient>
     ));
   };
 
@@ -326,8 +484,33 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#495057" />
           <Text style={styles.loadingText}>Loading completion history...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (authError) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons name="lock-alert" size={64} color="#fa5252" />
+          <Text style={styles.errorText}>Authentication Error</Text>
+          <Text style={styles.errorSubtext}>Please log in again</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <LinearGradient
+              colors={['#fa5252', '#e03131']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Go to Login</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -346,10 +529,17 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
       >
         {error ? (
           <View style={styles.errorContainer}>
-            <MaterialCommunityIcons name="alert-circle" size={48} color="#dc3545" />
+            <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
             <Text style={styles.errorText}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={() => fetchHistory()}>
-              <Text style={styles.retryButtonText}>Retry</Text>
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.retryButtonGradient}
+              >
+                <Text style={[styles.retryButtonText, { color: '#495057' }]}>Retry</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : (
@@ -374,7 +564,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef'
   },
@@ -383,10 +572,6 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center'
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#007AFF'
   },
   titleContainer: {
     flex: 1,
@@ -413,33 +598,43 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#6c757d'
+    color: '#868e96'
+  },
+  errorContainer: {
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 40
+  },
+  errorText: {
+    color: '#fa5252',
+    textAlign: 'center',
+    marginVertical: 12,
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  errorSubtext: {
+    color: '#868e96',
+    textAlign: 'center',
+    marginBottom: 20
+  },
+  retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginTop: 8
+  },
+  retryButtonGradient: {
+    paddingHorizontal: 24,
+    paddingVertical: 12
+  },
+  retryButtonText: {
+    fontWeight: '600',
+    fontSize: 16
   },
   content: {
     flex: 1,
     padding: 16
   },
-  errorContainer: {
-    alignItems: 'center',
-    padding: 20
-  },
-  errorText: {
-    color: '#dc3545',
-    textAlign: 'center',
-    marginVertical: 12
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: '600'
-  },
   filtersContainer: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -499,8 +694,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    backgroundColor: '#f8f9fa'
+    borderBottomColor: '#e9ecef'
   },
   searchInput: {
     flex: 1,
@@ -527,27 +721,22 @@ const styles = StyleSheet.create({
     gap: 8
   },
   weekButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#dee2e6'
+    overflow: 'hidden'
   },
-  activeWeekButton: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF'
+  weekButtonGradient: {
+    paddingHorizontal: 12,
+    paddingVertical: 6
   },
   weekButtonText: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#868e96',
     fontWeight: '500'
   },
   activeWeekText: {
     color: 'white'
   },
   taskGroup: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -566,6 +755,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef'
   },
+  taskGroupIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
   taskGroupTitle: {
     fontSize: 16,
     fontWeight: '600',
@@ -573,18 +769,16 @@ const styles = StyleSheet.create({
     flex: 1
   },
   taskGroupBadge: {
-    backgroundColor: '#e7f5ff',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12
   },
   taskGroupBadgeText: {
     fontSize: 11,
-    color: '#007AFF',
+    color: '#495057',
     fontWeight: '600'
   },
   completionCard: {
-    backgroundColor: '#f8f9fa',
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
@@ -607,7 +801,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden'
@@ -618,7 +811,7 @@ const styles = StyleSheet.create({
     borderRadius: 18
   },
   userInitial: {
-    color: 'white',
+    color: '#495057',
     fontSize: 14,
     fontWeight: 'bold'
   },
@@ -633,25 +826,24 @@ const styles = StyleSheet.create({
   },
   completionDate: {
     fontSize: 11,
-    color: '#6c757d'
+    color: '#868e96'
   },
   completionMeta: {
     alignItems: 'flex-end',
     gap: 4
   },
   weekBadge: {
-    backgroundColor: '#e7f5ff',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8
   },
-  activeWeekBadge: {
-    backgroundColor: '#007AFF'
-  },
   weekBadgeText: {
     fontSize: 9,
-    color: '#007AFF',
+    color: '#495057',
     fontWeight: '600'
+  },
+  activeWeekBadgeText: {
+    color: 'white'
   },
   verifiedBadge: {
     flexDirection: 'row',
@@ -661,36 +853,32 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 3
   },
-  verifiedTrue: {
-    backgroundColor: '#d3f9d8'
-  },
-  verifiedFalse: {
-    backgroundColor: '#fff3bf'
-  },
   verifiedText: {
     fontSize: 9,
     fontWeight: '600'
-  },
-  verifiedTrueText: {
-    color: '#2b8a3e'
-  },
-  verifiedFalseText: {
-    color: '#e67700'
   },
   completionDetails: {
     flexDirection: 'row',
     gap: 12,
     marginBottom: 8,
-    paddingLeft: 44
+    paddingLeft: 44,
+    flexWrap: 'wrap'
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4
+    gap: 6
+  },
+  detailIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   detailText: {
     fontSize: 11,
-    color: '#6c757d'
+    color: '#868e96'
   },
   completionFooter: {
     flexDirection: 'row',
@@ -704,7 +892,7 @@ const styles = StyleSheet.create({
   },
   viewDetails: {
     fontSize: 11,
-    color: '#007AFF',
+    color: '#495057',
     fontWeight: '500'
   },
   emptyContainer: {
@@ -714,7 +902,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: '#6c757d',
+    color: '#868e96',
     marginBottom: 8,
     marginTop: 16
   },

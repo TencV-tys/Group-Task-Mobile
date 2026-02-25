@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AssignmentService, TodayAssignment } from '../services/AssignmentService';
+import * as SecureStore from 'expo-secure-store';
 
 export default function TodayAssignmentsScreen({ navigation, route }: any) {
   const { groupId, groupName } = route.params || {};
@@ -20,18 +21,48 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [assignments, setAssignments] = useState<TodayAssignment[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        console.warn('🔐 TodayAssignmentsScreen: No auth token available');
+        setAuthError(true);
+        setError('Please log in again');
+        return false;
+      }
+      console.log('✅ TodayAssignmentsScreen: Auth token found');
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('❌ TodayAssignmentsScreen: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     fetchTodayAssignments();
   }, [groupId]);
 
   const fetchTodayAssignments = async (isRefreshing = false) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (isRefreshing) {
       setRefreshing(true);
     } else {
       setLoading(true);
     }
     setError(null);
+    setAuthError(false);
 
     try {
       const result = await AssignmentService.getTodayAssignments(groupId);
@@ -40,6 +71,10 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
         setAssignments(result.data?.assignments || []);
       } else {
         setError(result.message || 'Failed to load today\'s assignments');
+        if (result.message?.toLowerCase().includes('token') || 
+            result.message?.toLowerCase().includes('auth')) {
+          setAuthError(true);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching today\'s assignments:', err);
@@ -75,7 +110,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   };
 
   // Fix: Properly type the gradient colors
-  const getGradientColors = (item: TodayAssignment): [string, string, ...string[]] => {
+  const getGradientColors = (item: TodayAssignment): [string, string] => {
     const isUrgent = item.timeLeft && item.timeLeft < 300;
     const isLate = item.willBePenalized;
     
@@ -92,16 +127,22 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   };
 
   // Fix: Add proper type for conditional styles
-  const getStatusBadgeColors = (item: TodayAssignment): [string, string, ...string[]] => {
+  const getStatusBadgeColors = (item: TodayAssignment): [string, string] => {
     const isLate = item.willBePenalized;
     if (isLate) return ['#fff3bf', '#ffec99'];
     if (item.canSubmit) return ['#d3f9d8', '#b2f2bb'];
     return ['#f1f3f5', '#e9ecef'];
   };
 
+  // Fix: Get timer gradient colors
+  const getTimerGradientColors = (isUrgent: boolean): [string, string] => {
+    return isUrgent ? ['#ffc9c9', '#ffb3b3'] : ['#d3f9d8', '#b2f2bb'];
+  };
+
   const renderAssignment = ({ item }: { item: TodayAssignment }) => {
-    const isUrgent = item.timeLeft && item.timeLeft < 300;
-    const isLate = item.willBePenalized;
+   const timeLeft = item.timeLeft;
+  const isUrgent = timeLeft ? timeLeft < 300 : false; // 👈 Ensures boolean
+  const isLate = item.willBePenalized ?? false; // 👈 Ensures boolean
 
     return (
       <TouchableOpacity
@@ -181,7 +222,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
 
           {item.timeLeft !== undefined && item.timeLeft > 0 && (
             <LinearGradient
-              colors={isUrgent ? (['#ffc9c9', '#ffb3b3'] as [string, string]) : ['#d3f9d8', '#b2f2bb']}
+              colors={getTimerGradientColors(isUrgent)}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.timerContainer}
@@ -191,9 +232,9 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
                 size={16} 
                 color={isUrgent ? "#fa5252" : "#2b8a3e"} 
               />
-           <Text style={isUrgent ? [styles.timerText, styles.urgentTimerText] : styles.timerText}>
-  {formatTimeLeft(item.timeLeft)} {item.canSubmit ? 'left to submit' : 'until submission opens'}
-</Text>
+              <Text style={isUrgent ? [styles.timerText, styles.urgentTimerText] : styles.timerText}>
+                {formatTimeLeft(item.timeLeft)} {item.canSubmit ? 'left to submit' : 'until submission opens'}
+              </Text>
             </LinearGradient>
           )}
 
@@ -207,13 +248,13 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
 
   const renderHeader = () => (
     <LinearGradient
-      colors={['#f8f9fa', '#e9ecef']}
+      colors={['#ffffff', '#f8f9fa']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.header}
     >
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <MaterialCommunityIcons name="arrow-left" size={24} color="#007AFF" />
+        <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
       </TouchableOpacity>
       <View style={styles.titleContainer}>
         <Text style={styles.title} numberOfLines={1}>
@@ -229,8 +270,33 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#495057" />
           <Text style={styles.loadingText}>Loading today's assignments...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (authError) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons name="lock-alert" size={64} color="#fa5252" />
+          <Text style={styles.errorText}>Authentication Error</Text>
+          <Text style={styles.errorSubtext}>Please log in again</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <LinearGradient
+              colors={['#fa5252', '#e03131']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Go to Login</Text>
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -241,26 +307,26 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       {renderHeader()}
 
-     <FlatList
-  data={assignments}
-  renderItem={renderAssignment}
-  keyExtractor={(item) => item.id}
-  refreshControl={
-    <RefreshControl refreshing={refreshing} onRefresh={() => fetchTodayAssignments(true)} />
-  }
-  ListEmptyComponent={
-    !loading ? (
-      <View style={styles.emptyContainer}>
-        <MaterialCommunityIcons name="calendar-check" size={64} color="#dee2e6" />
-        <Text style={styles.emptyText}>No assignments due today!</Text>
-        <Text style={styles.emptySubtext}>
-          You're all caught up for today
-        </Text>
-      </View>
-    ) : null
-  }
-  contentContainerStyle={styles.listContainer}
-/>
+      <FlatList
+        data={assignments}
+        renderItem={renderAssignment}
+        keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchTodayAssignments(true)} />
+        }
+        ListEmptyComponent={
+          !loading ? (
+            <View style={styles.emptyContainer}>
+              <MaterialCommunityIcons name="calendar-check" size={64} color="#dee2e6" />
+              <Text style={styles.emptyText}>No assignments due today!</Text>
+              <Text style={styles.emptySubtext}>
+                You're all caught up for today
+              </Text>
+            </View>
+          ) : null
+        }
+        contentContainerStyle={styles.listContainer}
+      />
     </SafeAreaView>
   );
 }
@@ -296,7 +362,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#868e96',
     marginTop: 2
   },
   headerSpacer: {
@@ -309,7 +375,38 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#6c757d'
+    color: '#868e96'
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  errorText: {
+    color: '#fa5252',
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8
+  },
+  errorSubtext: {
+    color: '#868e96',
+    fontSize: 14,
+    marginBottom: 24
+  },
+  retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  retryButtonGradient: {
+    paddingHorizontal: 24,
+    paddingVertical: 12
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16
   },
   listContainer: {
     padding: 16
@@ -350,7 +447,7 @@ const styles = StyleSheet.create({
   },
   groupName: {
     fontSize: 13,
-    color: '#6c757d'
+    color: '#868e96'
   },
   statusBadge: {
     flexDirection: 'row',
@@ -368,7 +465,7 @@ const styles = StyleSheet.create({
     color: '#2b8a3e'
   },
   waitingText: {
-    color: '#6c757d'
+    color: '#868e96'
   },
   lateText: {
     color: '#e67700'
@@ -422,7 +519,7 @@ const styles = StyleSheet.create({
   },
   reasonText: {
     fontSize: 13,
-    color: '#6c757d',
+    color: '#868e96',
     fontStyle: 'italic',
     marginTop: 8
   },
@@ -433,7 +530,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    color: '#6c757d',
+    color: '#868e96',
     marginTop: 16,
     marginBottom: 8
   },

@@ -15,9 +15,10 @@ import {
 import { TaskService } from '../services/TaskService';
 import { AssignmentService } from '../services/AssignmentService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SettingsModal } from '../components/SettingsModal';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -31,16 +32,25 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  // State for today's assignments
+  const [todayAssignments, setTodayAssignments] = useState<any[]>([]);
+  const [showTodaySection, setShowTodaySection] = useState(false);
   
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
 
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
-        const userStr = await AsyncStorage.getItem('user');
+        const userStr = await SecureStore.getItemAsync('user');
         if (userStr) {
           const user = JSON.parse(userStr);
           setCurrentUserId(user.id);
+        } else {
+          const userDataStr = await SecureStore.getItemAsync('userData');
+          if (userDataStr) {
+            const userData = JSON.parse(userDataStr);
+            setCurrentUserId(userData.id || userData._id);
+          }
         }
       } catch (error) {
         console.error('Error getting current user:', error);
@@ -64,6 +74,16 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     });
     return unsubscribe;
   }, [navigation, groupId]);
+
+  // Helper function to find today's assignments
+  const findTodayAssignments = (tasks: any[]) => {
+    const today = new Date().toDateString();
+    return tasks.filter(task => {
+      if (!task.userAssignment?.dueDate) return false;
+      const dueDate = new Date(task.userAssignment.dueDate).toDateString();
+      return today === dueDate && !task.userAssignment.completed;
+    });
+  };
 
   const fetchTasks = async (isRefreshing = false) => {
     if (isRefreshing) {
@@ -120,8 +140,15 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         
         const uniqueMyTasks = Array.from(taskMap.values());
         setMyTasks(uniqueMyTasks);
+        
+        // Find and set today's assignments
+        const todayTasks = findTodayAssignments(uniqueMyTasks);
+        setTodayAssignments(todayTasks);
+        setShowTodaySection(todayTasks.length > 0);
       } else {
         setMyTasks([]);
+        setTodayAssignments([]);
+        setShowTodaySection(false);
       }  
       
     } catch (err: any) {
@@ -408,6 +435,28 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     });
   };
 
+  // Handle viewing all today's tasks
+  const handleViewAllTodayTasks = () => {
+    if (todayAssignments.length === 0) return;
+    
+    if (todayAssignments.length === 1) {
+      // If only one, go directly to AssignmentDetails
+      navigation.navigate('AssignmentDetails', {
+        assignmentId: todayAssignments[0].userAssignment.id,
+        isAdmin: false,
+        onVerified: () => {
+          fetchTasks();
+        }
+      });
+    } else {
+      // Navigate to TodayAssignments screen
+      navigation.navigate('TodayAssignments', {
+        groupId,
+        groupName
+      });
+    }
+  };
+
   const renderAssignmentInfo = (task: any) => {
     const hasAssignment = task.userAssignment || task.assignments?.length > 0;
     
@@ -558,13 +607,18 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   };
 
   const renderHeader = () => (
-    <View style={styles.header}>
+    <LinearGradient
+      colors={['#f8f9fa', '#e9ecef']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.header}
+    >
       <TouchableOpacity 
         onPress={() => navigation.goBack()} 
         style={styles.backButton}
         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
       >
-        <Text style={styles.backButtonText}>←</Text>
+        <MaterialCommunityIcons name="arrow-left" size={24} color="#007AFF" />
       </TouchableOpacity>
       
       <View style={styles.titleContainer}>
@@ -595,229 +649,384 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           onPress={() => setShowSettingsModal(true)}
           hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
         >
-          <MaterialCommunityIcons name="dots-vertical" size={24} color="#007AFF" />
+          <MaterialCommunityIcons name="cog" size={24} color="#007AFF" />
         </TouchableOpacity>
       </View>
-    </View>
+    </LinearGradient>
   );
 
- const renderTask = ({ item }: any) => {
-  const isAdmin = userRole === 'ADMIN';
-  const isCompleted = item.assignment?.completed || item.userAssignment?.completed;
-  const isMyTasksView = selectedTab === 'my';
-  const isSubmittableNow = item.isSubmittableNow;
-  const timeLeft = item.timeLeft;
-  const submissionStatus = item.submissionStatus;
-  const willBePenalized = item.willBePenalized;
-  
-  // Check if this task is due today
-  const isDueToday = () => {
-    if (!item.userAssignment?.dueDate) return false;
-    const today = new Date().toDateString();
-    const dueDate = new Date(item.userAssignment.dueDate).toDateString();
-    return today === dueDate;
-  };
-
-  const handleViewTodayAssignment = () => {
-    if (item.userAssignment) {
-      navigation.navigate('AssignmentDetails', {
-        assignmentId: item.userAssignment.id,
-        isAdmin: false,
-        onVerified: () => {
-          fetchTasks();
-        }
-      });
-    }
-  };
-
-  return (
-    <TouchableOpacity
-      style={[
-        styles.taskCard,
-        isCompleted && styles.completedTaskCard,
-        isMyTasksView && isSubmittableNow && styles.submittableTaskCard,
-        isMyTasksView && willBePenalized && styles.penaltyTaskCard,
-        isMyTasksView && isDueToday() && !isCompleted && styles.todayTaskCard // New style for today's tasks
-      ]}
-      onPress={() => handleViewTaskDetails(item.id)}
-      onLongPress={() => !isMyTasksView && isAdmin && showTaskOptions(item)}
-    >
-      {/* Today's Assignment Badge - NEW */}
-      {isMyTasksView && isDueToday() && !isCompleted && (
-        <View style={styles.todayBadge}>
-          <MaterialCommunityIcons name="clock-alert" size={14} color="#fff" />
-          <Text style={styles.todayBadgeText}>DUE TODAY</Text>
-        </View>
-      )}
-
-      <View style={styles.taskHeader}>
-        <View style={[
-          styles.taskIcon,
-          isCompleted 
-            ? { backgroundColor: '#34c759' }
-            : isDueToday() && isMyTasksView
-              ? { backgroundColor: '#fa5252' } // Red icon for today's tasks
-              : { backgroundColor: '#e7f5ff' }
-        ]}>
-          <MaterialCommunityIcons 
-            name={isCompleted ? "check" : "format-list-checks"} 
-            size={20} 
-            color={isCompleted ? 'white' : isDueToday() && isMyTasksView ? 'white' : '#007AFF'} 
-          />
-        </View>
-        <View style={styles.taskInfo}>
-          <View style={styles.taskTitleRow}>
-            <Text style={[
-              styles.taskTitle,
-              isCompleted && styles.completedTaskTitle,
-              isMyTasksView && isDueToday() && !isCompleted && styles.todayTaskTitle // Highlight today's task title
-            ]} numberOfLines={2}>
-              {item.title}
+  // Render today's assignments section at the top
+  const renderTodaySection = () => {
+    if (!showTodaySection || selectedTab !== 'my') return null;
+    
+    return (
+      <LinearGradient
+        colors={['#fff5f5', '#ffe3e3']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.todaySection}
+      >
+        <View style={styles.todaySectionHeader}>
+          <View style={styles.todaySectionTitleContainer}>
+            <MaterialCommunityIcons name="clock-alert" size={20} color="#fa5252" />
+            <Text style={styles.todaySectionTitle}>
+              Due Today ({todayAssignments.length})
             </Text>
-            
-            {!isMyTasksView && isAdmin && (
-              <TouchableOpacity 
-                style={styles.editButton}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleEditTask(item);
-                }}
-              >
-                <MaterialCommunityIcons name="pencil" size={18} color="#6c757d" />
-              </TouchableOpacity>
-            )}
           </View>
-          
-          {item.description && (
-            <Text style={[
-              styles.taskDescription,
-              isCompleted && styles.completedTaskDescription
-            ]} numberOfLines={2}>
-              {item.description}
-            </Text>
-          )}
-          
-          <View style={styles.taskMeta}>
-            <View style={styles.pointsBadge}>
-              <MaterialCommunityIcons name="star" size={12} color="#e67700" />
-              <Text style={styles.taskPoints}>{item.points} pts</Text>
-            </View>
-            
-            {item.category && (
-              <View style={styles.categoryBadge}>
-                <Text style={styles.taskCategory}>{item.category}</Text>
-              </View>
-            )}
-
-            {/* Due Today Indicator - NEW */}
-            {isMyTasksView && isDueToday() && !isCompleted && (
-              <View style={styles.dueTodayBadge}>
-                <MaterialCommunityIcons name="alert" size={12} color="#fa5252" />
-                <Text style={styles.dueTodayText}>Today</Text>
-              </View>
-            )}
-          </View>
+          <TouchableOpacity onPress={handleViewAllTodayTasks}>
+            <Text style={styles.todaySectionViewAll}>View All</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-      
-      {renderAssignmentInfo(item)}
-      
-      {isMyTasksView && !isCompleted && (
-        <>
-          {/* TODAY'S ASSIGNMENT BUTTON - NEW (appears at the top) */}
-          {isDueToday() && (
-            <TouchableOpacity
-              style={styles.todayAssignmentButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleViewTodayAssignment();
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.todayAssignmentContent}>
-                <MaterialCommunityIcons name="calendar-check" size={20} color="white" />
-                <Text style={styles.todayAssignmentText}>View Today's Assignment</Text>
-                <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+        
+        {todayAssignments.slice(0, 2).map((task) => (
+          <TouchableOpacity
+            key={task.id}
+            style={styles.todayTaskItem}
+            onPress={() => {
+              navigation.navigate('AssignmentDetails', {
+                assignmentId: task.userAssignment.id,
+                isAdmin: false,
+                onVerified: () => {
+                  fetchTasks();
+                }
+              });
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.todayTaskItemContent}>
+              <View style={styles.todayTaskItemIcon}>
+                <MaterialCommunityIcons name="calendar-check" size={18} color="#fa5252" />
               </View>
-            </TouchableOpacity>
-          )}
-
-          {/* Original Complete Now button (appears below) */}
-          {isSubmittableNow ? (
-            <TouchableOpacity
-              style={[
-                styles.completeNowButton,
-                willBePenalized && styles.lateButton
-              ]}
-              onPress={(e) => {
-                e.stopPropagation();
-                handleCompleteNow(item);
-              }}
-              activeOpacity={0.8}
-            >
-              <View style={styles.completeNowContent}>
-                <MaterialCommunityIcons 
-                  name={willBePenalized ? "timer-alert" : "check-circle"} 
-                  size={20} 
-                  color="white" 
-                />
-                <Text style={styles.completeNowText}>
-                  {willBePenalized ? 'Submit Late' : 'Complete Now'}
+              <View style={styles.todayTaskItemInfo}>
+                <Text style={styles.todayTaskItemTitle} numberOfLines={1}>
+                  {task.title}
                 </Text>
-                {timeLeft && timeLeft < 600 && (
-                  <View style={styles.timeLeftBadge}>
-                    <Text style={styles.timeLeftText}>
-                      {formatTimeLeft(timeLeft)}
-                    </Text>
-                  </View>
+                <Text style={styles.todayTaskItemTime}>
+                  {task.userAssignment?.timeSlot 
+                    ? `${task.userAssignment.timeSlot.startTime} - ${task.userAssignment.timeSlot.endTime}`
+                    : 'Due today'}
+                </Text>
+              </View>
+              <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+            </View>
+          </TouchableOpacity>
+        ))}
+        
+        {todayAssignments.length > 2 && (
+          <TouchableOpacity 
+            style={styles.todayMoreButton}
+            onPress={handleViewAllTodayTasks}
+          >
+            <Text style={styles.todayMoreButtonText}>
+              +{todayAssignments.length - 2} more
+            </Text>
+          </TouchableOpacity>
+        )}
+      </LinearGradient>
+    );
+  };
+
+  // Render floating action button for today's tasks
+  const renderTodayFAB = () => {
+    if (!showTodaySection || selectedTab !== 'my') return null;
+    
+    return (
+      <TouchableOpacity
+        style={styles.todayFAB}
+        onPress={handleViewAllTodayTasks}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={['#fa5252', '#e03131']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.todayFABContent}
+        >
+          <MaterialCommunityIcons name="calendar-clock" size={24} color="white" />
+          <View style={styles.todayFABTextContainer}>
+            <Text style={styles.todayFABTitle}>Today's Tasks</Text>
+            <Text style={styles.todayFABCount}>{todayAssignments.length} due</Text>
+          </View>
+          <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderTask = ({ item }: any) => {
+    const isAdmin = userRole === 'ADMIN';
+    const isCompleted = item.assignment?.completed || item.userAssignment?.completed;
+    const isMyTasksView = selectedTab === 'my';
+    const isSubmittableNow = item.isSubmittableNow;
+    const timeLeft = item.timeLeft;
+    const submissionStatus = item.submissionStatus;
+    const willBePenalized = item.willBePenalized;
+    
+    // Check if this task is due today
+    const isDueToday = () => {
+      if (!item.userAssignment?.dueDate) return false;
+      const today = new Date().toDateString();
+      const dueDate = new Date(item.userAssignment.dueDate).toDateString();
+      return today === dueDate;
+    };
+
+    const handleViewTodayAssignment = () => {
+      if (item.userAssignment) {
+        navigation.navigate('AssignmentDetails', {
+          assignmentId: item.userAssignment.id,
+          isAdmin: false,
+          onVerified: () => {
+            fetchTasks();
+          }
+        });
+      }
+    };
+
+    // Determine gradient colors based on task status
+    const getGradientColors = () => {
+      if (isCompleted) {
+        return ['#f8f9fa', '#e9ecef'];
+      }
+      if (isMyTasksView && isDueToday() && !isCompleted) {
+        return ['#fff5f5', '#ffe3e3'];
+      }
+      if (isMyTasksView && isSubmittableNow) {
+        return willBePenalized ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb'];
+      }
+      return ['#ffffff', '#f8f9fa'];
+    };
+
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => handleViewTaskDetails(item.id)}
+        onLongPress={() => !isMyTasksView && isAdmin && showTaskOptions(item)}
+      >
+     <LinearGradient
+  colors={getGradientColors() as [string, string, ...string[]]}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 1 }}
+  style={[
+    styles.taskCard,
+    isMyTasksView && isDueToday() && !isCompleted && styles.todayTaskCard
+  ]}
+>
+          {/* Today's Assignment Badge */}
+          {isMyTasksView && isDueToday() && !isCompleted && (
+            <View style={styles.todayBadge}>
+              <MaterialCommunityIcons name="clock-alert" size={14} color="#fff" />
+              <Text style={styles.todayBadgeText}>DUE TODAY</Text>
+            </View>
+          )}
+
+          <View style={styles.taskHeader}>
+            <LinearGradient
+              colors={
+                isCompleted 
+                  ? ['#34c759', '#2b8a3e']
+                  : isDueToday() && isMyTasksView
+                    ? ['#fa5252', '#e03131']
+                    : ['#e7f5ff', '#d0ebff']
+              }
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.taskIcon}
+            >
+              <MaterialCommunityIcons 
+                name={isCompleted ? "check" : "format-list-checks"} 
+                size={20} 
+                color="white" 
+              />
+            </LinearGradient>
+            <View style={styles.taskInfo}>
+              <View style={styles.taskTitleRow}>
+                <Text style={[
+                  styles.taskTitle,
+                  isCompleted && styles.completedTaskTitle,
+                  isMyTasksView && isDueToday() && !isCompleted && styles.todayTaskTitle
+                ]} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                
+                {!isMyTasksView && isAdmin && (
+                  <TouchableOpacity 
+                    style={styles.editButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handleEditTask(item);
+                    }}
+                  >
+                    <MaterialCommunityIcons name="pencil" size={18} color="#6c757d" />
+                  </TouchableOpacity>
                 )}
               </View>
-            </TouchableOpacity>
-          ) : (
-            submissionStatus === 'waiting' && timeLeft && timeLeft > 0 && (
-              <View style={styles.timeLeftContainer}>
-                <MaterialCommunityIcons name="timer" size={14} color="#e67700" />
-                <Text style={styles.timeLeftLabel}>
-                  Opens in {formatTimeLeft(timeLeft)}
+              
+              {item.description && (
+                <Text style={[
+                  styles.taskDescription,
+                  isCompleted && styles.completedTaskDescription
+                ]} numberOfLines={2}>
+                  {item.description}
                 </Text>
+              )}
+              
+              <View style={styles.taskMeta}>
+                <LinearGradient
+                  colors={['#fff3bf', '#ffec99']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.pointsBadge}
+                >
+                  <MaterialCommunityIcons name="star" size={12} color="#e67700" />
+                  <Text style={styles.taskPoints}>{item.points} pts</Text>
+                </LinearGradient>
+                
+                {item.category && (
+                  <LinearGradient
+                    colors={['#e7f5ff', '#d0ebff']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.categoryBadge}
+                  >
+                    <Text style={styles.taskCategory}>{item.category}</Text>
+                  </LinearGradient>
+                )}
+
+                {/* Due Today Indicator */}
+                {isMyTasksView && isDueToday() && !isCompleted && (
+                  <LinearGradient
+                    colors={['#fff5f5', '#ffe3e3']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.dueTodayBadge}
+                  >
+                    <MaterialCommunityIcons name="alert" size={12} color="#fa5252" />
+                    <Text style={styles.dueTodayText}>Today</Text>
+                  </LinearGradient>
+                )}
               </View>
-            )
+            </View>
+          </View>
+          
+          {renderAssignmentInfo(item)}
+          
+          {isMyTasksView && !isCompleted && (
+            <>
+              {/* TODAY'S ASSIGNMENT BUTTON */}
+              {isDueToday() && (
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleViewTodayAssignment();
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={['#fa5252', '#e03131']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.todayAssignmentButton}
+                  >
+                    <View style={styles.todayAssignmentContent}>
+                      <MaterialCommunityIcons name="calendar-check" size={20} color="white" />
+                      <Text style={styles.todayAssignmentText}>View Today's Assignment</Text>
+                      <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+
+              {/* Complete Now button */}
+              {isSubmittableNow ? (
+                <TouchableOpacity
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleCompleteNow(item);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <LinearGradient
+                    colors={willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.completeNowButton}
+                  >
+                    <View style={styles.completeNowContent}>
+                      <MaterialCommunityIcons 
+                        name={willBePenalized ? "timer-alert" : "check-circle"} 
+                        size={20} 
+                        color="white" 
+                      />
+                      <Text style={styles.completeNowText}>
+                        {willBePenalized ? 'Submit Late' : 'Complete Now'}
+                      </Text>
+                      {timeLeft && timeLeft < 600 && (
+                        <View style={styles.timeLeftBadge}>
+                          <Text style={styles.timeLeftText}>
+                            {formatTimeLeft(timeLeft)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ) : (
+                submissionStatus === 'waiting' && timeLeft && timeLeft > 0 && (
+                  <LinearGradient
+                    colors={['#fff3bf', '#ffec99']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.timeLeftContainer}
+                  >
+                    <MaterialCommunityIcons name="timer" size={14} color="#e67700" />
+                    <Text style={styles.timeLeftLabel}>
+                      Opens in {formatTimeLeft(timeLeft)}
+                    </Text>
+                  </LinearGradient>
+                )
+              )}
+              
+              {submissionStatus === 'expired' && (
+                <LinearGradient
+                  colors={['#ffc9c9', '#ffb3b3']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.timeLeftContainer, styles.expiredContainer]}
+                >
+                  <MaterialCommunityIcons name="timer-off" size={14} color="#fa5252" />
+                  <Text style={[styles.timeLeftLabel, styles.expiredText]}>
+                    Submission window closed
+                  </Text>
+                </LinearGradient>
+              )}
+            </>
           )}
           
-          {submissionStatus === 'expired' && (
-            <View style={[styles.timeLeftContainer, styles.expiredContainer]}>
-              <MaterialCommunityIcons name="timer-off" size={14} color="#fa5252" />
-              <Text style={[styles.timeLeftLabel, styles.expiredText]}>
-                Submission window closed
-              </Text>
-            </View>
+          <View style={styles.taskFooter}>
+            <Text style={styles.taskCreator}>
+              <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
+            </Text>
+            <Text style={styles.taskDate}>
+              {new Date(item.createdAt).toLocaleDateString()}
+            </Text>
+          </View>
+          
+          {!isMyTasksView && isAdmin && (
+            <TouchableOpacity 
+              style={styles.deleteButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleDeleteTask(item.id, item.title);
+              }}
+            >
+              <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
+            </TouchableOpacity>
           )}
-        </>
-      )}
-      
-      <View style={styles.taskFooter}>
-        <Text style={styles.taskCreator}>
-          <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
-        </Text>
-        <Text style={styles.taskDate}>
-          {new Date(item.createdAt).toLocaleDateString()}
-        </Text>
-      </View>
-      
-      {!isMyTasksView && isAdmin && (
-        <TouchableOpacity 
-          style={styles.deleteButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleDeleteTask(item.id, item.title);
-          }}
-        >
-          <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
-  );
-};
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
   const renderContent = () => {
     const currentTasks = selectedTab === 'my' ? myTasks : tasks;
     const showEmpty = !loading && currentTasks.length === 0;
@@ -829,6 +1038,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         keyExtractor={(item, index) => {
           return item?.id || `task-${index}`;
         }}
+        ListHeaderComponent={renderTodaySection()}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -859,7 +1069,14 @@ export default function GroupTasksScreen({ navigation, route }: any) {
                   style={styles.emptyButton}
                   onPress={handleCreateTask}
                 >
-                  <Text style={styles.emptyButtonText}>Create First Task</Text>
+                  <LinearGradient
+                    colors={['#007AFF', '#0056b3']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.emptyButtonGradient}
+                  >
+                    <Text style={styles.emptyButtonText}>Create First Task</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               )}
             </View>
@@ -895,17 +1112,26 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             style={styles.retryButton}
             onPress={() => fetchTasks()}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <LinearGradient
+              colors={['#007AFF', '#0056b3']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       ) : (
         renderContent()
       )}
 
+      {/* Today's Tasks FAB */}
+      {renderTodayFAB()}
+
       {userRole === 'ADMIN' && selectedTab === 'all' && (
         <View style={styles.floatingButtonsContainer}>
           <TouchableOpacity
-            style={[styles.floatingButton, styles.reviewButton]}
             onPress={() => navigation.navigate('PendingVerifications', {
               groupId,
               groupName,
@@ -913,34 +1139,58 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             })}
             activeOpacity={0.8}
           >
-            <View style={styles.floatingButtonInner}>
-              <MaterialCommunityIcons name="clipboard-check" size={22} color="white" />
-              <Text style={styles.floatingButtonText}>Review</Text>
-            </View>
+            <LinearGradient
+              colors={['#e67700', '#cc5f00']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.floatingButton, styles.reviewButton]}
+            >
+              <View style={styles.floatingButtonInner}>
+                <MaterialCommunityIcons name="clipboard-check" size={22} color="white" />
+                <Text style={styles.floatingButtonText}>Review</Text>
+              </View>
+            </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.floatingButton, styles.assignButton]}
             onPress={handleNavigateToAssignment}
             activeOpacity={0.8}
           >
-            <View style={styles.floatingButtonInner}>
-              <MaterialCommunityIcons name="account-switch" size={22} color="white" />
-              <Text style={styles.floatingButtonText}>Assign</Text>
-            </View>
+            <LinearGradient
+              colors={['#28a745', '#1e7b34']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.floatingButton, styles.assignButton]}
+            >
+              <View style={styles.floatingButtonInner}>
+                <MaterialCommunityIcons name="account-switch" size={22} color="white" />
+                <Text style={styles.floatingButtonText}>Assign</Text>
+              </View>
+            </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity
-            style={[styles.floatingButton, styles.createButton]}
             onPress={handleCreateTask}
             activeOpacity={0.8}
           >
-            <MaterialCommunityIcons name="plus" size={28} color="white" />
+            <LinearGradient
+              colors={['#007AFF', '#0056b3']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.floatingButton, styles.createButton]}
+            >
+              <MaterialCommunityIcons name="plus" size={28} color="white" />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       )}
 
-      <View style={styles.bottomTab}>
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.bottomTab}
+      >
         <TouchableOpacity 
           style={[styles.tabButton, selectedTab === 'all' && styles.activeTabButton]}
           onPress={() => setSelectedTab('all')}
@@ -974,7 +1224,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             My Tasks
           </Text>
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       <SettingsModal
         visible={showSettingsModal}
@@ -1012,9 +1262,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#dee2e6',
     minHeight: 56,
   },
   backButton: {
@@ -1023,11 +1272,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 20
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#007AFF',
-    fontWeight: '400'
   },
   titleContainer: {
     flex: 1,
@@ -1095,10 +1339,12 @@ const styles = StyleSheet.create({
     marginTop: 12
   },
   retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  retryButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8
   },
   retryButtonText: {
     color: 'white',
@@ -1110,30 +1356,30 @@ const styles = StyleSheet.create({
     paddingBottom: 100
   },
   taskCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     position: 'relative'
   },
   completedTaskCard: {
-    backgroundColor: '#f8f9fa',
     opacity: 0.9
   },
   submittableTaskCard: {
     borderWidth: 2,
-    borderColor: '#2b8a3e',
-    backgroundColor: '#f0f9f0'
+    borderColor: '#2b8a3e'
   },
   penaltyTaskCard: {
     borderWidth: 2,
-    borderColor: '#e67700',
-    backgroundColor: '#fff3e0'
+    borderColor: '#e67700'
+  },
+  todayTaskCard: {
+    borderWidth: 2,
+    borderColor: '#fa5252'
   },
   taskHeader: {
     flexDirection: 'row',
@@ -1169,6 +1415,10 @@ const styles = StyleSheet.create({
     color: '#6c757d',
     textDecorationLine: 'line-through'
   },
+  todayTaskTitle: {
+    color: '#fa5252',
+    fontWeight: '700'
+  },
   editButton: {
     padding: 4
   },
@@ -1201,7 +1451,6 @@ const styles = StyleSheet.create({
     gap: 8
   },
   pointsBadge: {
-    backgroundColor: '#fff3bf',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -1215,7 +1464,6 @@ const styles = StyleSheet.create({
     color: '#e67700'
   },
   categoryBadge: {
-    backgroundColor: '#e7f5ff',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12
@@ -1228,7 +1476,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: '#f1f3f5',
+    borderTopColor: 'rgba(0,0,0,0.05)',
     paddingTop: 12,
     marginTop: 12
   },
@@ -1243,18 +1491,19 @@ const styles = StyleSheet.create({
     color: '#868e96'
   },
   assignmentInfo: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'rgba(255,255,255,0.8)',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
-    borderWidth: 1
+    borderWidth: 1,
+    borderColor: '#dee2e6'
   },
   myAssignment: {
-    backgroundColor: '#e7f5ff',
+    backgroundColor: 'rgba(231, 245, 255, 0.8)',
     borderColor: '#a5d8ff'
   },
   unassignedInfo: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'rgba(255,255,255,0.8)',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
@@ -1271,11 +1520,11 @@ const styles = StyleSheet.create({
     fontStyle: 'italic'
   },
   completedAssignment: {
-    backgroundColor: '#d3f9d8',
+    backgroundColor: 'rgba(211, 249, 216, 0.8)',
     borderColor: '#b2f2bb'
   },
   pendingAssignment: {
-    backgroundColor: '#fff3bf',
+    backgroundColor: 'rgba(255, 243, 191, 0.8)',
     borderColor: '#ffd43b'
   },
   assignmentHeader: {
@@ -1300,7 +1549,6 @@ const styles = StyleSheet.create({
     color: '#212529'
   },
   completeNowButton: {
-    backgroundColor: '#2b8a3e',
     borderRadius: 8,
     marginBottom: 12,
     overflow: 'hidden'
@@ -1335,7 +1583,6 @@ const styles = StyleSheet.create({
   timeLeftContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3bf',
     padding: 10,
     borderRadius: 8,
     marginBottom: 12,
@@ -1347,7 +1594,7 @@ const styles = StyleSheet.create({
     fontWeight: '500'
   },
   expiredContainer: {
-    backgroundColor: '#ffc9c9',
+    borderWidth: 1,
     borderColor: '#fa5252'
   },
   expiredText: {
@@ -1373,11 +1620,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 20
   },
-  emptyButton: { 
+  emptyButton: {
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  emptyButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8
   },
   emptyButtonText: {
     color: 'white',
@@ -1400,21 +1649,19 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    overflow: 'hidden'
   },
   assignButton: {
-    backgroundColor: '#28a745',
     paddingHorizontal: 16,
     paddingVertical: 10
   },
   createButton: {
-    backgroundColor: '#007AFF',
     width: 56,
     height: 56,
     borderRadius: 28
   },
   reviewButton: {
-    backgroundColor: '#e67700',
     paddingHorizontal: 16,
     paddingVertical: 10
   },
@@ -1422,7 +1669,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10
   },
   floatingButtonText: {
     color: 'white',
@@ -1431,9 +1680,8 @@ const styles = StyleSheet.create({
   },
   bottomTab: {
     flexDirection: 'row',
-    backgroundColor: 'white',
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
+    borderTopColor: '#dee2e6',
     paddingTop: 8,
     paddingBottom: 8,
     paddingHorizontal: 16,
@@ -1470,78 +1718,170 @@ const styles = StyleSheet.create({
     color: '#007AFF', 
     fontWeight: '600' 
   },
-  // Add these new styles to your existing StyleSheet
-todayTaskCard: {
-  borderWidth: 2,
-  borderColor: '#fa5252',
-  backgroundColor: '#fff5f5'
-},
-todayBadge: {
-  position: 'absolute',
-  top: -10,
-  right: 10,
-  backgroundColor: '#fa5252',
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 10,
-  paddingVertical: 4,
-  borderRadius: 16,
-  gap: 4,
-  zIndex: 10,
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 3
-},
-todayBadgeText: {
-  color: '#fff',
-  fontSize: 11,
-  fontWeight: '700'
-},
-todayTaskTitle: {
-  color: '#fa5252',
-  fontWeight: '700'
-},
-dueTodayBadge: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  backgroundColor: '#fff5f5',
-  paddingHorizontal: 6,
-  paddingVertical: 3,
-  borderRadius: 8,
-  gap: 4,
-  borderWidth: 1,
-  borderColor: '#ffc9c9'
-},
-dueTodayText: {
-  fontSize: 10,
-  color: '#fa5252',
-  fontWeight: '600'
-},
-todayAssignmentButton: {
-  backgroundColor: '#fa5252',
-  borderRadius: 8,
-  marginBottom: 12,
-  overflow: 'hidden',
-  shadowColor: '#000',
-  shadowOffset: { width: 0, height: 2 },
-  shadowOpacity: 0.1,
-  shadowRadius: 4,
-  elevation: 3
-},
-todayAssignmentContent: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: 14,
-  paddingHorizontal: 16
-},
-todayAssignmentText: {
-  color: 'white',
-  fontSize: 15,
-  fontWeight: '700',
-  flex: 1,
-  textAlign: 'center'
-}
+  // Today's section styles
+  todaySection: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#fa5252',
+  },
+  todaySectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  todaySectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  todaySectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fa5252',
+  },
+  todaySectionViewAll: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  todayTaskItem: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#ffc9c9',
+  },
+  todayTaskItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  todayTaskItemIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#fff5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todayTaskItemInfo: {
+    flex: 1,
+  },
+  todayTaskItemTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 4,
+  },
+  todayTaskItemTime: {
+    fontSize: 12,
+    color: '#868e96',
+  },
+  todayMoreButton: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  todayMoreButtonText: {
+    fontSize: 13,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  todayFAB: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1000,
+    overflow: 'hidden'
+  },
+  todayFABContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  todayFABTextContainer: {
+    flex: 1,
+  },
+  todayFABTitle: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  todayFABCount: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 13,
+  },
+  todayBadge: {
+    position: 'absolute',
+    top: -10,
+    right: 10,
+    backgroundColor: '#fa5252',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    gap: 4,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3
+  },
+  todayBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  dueTodayBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#ffc9c9'
+  },
+  dueTodayText: {
+    fontSize: 10,
+    color: '#fa5252',
+    fontWeight: '600'
+  },
+  todayAssignmentButton: {
+    borderRadius: 8,
+    marginBottom: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3
+  },
+  todayAssignmentContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 14,
+    paddingHorizontal: 16
+  },
+  todayAssignmentText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '700',
+    flex: 1,
+    textAlign: 'center'
+  }
 });

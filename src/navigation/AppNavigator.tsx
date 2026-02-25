@@ -26,6 +26,7 @@ import FeedbackHistoryScreen from '../screens/FeedbackHistoryScreen';
 import GroupActivityScreen from '../screens/GroupActivityScreen';
 import MemberContributionsScreen from '../screens/MemberContributionsScreen';
 import TaskCompletionHistoryScreen from '../screens/TaskCompletionHistoryScreen';
+import TodayAssignmentsScreen from '../screens/TodayAssignmentsScreen';
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
 import { MySwapRequestsScreen } from '../screens/MySwapRequestScreen';
@@ -256,7 +257,11 @@ export default function AppNavigator() {
   component={TaskCompletionHistoryScreen}
   options={{ headerShown: false }}
 />
-
+<Stack.Screen 
+  name="TodayAssignments" 
+  component={TodayAssignmentsScreen}
+  options={{ headerShown: false }}
+/>
     </Stack.Navigator>
   );
 }

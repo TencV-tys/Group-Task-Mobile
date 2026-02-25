@@ -601,165 +601,223 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     </View>
   );
 
-  const renderTask = ({ item }: any) => {
-    const isAdmin = userRole === 'ADMIN';
-    const isCompleted = item.assignment?.completed || item.userAssignment?.completed;
-    const isMyTasksView = selectedTab === 'my';
-    const isSubmittableNow = item.isSubmittableNow;
-    const timeLeft = item.timeLeft;
-    const submissionStatus = item.submissionStatus;
-    const willBePenalized = item.willBePenalized;
-    
-    return (
-      <TouchableOpacity
-        style={[
-          styles.taskCard,
-          isCompleted && styles.completedTaskCard,
-          isMyTasksView && isSubmittableNow && styles.submittableTaskCard,
-          isMyTasksView && willBePenalized && styles.penaltyTaskCard
-        ]}
-        onPress={() => handleViewTaskDetails(item.id)}
-        onLongPress={() => !isMyTasksView && isAdmin && showTaskOptions(item)}
-      >
-        <View style={styles.taskHeader}>
-          <View style={[
-            styles.taskIcon,
-            isCompleted 
-              ? { backgroundColor: '#34c759' }
-              : { backgroundColor: '#e7f5ff' }
-          ]}>
-            <MaterialCommunityIcons 
-              name={isCompleted ? "check" : "format-list-checks"} 
-              size={20} 
-              color={isCompleted ? 'white' : '#007AFF'} 
-            />
-          </View>
-          <View style={styles.taskInfo}>
-            <View style={styles.taskTitleRow}>
-              <Text style={[
-                styles.taskTitle,
-                isCompleted && styles.completedTaskTitle
-              ]} numberOfLines={2}>
-                {item.title}
-              </Text>
-              
-              {!isMyTasksView && isAdmin && (
-                <TouchableOpacity 
-                  style={styles.editButton}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleEditTask(item);
-                  }}
-                >
-                  <MaterialCommunityIcons name="pencil" size={18} color="#6c757d" />
-                </TouchableOpacity>
-              )}
-            </View>
-            
-            {item.description && (
-              <Text style={[
-                styles.taskDescription,
-                isCompleted && styles.completedTaskDescription
-              ]} numberOfLines={2}>
-                {item.description}
-              </Text>
-            )}
-            
-            <View style={styles.taskMeta}>
-              <View style={styles.pointsBadge}>
-                <MaterialCommunityIcons name="star" size={12} color="#e67700" />
-                <Text style={styles.taskPoints}>{item.points} pts</Text>
-              </View>
-              
-              {item.category && (
-                <View style={styles.categoryBadge}>
-                  <Text style={styles.taskCategory}>{item.category}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-        
-        {renderAssignmentInfo(item)}
-        
-        {isMyTasksView && !isCompleted && (
-          <>
-            {isSubmittableNow ? (
-              <TouchableOpacity
-                style={[
-                  styles.completeNowButton,
-                  willBePenalized && styles.lateButton
-                ]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleCompleteNow(item);
-                }}
-                activeOpacity={0.8}
-              >
-                <View style={styles.completeNowContent}>
-                  <MaterialCommunityIcons 
-                    name={willBePenalized ? "timer-alert" : "check-circle"} 
-                    size={20} 
-                    color="white" 
-                  />
-                  <Text style={styles.completeNowText}>
-                    {willBePenalized ? 'Submit Late' : 'Complete Now'}
-                  </Text>
-                  {timeLeft && timeLeft < 600 && (
-                    <View style={styles.timeLeftBadge}>
-                      <Text style={styles.timeLeftText}>
-                        {formatTimeLeft(timeLeft)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            ) : (
-              submissionStatus === 'waiting' && timeLeft && timeLeft > 0 && (
-                <View style={styles.timeLeftContainer}>
-                  <MaterialCommunityIcons name="timer" size={14} color="#e67700" />
-                  <Text style={styles.timeLeftLabel}>
-                    Opens in {formatTimeLeft(timeLeft)}
-                  </Text>
-                </View>
-              )
-            )}
-            
-            {submissionStatus === 'expired' && (
-              <View style={[styles.timeLeftContainer, styles.expiredContainer]}>
-                <MaterialCommunityIcons name="timer-off" size={14} color="#fa5252" />
-                <Text style={[styles.timeLeftLabel, styles.expiredText]}>
-                  Submission window closed
-                </Text>
-              </View>
-            )}
-          </>
-        )}
-        
-        <View style={styles.taskFooter}>
-          <Text style={styles.taskCreator}>
-            <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
-          </Text>
-          <Text style={styles.taskDate}>
-            {new Date(item.createdAt).toLocaleDateString()}
-          </Text>
-        </View>
-        
-        {!isMyTasksView && isAdmin && (
-          <TouchableOpacity 
-            style={styles.deleteButton}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleDeleteTask(item.id, item.title);
-            }}
-          >
-            <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
-    );
+ const renderTask = ({ item }: any) => {
+  const isAdmin = userRole === 'ADMIN';
+  const isCompleted = item.assignment?.completed || item.userAssignment?.completed;
+  const isMyTasksView = selectedTab === 'my';
+  const isSubmittableNow = item.isSubmittableNow;
+  const timeLeft = item.timeLeft;
+  const submissionStatus = item.submissionStatus;
+  const willBePenalized = item.willBePenalized;
+  
+  // Check if this task is due today
+  const isDueToday = () => {
+    if (!item.userAssignment?.dueDate) return false;
+    const today = new Date().toDateString();
+    const dueDate = new Date(item.userAssignment.dueDate).toDateString();
+    return today === dueDate;
   };
 
+  const handleViewTodayAssignment = () => {
+    if (item.userAssignment) {
+      navigation.navigate('AssignmentDetails', {
+        assignmentId: item.userAssignment.id,
+        isAdmin: false,
+        onVerified: () => {
+          fetchTasks();
+        }
+      });
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.taskCard,
+        isCompleted && styles.completedTaskCard,
+        isMyTasksView && isSubmittableNow && styles.submittableTaskCard,
+        isMyTasksView && willBePenalized && styles.penaltyTaskCard,
+        isMyTasksView && isDueToday() && !isCompleted && styles.todayTaskCard // New style for today's tasks
+      ]}
+      onPress={() => handleViewTaskDetails(item.id)}
+      onLongPress={() => !isMyTasksView && isAdmin && showTaskOptions(item)}
+    >
+      {/* Today's Assignment Badge - NEW */}
+      {isMyTasksView && isDueToday() && !isCompleted && (
+        <View style={styles.todayBadge}>
+          <MaterialCommunityIcons name="clock-alert" size={14} color="#fff" />
+          <Text style={styles.todayBadgeText}>DUE TODAY</Text>
+        </View>
+      )}
+
+      <View style={styles.taskHeader}>
+        <View style={[
+          styles.taskIcon,
+          isCompleted 
+            ? { backgroundColor: '#34c759' }
+            : isDueToday() && isMyTasksView
+              ? { backgroundColor: '#fa5252' } // Red icon for today's tasks
+              : { backgroundColor: '#e7f5ff' }
+        ]}>
+          <MaterialCommunityIcons 
+            name={isCompleted ? "check" : "format-list-checks"} 
+            size={20} 
+            color={isCompleted ? 'white' : isDueToday() && isMyTasksView ? 'white' : '#007AFF'} 
+          />
+        </View>
+        <View style={styles.taskInfo}>
+          <View style={styles.taskTitleRow}>
+            <Text style={[
+              styles.taskTitle,
+              isCompleted && styles.completedTaskTitle,
+              isMyTasksView && isDueToday() && !isCompleted && styles.todayTaskTitle // Highlight today's task title
+            ]} numberOfLines={2}>
+              {item.title}
+            </Text>
+            
+            {!isMyTasksView && isAdmin && (
+              <TouchableOpacity 
+                style={styles.editButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleEditTask(item);
+                }}
+              >
+                <MaterialCommunityIcons name="pencil" size={18} color="#6c757d" />
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          {item.description && (
+            <Text style={[
+              styles.taskDescription,
+              isCompleted && styles.completedTaskDescription
+            ]} numberOfLines={2}>
+              {item.description}
+            </Text>
+          )}
+          
+          <View style={styles.taskMeta}>
+            <View style={styles.pointsBadge}>
+              <MaterialCommunityIcons name="star" size={12} color="#e67700" />
+              <Text style={styles.taskPoints}>{item.points} pts</Text>
+            </View>
+            
+            {item.category && (
+              <View style={styles.categoryBadge}>
+                <Text style={styles.taskCategory}>{item.category}</Text>
+              </View>
+            )}
+
+            {/* Due Today Indicator - NEW */}
+            {isMyTasksView && isDueToday() && !isCompleted && (
+              <View style={styles.dueTodayBadge}>
+                <MaterialCommunityIcons name="alert" size={12} color="#fa5252" />
+                <Text style={styles.dueTodayText}>Today</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+      
+      {renderAssignmentInfo(item)}
+      
+      {isMyTasksView && !isCompleted && (
+        <>
+          {/* TODAY'S ASSIGNMENT BUTTON - NEW (appears at the top) */}
+          {isDueToday() && (
+            <TouchableOpacity
+              style={styles.todayAssignmentButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleViewTodayAssignment();
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.todayAssignmentContent}>
+                <MaterialCommunityIcons name="calendar-check" size={20} color="white" />
+                <Text style={styles.todayAssignmentText}>View Today's Assignment</Text>
+                <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+              </View>
+            </TouchableOpacity>
+          )}
+
+          {/* Original Complete Now button (appears below) */}
+          {isSubmittableNow ? (
+            <TouchableOpacity
+              style={[
+                styles.completeNowButton,
+                willBePenalized && styles.lateButton
+              ]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleCompleteNow(item);
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={styles.completeNowContent}>
+                <MaterialCommunityIcons 
+                  name={willBePenalized ? "timer-alert" : "check-circle"} 
+                  size={20} 
+                  color="white" 
+                />
+                <Text style={styles.completeNowText}>
+                  {willBePenalized ? 'Submit Late' : 'Complete Now'}
+                </Text>
+                {timeLeft && timeLeft < 600 && (
+                  <View style={styles.timeLeftBadge}>
+                    <Text style={styles.timeLeftText}>
+                      {formatTimeLeft(timeLeft)}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          ) : (
+            submissionStatus === 'waiting' && timeLeft && timeLeft > 0 && (
+              <View style={styles.timeLeftContainer}>
+                <MaterialCommunityIcons name="timer" size={14} color="#e67700" />
+                <Text style={styles.timeLeftLabel}>
+                  Opens in {formatTimeLeft(timeLeft)}
+                </Text>
+              </View>
+            )
+          )}
+          
+          {submissionStatus === 'expired' && (
+            <View style={[styles.timeLeftContainer, styles.expiredContainer]}>
+              <MaterialCommunityIcons name="timer-off" size={14} color="#fa5252" />
+              <Text style={[styles.timeLeftLabel, styles.expiredText]}>
+                Submission window closed
+              </Text>
+            </View>
+          )}
+        </>
+      )}
+      
+      <View style={styles.taskFooter}>
+        <Text style={styles.taskCreator}>
+          <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
+        </Text>
+        <Text style={styles.taskDate}>
+          {new Date(item.createdAt).toLocaleDateString()}
+        </Text>
+      </View>
+      
+      {!isMyTasksView && isAdmin && (
+        <TouchableOpacity 
+          style={styles.deleteButton}
+          onPress={(e) => {
+            e.stopPropagation();
+            handleDeleteTask(item.id, item.title);
+          }}
+        >
+          <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
+        </TouchableOpacity>
+      )}
+    </TouchableOpacity>
+  );
+};
   const renderContent = () => {
     const currentTasks = selectedTab === 'my' ? myTasks : tasks;
     const showEmpty = !loading && currentTasks.length === 0;
@@ -1411,5 +1469,79 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: '#007AFF', 
     fontWeight: '600' 
-  }
+  },
+  // Add these new styles to your existing StyleSheet
+todayTaskCard: {
+  borderWidth: 2,
+  borderColor: '#fa5252',
+  backgroundColor: '#fff5f5'
+},
+todayBadge: {
+  position: 'absolute',
+  top: -10,
+  right: 10,
+  backgroundColor: '#fa5252',
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderRadius: 16,
+  gap: 4,
+  zIndex: 10,
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3
+},
+todayBadgeText: {
+  color: '#fff',
+  fontSize: 11,
+  fontWeight: '700'
+},
+todayTaskTitle: {
+  color: '#fa5252',
+  fontWeight: '700'
+},
+dueTodayBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#fff5f5',
+  paddingHorizontal: 6,
+  paddingVertical: 3,
+  borderRadius: 8,
+  gap: 4,
+  borderWidth: 1,
+  borderColor: '#ffc9c9'
+},
+dueTodayText: {
+  fontSize: 10,
+  color: '#fa5252',
+  fontWeight: '600'
+},
+todayAssignmentButton: {
+  backgroundColor: '#fa5252',
+  borderRadius: 8,
+  marginBottom: 12,
+  overflow: 'hidden',
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 2 },
+  shadowOpacity: 0.1,
+  shadowRadius: 4,
+  elevation: 3
+},
+todayAssignmentContent: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: 14,
+  paddingHorizontal: 16
+},
+todayAssignmentText: {
+  color: 'white',
+  fontSize: 15,
+  fontWeight: '700',
+  flex: 1,
+  textAlign: 'center'
+}
 });

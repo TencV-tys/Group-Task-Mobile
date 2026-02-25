@@ -1,4 +1,4 @@
-// components/SettingsModal.tsx - UPDATED with token checking
+// components/SettingsModal.tsx - UPDATED with clean UI and consistent colors
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -79,7 +79,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const loadGroupData = async () => {
     if (!visible) return;
 
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       Alert.alert(
@@ -102,25 +101,16 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             .slice(0, 5);
           setLeaderboard(sortedUsers);
         }
-      } else if (statsResult.message?.toLowerCase().includes('token') || 
-                 statsResult.message?.toLowerCase().includes('auth')) {
-        setAuthError(true);
       }
 
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
         setRotationWeek(groupResult.group?.currentRotationWeek || 1);
-      } else if (groupResult.message?.toLowerCase().includes('token') || 
-                 groupResult.message?.toLowerCase().includes('auth')) {
-        setAuthError(true);
       }
 
       const membersResult = await GroupMembersService.getGroupMembers(groupId);
       if (membersResult.success) {
         setMembers(membersResult.members || []);
-      } else if (membersResult.message?.toLowerCase().includes('token') || 
-                 membersResult.message?.toLowerCase().includes('auth')) {
-        setAuthError(true);
       }
 
       setLoadingMyTasks(true);
@@ -162,9 +152,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             checkWeekSwapAvailability(weekStart, weekEnd);
           }
         }
-      } else if (myTasksResult.message?.toLowerCase().includes('token') || 
-                 myTasksResult.message?.toLowerCase().includes('auth')) {
-        setAuthError(true);
       }
       setLoadingMyTasks(false);
 
@@ -184,24 +171,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     const hoursSinceWeekStart = (now.getTime() - weekStartDay.getTime()) / (1000 * 60 * 60);
     const isWithinFirst24Hours = hoursSinceWeekStart >= 0 && hoursSinceWeekStart <= 24;
     
-    console.log('📅 Week swap check:', {
-      weekStart: weekStartDay.toISOString(),
-      now: now.toISOString(),
-      hoursSinceWeekStart,
-      isWithinFirst24Hours
-    });
-    
     if (!isWithinFirst24Hours) {
       setCanSwapWeek(false);
       if (hoursSinceWeekStart < 0) {
         setWeekSwapReason('Week hasn\'t started yet');
       } else {
-        setWeekSwapReason('Week swap window has closed (only available within first 24 hours of the week)');
+        setWeekSwapReason('Week swap window has closed');
       }
     } else {
       setCanSwapWeek(true);
       const hoursLeft = Math.ceil(24 - hoursSinceWeekStart);
-      setWeekSwapReason(`${hoursLeft} hour(s) left to swap the entire week`);
+      setWeekSwapReason(`${hoursLeft} hour(s) left to swap`);
     }
   };
 
@@ -211,12 +191,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [visible]);
 
-  // Show auth error if needed
   useEffect(() => {
     if (authError && visible) {
       Alert.alert(
         'Session Expired',
-        'Your session has expired. Please log in again.',
+        'Please log in again.',
         [
           { 
             text: 'OK', 
@@ -232,16 +211,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   }, [authError, visible]);
 
   const handleRotateTasks = async () => {
-    // Check token before action
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
+    if (!hasToken) return;
 
     Alert.alert(
       'Rotate Tasks',
-      'Are you sure you want to rotate tasks to the next week? This will reassign all recurring tasks.',
+      'This will reassign all recurring tasks to the next week.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -255,12 +230,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onRefreshTasks?.();
                 loadGroupData();
               } else { 
-                if (result.message?.toLowerCase().includes('token') || 
-                    result.message?.toLowerCase().includes('auth')) {
-                  setAuthError(true);
-                } else {
-                  Alert.alert('Error', result.message || 'Failed to rotate tasks');
-                }
+                Alert.alert('Error', result.message || 'Failed to rotate tasks');
               }
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Failed to rotate tasks');
@@ -272,15 +242,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const handleSwapEntireWeek = async () => {
-    // Check token before action
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
+    if (!hasToken) return;
 
     if (myAssignments.length === 0) {
-      Alert.alert('No Tasks', 'You have no assigned tasks this week to swap.');
+      Alert.alert('No Tasks', 'You have no assigned tasks this week.');
       return;
     }
 
@@ -289,7 +255,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     );
 
     if (incompleteAssignments.length === 0) {
-      Alert.alert('All Completed', 'You have already completed all your tasks this week.');
+      Alert.alert('All Completed', 'You have completed all your tasks this week.');
       return;
     }
 
@@ -302,9 +268,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     Alert.alert(
       'Swap Entire Week',
-      `Are you sure you want to swap ALL your tasks for week ${rotationWeek}?\n\n` +
-      `You have ${incompleteAssignments.length} incomplete task(s) this week.\n\n` +
-      `⚠️ This action is only available within the first 24 hours of the week (Monday 00:00 - Tuesday 00:00).`,
+      `Swap all ${incompleteAssignments.length} incomplete task(s) for week ${rotationWeek}?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -331,143 +295,78 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const handleReviewSubmissions = async () => {
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
-    navigation.navigate('PendingVerifications', {
-      groupId,
-      groupName,
-      userRole
-    });
+    if (!hasToken) return;
+    navigation.navigate('PendingVerifications', { groupId, groupName, userRole });
     onClose();
   };
 
   const handleViewRotationSchedule = async () => {
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
+    if (!hasToken) return;
     navigation.navigate('RotationSchedule', { groupId, groupName, userRole });
     onClose();
   };
 
   const handleViewAssignment = async () => {
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
+    if (!hasToken) return;
     onNavigateToAssignment?.();
     onClose();
   };
 
   const handleGroupSettings = async () => {
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
+    if (!hasToken) return;
     navigation.navigate('GroupMembers', { groupId, groupName, userRole });
     onClose();
   };
 
   const handleTaskStatistics = async () => {
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
-    navigation.navigate('DetailedStatistics', { 
-      groupId, 
-      groupName
-    });
+    if (!hasToken) return;
+    navigation.navigate('DetailedStatistics', { groupId, groupName });
     onClose();
   };
 
   const handleViewFullLeaderboard = async () => {
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
-    navigation.navigate('FullLeaderboard', { 
-      groupId, 
-      groupName
-    });
+    if (!hasToken) return;
+    navigation.navigate('FullLeaderboard', { groupId, groupName });
     onClose();
   };
 
-  // Group Activity - Admin only
   const handleGroupActivity = async () => {
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
-    navigation.navigate('GroupActivity', {
-      groupId,
-      groupName,
-      userRole
-    });
+    if (!hasToken) return;
+    navigation.navigate('GroupActivity', { groupId, groupName, userRole });
     onClose();
   };
 
-  // Member Contributions - Admin only
   const handleMemberContributions = async () => {
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
-    navigation.navigate('MemberContributions', {
-      groupId,
-      groupName,
-      userRole
-    });
+    if (!hasToken) return;
+    navigation.navigate('MemberContributions', { groupId, groupName, userRole });
     onClose();
   };
 
-  // Task Completion History - ALL MEMBERS can see
   const handleTaskCompletionHistory = async () => {
     const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
-    navigation.navigate('TaskCompletionHistory', {
-      groupId,
-      groupName,
-      userRole
-    });
+    if (!hasToken) return;
+    navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole });
     onClose();
   };
 
-  // Fixed: Properly typed gradient colors function
   const getLeaderboardGradientColors = (index: number): [string, string] => {
-    const isFirst = index === 0;
-    const isSecond = index === 1;
-    const isThird = index === 2;
-    
-    if (isFirst) return ['#fff3bf', '#ffec99']; // Gold gradient
-    if (isSecond) return ['#f1f3f5', '#e9ecef']; // Silver gradient
-    if (isThird) return ['#f8f9fa', '#dee2e6']; // Bronze gradient
-    return ['#f8f9fa', '#e9ecef']; // Default light gray
+    if (index === 0) return ['#fff3bf', '#ffec99']; // Gold
+    if (index === 1) return ['#f1f3f5', '#e9ecef']; // Silver
+    if (index === 2) return ['#f8f9fa', '#dee2e6']; // Bronze
+    return ['#f8f9fa', '#e9ecef']; // Default
   };
 
   const renderLeaderboardItem = (item: any, index: number) => {
     const isFirst = index === 0;
     const isSecond = index === 1;
     const isThird = index === 2;
-
-    // Fixed: Properly typed conditional styles
-    const getBorderStyle = () => {
-      if (isFirst) return styles.firstPlace;
-      if (isSecond) return styles.secondPlace;
-      if (isThird) return styles.thirdPlace;
-      return null;
-    };
 
     return (
       <LinearGradient
@@ -477,7 +376,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         end={{ x: 1, y: 1 }}
         style={[
           styles.leaderboardItem,
-          getBorderStyle()
+          isFirst && styles.firstPlace,
+          isSecond && styles.secondPlace,
+          isThird && styles.thirdPlace
         ].filter(Boolean)}
       >
         <View style={styles.leaderboardRank}>
@@ -493,16 +394,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </View>
         
         <View style={styles.leaderboardUser}>
-          <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']} // Light gray gradient for avatar background
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.userAvatar}
-          >
+          <View style={styles.userAvatar}>
             <Text style={styles.userInitial}>
               {item.userName?.charAt(0) || '?'}
             </Text>
-          </LinearGradient>
+          </View>
           <View style={styles.userInfo}>
             <Text style={styles.userName} numberOfLines={1}>
               {item.userName}
@@ -514,7 +410,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </View>
         
         <LinearGradient
-          colors={['#d3f9d8', '#b2f2bb']} // Light green for points badge
+          colors={['#d3f9d8', '#b2f2bb']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.pointsBadge}
@@ -536,17 +432,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const getHoursLeftText = () => {
     if (!weekStartDate) return '';
-    
     const now = new Date();
     const weekStart = new Date(weekStartDate);
     weekStart.setHours(0, 0, 0, 0);
-    
     const hoursSinceWeekStart = (now.getTime() - weekStart.getTime()) / (1000 * 60 * 60);
     const hoursLeft = Math.max(0, 24 - hoursSinceWeekStart);
     
     if (hoursLeft <= 0) return '';
-    if (hoursLeft < 1) return `${Math.round(hoursLeft * 60)} minutes left`;
-    return `${Math.ceil(hoursLeft)} hour(s) left`;
+    if (hoursLeft < 1) return `${Math.round(hoursLeft * 60)}m left`;
+    return `${Math.ceil(hoursLeft)}h left`;
   };
 
   return (
@@ -563,30 +457,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           end={{ x: 1, y: 1 }}
           style={styles.modalContent}
         >
+          {/* Header */}
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>
-              {groupName} Settings
-            </Text>
-            <TouchableOpacity onPress={onClose}>
-              <MaterialCommunityIcons name="close" size={24} color="#000" />
+            <View style={styles.headerLeft}>
+              <LinearGradient
+                colors={['#2b8a3e', '#1e6b2c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.headerIcon}
+              >
+                <MaterialCommunityIcons name="cog" size={20} color="white" />
+              </LinearGradient>
+              <Text style={styles.modalTitle}>{groupName}</Text>
+            </View>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+              <MaterialCommunityIcons name="close" size={20} color="#868e96" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalBody}>
+          <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
             {/* Rotation Section */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <MaterialCommunityIcons name="calendar-sync" size={20} color="#495057" />
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.sectionIcon}
+                >
+                  <MaterialCommunityIcons name="calendar-sync" size={16} color="#495057" />
+                </LinearGradient>
                 <Text style={styles.sectionTitle}>Rotation</Text>
               </View>
               
-              <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']} // Light gray gradient
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.rotationCard}
-              >
-                <View style={styles.rotationInfo}>
+              <View style={styles.rotationCard}>
+                <View>
                   <Text style={styles.rotationLabel}>Current Week</Text>
                   <Text style={styles.rotationValue}>Week {rotationWeek}</Text>
                   {weekStartDate && weekEndDate && (
@@ -594,391 +499,280 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       {weekStartDate.toLocaleDateString()} - {weekEndDate.toLocaleDateString()}
                     </Text>
                   )}
-                  {weekStartDate && (
-                    <Text style={styles.weekStartDay}>
-                      Week starts: {getWeekDayName(weekStartDate)}
-                    </Text>
-                  )}
                 </View>
                 
                 {isAdmin && (
-                  <TouchableOpacity onPress={handleRotateTasks}>
-                    <LinearGradient
-                      colors={['#d3f9d8', '#b2f2bb']} // Light green gradient
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.rotateButton}
-                    >
-                      <MaterialCommunityIcons name="rotate-right" size={16} color="#2b8a3e" />
-                      <Text style={styles.rotateButtonText}>Rotate Tasks</Text>
-                    </LinearGradient>
+                  <TouchableOpacity onPress={handleRotateTasks} style={styles.rotateButton}>
+                    <MaterialCommunityIcons name="rotate-right" size={16} color="#2b8a3e" />
+                    <Text style={styles.rotateButtonText}>Rotate</Text>
                   </TouchableOpacity>
                 )}
-              </LinearGradient>
+              </View>
 
-              <TouchableOpacity onPress={handleViewRotationSchedule}>
+              <TouchableOpacity onPress={handleViewRotationSchedule} style={styles.menuItem}>
+                <View style={styles.menuItemLeft}>
+                  <MaterialCommunityIcons name="calendar-clock" size={18} color="#495057" />
+                  <Text style={styles.menuItemText}>Rotation Schedule</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Swap Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
                 <LinearGradient
                   colors={['#f8f9fa', '#e9ecef']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.actionButton}
+                  style={styles.sectionIcon}
                 >
-                  <MaterialCommunityIcons name="calendar-clock" size={18} color="#495057" />
-                  <Text style={styles.actionButtonText}>View Rotation Schedule</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                  <MaterialCommunityIcons name="swap-horizontal" size={16} color="#4F46E5" />
                 </LinearGradient>
-              </TouchableOpacity>
-            </View>
-
-            {/* Swap Entire Week Section */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <MaterialCommunityIcons name="swap-horizontal" size={20} color="#4F46E5" />
-                <Text style={styles.sectionTitle}>Swap Entire Week</Text>
+                <Text style={styles.sectionTitle}>Week Swap</Text>
               </View>
 
               {loadingMyTasks ? (
-                <ActivityIndicator size="small" color="#4F46E5" />
+                <ActivityIndicator size="small" color="#4F46E5" style={styles.loader} />
               ) : (
-                <LinearGradient
-                  colors={canSwapWeek ? ['#EEF2FF', '#dbe4ff'] : ['#F3F4F6', '#e5e7eb']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[
-                    styles.swapCard,
-                    !canSwapWeek && styles.swapCardDisabled
-                  ]}
-                >
+                <View style={[styles.swapCard, !canSwapWeek && styles.swapCardDisabled]}>
                   <View style={styles.swapInfo}>
                     <Text style={styles.swapDescription}>
-                      Swap all your tasks for week {rotationWeek} with another member
+                      Swap your week {rotationWeek} tasks
                     </Text>
                     
                     <View style={styles.weekAvailability}>
                       <MaterialCommunityIcons 
                         name={canSwapWeek ? "check-circle" : "clock-alert"} 
-                        size={16} 
+                        size={14} 
                         color={canSwapWeek ? "#2b8a3e" : "#fa5252"} 
                       />
                       <Text style={[
                         styles.weekAvailabilityText,
                         canSwapWeek ? styles.availableText : styles.unavailableText
                       ]}>
-                        {canSwapWeek 
-                          ? `✅ Available now - ${getHoursLeftText()}` 
-                          : weekSwapReason || 'Week swap window is closed'}
+                        {canSwapWeek ? getHoursLeftText() : weekSwapReason}
                       </Text>
                     </View>
 
                     {canSwapWeek && (
-                      <LinearGradient
-                        colors={['#ffffff', '#f8f9fa']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.taskCountBadge}
-                      >
-                        <MaterialCommunityIcons name="clipboard-text" size={14} color="#4F46E5" />
+                      <View style={styles.taskCountBadge}>
+                        <MaterialCommunityIcons name="clipboard-text" size={12} color="#4F46E5" />
                         <Text style={styles.taskCountText}>
-                          {incompleteCount} incomplete task(s) this week
+                          {incompleteCount} incomplete
                         </Text>
-                      </LinearGradient>
-                    )}
-
-                    {weekStartDate && (
-                      <Text style={styles.weekInfo}>
-                        Week started: {weekStartDate.toLocaleDateString()} at 00:00
-                      </Text>
+                      </View>
                     )}
                   </View>
 
                   <TouchableOpacity
                     onPress={handleSwapEntireWeek}
                     disabled={!canSwapWeek || incompleteCount === 0 || swapLoading}
+                    style={[
+                      styles.swapActionButton,
+                      (!canSwapWeek || incompleteCount === 0) && styles.swapActionDisabled
+                    ]}
                   >
-                    <LinearGradient
-                      colors={canSwapWeek && incompleteCount > 0 ? ['#4F46E5', '#3730a3'] : ['#9CA3AF', '#6B7280']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={[
-                        styles.swapActionButton,
-                        (!canSwapWeek || incompleteCount === 0 || swapLoading) && styles.swapActionDisabled
-                      ]}
-                    >
-                      {swapLoading ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <>
-                          <MaterialCommunityIcons name="swap-horizontal" size={18} color="#fff" />
-                          <Text style={styles.swapActionText}>Swap Week</Text>
-                        </>
-                      )}
-                    </LinearGradient>
+                    {swapLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <MaterialCommunityIcons name="swap-horizontal" size={16} color="#fff" />
+                        <Text style={styles.swapActionText}>Swap</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
-                </LinearGradient>
-              )}
-
-              {!canSwapWeek && !loadingMyTasks && weekStartDate && (
-                <LinearGradient
-                  colors={['#fff5f5', '#ffe3e3']} // Light red gradient
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.infoBox}
-                >
-                  <MaterialCommunityIcons name="information" size={20} color="#fa5252" />
-                  <Text style={styles.infoUnavailableText}>
-                    Week swaps are only available within the first 24 hours after the week starts.
-                    {'\n\n'}
-                    Week started: {weekStartDate.toLocaleDateString()} at 00:00
-                  </Text>
-                </LinearGradient>
-              )}
-
-              {canSwapWeek && incompleteCount === 0 && !loadingMyTasks && (
-                <LinearGradient
-                  colors={['#d3f9d8', '#b2f2bb']} // Light green gradient
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.successBox}
-                >
-                  <MaterialCommunityIcons name="check-circle" size={20} color="#2b8a3e" />
-                  <Text style={styles.successText}>
-                    ✓ All tasks completed! No pending tasks to swap.
-                  </Text>
-                </LinearGradient>
+                </View>
               )}
             </View>
 
-            {/* TASK COMPLETION HISTORY - ALL MEMBERS CAN SEE */}
+            {/* History Section - All Members */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <MaterialCommunityIcons name="history" size={20} color="#2b8a3e" />
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.sectionIcon}
+                >
+                  <MaterialCommunityIcons name="history" size={16} color="#2b8a3e" />
+                </LinearGradient>
                 <Text style={styles.sectionTitle}>History</Text>
               </View>
 
-              <TouchableOpacity onPress={handleTaskCompletionHistory}>
-                <LinearGradient
-                  colors={['#d3f9d8', '#b2f2bb']} // Light green gradient
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.actionButton, styles.historyButton]}
-                >
+              <TouchableOpacity onPress={handleTaskCompletionHistory} style={styles.menuItem}>
+                <View style={styles.menuItemLeft}>
                   <MaterialCommunityIcons name="clipboard-list" size={18} color="#2b8a3e" />
-                  <View style={styles.reviewButtonContent}>
-                    <Text style={styles.actionButtonText}>Task Completion History</Text>
-                  </View>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#2b8a3e" />
-                </LinearGradient>
+                  <Text style={styles.menuItemText}>Task Completion History</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
               </TouchableOpacity>
             </View>
 
-            {/* Admin Actions - Only visible to admins */}
+            {/* Admin Actions */}
             {isAdmin && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
-                  <MaterialCommunityIcons name="shield-account" size={20} color="#495057" />
-                  <Text style={styles.sectionTitle}>Admin Actions</Text>
+                  <LinearGradient
+                    colors={['#f8f9fa', '#e9ecef']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.sectionIcon}
+                  >
+                    <MaterialCommunityIcons name="shield-account" size={16} color="#495057" />
+                  </LinearGradient>
+                  <Text style={styles.sectionTitle}>Admin</Text>
                 </View>
 
-                <TouchableOpacity onPress={handleViewAssignment}>
-                  <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.actionButton}
-                  >
+                <TouchableOpacity onPress={handleViewAssignment} style={styles.menuItem}>
+                  <View style={styles.menuItemLeft}>
                     <MaterialCommunityIcons name="account-switch" size={18} color="#495057" />
-                    <Text style={styles.actionButtonText}>Manage Assignments</Text>
-                    <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
-                  </LinearGradient>
+                    <Text style={styles.menuItemText}>Manage Assignments</Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={handleGroupSettings}>
-                  <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.actionButton}
-                  >
+                <TouchableOpacity onPress={handleGroupSettings} style={styles.menuItem}>
+                  <View style={styles.menuItemLeft}>
                     <MaterialCommunityIcons name="cog" size={18} color="#495057" />
-                    <Text style={styles.actionButtonText}>Group Settings</Text>
-                    <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
-                  </LinearGradient>
+                    <Text style={styles.menuItemText}>Group Settings</Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
                 </TouchableOpacity>
 
-                {/* Group Activity - Admin only */}
-                <TouchableOpacity onPress={handleGroupActivity}>
-                  <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.actionButton}
-                  >
+                <TouchableOpacity onPress={handleGroupActivity} style={styles.menuItem}>
+                  <View style={styles.menuItemLeft}>
                     <MaterialCommunityIcons name="chart-timeline-variant" size={18} color="#495057" />
-                    <Text style={styles.actionButtonText}>Group Activity</Text>
-                    <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
-                  </LinearGradient>
+                    <Text style={styles.menuItemText}>Group Activity</Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
                 </TouchableOpacity>
 
-                {/* Member Contributions - Admin only */}
-                <TouchableOpacity onPress={handleMemberContributions}>
-                  <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.actionButton}
-                  >
+                <TouchableOpacity onPress={handleMemberContributions} style={styles.menuItem}>
+                  <View style={styles.menuItemLeft}>
                     <MaterialCommunityIcons name="account-details" size={18} color="#495057" />
-                    <Text style={styles.actionButtonText}>Member Contributions</Text>
-                    <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
-                  </LinearGradient>
+                    <Text style={styles.menuItemText}>Member Contributions</Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
                 </TouchableOpacity>
-                   
-                <TouchableOpacity onPress={handleReviewSubmissions}>
+
+                <TouchableOpacity onPress={handleReviewSubmissions} style={[styles.menuItem, styles.reviewItem]}>
+                  <View style={styles.menuItemLeft}>
+                    <MaterialCommunityIcons name="clipboard-check" size={18} color="#fa5252" />
+                    <Text style={styles.menuItemText}>Review Submissions</Text>
+                  </View>
                   <LinearGradient
-                    colors={['#fff5f5', '#ffe3e3']} // Light red gradient for review
+                    colors={['#fa5252', '#e03131']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={[styles.actionButton, styles.reviewButton]}
+                    style={styles.pendingBadge}
                   >
-                    <MaterialCommunityIcons name="clipboard-check" size={18} color="#fa5252" />
-                    <View style={styles.reviewButtonContent}>
-                      <Text style={styles.actionButtonText}>Review Submissions</Text>
-                      <LinearGradient
-                        colors={['#fa5252', '#e03131']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.pendingBadge}
-                      >
-                        <Text style={styles.pendingBadgeText}>Pending</Text>
-                      </LinearGradient>
-                    </View>
-                    <MaterialCommunityIcons name="chevron-right" size={18} color="#fa5252" />
+                    <Text style={styles.pendingBadgeText}>Pending</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* Statistics Section */}
+            {/* Statistics */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <MaterialCommunityIcons name="chart-bar" size={20} color="#495057" />
-                <Text style={styles.sectionTitle}>Statistics</Text>
-              </View>
-
-              {loadingStats ? (
-                <ActivityIndicator size="small" color="#495057" />
-              ) : groupStats ? (
-                <View style={styles.statsGrid}>
-                  <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.statCard}
-                  >
-                    <Text style={styles.statNumber}>
-                      {groupStats.totalTasks || 0}
-                    </Text>
-                    <Text style={styles.statLabel}>Total Tasks</Text>
-                  </LinearGradient>
-                  
-                  <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.statCard}
-                  >
-                    <Text style={styles.statNumber}>
-                      {groupStats.currentWeek?.totalAssignments || 0}
-                    </Text>
-                    <Text style={styles.statLabel}>This Week</Text>
-                  </LinearGradient>
-                  
-                  <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.statCard}
-                  >
-                    <Text style={styles.statNumber}>
-                      {groupStats.recurringTasks || 0}
-                    </Text>
-                    <Text style={styles.statLabel}>Recurring</Text>
-                  </LinearGradient>
-                  
-                  <LinearGradient
-                    colors={['#d3f9d8', '#b2f2bb']} // Light green for points earned
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.statCard}
-                  >
-                    <Text style={styles.statNumber}>
-                      {groupStats.currentWeek?.completedPoints || 0}
-                    </Text>
-                    <Text style={styles.statLabel}>Points Earned</Text>
-                  </LinearGradient>
-                </View>
-              ) : (
-                <Text style={styles.noDataText}>No statistics available</Text>
-              )}
-
-              <TouchableOpacity onPress={handleTaskStatistics}>
                 <LinearGradient
                   colors={['#f8f9fa', '#e9ecef']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.actionButton}
+                  style={styles.sectionIcon}
                 >
-                  <MaterialCommunityIcons name="chart-box" size={18} color="#495057" />
-                  <Text style={styles.actionButtonText}>View Detailed Statistics</Text>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                  <MaterialCommunityIcons name="chart-bar" size={16} color="#495057" />
                 </LinearGradient>
+                <Text style={styles.sectionTitle}>Stats</Text>
+              </View>
+
+              {loadingStats ? (
+                <ActivityIndicator size="small" color="#495057" style={styles.loader} />
+              ) : groupStats ? (
+                <View style={styles.statsGrid}>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{groupStats.totalTasks || 0}</Text>
+                    <Text style={styles.statLabel}>Tasks</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{groupStats.currentWeek?.totalAssignments || 0}</Text>
+                    <Text style={styles.statLabel}>This Week</Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statNumber}>{groupStats.recurringTasks || 0}</Text>
+                    <Text style={styles.statLabel}>Recurring</Text>
+                  </View>
+                  <View style={[styles.statItem, styles.pointsStat]}>
+                    <Text style={styles.statNumber}>{groupStats.currentWeek?.completedPoints || 0}</Text>
+                    <Text style={styles.statLabel}>Points</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.noDataText}>No stats available</Text>
+              )}
+
+              <TouchableOpacity onPress={handleTaskStatistics} style={styles.menuItem}>
+                <View style={styles.menuItemLeft}>
+                  <MaterialCommunityIcons name="chart-box" size={18} color="#495057" />
+                  <Text style={styles.menuItemText}>Detailed Statistics</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
               </TouchableOpacity>
             </View>
 
-            {/* Leaderboard Section */}
+            {/* Leaderboard */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
-                <MaterialCommunityIcons name="podium" size={20} color="#495057" />
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.sectionIcon}
+                >
+                  <MaterialCommunityIcons name="podium" size={16} color="#495057" />
+                </LinearGradient>
                 <Text style={styles.sectionTitle}>Leaderboard</Text>
               </View>
 
               {loadingLeaderboard ? (
-                <ActivityIndicator size="small" color="#495057" />
+                <ActivityIndicator size="small" color="#495057" style={styles.loader} />
               ) : leaderboard.length > 0 ? (
                 <View style={styles.leaderboardContainer}>
-                  {leaderboard.slice(0, 5).map((item, index) => 
-                    renderLeaderboardItem(item, index)
-                  )}
+                  {leaderboard.slice(0, 5).map(renderLeaderboardItem)}
                 </View>
               ) : (
-                <Text style={styles.noDataText}>No leaderboard data yet</Text>
+                <Text style={styles.noDataText}>No data yet</Text>
               )}
 
-              <TouchableOpacity onPress={handleViewFullLeaderboard}>
-                <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.viewAllButton}
-                >
-                  <Text style={styles.viewAllText}>View Full Leaderboard</Text>
-                </LinearGradient>
+              <TouchableOpacity onPress={handleViewFullLeaderboard} style={styles.menuItem}>
+                <View style={styles.menuItemLeft}>
+                  <MaterialCommunityIcons name="trophy" size={18} color="#495057" />
+                  <Text style={styles.menuItemText}>Full Leaderboard</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
               </TouchableOpacity>
             </View>
           </ScrollView>
 
+          {/* Footer */}
           <LinearGradient
             colors={['#f8f9fa', '#e9ecef']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.modalFooter}
           >
-            <Text style={styles.footerText}>
-              Group ID: {groupId.substring(0, 8)}...
-            </Text>
-            <Text style={styles.footerRole}>
-              {isAdmin ? 'Group Admin' : 'Member'}
-            </Text>
+            <Text style={styles.footerText}>ID: {groupId.substring(0, 8)}...</Text>
+            <LinearGradient
+              colors={isAdmin ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.roleBadge}
+            >
+              <Text style={[styles.footerRole, isAdmin && styles.adminRole]}>
+                {isAdmin ? 'Admin' : 'Member'}
+              </Text>
+            </LinearGradient>
           </LinearGradient>
         </LinearGradient>
       </View>
@@ -993,8 +787,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end'
   },
   modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     maxHeight: '90%'
   },
   modalHeader: {
@@ -1005,13 +799,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef'
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  headerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#212529'
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#212529',
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f1f3f5',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalBody: {
-    padding: 20
+    padding: 16,
   },
   modalFooter: {
     flexDirection: 'row',
@@ -1023,339 +837,301 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 12,
-    color: '#868e96'
+    color: '#868e96',
+  },
+  roleBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
   },
   footerRole: {
     fontSize: 12,
+    color: '#495057',
+    fontWeight: '500',
+  },
+  adminRole: {
     color: '#2b8a3e',
-    fontWeight: '600'
+    fontWeight: '600',
   },
   section: {
-    marginBottom: 24
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 16
+    marginBottom: 12,
+  },
+  sectionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#212529'
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#212529',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f5',
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: '#212529',
+    fontWeight: '500',
+  },
+  reviewItem: {
+    borderBottomWidth: 0,
   },
   rotationCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: '#f8f9fa',
     padding: 16,
     borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  rotationInfo: {
-    flex: 1
+    marginBottom: 8,
   },
   rotationLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#868e96',
-    marginBottom: 4
+    marginBottom: 2,
   },
   rotationValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#212529'
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#212529',
   },
   rotationDate: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#868e96',
-    marginTop: 4
-  },
-  weekStartDay: {
-    fontSize: 12,
-    color: '#4F46E5',
     marginTop: 4,
-    fontWeight: '500'
   },
   rotateButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
-    gap: 6
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#d3f9d8',
   },
   rotateButtonText: {
     color: '#2b8a3e',
     fontWeight: '600',
-    fontSize: 14
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  actionButtonText: {
-    fontSize: 15,
-    color: '#212529',
-    fontWeight: '500',
-    flex: 1,
-    marginHorizontal: 12
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16
-  },
-  statCard: {
-    flex: 1,
-    minWidth: '45%',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 4
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#868e96',
-    textAlign: 'center'
-  },
-  noDataText: {
-    fontSize: 14,
-    color: '#adb5bd',
-    textAlign: 'center',
-    paddingVertical: 20,
-    fontStyle: 'italic'
-  },
-  leaderboardContainer: {
-    marginBottom: 16
-  },
-  leaderboardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  firstPlace: {
-    borderColor: '#ffd43b',
-    borderWidth: 2
-  },
-  secondPlace: {
-    borderColor: '#ced4da',
-    borderWidth: 2
-  },
-  thirdPlace: {
-    borderColor: '#e9ecef',
-    borderWidth: 2
-  },
-  leaderboardRank: {
-    width: 32,
-    alignItems: 'center'
-  },
-  rankNumber: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#868e96'
-  },
-  leaderboardUser: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12
-  },
-  userAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  userInitial: {
-    color: '#212529',
-    fontWeight: 'bold',
-    fontSize: 14
-  },
-  userInfo: {
-    flex: 1 
-  },
-  userName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 2
-  },
-  userStats: {
-    fontSize: 12,
-    color: '#868e96'
-  },
-  pointsBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12
-  },
-  pointsText: {
-    color: '#2b8a3e',
-    fontWeight: 'bold',
-    fontSize: 12
-  },
-  viewAllButton: {
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  viewAllText: {
-    color: '#495057',
-    fontWeight: '600',
-    fontSize: 14
-  },
-  reviewButton: {
-    borderColor: '#ffc9c9'
-  },
-  reviewButtonContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: 12
-  },
-  pendingBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginLeft: 8
-  },
-  pendingBadgeText: {
-    color: 'white',
-    fontSize: 11, 
-    fontWeight: '600'
-  },
-  historyButton: {
-    borderColor: '#b2f2bb'
+    fontSize: 13,
   },
   swapCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
     padding: 16,
     borderRadius: 12,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#4F46E5',
-    marginBottom: 8
   },
   swapCardDisabled: {
-    borderColor: '#ced4da',
-    opacity: 0.7
+    borderColor: '#e9ecef',
+    opacity: 0.7,
   },
   swapInfo: {
     flex: 1,
-    marginRight: 12
+    marginRight: 12,
   },
   swapDescription: {
     fontSize: 14,
     color: '#212529',
     marginBottom: 8,
-    fontWeight: '500'
+    fontWeight: '500',
   },
   weekAvailability: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-    gap: 6
+    marginBottom: 4,
+    gap: 4,
   },
   weekAvailabilityText: {
-    fontSize: 13,
+    fontSize: 12,
     flex: 1,
-    fontWeight: '500'
+    fontWeight: '500',
   },
   availableText: {
-    color: '#2b8a3e'
+    color: '#2b8a3e',
   },
   unavailableText: {
-    color: '#fa5252'
+    color: '#fa5252',
   },
   taskCountBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
     alignSelf: 'flex-start',
-    gap: 6
+    gap: 4,
   },
   taskCountText: {
-    fontSize: 12,
-    color: '#4F46E5',
-    fontWeight: '600'
-  },
-  weekInfo: {
     fontSize: 11,
-    color: '#868e96',
-    marginTop: 6,
-    fontStyle: 'italic'
+    color: '#4F46E5',
+    fontWeight: '600',
   },
   swapActionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: '#4F46E5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6
+    gap: 4,
   },
   swapActionDisabled: {
-    opacity: 0.5
+    backgroundColor: '#ced4da',
+    opacity: 0.5,
   },
   swapActionText: {
     color: '#fff',
     fontWeight: '600',
-    fontSize: 14
-  },
-  infoBox: {
-    flexDirection: 'row',
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#ffc9c9'
-  },
-  infoUnavailableText: {
-    flex: 1,
     fontSize: 13,
-    color: '#fa5252',
-    lineHeight: 18
   },
-  successBox: {
+  statsGrid: {
     flexDirection: 'row',
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#b2f2bb'
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
   },
-  successText: {
+  statItem: {
     flex: 1,
+    minWidth: '45%',
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  pointsStat: {
+    backgroundColor: '#d3f9d8',
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#212529',
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#868e96',
+  },
+  noDataText: {
     fontSize: 13,
+    color: '#adb5bd',
+    textAlign: 'center',
+    paddingVertical: 16,
+    fontStyle: 'italic',
+  },
+  loader: {
+    paddingVertical: 20,
+  },
+  leaderboardContainer: {
+    marginBottom: 8,
+  },
+  leaderboardItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  firstPlace: {
+    borderColor: '#ffd43b',
+    borderWidth: 2,
+  },
+  secondPlace: {
+    borderColor: '#ced4da',
+    borderWidth: 2,
+  },
+  thirdPlace: {
+    borderColor: '#e9ecef',
+    borderWidth: 2,
+  },
+  leaderboardRank: {
+    width: 28,
+    alignItems: 'center',
+  },
+  rankNumber: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#868e96',
+  },
+  leaderboardUser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  userAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e9ecef',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userInitial: {
+    color: '#495057',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 1,
+  },
+  userStats: {
+    fontSize: 11,
+    color: '#868e96',
+  },
+  pointsBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  pointsText: {
     color: '#2b8a3e',
-    fontWeight: '500'
-  }
+    fontWeight: 'bold',
+    fontSize: 11,
+  },
+  pendingBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  pendingBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+  },
 });

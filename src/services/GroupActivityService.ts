@@ -13,7 +13,7 @@ export class GroupActivityService {
       console.error('GroupActivityService: Error getting auth token:', error);
       return null;
     }
-  }
+  } 
 
   private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
     const token = await this.getAuthToken();

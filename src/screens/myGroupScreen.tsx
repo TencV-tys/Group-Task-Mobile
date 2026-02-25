@@ -1,4 +1,4 @@
-// src/screens/MyGroupsScreen.tsx - UPDATED WITH GROUP AVATARS
+// src/screens/MyGroupsScreen.tsx - UPDATED with clean UI and consistent colors
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,8 +11,9 @@ import {
   RefreshControl,
   Alert,
   Share,
-  Image // Add Image import
+  Image
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useMyGroups } from '../groupHook/useMyGroups';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -25,7 +26,7 @@ export default function MyGroupsScreen({ navigation }: any) {
     fetchGroups, 
     refreshGroups,  
     addGroup,
-    updateGroupAvatar // Add this if available in your hook
+    updateGroupAvatar
   } = useMyGroups();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,7 +42,7 @@ export default function MyGroupsScreen({ navigation }: any) {
           id: newGroup.id,
           name: newGroup.name,
           description: newGroup.description,
-          avatarUrl: newGroup.avatarUrl, // Add avatarUrl
+          avatarUrl: newGroup.avatarUrl,
           inviteCode: newGroup.inviteCode,
           createdAt: newGroup.createdAt,
           createdById: newGroup.createdById,
@@ -61,7 +62,7 @@ export default function MyGroupsScreen({ navigation }: any) {
           id: newGroup.id,
           name: newGroup.name,
           description: newGroup.description,
-          avatarUrl: newGroup.avatarUrl, // Add avatarUrl
+          avatarUrl: newGroup.avatarUrl,
           inviteCode: newGroup.inviteCode,
           createdAt: newGroup.createdAt,
           createdById: newGroup.createdById,
@@ -138,13 +139,18 @@ export default function MyGroupsScreen({ navigation }: any) {
             style={[
               styles.groupIcon,
               styles.groupAvatarImage,
-              { borderColor: isAdmin ? '#007AFF' : '#6c757d' }
+              { borderColor: isAdmin ? '#2b8a3e' : '#e9ecef' }
             ]}
           />
           {isAdmin && (
-            <View style={styles.adminBadge}>
-              <MaterialCommunityIcons name="crown" size={12} color="#FFD700" />
-            </View>
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.adminBadge}
+            >
+              <MaterialCommunityIcons name="crown" size={10} color="white" />
+            </LinearGradient>
           )}
         </View>
       );
@@ -152,18 +158,31 @@ export default function MyGroupsScreen({ navigation }: any) {
       const groupName = group.name || 'Unnamed Group';
       return (
         <View style={styles.groupIconContainer}>
-          <View style={[
-            styles.groupIcon,
-            { backgroundColor: isAdmin ? '#007AFF' : '#6c757d' }
-          ]}>
-            <Text style={styles.groupIconText}>
+          <LinearGradient
+            colors={isAdmin ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.groupIcon,
+              { borderWidth: 1, borderColor: isAdmin ? '#2b8a3e' : '#e9ecef' }
+            ]}
+          >
+            <Text style={[
+              styles.groupIconText,
+              { color: isAdmin ? 'white' : '#495057' }
+            ]}>
               {groupName.charAt(0).toUpperCase()}
             </Text>
-          </View>
+          </LinearGradient>
           {isAdmin && (
-            <View style={styles.adminBadge}>
-              <MaterialCommunityIcons name="crown" size={12} color="#FFD700" />
-            </View>
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.adminBadge}
+            >
+              <MaterialCommunityIcons name="crown" size={10} color="white" />
+            </LinearGradient>
           )}
         </View>
       );
@@ -187,9 +206,19 @@ export default function MyGroupsScreen({ navigation }: any) {
           <View style={styles.groupMainInfo}>
             <View style={styles.groupTitleRow}>
               <Text style={styles.groupName} numberOfLines={1}>{groupName}</Text>
-              <Text style={[styles.groupRole, isAdmin && styles.adminRoleText]}>
-                {isAdmin ? 'Admin' : 'Member'}
-              </Text>
+              <LinearGradient
+                colors={isAdmin ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.roleBadge}
+              >
+                <Text style={[
+                  styles.groupRole,
+                  isAdmin && styles.adminRoleText
+                ]}>
+                  {isAdmin ? 'Admin' : 'Member'}
+                </Text>
+              </LinearGradient>
             </View>
             
             {item.description ? (
@@ -202,19 +231,13 @@ export default function MyGroupsScreen({ navigation }: any) {
             
             <View style={styles.groupQuickStats}>
               <View style={styles.statItem}>
-                <MaterialCommunityIcons name="account-group" size={16} color="#6c757d" />
+                <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
                 <Text style={styles.statText}>{item.memberCount || 1}</Text>
               </View>
               <View style={styles.statItem}>
-                <MaterialCommunityIcons name="clipboard-check" size={16} color="#6c757d" />
+                <MaterialCommunityIcons name="clipboard-check" size={14} color="#868e96" />
                 <Text style={styles.statText}>{item.taskCount || 0}</Text>
               </View>
-              {item.avatarUrl && (
-                <View style={styles.statItem}>
-                  <MaterialCommunityIcons name="image" size={16} color="#6c757d" />
-                  <Text style={styles.statText}>Avatar</Text>
-                </View>
-              )}
             </View>
           </View>
         </View>
@@ -227,7 +250,7 @@ export default function MyGroupsScreen({ navigation }: any) {
               handleInviteGroup(item);
             }}
           >
-            <MaterialCommunityIcons name="account-plus" size={18} color="#007AFF" />
+            <MaterialCommunityIcons name="account-plus" size={16} color="#2b8a3e" />
             <Text style={styles.actionButtonText}>Invite</Text>
           </TouchableOpacity>
           
@@ -238,7 +261,7 @@ export default function MyGroupsScreen({ navigation }: any) {
               handleTasksGroup(item);
             }}
           >
-            <MaterialCommunityIcons name="clipboard-text" size={18} color="#28a745" />
+            <MaterialCommunityIcons name="clipboard-text" size={16} color="#495057" />
             <Text style={styles.actionButtonText}>Tasks</Text>
           </TouchableOpacity>
           
@@ -250,7 +273,7 @@ export default function MyGroupsScreen({ navigation }: any) {
                 handleManageGroup(item);
               }}
             >
-              <MaterialCommunityIcons name="cog" size={18} color="#6c757d" />
+              <MaterialCommunityIcons name="cog" size={16} color="#495057" />
               <Text style={styles.actionButtonText}>Manage</Text>
             </TouchableOpacity>
           )}
@@ -263,7 +286,7 @@ export default function MyGroupsScreen({ navigation }: any) {
     if (loading && !refreshing) {
       return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading your groups...</Text>
         </View>
       );
@@ -282,8 +305,15 @@ export default function MyGroupsScreen({ navigation }: any) {
               style={styles.primaryButton}
               onPress={() => fetchGroups()}
             >
-              <MaterialCommunityIcons name="refresh" size={20} color="white" />
-              <Text style={styles.primaryButtonText}>Try Again</Text>
+              <LinearGradient
+                colors={['#2b8a3e', '#1e6b2c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.primaryButtonGradient}
+              >
+                <MaterialCommunityIcons name="refresh" size={18} color="white" />
+                <Text style={styles.primaryButtonText}>Try Again</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
@@ -299,8 +329,8 @@ export default function MyGroupsScreen({ navigation }: any) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={refreshGroups}
-            colors={['#007AFF']}
-            tintColor="#007AFF"
+            colors={['#2b8a3e']}
+            tintColor="#2b8a3e"
           />
         }
         ListHeaderComponent={
@@ -329,15 +359,29 @@ export default function MyGroupsScreen({ navigation }: any) {
                 style={styles.primaryButton}
                 onPress={handleCreateGroup}
               >
-                <MaterialCommunityIcons name="plus" size={20} color="white" />
-                <Text style={styles.primaryButtonText}>Create Group</Text>
+                <LinearGradient
+                  colors={['#2b8a3e', '#1e6b2c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.primaryButtonGradient}
+                >
+                  <MaterialCommunityIcons name="plus" size={18} color="white" />
+                  <Text style={styles.primaryButtonText}>Create Group</Text>
+                </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.secondaryButton}
                 onPress={handleJoinGroup}
               >
-                <MaterialCommunityIcons name="login" size={20} color="#007AFF" />
-                <Text style={styles.secondaryButtonText}>Join Group</Text>
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.secondaryButtonGradient}
+                >
+                  <MaterialCommunityIcons name="login" size={18} color="#495057" />
+                  <Text style={styles.secondaryButtonText}>Join Group</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -351,12 +395,17 @@ export default function MyGroupsScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
         <TouchableOpacity 
           onPress={() => navigation.goBack()} 
           style={styles.backButton}
         >
-          <Text style={styles.backButtonText}>←</Text>
+          <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
@@ -372,28 +421,45 @@ export default function MyGroupsScreen({ navigation }: any) {
           style={styles.refreshButton}
         >
           {refreshing ? (
-            <ActivityIndicator size="small" color="#007AFF" />
+            <ActivityIndicator size="small" color="#2b8a3e" />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
+            <MaterialCommunityIcons name="refresh" size={22} color="#495057" />
           )}
         </TouchableOpacity>
-      </View>
+      </LinearGradient>
 
       {/* Quick Actions Bar */}
       <View style={styles.quickActions}>
         <TouchableOpacity 
-          style={[styles.quickAction, styles.createAction]}
+          style={styles.quickAction}
           onPress={handleCreateGroup}
+          activeOpacity={0.8}
         >
-          <MaterialCommunityIcons name="plus-circle" size={20} color="white" />
-          <Text style={styles.quickActionText}>Create</Text>
+          <LinearGradient
+            colors={['#2b8a3e', '#1e6b2c']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.quickActionGradient}
+          >
+            <MaterialCommunityIcons name="plus-circle" size={18} color="white" />
+            <Text style={styles.quickActionText}>Create</Text>
+          </LinearGradient>
         </TouchableOpacity>
+        
         <TouchableOpacity 
-          style={[styles.quickAction, styles.joinAction]}
+          style={styles.quickAction}
           onPress={handleJoinGroup}
+          activeOpacity={0.8}
         >
-          <MaterialCommunityIcons name="login" size={20} color="white" />
-          <Text style={styles.quickActionText}>Join</Text>
+          <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.quickActionGradient}
+          >
+            <MaterialCommunityIcons name="login" size={18} color="#495057" />
+            <Text style={[styles.quickActionText, styles.joinActionText]}>Join</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
@@ -413,83 +479,87 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 5,
-    backgroundColor: 'white',
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
-    minHeight: 56,
+    minHeight: 60,
   },
   backButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#007AFF',
-    fontWeight: '400',
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   titleContainer: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
     color: '#212529',
-    textAlign: 'center',
   },
   subtitle: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#868e96',
     marginTop: 2,
-    textAlign: 'center',
   },
   refreshButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#f1f3f5',
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   // Quick Actions
   quickActions: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     gap: 8,
   },
   quickAction: {
     flex: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  quickActionGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  createAction: {
-    backgroundColor: '#007AFF',
-  },
-  joinAction: {
-    backgroundColor: '#28a745',
+    paddingVertical: 12,
   },
   quickActionText: {
     fontSize: 14,
     fontWeight: '600',
     color: 'white',
   },
+  joinActionText: {
+    color: '#495057',
+  },
   // Group List
   listContent: {
     padding: 16,
+    paddingTop: 0,
   },
   listHeader: {
     marginBottom: 16,
@@ -501,24 +571,24 @@ const styles = StyleSheet.create({
   },
   listHeaderSubtitle: {
     fontSize: 14,
-    color: '#6c757d',
+    color: '#868e96',
     marginTop: 4,
   },
   // Group Card
   groupCard: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 2,
   },
   groupHeader: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   groupIconContainer: {
     position: 'relative',
@@ -530,28 +600,26 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
   },
   groupAvatarImage: {
     backgroundColor: 'transparent',
+    borderWidth: 2,
   },
   groupIconText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
   },
   adminBadge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'white',
+    top: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: 'white',
   },
   groupMainInfo: {
     flex: 1,
@@ -569,18 +637,18 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  groupRole: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#6c757d',
-    backgroundColor: '#f1f3f5',
+  roleBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
   },
+  groupRole: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#495057',
+  },
   adminRoleText: {
-    color: '#1971c2',
-    backgroundColor: '#e7f5ff',
+    color: '#2b8a3e',
   },
   groupDescription: {
     fontSize: 14,
@@ -596,7 +664,6 @@ const styles = StyleSheet.create({
   },
   groupQuickStats: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 16,
   },
   statItem: {
@@ -605,14 +672,14 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#495057',
     fontWeight: '500',
   },
   groupActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
+    borderTopColor: '#f1f3f5',
     paddingTop: 12,
     gap: 8,
   },
@@ -621,9 +688,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     paddingVertical: 8,
-    borderRadius: 6,
+    borderRadius: 8,
     backgroundColor: '#f8f9fa',
   },
   actionButtonText: {
@@ -639,25 +706,25 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#6c757d',
+    color: '#868e96',
     marginTop: 12,
   },
   emptyContainer: {
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 60,
+    paddingVertical: 40,
   },
   emptyIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: '#212529',
     marginBottom: 8,
@@ -665,7 +732,7 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#6c757d',
+    color: '#868e96',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 20,
@@ -675,15 +742,22 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   primaryButton: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    minWidth: 140,
+    shadowColor: '#2b8a3e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  primaryButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#007AFF',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 140,
   },
   primaryButtonText: {
     fontSize: 14,
@@ -691,19 +765,26 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   secondaryButton: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    minWidth: 140,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  secondaryButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#f1f3f5',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 140,
   },
   secondaryButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#007AFF',
+    color: '#495057',
   },
-});
+});  

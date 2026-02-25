@@ -1,4 +1,4 @@
-// src/screens/JoinGroupScreen.tsx
+// src/screens/JoinGroupScreen.tsx - UPDATED with clean UI
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
@@ -13,6 +13,8 @@ import {
   Alert,
   ScrollView
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useJoinGroup } from '../groupHook/useJoinGroup';
 
 export default function JoinGroupScreen({ navigation, route }: any) {
@@ -25,7 +27,6 @@ export default function JoinGroupScreen({ navigation, route }: any) {
   // Handle success
   useEffect(() => {
     if (success && joinedGroup) {
-      // Show success message
       Alert.alert(
         'Success!',
         `You've joined "${joinedGroup.name || 'the group'}" successfully!`,
@@ -33,7 +34,6 @@ export default function JoinGroupScreen({ navigation, route }: any) {
           {
             text: 'OK',
             onPress: () => {
-              // Notify parent screen if callback exists
               if (onGroupJoined) {
                 onGroupJoined({
                   ...joinedGroup,
@@ -42,7 +42,6 @@ export default function JoinGroupScreen({ navigation, route }: any) {
                 });
               }
               
-              // Go back to previous screen
               setTimeout(() => {
                 navigation.goBack();
               }, 300);
@@ -61,10 +60,8 @@ export default function JoinGroupScreen({ navigation, route }: any) {
   }, [error, success]);
 
   const handleJoin = async () => {
-    // Reset any previous state
     reset();
     
-    // Validate
     if (!inviteCode.trim()) {
       Alert.alert('Error', 'Please enter an invite code');
       return;
@@ -75,12 +72,9 @@ export default function JoinGroupScreen({ navigation, route }: any) {
       return;
     }
 
-    // Call joinGroup hook
     const result = await joinGroup(inviteCode);
     
-    // If successful, the useEffect above will handle navigation
     if (!result.success) {
-      // Error is already set in the hook, Alert will show via useEffect
       console.log('Join failed:', result.message);
     }
   };
@@ -90,7 +84,6 @@ export default function JoinGroupScreen({ navigation, route }: any) {
     navigation.goBack();
   };
 
-  // Auto-uppercase input
   const handleCodeChange = (text: string) => {
     setInviteCode(text.toUpperCase().replace(/[^A-Z0-9]/g, ''));
   };
@@ -101,102 +94,185 @@ export default function JoinGroupScreen({ navigation, route }: any) {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ flex: 1 }}
         >
-          <View style={styles.header}>
-            <TouchableOpacity 
-              onPress={handleCancel}
-              style={styles.backButton}
-            >
-              <Text style={styles.backButtonText}>✕</Text>
-            </TouchableOpacity>
-            <Text style={styles.headerTitle}>Join Group</Text>
-            <View style={styles.headerSpacer} />
-          </View>
-
-          <View style={styles.content}>
-            <View style={styles.iconContainer}>
-              <View style={styles.iconCircle}>
-                <Text style={styles.iconText}>👥</Text>
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header */}
+            <View style={styles.header}>
+              <TouchableOpacity 
+                onPress={handleCancel}
+                style={styles.backButton}
+              >
+                <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
+              </TouchableOpacity>
+              
+              <View style={styles.headerCenter}>
+                <LinearGradient
+                  colors={['#2b8a3e', '#1e6b2c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.headerIcon}
+                >
+                  <MaterialCommunityIcons name="account-group" size={24} color="white" />
+                </LinearGradient>
+                <Text style={styles.headerTitle}>Join Group</Text>
               </View>
+              
+              <View style={styles.headerSpacer} />
             </View>
 
-            <Text style={styles.title}>Enter Invite Code</Text>
             <Text style={styles.subtitle}>
-              Ask your group admin for the 6-character invite code
+              Enter the invite code shared by your group admin
             </Text>
 
-            <View style={styles.inputContainer}>
-              <TextInput
+            {/* Input Section */}
+            <View style={styles.inputSection}>
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
                 style={[
-                  styles.input,
+                  styles.inputGradient,
                   error && !success && styles.inputError,
                   success && styles.inputSuccess
                 ]}
-                placeholder="ABCD12"
-                placeholderTextColor="#adb5bd"
-                value={inviteCode}
-                onChangeText={handleCodeChange}
-                autoCapitalize="characters"
-                maxLength={6}
-                editable={!loading}
-                textAlign="center"
-                autoFocus
-                selectTextOnFocus
-              />
-              <Text style={styles.inputLabel}>
-                {inviteCode.length}/6 characters
-              </Text>
+              >
+                <MaterialCommunityIcons name="key" size={20} color="#868e96" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter 6-character code"
+                  placeholderTextColor="#adb5bd"
+                  value={inviteCode}
+                  onChangeText={handleCodeChange}
+                  autoCapitalize="characters"
+                  maxLength={6}
+                  editable={!loading}
+                  autoFocus
+                />
+              </LinearGradient>
+              
+              <View style={styles.codeHint}>
+                <MaterialCommunityIcons 
+                  name={inviteCode.length === 6 ? "check-circle" : "information"} 
+                  size={16} 
+                  color={inviteCode.length === 6 ? "#2b8a3e" : "#868e96"} 
+                />
+                <Text style={[
+                  styles.codeHintText,
+                  inviteCode.length === 6 && styles.codeHintValid
+                ]}>
+                  {inviteCode.length === 6 
+                    ? "Code length valid" 
+                    : `${inviteCode.length}/6 characters`}
+                </Text>
+              </View>
             </View>
 
+            {/* Join Button */}
             <TouchableOpacity
-              style={[
-                styles.button,
-                loading && styles.buttonDisabled,
-                success && styles.buttonSuccess
-              ]}
+              style={[styles.button, loading && styles.buttonDisabled]}
               onPress={handleJoin}
               disabled={loading || inviteCode.length !== 6}
+              activeOpacity={0.8}
             >
-              {loading ? (
-                <ActivityIndicator color="white" />
-              ) : success ? (
-                <Text style={styles.buttonText}>✓ Joined!</Text>
-              ) : (
-                <Text style={styles.buttonText}>
-                  {inviteCode.length === 6 ? 'Join Group' : 'Enter 6-digit Code'}
-                </Text>
-              )}
+              <LinearGradient
+                colors={inviteCode.length === 6 ? ['#2b8a3e', '#1e6b2c'] : ['#e9ecef', '#dee2e6']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.buttonGradient}
+              >
+                {loading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons 
+                      name={inviteCode.length === 6 ? "login" : "lock"} 
+                      size={20} 
+                      color={inviteCode.length === 6 ? "white" : "#868e96"} 
+                    />
+                    <Text style={[
+                      styles.buttonText,
+                      inviteCode.length !== 6 && styles.buttonTextDisabled
+                    ]}>
+                      {inviteCode.length === 6 ? 'Join Group' : 'Enter Complete Code'}
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
 
-            <View style={styles.infoBox}>
-              <Text style={styles.infoTitle}>Where to find invite code?</Text>
-              <Text style={styles.infoText}>
-                • Ask the group admin{'\n'}
-                • Check group invitation message{'\n'}
-                • Look for 6-character code (e.g., ABCD12)
-              </Text>
-            </View>
-
-            {error && !success && (
-              <View style={styles.errorBox}>
-                <Text style={styles.errorIcon}>⚠️</Text>
-                <Text style={styles.errorText}>{error}</Text>
+            {/* Info Card */}
+            <LinearGradient
+              colors={['#e7f5ff', '#d0ebff']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.infoCard}
+            >
+              <MaterialCommunityIcons name="help-circle" size={20} color="#2b8a3e" />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoTitle}>Where to find the code?</Text>
+                <View style={styles.infoBullets}>
+                  <View style={styles.bulletItem}>
+                    <Text style={styles.bulletDot}>•</Text>
+                    <Text style={styles.bulletText}>Ask the group admin</Text>
+                  </View>
+                  <View style={styles.bulletItem}>
+                    <Text style={styles.bulletDot}>•</Text>
+                    <Text style={styles.bulletText}>Check your invitation message</Text>
+                  </View>
+                  <View style={styles.bulletItem}>
+                    <Text style={styles.bulletDot}>•</Text>
+                    <Text style={styles.bulletText}>Look for 6-character code (e.g., ABC123)</Text>
+                  </View>
+                </View>
               </View>
+            </LinearGradient>
+
+            {/* Status Messages */}
+            {error && !success && (
+              <LinearGradient
+                colors={['#fff5f5', '#ffe3e3']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.messageBox}
+              >
+                <MaterialCommunityIcons name="alert-circle" size={20} color="#fa5252" />
+                <Text style={styles.errorText}>{error}</Text>
+              </LinearGradient>
             )}
 
             {success && (
-              <View style={styles.successBox}>
-                <Text style={styles.successIcon}>🎉</Text>
+              <LinearGradient
+                colors={['#d3f9d8', '#b2f2bb']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.messageBox}
+              >
+                <MaterialCommunityIcons name="check-circle" size={20} color="#2b8a3e" />
                 <Text style={styles.successText}>
                   Success! You've joined {joinedGroup?.name || 'the group'}
                 </Text>
-              </View>
+              </LinearGradient>
             )}
-          </View>
-        </ScrollView>
+
+            {/* Cancel Link */}
+            <TouchableOpacity
+              onPress={handleCancel}
+              disabled={loading}
+              style={styles.cancelContainer}
+            >
+              <Text style={styles.link}>Cancel</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </LinearGradient>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -212,182 +288,200 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    marginBottom: 8,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f1f3f5',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  backButtonText: {
-    fontSize: 20,
-    color: '#495057',
-    fontWeight: '300',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  content: {
-    flex: 1,
-    padding: 30,
-    paddingTop: 40,
-  },
-  iconContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  iconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#e3f2fd',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#bbdefb',
-  },
-  iconText: {
-    fontSize: 36,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#212529',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6c757d',
-    textAlign: 'center',
-    marginBottom: 40,
-    lineHeight: 22,
-  },
-  inputContainer: {
-    marginBottom: 30,
-  },
-  input: {
-    height: 60,
-    borderWidth: 2,
-    borderColor: '#dee2e6',
-    borderRadius: 15,
-    paddingHorizontal: 20,
     backgroundColor: 'white',
-    fontSize: 28,
-    fontWeight: 'bold',
-    letterSpacing: 4,
-    color: '#212529',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  inputError: {
-    borderColor: '#ff6b6b',
-    backgroundColor: '#fff5f5',
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
   },
-  inputSuccess: {
-    borderColor: '#51cf66',
-    backgroundColor: '#ebfbee',
-  },
-  inputLabel: {
-    fontSize: 12,
-    color: '#adb5bd',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  button: {
-    height: 56,
-    backgroundColor: '#4263eb',
-    borderRadius: 15,
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
-    shadowColor: '#4263eb',
+    marginBottom: 8,
+    shadowColor: '#2b8a3e',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#212529',
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 44,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#868e96',
+    textAlign: 'center',
+    marginBottom: 32,
+    paddingHorizontal: 20,
+    lineHeight: 20,
+  },
+  inputSection: {
+    marginBottom: 24,
+  },
+  inputGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  input: {
+    flex: 1,
+    height: 60,
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: 2,
+    color: '#212529',
+    backgroundColor: 'transparent',
+  },
+  inputError: {
+    borderColor: '#fa5252',
+    backgroundColor: '#fff5f5',
+  },
+  inputSuccess: {
+    borderColor: '#2b8a3e',
+    backgroundColor: '#f0f9f0',
+  },
+  codeHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    gap: 4,
+  },
+  codeHintText: {
+    fontSize: 12,
+    color: '#868e96',
+  },
+  codeHintValid: {
+    color: '#2b8a3e',
+    fontWeight: '600',
+  },
+  button: {
+    borderRadius: 12,
+    marginBottom: 24,
+    overflow: 'hidden',
+    shadowColor: '#2b8a3e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  buttonGradient: {
+    height: 56,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
   },
   buttonDisabled: {
-    backgroundColor: '#adb5bd',
     shadowOpacity: 0,
-  },
-  buttonSuccess: {
-    backgroundColor: '#51cf66',
   },
   buttonText: {
     color: 'white',
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  infoBox: {
-    backgroundColor: '#f1f3f5',
+  buttonTextDisabled: {
+    color: '#868e96',
+  },
+  infoCard: {
+    flexDirection: 'row',
+    padding: 16,
     borderRadius: 12,
-    padding: 20,
-    marginBottom: 30,
+    marginBottom: 24,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#b2f2bb',
+  },
+  infoContent: {
+    flex: 1,
   },
   infoTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
-    marginBottom: 10,
+    color: '#2b8a3e',
+    marginBottom: 8,
   },
-  infoText: {
-    fontSize: 14,
-    color: '#495057',
-    lineHeight: 22,
+  infoBullets: {
+    gap: 6,
   },
-  errorBox: {
+  bulletItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff5f5',
-    borderWidth: 1,
-    borderColor: '#ffc9c9',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
+    gap: 6,
   },
-  errorIcon: {
-    fontSize: 20,
-    marginRight: 10,
+  bulletDot: {
+    fontSize: 14,
+    color: '#2b8a3e',
+  },
+  bulletText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#495057',
+    lineHeight: 18,
+  },
+  messageBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   errorText: {
     flex: 1,
     fontSize: 14,
     color: '#fa5252',
-  },
-  successBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ebfbee',
-    borderWidth: 1,
-    borderColor: '#b2f2bb',
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
-  },
-  successIcon: {
-    fontSize: 20,
-    marginRight: 10,
+    lineHeight: 20,
   },
   successText: {
     flex: 1,
     fontSize: 14,
     color: '#2b8a3e',
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  cancelContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  link: {
+    color: '#868e96',
+    textAlign: 'center',
+    fontSize: 16,
     fontWeight: '500',
   },
 });

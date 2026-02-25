@@ -1,4 +1,4 @@
-// src/screens/PendingVerificationsScreen.tsx - COMPLETE FIXED VERSION
+// src/screens/PendingVerificationsScreen.tsx - UPDATED with clean UI and consistent colors
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -13,6 +13,7 @@ import {
   StatusBar, 
   Image
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../services/AssignmentService'; 
 
@@ -57,10 +58,9 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     try {
       console.log(`Fetching ${filter} submissions for group:`, groupId);
       
-      // Map filter to status parameter
       let statusParam: string | undefined;
       if (filter === 'pending') {
-        statusParam = 'submitted'; // Get all submitted assignments
+        statusParam = 'submitted';
       } else if (filter === 'verified') {
         statusParam = 'verified';
       } else if (filter === 'rejected') {
@@ -77,9 +77,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
       if (result.success) {
         let assignments = result.assignments || result.data?.assignments || [];
         
-        // For pending filter, ONLY show assignments that are:
-        // 1. completed = true (submitted)
-        // 2. verified = null (not yet approved/rejected)
         if (filter === 'pending') {
           assignments = assignments.filter((a: any) => 
             a.completed === true && a.verified === null
@@ -147,11 +144,8 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               
               if (result.success) {
                 Alert.alert('Success', 'Submission approved successfully');
-                // Remove this item from the list immediately
                 setSubmissions(prev => prev.filter(item => item.id !== assignmentId));
-                // Refresh stats
                 fetchStats();
-                // Refresh the list to be safe
                 fetchSubmissions();
               } else {
                 Alert.alert('Error', result.message || 'Failed to approve submission');
@@ -183,11 +177,8 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               
               if (result.success) {
                 Alert.alert('Success', 'Submission rejected');
-                // Remove this item from the list immediately
                 setSubmissions(prev => prev.filter(item => item.id !== assignmentId));
-                // Refresh stats
                 fetchStats();
-                // Refresh the list to be safe
                 fetchSubmissions();
               } else {
                 Alert.alert('Error', result.message || 'Failed to reject submission');
@@ -219,7 +210,12 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     if (!stats) return null;
     
     return (
-      <View style={styles.statsBar}>
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.statsBar}
+      >
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{stats.pendingVerification || 0}</Text>
           <Text style={styles.statLabel}>Pending</Text>
@@ -234,7 +230,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           <Text style={styles.statNumber}>{stats.rejectedAssignments || 0}</Text>
           <Text style={styles.statLabel}>Rejected</Text>
         </View>
-      </View>
+      </LinearGradient>
     );
   };
 
@@ -247,15 +243,20 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
         <MaterialCommunityIcons 
           name="clock-check" 
           size={16} 
-          color={filter === 'pending' ? '#007AFF' : '#868e96'} 
+          color={filter === 'pending' ? '#2b8a3e' : '#868e96'} 
         />
         <Text style={[styles.filterText, filter === 'pending' && styles.activeFilterText]}>
           Pending
         </Text>
         {filter === 'pending' && stats?.pendingVerification > 0 && (
-          <View style={styles.badge}>
+          <LinearGradient
+            colors={['#2b8a3e', '#1e6b2c']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.badge}
+          >
             <Text style={styles.badgeText}>{stats.pendingVerification}</Text>
-          </View>
+          </LinearGradient>
         )}
       </TouchableOpacity>
       
@@ -291,10 +292,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
   const renderSubmissionItem = ({ item }: any) => {
     const isPending = filter === 'pending';
-    const isVerified = filter === 'verified';
-    const isRejected = filter === 'rejected';
-    
-    // IMPORTANT: Only show quick actions for assignments that are actually submitted (completed = true) and not verified
     const isSubmitted = item.completed === true && item.verified === null;
     
     return (
@@ -305,7 +302,12 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
       >
         <View style={styles.cardHeader}>
           <View style={styles.userInfo}>
-            <View style={styles.avatar}>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatar}
+            >
               {item.userAvatar ? (
                 <Image source={{ uri: item.userAvatar }} style={styles.avatarImage} />
               ) : (
@@ -313,7 +315,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
                   {item.userName?.charAt(0) || 'U'}
                 </Text>
               )}
-            </View>
+            </LinearGradient>
             <View style={styles.userDetails}>
               <Text style={styles.userName} numberOfLines={1}>
                 {item.userName}
@@ -327,37 +329,51 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           </View>
           
           {isPending && item.completed === true && item.verified === null && (
-            <View style={styles.pendingBadge}>
-              <MaterialCommunityIcons name="clock" size={12} color="#e67700" />
+            <LinearGradient
+              colors={['#d3f9d8', '#b2f2bb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.pendingBadge}
+            >
+              <MaterialCommunityIcons name="clock" size={12} color="#2b8a3e" />
               <Text style={styles.pendingBadgeText}>Pending</Text>
-            </View>
+            </LinearGradient>
           )}
-          {isPending && item.completed === false && (
-            <View style={styles.notSubmittedBadge}>
-              <MaterialCommunityIcons name="clock-outline" size={12} color="#6c757d" />
-              <Text style={styles.notSubmittedBadgeText}>Not Submitted</Text>
-            </View>
-          )}
-          {isVerified && (
-            <View style={styles.verifiedBadge}>
+          {filter === 'verified' && (
+            <LinearGradient
+              colors={['#d3f9d8', '#b2f2bb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.verifiedBadge}
+            >
               <MaterialCommunityIcons name="check-circle" size={12} color="#2b8a3e" />
               <Text style={styles.verifiedBadgeText}>Verified</Text>
-            </View>
+            </LinearGradient>
           )}
-          {isRejected && (
-            <View style={styles.rejectedBadge}>
+          {filter === 'rejected' && (
+            <LinearGradient
+              colors={['#fff5f5', '#ffe3e3']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.rejectedBadge}
+            >
               <MaterialCommunityIcons name="close-circle" size={12} color="#fa5252" />
               <Text style={styles.rejectedBadgeText}>Rejected</Text>
-            </View>
+            </LinearGradient>
           )}
         </View>
 
-        <View style={styles.taskInfo}>
-          <MaterialCommunityIcons name="format-list-checks" size={16} color="#007AFF" />
+        <LinearGradient
+          colors={['#f8f9fa', '#e9ecef']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.taskInfo}
+        >
+          <MaterialCommunityIcons name="format-list-checks" size={16} color="#495057" />
           <Text style={styles.taskTitle} numberOfLines={2}>
             {item.taskTitle}
           </Text>
-        </View>
+        </LinearGradient>
 
         <View style={styles.detailsRow}>
           <View style={styles.detailItem}>
@@ -367,16 +383,16 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           
           {item.dueDate && (
             <View style={styles.detailItem}>
-              <MaterialCommunityIcons name="calendar" size={14} color="#6c757d" />
+              <MaterialCommunityIcons name="calendar" size={14} color="#868e96" />
               <Text style={styles.detailText}>
-                Due: {item.dueDate.toLocaleDateString()}
+                {item.dueDate.toLocaleDateString()}
               </Text>
             </View>
           )}
 
           {item.timeSlot && (
             <View style={styles.detailItem}>
-              <MaterialCommunityIcons name="clock" size={14} color="#6c757d" />
+              <MaterialCommunityIcons name="clock" size={14} color="#868e96" />
               <Text style={styles.detailText}>
                 {item.timeSlot.startTime} - {item.timeSlot.endTime}
               </Text>
@@ -386,26 +402,40 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
         <View style={styles.evidenceRow}>
           {item.photoUrl ? (
-            <View style={styles.hasPhotoBadge}>
-              <MaterialCommunityIcons name="image" size={14} color="#007AFF" />
-              <Text style={styles.hasPhotoText}>Has Photo</Text>
-            </View>
+            <LinearGradient
+              colors={['#e7f5ff', '#d0ebff']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.hasPhotoBadge}
+            >
+              <MaterialCommunityIcons name="image" size={14} color="#2b8a3e" />
+              <Text style={styles.hasPhotoText}>Photo</Text>
+            </LinearGradient>
           ) : (
-            <View style={styles.noPhotoBadge}>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.noPhotoBadge}
+            >
               <MaterialCommunityIcons name="image-off" size={14} color="#868e96" />
               <Text style={styles.noPhotoText}>No Photo</Text>
-            </View>
+            </LinearGradient>
           )}
           
           {item.notes ? (
-            <View style={styles.hasNotesBadge}>
+            <LinearGradient
+              colors={['#fff3bf', '#ffec99']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.hasNotesBadge}
+            >
               <MaterialCommunityIcons name="note-text" size={14} color="#e67700" />
-              <Text style={styles.hasNotesText}>Has Notes</Text>
-            </View>
+              <Text style={styles.hasNotesText}>Notes</Text>
+            </LinearGradient>
           ) : null}
         </View>
 
-        {/* ONLY SHOW QUICK ACTIONS FOR SUBMITTED ASSIGNMENTS IN PENDING FILTER */}
         {isPending && isSubmitted && (
           <View style={styles.quickActions}>
             <TouchableOpacity
@@ -415,8 +445,15 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
                 handleQuickReject(item.id, item.taskTitle);
               }}
             >
-              <MaterialCommunityIcons name="close" size={16} color="#fa5252" />
-              <Text style={styles.quickRejectText}>Reject</Text>
+              <LinearGradient
+                colors={['#fff5f5', '#ffe3e3']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionGradient}
+              >
+                <MaterialCommunityIcons name="close" size={14} color="#fa5252" />
+                <Text style={styles.quickRejectText}>Reject</Text>
+              </LinearGradient>
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -426,32 +463,49 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
                 handleQuickApprove(item.id, item.taskTitle);
               }}
             >
-              <MaterialCommunityIcons name="check" size={16} color="#2b8a3e" />
-              <Text style={styles.quickApproveText}>Approve</Text>
+              <LinearGradient
+                colors={['#d3f9d8', '#b2f2bb']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionGradient}
+              >
+                <MaterialCommunityIcons name="check" size={14} color="#2b8a3e" />
+                <Text style={styles.quickApproveText}>Approve</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         )}
 
         {item.adminNotes && (
-          <View style={styles.adminNotesPreview}>
-            <MaterialCommunityIcons name="message-text" size={14} color="#6c757d" />
+          <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.adminNotesPreview}
+          >
+            <MaterialCommunityIcons name="message-text" size={14} color="#868e96" />
             <Text style={styles.adminNotesText} numberOfLines={1}>
               {item.adminNotes}
             </Text>
-          </View>
+          </LinearGradient>
         )}
       </TouchableOpacity>
     );
   };
 
   const renderHeader = () => (
-    <View style={styles.header}>
+    <LinearGradient
+      colors={['#ffffff', '#f8f9fa']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.header}
+    >
       <TouchableOpacity 
         onPress={() => navigation.goBack()} 
         style={styles.backButton}
         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
       >
-        <Text style={styles.backButtonText}>←</Text>
+        <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
       </TouchableOpacity>
       
       <View style={styles.titleContainer}>
@@ -470,9 +524,9 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           fetchStats();
         }}
       >
-        <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
+        <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 
   if (!isAdmin) {
@@ -488,18 +542,25 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
       
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading submissions...</Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#dc3545" />
+          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={() => fetchSubmissions()}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       ) : (
@@ -514,7 +575,8 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
                 fetchSubmissions(true);
                 fetchStats();
               }}
-              colors={['#007AFF']}
+              colors={['#2b8a3e']}
+              tintColor="#2b8a3e"
             />
           }
           ListEmptyComponent={
@@ -558,21 +620,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
     minHeight: 56,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
-    alignItems: 'center'
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#007AFF',
-    fontWeight: '400'
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   titleContainer: {
     flex: 1,
@@ -581,26 +644,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212529',
     textAlign: 'center'
   },
   subtitle: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#868e96',
     marginTop: 2,
     textAlign: 'center'
   },
   refreshButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   statsBar: {
     flexDirection: 'row',
-    backgroundColor: 'white',
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderBottomWidth: 1,
@@ -618,7 +687,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: '#6c757d'
+    color: '#868e96'
   },
   statDivider: {
     width: 1,
@@ -627,11 +696,11 @@ const styles = StyleSheet.create({
   filterContainer: {
     flexDirection: 'row',
     backgroundColor: 'white',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
-    flexWrap: 'wrap',
+    gap: 8,
   },
   filterTab: {
     flexDirection: 'row',
@@ -639,13 +708,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 4,
     backgroundColor: '#f8f9fa',
-    gap: 4,
+    gap: 6,
+    flex: 1,
+    justifyContent: 'center',
   },
   activeFilterTab: {
-    backgroundColor: '#e7f5ff'
+    backgroundColor: '#e8f5e9',
+    borderWidth: 1,
+    borderColor: '#2b8a3e',
   },
   filterText: {
     fontSize: 13,
@@ -653,14 +724,13 @@ const styles = StyleSheet.create({
     color: '#868e96'
   },
   activeFilterText: {
-    color: '#007AFF'
+    color: '#2b8a3e'
   },
   badge: {
-    backgroundColor: '#007AFF',
     borderRadius: 12,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    marginLeft: 2
+    marginLeft: 4
   },
   badgeText: {
     color: 'white',
@@ -674,7 +744,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#6c757d',
+    color: '#868e96',
     fontSize: 14
   },
   errorContainer: {
@@ -684,17 +754,19 @@ const styles = StyleSheet.create({
     padding: 20
   },
   errorText: {
-    color: '#dc3545',
+    color: '#fa5252',
     textAlign: 'center',
     marginBottom: 16,
     fontSize: 16,
     marginTop: 12
   },
   retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  retryButtonGradient: {
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8
+    paddingVertical: 12
   },
   retryButtonText: {
     color: 'white',
@@ -711,11 +783,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20
   },
   emptyText: {
-    fontSize: 18,
-    color: '#6c757d',
+    fontSize: 16,
+    color: '#868e96',
     marginBottom: 8,
     marginTop: 16,
-    textAlign: 'center'
+    textAlign: 'center',
+    fontWeight: '600'
   },
   emptySubtext: {
     fontSize: 14,
@@ -725,111 +798,95 @@ const styles = StyleSheet.create({
   },
   submissionCard: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1
+    shadowRadius: 8,
+    elevation: 2,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 12
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1
+    flex: 1,
+    gap: 12
   },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12
+    borderWidth: 1,
+    borderColor: '#e9ecef'
   },
   avatarImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
   avatarText: {
-    color: 'white',
+    color: '#495057',
     fontSize: 16,
-    fontWeight: 'bold'
+    fontWeight: '600'
   },
   userDetails: {
     flex: 1
   },
   userName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#212529',
     marginBottom: 2
   },
   submissionTime: {
     fontSize: 12,
-    color: '#6c757d'
+    color: '#868e96'
   },
   pendingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3bf',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4
   },
   pendingBadgeText: {
-    fontSize: 12,
-    color: '#e67700',
-    fontWeight: '600'
-  },
-  notSubmittedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f3f5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4
-  },
-  notSubmittedBadgeText: {
-    fontSize: 12,
-    color: '#6c757d',
+    fontSize: 11,
+    color: '#2b8a3e',
     fontWeight: '600'
   },
   verifiedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#d3f9d8',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4
   },
   verifiedBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#2b8a3e',
     fontWeight: '600'
   },
   rejectedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffc9c9',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4
   },
   rejectedBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#fa5252',
     fontWeight: '600'
   },
@@ -838,15 +895,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     marginBottom: 12,
-    backgroundColor: '#f8f9fa',
     padding: 12,
-    borderRadius: 8
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
   },
   taskTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '500',
     color: '#212529',
-    flex: 1
+    flex: 1,
+    lineHeight: 20
   },
   detailsRow: {
     flexDirection: 'row',
@@ -857,10 +916,14 @@ const styles = StyleSheet.create({
   detailItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4
+    gap: 4,
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   detailText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#495057'
   },
   evidenceRow: {
@@ -874,91 +937,91 @@ const styles = StyleSheet.create({
   hasPhotoBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e7f5ff',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4
   },
   hasPhotoText: {
-    fontSize: 12,
-    color: '#007AFF'
+    fontSize: 11,
+    color: '#2b8a3e',
+    fontWeight: '500'
   },
   noPhotoBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f3f5',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4
   },
   noPhotoText: {
-    fontSize: 12,
-    color: '#868e96'
+    fontSize: 11,
+    color: '#868e96',
+    fontWeight: '500'
   },
   hasNotesBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3bf',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     gap: 4
   },
   hasNotesText: {
-    fontSize: 12,
-    color: '#e67700'
+    fontSize: 11,
+    color: '#e67700',
+    fontWeight: '500'
   },
   quickActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 12,
+    gap: 8,
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#f1f3f5'
   },
   quickRejectButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    flex: 1,
+  },
+  quickApproveButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    flex: 1,
+  },
+  quickActionGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    justifyContent: 'center',
     paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#fff5f5',
-    gap: 6
+    gap: 4,
   },
   quickRejectText: {
     color: '#fa5252',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600'
-  },
-  quickApproveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#d3f9d8',
-    gap: 6
   },
   quickApproveText: {
     color: '#2b8a3e',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600'
   },
   adminNotesPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
     padding: 8,
-    borderRadius: 6,
+    borderRadius: 8,
     marginTop: 8,
-    gap: 6
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
   },
   adminNotesText: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#868e96',
     flex: 1,
     fontStyle: 'italic'
   }

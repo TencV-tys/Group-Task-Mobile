@@ -1,3 +1,4 @@
+// src/screens/GroupMembersScreen.tsx - UPDATED with clean UI and consistent colors
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -16,6 +17,7 @@ import {
   TextInput,
   Image
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { GroupMembersService } from '../services/GroupMemberService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -138,47 +140,54 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     setShowEditModal(true);
   };
 
-  const handleSaveGroupChanges = async () => {
-    // Validate input
-    if (!editingGroup.name.trim()) {
-      Alert.alert('Error', 'Group name is required');
+ const handleSaveGroupChanges = async () => {
+  // Validate input
+  if (!editingGroup.name.trim()) {
+    Alert.alert('Error', 'Group name is required');
+    return;
+  }
+
+  try {
+    setSavingGroup(true);
+    
+    // Check if group data has actually changed
+    const hasChanged = 
+      editingGroup.name.trim() !== (groupInfo?.name || '') ||
+      editingGroup.description !== (groupInfo?.description || '');
+
+    if (!hasChanged) {
+      Alert.alert('Info', 'No changes detected');
+      setShowEditModal(false);
       return;
     }
 
-    try {
-      setSavingGroup(true);
-      
-      // Check if group data has actually changed
-      const hasChanged = 
-        editingGroup.name.trim() !== (groupInfo?.name || '') ||
-        editingGroup.description !== (groupInfo?.description || '');
-
-      if (!hasChanged) {
-        Alert.alert('Info', 'No changes detected');
-        setShowEditModal(false);
-        return;
-      }
-
-      // Call the updateGroup method
-      const result = await GroupMembersService.updateGroup(groupId, {
+    // Call the updateGroup method
+    const result = await GroupMembersService.updateGroup(groupId, {
+      name: editingGroup.name.trim(),
+      description: editingGroup.description.trim()
+    });
+    
+    if (result.success) {
+      // ✅ FIX: Pass both groupId and updated group data
+      updateGroupInfo(groupId, {
+        ...groupInfo,
+        ...result.group,
         name: editingGroup.name.trim(),
         description: editingGroup.description.trim()
       });
       
-      if (result.success) {
-        updateGroupInfo(result.group);
-        Alert.alert('Success', 'Group updated successfully');
-        setShowEditModal(false);
-        fetchData(true); // Refresh data to get updated group info
-      } else {
-        Alert.alert('Error', result.message || 'Failed to update group');
-      }
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update group');
-    } finally {
-      setSavingGroup(false);
+      Alert.alert('Success', 'Group updated successfully');
+      setShowEditModal(false);
+      fetchData(true); // Refresh data to get updated group info
+    } else {
+      Alert.alert('Error', result.message || 'Failed to update group');
     }
-  };
+  } catch (err: any) {
+    Alert.alert('Error', err.message || 'Failed to update group');
+  } finally {
+    setSavingGroup(false);
+  }
+};
 
   // Handle group avatar selection
   const handleGroupAvatarSelect = async () => {
@@ -476,9 +485,14 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       const remaining = members.length - 6;
       return (
         <View style={[styles.avatarContainer, { left: index * (avatarSize + overlap) }]}>
-          <View style={[styles.avatar, styles.moreAvatar]}>
+          <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.avatar, styles.moreAvatar]}
+          >
             <Text style={styles.moreAvatarText}>+{remaining}</Text>
-          </View>
+          </LinearGradient>
         </View>
       );
     }
@@ -496,27 +510,37 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 height: avatarSize, 
                 borderRadius: avatarSize / 2,
                 borderWidth: 2,
-                borderColor: member.role === 'ADMIN' ? '#FFD700' : '#fff'
+                borderColor: member.role === 'ADMIN' ? '#2b8a3e' : '#e9ecef'
               }
             ]}
           />
         ) : (
-          <View style={[
-            styles.avatar,
-            { 
-              backgroundColor: member.role === 'ADMIN' ? '#007AFF' : '#6c757d',
-              borderWidth: 2,
-              borderColor: member.role === 'ADMIN' ? '#FFD700' : '#fff'
-            }
-          ]}>
-            <Text style={styles.avatarText}>
+          <LinearGradient
+            colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[
+              styles.avatar,
+              { 
+                width: avatarSize, 
+                height: avatarSize, 
+                borderRadius: avatarSize / 2,
+                borderWidth: 2,
+                borderColor: member.role === 'ADMIN' ? '#2b8a3e' : '#e9ecef'
+              }
+            ]}
+          >
+            <Text style={[
+              styles.avatarText,
+              { color: member.role === 'ADMIN' ? 'white' : '#495057' }
+            ]}>
               {member.fullName?.charAt(0)?.toUpperCase() || 'U'}
             </Text>
-          </View>
+          </LinearGradient>
         )}
         {member.role === 'ADMIN' && (
           <View style={styles.adminCrown}>
-            <MaterialCommunityIcons name="crown" size={12} color="#FFD700" />
+            <MaterialCommunityIcons name="crown" size={10} color="#2b8a3e" />
           </View>
         )}
       </View>
@@ -540,19 +564,27 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 styles.memberAvatarImage,
                 { 
                   borderWidth: 2,
-                  borderColor: item.role === 'ADMIN' ? '#FFD700' : '#e9ecef'
+                  borderColor: item.role === 'ADMIN' ? '#2b8a3e' : '#e9ecef'
                 }
               ]}
             />
           ) : (
-            <View style={[
-              styles.memberAvatar,
-              { backgroundColor: item.role === 'ADMIN' ? '#007AFF' : '#6c757d' }
-            ]}>
-              <Text style={styles.memberAvatarText}>
+            <LinearGradient
+              colors={item.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[
+                styles.memberAvatar,
+                { borderWidth: 2, borderColor: item.role === 'ADMIN' ? '#2b8a3e' : '#e9ecef' }
+              ]}
+            >
+              <Text style={[
+                styles.memberAvatarText,
+                { color: item.role === 'ADMIN' ? 'white' : '#495057' }
+              ]}>
                 {item.fullName?.charAt(0)?.toUpperCase() || 'U'}
               </Text>
-            </View>
+            </LinearGradient>
           )}
           <View style={styles.memberDetails}>
             <View style={styles.memberHeader}>
@@ -560,10 +592,15 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 {item.fullName} {isCurrentUser && '(You)'}
               </Text>
               {item.role === 'ADMIN' && (
-                <View style={styles.adminBadge}>
-                  <MaterialCommunityIcons name="crown" size={14} color="#FFD700" />
+                <LinearGradient
+                  colors={['#d3f9d8', '#b2f2bb']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.adminBadge}
+                >
+                  <MaterialCommunityIcons name="crown" size={12} color="#2b8a3e" />
                   <Text style={styles.adminBadgeText}>Admin</Text>
-                </View>
+                </LinearGradient>
               )}
             </View>
             {item.email && (
@@ -590,7 +627,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 <MaterialCommunityIcons 
                   name={item.role === 'ADMIN' ? 'account-arrow-down' : 'account-arrow-up'} 
                   size={16} 
-                  color={item.role === 'ADMIN' ? '#fa5252' : '#1864ab'} 
+                  color={item.role === 'ADMIN' ? '#fa5252' : '#2b8a3e'} 
                 />
               </TouchableOpacity>
             )}
@@ -605,17 +642,27 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             )}
             
             {isOnlyAdmin && (
-              <View style={styles.protectedBadge}>
+              <LinearGradient
+                colors={['#fff3bf', '#ffec99']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.protectedBadge}
+              >
                 <MaterialCommunityIcons name="shield-check" size={14} color="#e67700" />
-              </View>
+              </LinearGradient>
             )}
           </View>
         )}
 
         {isCurrentUser && (
-          <View style={styles.currentUserBadge}>
+          <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.currentUserBadge}
+          >
             <Text style={styles.currentUserBadgeText}>You</Text>
-          </View>
+          </LinearGradient>
         )}
       </View>
     );
@@ -625,7 +672,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading group...</Text>
         </View>
       </SafeAreaView>
@@ -640,37 +687,49 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#000" />
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Group Info</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => fetchData(true)} style={styles.headerIcon}>
-            <MaterialCommunityIcons name="refresh" size={24} color="#007AFF" />
+            <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
           </TouchableOpacity>
           {currentUserRole === 'ADMIN' && (
             <TouchableOpacity 
               onPress={() => setShowSettingsModal(true)} 
               style={styles.headerIcon}
             >
-              <MaterialCommunityIcons name="cog" size={24} color="#007AFF" />
+              <MaterialCommunityIcons name="cog" size={20} color="#495057" />
             </TouchableOpacity>
           )}
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => fetchData(true)}
-            colors={['#007AFF']}
+            colors={['#2b8a3e']}
+            tintColor="#2b8a3e"
           />
         }
+        showsVerticalScrollIndicator={false}
       >
         {/* Group Avatar Banner */}
-        <View style={styles.avatarBanner}>
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.avatarBanner}
+        >
           <View style={styles.avatarCircleContainer}>
             {members.slice(0, 7).map((member, index) => renderAvatar(member, index))}
           </View>
@@ -680,11 +739,12 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             onPress={() => currentUserRole === 'ADMIN' && handleGroupAvatarSelect()}
             disabled={currentUserRole !== 'ADMIN'}
             style={styles.groupInfoContainer}
+            activeOpacity={0.7}
           >
             <View style={styles.groupAvatarContainer}>
               {uploadingAvatar ? (
                 <View style={[styles.groupMainAvatar, styles.uploadingAvatar]}>
-                  <ActivityIndicator size="small" color="#007AFF" />
+                  <ActivityIndicator size="small" color="#2b8a3e" />
                 </View>
               ) : groupInfo?.avatarUrl ? (
                 <Image
@@ -692,21 +752,27 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                   style={[styles.groupMainAvatar, styles.groupAvatarImage]}
                 />
               ) : (
-                <View style={styles.groupMainAvatar}>
+                <LinearGradient
+                  colors={['#2b8a3e', '#1e6b2c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.groupMainAvatar}
+                >
                   <Text style={styles.groupAvatarText}>
                     {groupInfo?.name?.charAt(0) || groupName?.charAt(0) || 'G'}
                   </Text>
-                </View>
+                </LinearGradient>
               )}
               
               {currentUserRole === 'ADMIN' && !uploadingAvatar && (
-                <View style={styles.editAvatarIcon}>
-                  <MaterialCommunityIcons 
-                    name="camera-plus" 
-                    size={18} 
-                    color="#fff" 
-                  />
-                </View>
+                <LinearGradient
+                  colors={['#2b8a3e', '#1e6b2c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.editAvatarIcon}
+                >
+                  <MaterialCommunityIcons name="camera-plus" size={14} color="white" />
+                </LinearGradient>
               )}
             </View>
             
@@ -717,11 +783,11 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               )}
               <View style={styles.groupStats}>
                 <View style={styles.statItem}>
-                  <MaterialCommunityIcons name="account-group" size={16} color="#6c757d" />
+                  <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
                   <Text style={styles.statText}>{members.length} members</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <MaterialCommunityIcons name="crown" size={16} color="#FFD700" />
+                  <MaterialCommunityIcons name="crown" size={14} color="#2b8a3e" />
                   <Text style={styles.statText}>{adminCount} admins</Text>
                 </View>
               </View>
@@ -731,24 +797,53 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           {/* Admin Actions */}
           {currentUserRole === 'ADMIN' && (
             <View style={styles.adminActions}>
-              <TouchableOpacity style={styles.adminButton} onPress={handleEditGroup}>
-                <MaterialCommunityIcons name="pencil" size={20} color="#007AFF" />
-                <Text style={styles.adminButtonText}>Edit Group</Text>
+              <TouchableOpacity 
+                style={[styles.adminButton, styles.editButton]} 
+                onPress={handleEditGroup}
+                activeOpacity={0.7}
+              >
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.adminButtonGradient}
+                >
+                  <MaterialCommunityIcons name="pencil" size={16} color="#495057" />
+                  <Text style={styles.adminButtonText}>Edit</Text>
+                </LinearGradient>
               </TouchableOpacity>
               
-              <TouchableOpacity style={styles.adminButton} onPress={handleShareInvite}>
-                <MaterialCommunityIcons name="share-variant" size={20} color="#34c759" />
-                <Text style={styles.adminButtonText}>Share</Text>
+              <TouchableOpacity 
+                style={[styles.adminButton, styles.shareButton]} 
+                onPress={handleShareInvite}
+                activeOpacity={0.7}
+              >
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.adminButtonGradient}
+                >
+                  <MaterialCommunityIcons name="share-variant" size={16} color="#495057" />
+                  <Text style={styles.adminButtonText}>Share</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           )}
-        </View>
+        </LinearGradient>
 
         {/* Invite Code Section - Only show to admins */}
         {canSeeInviteCode && inviteCodeToShow && (
           <View style={styles.inviteSection}>
             <View style={styles.sectionHeader}>
-              <MaterialCommunityIcons name="qrcode" size={20} color="#007AFF" />
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.sectionIcon}
+              >
+                <MaterialCommunityIcons name="qrcode" size={14} color="#495057" />
+              </LinearGradient>
               <Text style={styles.sectionTitle}>Invite Code</Text>
             </View>
             
@@ -756,16 +851,15 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               style={styles.inviteCodeCard}
               onPress={() => {
                 Alert.alert('Invite Code', inviteCodeToShow, [
-                  { text: 'Copy', onPress: () => {
-                    // Copy to clipboard
-                  }},
+                  { text: 'Copy', onPress: () => {/* Copy to clipboard */} },
                   { text: 'Share', onPress: handleShareInvite },
-                  { text: 'OK', style: 'cancel' }
+                  { text: 'Cancel', style: 'cancel' }
                 ]);
               }}
+              activeOpacity={0.7}
             >
               <Text style={styles.inviteCode}>{inviteCodeToShow}</Text>
-              <MaterialCommunityIcons name="content-copy" size={20} color="#007AFF" />
+              <MaterialCommunityIcons name="content-copy" size={18} color="#495057" />
             </TouchableOpacity>
             
             <Text style={styles.inviteInstructions}>
@@ -776,9 +870,17 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               <TouchableOpacity 
                 style={styles.regenerateButton}
                 onPress={handleRegenerateInviteCode}
+                activeOpacity={0.7}
               >
-                <MaterialCommunityIcons name="refresh" size={16} color="#e67700" />
-                <Text style={styles.regenerateButtonText}>Regenerate Code</Text>
+                <LinearGradient
+                  colors={['#fff3bf', '#ffec99']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.regenerateButtonGradient}
+                >
+                  <MaterialCommunityIcons name="refresh" size={14} color="#e67700" />
+                  <Text style={styles.regenerateButtonText}>Regenerate</Text>
+                </LinearGradient>
               </TouchableOpacity>
             )}
           </View>
@@ -786,33 +888,52 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
         {/* Admin Warning */}
         {isOnlyAdmin && (
-          <View style={styles.warningSection}>
-            <MaterialCommunityIcons name="alert-circle" size={24} color="#e67700" />
+          <LinearGradient
+            colors={['#fff3bf', '#ffec99']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.warningSection}
+          >
+            <MaterialCommunityIcons name="alert-circle" size={20} color="#e67700" />
             <View style={styles.warningContent}>
               <Text style={styles.warningTitle}>You are the only admin</Text>
               <Text style={styles.warningText}>
-                Transfer ownership to another member before leaving the group.
+                Transfer ownership before leaving
               </Text>
             </View>
-          </View>
+          </LinearGradient>
         )}
 
         {/* Members List */}
         <View style={styles.membersSection}>
           <View style={styles.sectionHeader}>
-            <MaterialCommunityIcons name="account-multiple" size={20} color="#007AFF" />
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.sectionIcon}
+            >
+              <MaterialCommunityIcons name="account-multiple" size={14} color="#495057" />
+            </LinearGradient>
             <Text style={styles.sectionTitle}>Members ({members.length})</Text>
           </View>
 
           {error ? (
             <View style={styles.errorContainer}>
-              <MaterialCommunityIcons name="alert-circle" size={48} color="#dc3545" />
+              <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity
                 style={styles.retryButton}
                 onPress={() => fetchData()}
               >
-                <Text style={styles.retryButtonText}>Retry</Text>
+                <LinearGradient
+                  colors={['#2b8a3e', '#1e6b2c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.retryButtonGradient}
+                >
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           ) : (
@@ -823,7 +944,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               scrollEnabled={false}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <MaterialCommunityIcons name="account-group" size={48} color="#adb5bd" />
+                  <MaterialCommunityIcons name="account-group" size={48} color="#dee2e6" />
                   <Text style={styles.emptyText}>No members found</Text>
                 </View>
               }
@@ -839,18 +960,26 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           ]}
           onPress={handleLeaveGroup}
           disabled={isOnlyAdmin}
+          activeOpacity={0.7}
         >
-          <MaterialCommunityIcons 
-            name="exit-to-app" 
-            size={20} 
-            color={isOnlyAdmin ? "#adb5bd" : "#fa5252"} 
-          />
-          <Text style={[
-            styles.leaveButtonText,
-            isOnlyAdmin && styles.disabledLeaveButtonText
-          ]}>
-            {isOnlyAdmin ? 'Cannot Leave (Only Admin)' : 'Leave Group'}
-          </Text>
+          <LinearGradient
+            colors={isOnlyAdmin ? ['#f8f9fa', '#e9ecef'] : ['#fff5f5', '#ffe3e3']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.leaveButtonGradient}
+          >
+            <MaterialCommunityIcons 
+              name="exit-to-app" 
+              size={18} 
+              color={isOnlyAdmin ? "#adb5bd" : "#fa5252"} 
+            />
+            <Text style={[
+              styles.leaveButtonText,
+              isOnlyAdmin && styles.disabledLeaveButtonText
+            ]}>
+              {isOnlyAdmin ? 'Cannot Leave' : 'Leave Group'}
+            </Text>
+          </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
 
@@ -862,15 +991,20 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         onRequestClose={() => setShowSettingsModal(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <LinearGradient
+            colors={['#ffffff', '#f8f9fa']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.modalContent}
+          >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Group Settings</Text>
-              <TouchableOpacity onPress={() => setShowSettingsModal(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#000" />
+              <TouchableOpacity onPress={() => setShowSettingsModal(false)} style={styles.closeButton}>
+                <MaterialCommunityIcons name="close" size={20} color="#868e96" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               {/* Transfer Ownership */}
               <TouchableOpacity 
                 style={styles.settingsItem}
@@ -878,17 +1012,23 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                   setShowSettingsModal(false);
                   handleTransferOwnership();
                 }}
+                activeOpacity={0.7}
               >
-                <View style={[styles.settingsIcon, { backgroundColor: '#EEF2FF' }]}>
-                  <MaterialCommunityIcons name="swap-horizontal" size={20} color="#4F46E5" />
-                </View>
+                <LinearGradient
+                  colors={['#EEF2FF', '#dbe4ff']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.settingsIcon}
+                >
+                  <MaterialCommunityIcons name="swap-horizontal" size={18} color="#4F46E5" />
+                </LinearGradient>
                 <View style={styles.settingsContent}>
                   <Text style={styles.settingsTitle}>Transfer Ownership</Text>
                   <Text style={styles.settingsDescription}>
-                    Make another member the group admin
+                    Make another member admin
                   </Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
               </TouchableOpacity>
 
               {/* Regenerate Invite Code */}
@@ -898,17 +1038,23 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                   setShowSettingsModal(false);
                   handleRegenerateInviteCode();
                 }}
+                activeOpacity={0.7}
               >
-                <View style={[styles.settingsIcon, { backgroundColor: '#FEF3C7' }]}>
-                  <MaterialCommunityIcons name="refresh" size={20} color="#F59E0B" />
-                </View>
+                <LinearGradient
+                  colors={['#fff3bf', '#ffec99']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.settingsIcon}
+                >
+                  <MaterialCommunityIcons name="refresh" size={18} color="#e67700" />
+                </LinearGradient>
                 <View style={styles.settingsContent}>
-                  <Text style={styles.settingsTitle}>Regenerate Invite Code</Text>
+                  <Text style={styles.settingsTitle}>Regenerate Code</Text>
                   <Text style={styles.settingsDescription}>
-                    Create a new invite code (old one stops working)
+                    Create new invite code
                   </Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color="#9CA3AF" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
               </TouchableOpacity>
 
               {/* Delete Group - Danger */}
@@ -918,17 +1064,23 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                   setShowSettingsModal(false);
                   handleDeleteGroup();
                 }}
+                activeOpacity={0.7}
               >
-                <View style={[styles.settingsIcon, { backgroundColor: '#FEE2E2' }]}>
-                  <MaterialCommunityIcons name="trash-can" size={20} color="#EF4444" />
-                </View>
+                <LinearGradient
+                  colors={['#fff5f5', '#ffe3e3']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.settingsIcon}
+                >
+                  <MaterialCommunityIcons name="trash-can" size={18} color="#fa5252" />
+                </LinearGradient>
                 <View style={styles.settingsContent}>
                   <Text style={[styles.settingsTitle, styles.dangerText]}>Delete Group</Text>
                   <Text style={styles.settingsDescription}>
-                    Permanently delete this group and all tasks
+                    Permanently delete group
                   </Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color="#EF4444" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#fa5252" />
               </TouchableOpacity>
             </ScrollView>
 
@@ -938,7 +1090,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             >
               <Text style={styles.modalCloseText}>Close</Text>
             </TouchableOpacity>
-          </View>
+          </LinearGradient>
         </View>
       </Modal>
 
@@ -950,17 +1102,20 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         onRequestClose={() => setShowEditModal(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <LinearGradient
+            colors={['#ffffff', '#f8f9fa']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.modalContent}
+          >
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                Edit {editingGroup.name.trim() || groupInfo?.name || 'Group'}
-              </Text>
-              <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                <MaterialCommunityIcons name="close" size={24} color="#000" />
+              <Text style={styles.modalTitle}>Edit Group</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)} style={styles.closeButton}>
+                <MaterialCommunityIcons name="close" size={20} color="#868e96" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody}>
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               {/* Group Avatar Edit Section */}
               <View style={styles.avatarEditSection}>
                 <TouchableOpacity 
@@ -969,10 +1124,11 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                     setTimeout(() => handleGroupAvatarSelect(), 300);
                   }}
                   disabled={uploadingAvatar}
+                  activeOpacity={0.7}
                 >
                   {uploadingAvatar ? (
                     <View style={[styles.editAvatar, styles.uploadingAvatar]}>
-                      <ActivityIndicator size="small" color="#007AFF" />
+                      <ActivityIndicator size="small" color="#2b8a3e" />
                     </View>
                   ) : groupInfo?.avatarUrl ? (
                     <Image
@@ -980,15 +1136,25 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                       style={[styles.editAvatar, styles.editAvatarImage]}
                     />
                   ) : (
-                    <View style={styles.editAvatar}>
-                      <MaterialCommunityIcons name="camera-plus" size={32} color="#fff" />
-                    </View>
+                    <LinearGradient
+                      colors={['#2b8a3e', '#1e6b2c']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.editAvatar}
+                    >
+                      <MaterialCommunityIcons name="camera-plus" size={28} color="white" />
+                    </LinearGradient>
                   )}
                   
                   {!uploadingAvatar && (
-                    <View style={styles.editAvatarOverlay}>
-                      <MaterialCommunityIcons name="pencil" size={16} color="#fff" />
-                    </View>
+                    <LinearGradient
+                      colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.7)']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.editAvatarOverlay}
+                    >
+                      <MaterialCommunityIcons name="pencil" size={14} color="white" />
+                    </LinearGradient>
                   )}
                 </TouchableOpacity>
                 <Text style={styles.avatarNote}>
@@ -1003,7 +1169,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                       setTimeout(() => handleRemoveGroupAvatar(), 300);
                     }}
                   >
-                    <MaterialCommunityIcons name="trash-can" size={16} color="#fa5252" />
+                    <MaterialCommunityIcons name="trash-can" size={14} color="#fa5252" />
                     <Text style={styles.removeAvatarText}>Remove Avatar</Text>
                   </TouchableOpacity>
                 )}
@@ -1012,38 +1178,60 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               {/* Name Field */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Group Name</Text>
-                <TextInput
-                  style={styles.input}
-                  value={editingGroup.name}
-                  onChangeText={(text) => setEditingGroup({...editingGroup, name: text})}
-                  placeholder="Enter group name"
-                  maxLength={100}
-                />
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.inputGradient}
+                >
+                  <TextInput
+                    style={styles.input}
+                    value={editingGroup.name}
+                    onChangeText={(text) => setEditingGroup({...editingGroup, name: text})}
+                    placeholder="Enter group name"
+                    placeholderTextColor="#adb5bd"
+                    maxLength={100}
+                  />
+                </LinearGradient>
               </View>
 
               {/* Description Field */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Description</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={editingGroup.description}
-                  onChangeText={(text) => setEditingGroup({...editingGroup, description: text})}
-                  placeholder="Enter group description"
-                  multiline
-                  numberOfLines={3}
-                  maxLength={500}
-                />
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.inputGradient, styles.textAreaGradient]}
+                >
+                  <TextInput
+                    style={[styles.input, styles.textArea]}
+                    value={editingGroup.description}
+                    onChangeText={(text) => setEditingGroup({...editingGroup, description: text})}
+                    placeholder="Enter group description"
+                    placeholderTextColor="#adb5bd"
+                    multiline
+                    numberOfLines={3}
+                    maxLength={500}
+                    textAlignVertical="top"
+                  />
+                </LinearGradient>
                 <Text style={styles.charCount}>
-                  {editingGroup.description.length}/500 characters
+                  {editingGroup.description.length}/500
                 </Text>
               </View>
 
-              <View style={styles.infoBox}>
-                <MaterialCommunityIcons name="information" size={16} color="#6c757d" />
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.infoBox}
+              >
+                <MaterialCommunityIcons name="information" size={14} color="#868e96" />
                 <Text style={styles.infoText}>
-                  Group names and descriptions help members understand the purpose of the group.
+                  Group name helps members identify the group
                 </Text>
-              </View>
+              </LinearGradient>
             </ScrollView>
 
             <View style={styles.modalFooter}>
@@ -1053,6 +1241,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
+              
               <TouchableOpacity 
                 style={[
                   styles.saveButton,
@@ -1060,15 +1249,28 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 ]}
                 onPress={handleSaveGroupChanges}
                 disabled={!editingGroup.name.trim() || savingGroup}
+                activeOpacity={0.7}
               >
-                {savingGroup ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
-                )}
+                <LinearGradient
+                  colors={editingGroup.name.trim() ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.saveButtonGradient}
+                >
+                  {savingGroup ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <Text style={[
+                      styles.saveButtonText,
+                      !editingGroup.name.trim() && styles.saveButtonTextDisabled
+                    ]}>
+                      Save
+                    </Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
+          </LinearGradient>
         </View>
       </Modal>
     </SafeAreaView>
@@ -1078,7 +1280,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff'
+    backgroundColor: '#f8f9fa'
   },
   loadingContainer: {
     flex: 1,
@@ -1087,8 +1289,8 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#6c757d',
-    fontSize: 16
+    color: '#868e96',
+    fontSize: 14
   },
   header: {
     flexDirection: 'row',
@@ -1096,26 +1298,47 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0'
+    borderBottomColor: '#e9ecef'
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000'
+    fontWeight: '600',
+    color: '#212529'
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12
+    gap: 8
   },
   headerIcon: {
-    padding: 4
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2
   },
   avatarBanner: {
     padding: 20,
-    backgroundColor: '#f8f9fa',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef'
   },
@@ -1136,59 +1359,60 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff'
+    borderColor: 'white'
   },
   avatarImage: {
     backgroundColor: 'transparent',
   },
   moreAvatar: {
-    backgroundColor: '#6c757d'
+    borderColor: '#e9ecef'
   },
   moreAvatarText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14
+    color: '#495057',
+    fontWeight: '600',
+    fontSize: 13
   },
   avatarText: {
-    color: '#fff',
     fontWeight: 'bold',
-    fontSize: 18
+    fontSize: 16
   },
   adminCrown: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 2,
+    top: -4,
+    right: -4,
+    backgroundColor: 'white',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#FFD700'
+    borderColor: '#2b8a3e'
   },
   groupInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20
+    marginBottom: 16
   },
   groupAvatarContainer: {
     position: 'relative',
     marginRight: 16
   },
   groupMainAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#007AFF',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center'
   },
   groupAvatarImage: {
     backgroundColor: 'transparent',
-    borderWidth: 3,
-    borderColor: '#007AFF'
+    borderWidth: 2,
+    borderColor: '#2b8a3e'
   },
   groupAvatarText: {
-    color: '#fff',
-    fontSize: 32,
+    color: 'white',
+    fontSize: 24,
     fontWeight: 'bold'
   },
   uploadingAvatar: {
@@ -1198,31 +1422,30 @@ const styles = StyleSheet.create({
   },
   editAvatarIcon: {
     position: 'absolute',
-    bottom: 5,
-    right: 5,
-    backgroundColor: '#007AFF',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff'
+    borderColor: 'white'
   },
   groupTextInfo: {
     flex: 1
   },
   groupName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#000',
+    color: '#212529',
     marginBottom: 4
   },
   groupDescription: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 14,
+    color: '#868e96',
     marginBottom: 8,
-    lineHeight: 22
+    lineHeight: 20
   },
   groupStats: {
     flexDirection: 'row',
@@ -1234,8 +1457,8 @@ const styles = StyleSheet.create({
     gap: 4
   },
   statText: {
-    fontSize: 14,
-    color: '#6c757d'
+    fontSize: 13,
+    color: '#495057'
   },
   adminActions: {
     flexDirection: 'row',
@@ -1243,26 +1466,35 @@ const styles = StyleSheet.create({
   },
   adminButton: {
     flex: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  adminButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#fff',
+    gap: 6,
+    paddingVertical: 10,
     borderWidth: 1,
     borderColor: '#e9ecef'
   },
   adminButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF'
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#495057'
   },
+  editButton: {},
+  shareButton: {},
   inviteSection: {
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0'
+    borderBottomColor: '#e9ecef'
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -1270,46 +1502,56 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12
   },
+  sectionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000'
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#212529'
   },
   inviteCodeCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#e7f5ff',
+    backgroundColor: '#f8f9fa',
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#a5d8ff'
+    borderColor: '#e9ecef'
   },
   inviteCode: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#212529',
     letterSpacing: 2
   },
   inviteInstructions: {
-    fontSize: 14,
-    color: '#6c757d',
+    fontSize: 13,
+    color: '#868e96',
     marginBottom: 12
   },
   regenerateButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    alignSelf: 'flex-start'
+  },
+  regenerateButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
-    backgroundColor: '#fff3bf',
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderWidth: 1,
     borderColor: '#ffd43b'
   },
   regenerateButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#e67700'
   },
@@ -1317,25 +1559,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#fff3bf',
-    borderWidth: 1,
-    borderColor: '#ffd43b',
     marginHorizontal: 20,
     marginTop: 20,
     borderRadius: 12,
-    gap: 12
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#ffd43b'
   },
   warningContent: {
     flex: 1
   },
   warningTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#e67700',
-    marginBottom: 4
+    marginBottom: 2
   },
   warningText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#e67700'
   },
   membersSection: {
@@ -1346,27 +1587,29 @@ const styles = StyleSheet.create({
     padding: 30
   },
   errorText: {
-    color: '#dc3545',
+    color: '#fa5252',
     textAlign: 'center',
     marginVertical: 16,
-    fontSize: 16
+    fontSize: 14
   },
   retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  retryButtonGradient: {
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8
+    paddingVertical: 12
   },
   retryButtonText: {
-    color: '#fff',
+    color: 'white',
     fontWeight: '600',
-    fontSize: 16
+    fontSize: 14
   },
   memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
     position: 'relative'
@@ -1378,9 +1621,9 @@ const styles = StyleSheet.create({
     gap: 12
   },
   memberAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center'
   },
@@ -1388,9 +1631,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent'
   },
   memberAvatarText: {
-    color: '#fff',
     fontWeight: 'bold',
-    fontSize: 18
+    fontSize: 16
   },
   memberDetails: {
     flex: 1
@@ -1399,59 +1641,58 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4
+    marginBottom: 2
   },
   memberName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#000'
+    color: '#212529'
   },
   adminBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#FFD70020',
+    gap: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4
+    borderRadius: 12
   },
   adminBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#FFD700'
+    color: '#2b8a3e'
   },
   memberEmail: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#868e96',
     marginBottom: 2
   },
   memberJoined: {
-    fontSize: 12,
-    color: '#999'
+    fontSize: 11,
+    color: '#adb5bd'
   },
   memberActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 6,
     alignItems: 'center'
   },
   roleButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#e7f5ff',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#a5d8ff'
+    borderColor: '#e9ecef'
   },
   demoteButton: {
     backgroundColor: '#fff5f5',
     borderColor: '#ffc9c9'
   },
   removeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#fff5f5',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1459,10 +1700,9 @@ const styles = StyleSheet.create({
     borderColor: '#ffc9c9'
   },
   protectedBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#fff3bf',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -1472,46 +1712,49 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: '#e7f5ff',
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#a5d8ff'
+    borderColor: '#e9ecef'
   },
   currentUserBadgeText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
-    color: '#1864ab'
+    color: '#495057'
   },
   emptyContainer: {
     alignItems: 'center',
     padding: 40
   },
   emptyText: {
-    fontSize: 16,
-    color: '#6c757d',
+    fontSize: 14,
+    color: '#868e96',
     marginTop: 8
   },
   leaveButton: {
+    marginHorizontal: 20,
+    marginBottom: 30,
+    borderRadius: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  leaveButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginHorizontal: 20,
-    marginBottom: 30,
-    paddingVertical: 16,
-    backgroundColor: '#fff5f5',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#ffc9c9'
+    paddingVertical: 14
   },
   disabledLeaveButton: {
-    backgroundColor: '#f8f9fa',
-    borderColor: '#e9ecef'
+    opacity: 0.7
   },
   leaveButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#fa5252'
   },
@@ -1525,7 +1768,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end'
   },
   modalContent: {
-    backgroundColor: '#fff',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '90%'
@@ -1534,14 +1776,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0'
+    borderBottomColor: '#e9ecef'
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000'
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#212529'
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f8f9fa',
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   modalBody: {
     padding: 20
@@ -1549,66 +1799,74 @@ const styles = StyleSheet.create({
   modalFooter: {
     flexDirection: 'row',
     gap: 12,
-    padding: 20,
+    padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0'
+    borderTopColor: '#e9ecef'
   },
   modalCloseButton: {
     padding: 16,
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#f0f0f0'
+    borderTopColor: '#e9ecef'
   },
   modalCloseText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#007AFF'
+    color: '#495057'
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
     backgroundColor: '#f8f9fa',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e9ecef'
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#6c757d'
+    color: '#868e96'
   },
   saveButton: {
     flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#007AFF',
-    alignItems: 'center'
+    borderRadius: 8,
+    overflow: 'hidden'
+  },
+  saveButtonGradient: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   saveButtonDisabled: {
-    backgroundColor: '#c0c0c0'
+    opacity: 0.7
   },
   saveButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#fff'
+    color: 'white'
+  },
+  saveButtonTextDisabled: {
+    color: '#868e96'
   },
   avatarEditSection: {
     alignItems: 'center',
     marginBottom: 24
   },
   editAvatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#007AFF',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    overflow: 'hidden'
   },
   editAvatarImage: {
-    backgroundColor: 'transparent',
-    borderWidth: 3,
-    borderColor: '#007AFF'
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+    borderColor: '#2b8a3e'
   },
   editAvatarOverlay: {
     position: 'absolute',
@@ -1616,14 +1874,12 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center'
   },
   avatarNote: {
-    fontSize: 14,
-    color: '#6c757d',
+    fontSize: 13,
+    color: '#868e96',
     marginTop: 8
   },
   removeAvatarButton: {
@@ -1634,67 +1890,75 @@ const styles = StyleSheet.create({
     padding: 8
   },
   removeAvatarText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#fa5252'
   },
   inputGroup: {
     marginBottom: 20
   },
   inputLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#000',
+    color: '#495057',
     marginBottom: 8
   },
-  input: {
+  inputGradient: {
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f8f9fa'
+    borderColor: '#e9ecef'
+  },
+  textAreaGradient: {
+    minHeight: 80
+  },
+  input: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: '#212529',
+    backgroundColor: 'transparent'
   },
   textArea: {
     minHeight: 80,
     textAlignVertical: 'top'
   },
   charCount: {
-    fontSize: 12,
-    color: '#6c757d',
+    fontSize: 11,
+    color: '#868e96',
     textAlign: 'right',
     marginTop: 4
   },
   infoBox: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 8,
-    backgroundColor: '#f8f9fa',
     padding: 12,
     borderRadius: 8,
-    marginTop: 20
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#e9ecef'
   },
   infoText: {
-    fontSize: 14,
-    color: '#6c757d',
+    fontSize: 13,
+    color: '#868e96',
     flex: 1,
-    lineHeight: 20
+    lineHeight: 18
   },
   // Settings Modal Items
   settingsItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
-    gap: 16
+    gap: 12
   },
   dangerItem: {
     borderBottomWidth: 0
   },
   settingsIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center'
   },
@@ -1702,16 +1966,16 @@ const styles = StyleSheet.create({
     flex: 1
   },
   settingsTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#000',
-    marginBottom: 4
+    color: '#212529',
+    marginBottom: 2
   },
   settingsDescription: {
-    fontSize: 14,
-    color: '#6c757d'
+    fontSize: 13,
+    color: '#868e96'
   },
   dangerText: {
-    color: '#EF4444'
+    color: '#fa5252'
   }
 });

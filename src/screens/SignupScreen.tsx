@@ -1,4 +1,4 @@
-// src/screens/SignupScreen.tsx
+// src/screens/SignupScreen.tsx - UPDATED with light green gender buttons and working links
 import React, { useState } from 'react';
 import { 
   View, 
@@ -10,8 +10,10 @@ import {
   ActivityIndicator,
   ScrollView,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Linking
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSignupForm } from '../authHook/useSignupForm';
 import { AvatarPicker } from '../components/AvatarPicker';
 
@@ -23,7 +25,7 @@ const GENDER_OPTIONS = [
   { value: 'PREFER_NOT_TO_SAY', label: 'Prefer not to say' }
 ];
 
-// Simple gender picker for React Native
+// Simple gender picker with light green buttons
 const GenderPicker = ({ selectedValue, onValueChange, disabled }: any) => {
   return (
     <View style={styles.pickerContainer}>
@@ -34,18 +36,26 @@ const GenderPicker = ({ selectedValue, onValueChange, disabled }: any) => {
             key={gender.value}
             style={[
               styles.genderButton,
-              selectedValue === gender.value && styles.genderButtonSelected,
+              selectedValue === gender.value && styles.genderButtonActive,
               disabled && styles.genderButtonDisabled
             ]}
             onPress={() => !disabled && onValueChange(gender.value)}
             disabled={disabled}
+            activeOpacity={0.7}
           >
-            <Text style={[
-              selectedValue === gender.value ? styles.genderTextSelected : styles.genderText,
-              disabled && styles.genderTextDisabled
-            ]}>
-              {gender.label}
-            </Text>
+            <LinearGradient
+              colors={selectedValue === gender.value ? ['#2b8a3e', '#1e6b2c'] : ['#d3f9d8', '#b2f2bb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.genderButtonGradient}
+            >
+              <Text style={[
+                styles.genderText,
+                selectedValue === gender.value && styles.genderTextActive
+              ]}>
+                {gender.label}
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
         ))}
       </View>
@@ -63,18 +73,23 @@ const PasswordInput = ({
   togglePasswordVisibility 
 }: any) => {
   return (
-    <View style={styles.passwordContainer}>
+    <LinearGradient
+      colors={['#f8f9fa', '#e9ecef']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.passwordContainer}
+    >
       <TextInput
         style={[
           styles.passwordInput,
           !editable && styles.inputDisabled
         ]}
         placeholder={placeholder}
+        placeholderTextColor="#adb5bd"
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={!showPassword}
         editable={editable}
-        placeholderTextColor="#999"
       />
       <TouchableOpacity 
         style={styles.eyeButton}
@@ -88,7 +103,7 @@ const PasswordInput = ({
           {showPassword ? '👁️' : '👁️‍🗨️'}
         </Text>
       </TouchableOpacity>
-    </View>
+    </LinearGradient>
   );
 };
 
@@ -136,148 +151,211 @@ export default function SignupScreen({ navigation }: any) {
     }
   };
 
+  const handleTermsPress = () => {
+    // You can replace this with your actual terms URL
+    Linking.openURL('https://www.grouptask.com/terms');
+  };
+
+  const handlePrivacyPress = () => {
+    // You can replace this with your actual privacy URL
+    Linking.openURL('https://www.grouptask.com/privacy');
+  };
+
+  const handleLoginPress = () => {
+    navigation.goBack();
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
-        contentContainerStyle={styles.container}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ flex: 1 }}
       >
-        <Text style={styles.title}>Create Account</Text>
-        <Text style={styles.subtitle}>Join GroupTask to manage tasks with your team</Text>
-        
-        {/* Profile Picture Section */}
-        <View style={styles.avatarSection}>
-          <AvatarPicker
-            avatarImage={avatarImage}
-            onAvatarSelect={handleAvatarSelect}
-            onAvatarRemove={handleAvatarRemove}
-            uploading={uploadingAvatar}
-            editable={!loading}
-            size={140}
-          />
-        </View>
-        
-        {/* Message display */}
-        {message ? (
-          <View style={[
-            styles.messageBox,
-            message.includes('✅') || message.includes('📤') 
-              ? styles.successBox 
-              : styles.errorBox
-          ]}>
-            <Text style={styles.messageText}>{message}</Text>
+        <ScrollView 
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.headerContainer}>
+            <LinearGradient
+              colors={['#d3f9d8', '#b2f2bb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.logoContainer}
+            >
+              <Text style={styles.logoText}>GT</Text>
+            </LinearGradient>
+            <Text style={styles.title}>Create Account</Text>
+            <Text style={styles.subtitle}>Join GroupTask to manage tasks with your team</Text>
           </View>
-        ) : null}
-        
-        {/* Full Name */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Full Name *</Text>
-          <TextInput
+          
+          {/* Profile Picture Section */}
+          <View style={styles.avatarSection}>
+            <AvatarPicker
+              avatarImage={avatarImage}
+              onAvatarSelect={handleAvatarSelect}
+              onAvatarRemove={handleAvatarRemove}
+              uploading={uploadingAvatar}
+              editable={!loading}
+              size={120}
+            />
+            <Text style={styles.avatarHint}>Tap to add profile picture (optional)</Text>
+          </View>
+          
+          {/* Message display */}
+          {message ? (
+            <LinearGradient
+              colors={message.includes('✅') || message.includes('📤') ? ['#d3f9d8', '#b2f2bb'] : ['#fff5f5', '#ffe3e3']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.messageBox}
+            >
+              <Text style={[
+                styles.messageText,
+                message.includes('✅') || message.includes('📤') ? styles.successText : styles.errorText
+              ]}>
+                {message}
+              </Text>
+            </LinearGradient>
+          ) : null}
+          
+          {/* Full Name */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Full Name *</Text>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.inputGradient}
+            >
+              <TextInput
+                style={styles.input}
+                placeholder="John Doe"
+                placeholderTextColor="#adb5bd"
+                value={formData.fullName}
+                onChangeText={(text) => handleChange('fullName', text)}
+                editable={!loading}
+              />
+            </LinearGradient>
+          </View>
+          
+          {/* Email */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email Address *</Text>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.inputGradient}
+            >
+              <TextInput
+                style={styles.input}
+                placeholder="john@example.com"
+                placeholderTextColor="#adb5bd"
+                value={formData.email}
+                onChangeText={(text) => handleChange('email', text)}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                editable={!loading}
+              />
+            </LinearGradient>
+          </View>
+          
+          {/* Gender Picker */}
+          <GenderPicker
+            selectedValue={formData.gender}
+            onValueChange={(value: string) => handleChange('gender', value)}
+            disabled={loading}
+          />
+          
+          {/* Password with Eye Icon */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Password *</Text>
+            <PasswordInput
+              placeholder="Enter at least 6 characters"
+              value={formData.password}
+              onChangeText={(text:string) => handleChange('password', text)}
+              editable={!loading}
+              showPassword={showPassword}
+              togglePasswordVisibility={() => setShowPassword(!showPassword)}
+            />
+            <Text style={styles.hintText}>Minimum 6 characters</Text>
+          </View>
+          
+          {/* Confirm Password with Eye Icon */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Confirm Password *</Text>
+            <PasswordInput
+              placeholder="Re-enter your password"
+              value={formData.confirmPassword}
+              onChangeText={(text:string) => handleChange('confirmPassword', text)}
+              editable={!loading}
+              showPassword={showConfirmPassword}
+              togglePasswordVisibility={() => setShowConfirmPassword(!showConfirmPassword)}
+            />
+          </View>
+          
+          {/* Signup Button */}
+          <TouchableOpacity
             style={[
-              styles.input,
-              !loading && styles.inputFocused
+              styles.button,
+              loading && styles.buttonDisabled
             ]}
-            placeholder="John Doe"
-            value={formData.fullName}
-            onChangeText={(text) => handleChange('fullName', text)}
-            editable={!loading}
-            placeholderTextColor="#999"
-          />
-        </View>
-        
-        {/* Email */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Email Address *</Text>
-          <TextInput
-            style={[
-              styles.input,
-              !loading && styles.inputFocused
-            ]}
-            placeholder="john@example.com"
-            value={formData.email}
-            onChangeText={(text) => handleChange('email', text)}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            editable={!loading}
-            placeholderTextColor="#999"
-          />
-        </View>
-        
-        {/* Gender Picker */}
-        <GenderPicker
-          selectedValue={formData.gender}
-          onValueChange={(value: string) => handleChange('gender', value)}
-          disabled={loading}
-        />
-        
-        {/* Password with Eye Icon */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Password *</Text>
-          <PasswordInput
-            placeholder="Enter at least 6 characters"
-            value={formData.password}
-            onChangeText={(text:string) => handleChange('password', text)}
-            editable={!loading}
-            showPassword={showPassword}
-            togglePasswordVisibility={() => setShowPassword(!showPassword)}
-          />
-        </View>
-        
-        {/* Confirm Password with Eye Icon */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Confirm Password *</Text>
-          <PasswordInput
-            placeholder="Re-enter your password"
-            value={formData.confirmPassword}
-            onChangeText={(text:string) => handleChange('confirmPassword', text)}
-            editable={!loading}
-            showPassword={showConfirmPassword}
-            togglePasswordVisibility={() => setShowConfirmPassword(!showConfirmPassword)}
-          />
-        </View>
-        
-        {/* Signup Button */}
-        <TouchableOpacity
-          style={[
-            styles.button,
-            loading && styles.buttonDisabled,
-            styles.buttonWithIcon
-          ]}
-          onPress={onSignupPress}
-          disabled={loading}
-        >
-          {loading || uploadingAvatar ? (
-            <ActivityIndicator color="white" size="small" />
-          ) : (
-            <>
-              <Text style={styles.buttonText}>Create Account</Text>
-              <Text style={styles.buttonIcon}>→</Text>
-            </>
-          )}
-        </TouchableOpacity>
-        
-        {/* Terms & Privacy */}
-        <Text style={styles.termsText}>
-          By signing up, you agree to our{' '}
-          <Text style={styles.link}>Terms of Service</Text> and{' '}
-          <Text style={styles.link}>Privacy Policy</Text>
-        </Text>
-        
-        {/* Login Link */}
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          disabled={loading}
-          style={styles.loginLink}
-        >
-          <Text style={styles.loginLinkText}>
-            Already have an account? <Text style={styles.loginLinkBold}>Login</Text>
-          </Text>
-        </TouchableOpacity>
-      </ScrollView>
+            onPress={onSignupPress}
+            disabled={loading}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.buttonGradient}
+            >
+              {loading || uploadingAvatar ? (
+                <ActivityIndicator color="white" size="small" />
+              ) : (
+                <>
+                  <Text style={styles.buttonText}>Create Account</Text>
+                  <Text style={styles.buttonIcon}>→</Text>
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+          
+          {/* Terms & Privacy */}
+          <View style={styles.termsContainer}>
+            <Text style={styles.termsText}>
+              By signing up, you agree to our{' '}
+            </Text>
+            <View style={styles.termsLinks}>
+              <TouchableOpacity onPress={handleTermsPress}>
+                <Text style={styles.link}>Terms of Service</Text>
+              </TouchableOpacity>
+              <Text style={styles.termsText}> and </Text>
+              <TouchableOpacity onPress={handlePrivacyPress}>
+                <Text style={styles.link}>Privacy Policy</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          {/* Login Link */}
+          <TouchableOpacity
+            onPress={handleLoginPress}
+            disabled={loading}
+            style={styles.loginLink}
+          >
+            <Text style={styles.loginLinkText}>
+              Already have an account?{' '}
+              <Text style={styles.loginLinkBold}>Sign In</Text>
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </LinearGradient>
     </KeyboardAvoidingView>
   );
 }
@@ -286,27 +364,54 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 24,
-    backgroundColor: '#f8f9fa',
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  logoContainer: {
+    width: 70,
+    height: 70,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  logoText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#2b8a3e',
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '800',
     marginBottom: 8,
     textAlign: 'center',
     color: '#212529',
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6c757d',
+    fontSize: 14,
+    color: '#868e96',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 16,
   },
   avatarSection: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
+  },
+  avatarHint: {
+    fontSize: 12,
+    color: '#868e96',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   inputLabel: {
     fontSize: 14,
@@ -314,52 +419,56 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#495057',
   },
-  input: {
-    height: 56,
-    borderWidth: 1.5,
-    borderColor: '#e9ecef',
+  inputGradient: {
     borderRadius: 12,
-    paddingHorizontal: 16,
-    backgroundColor: 'white',
-    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
-  inputFocused: {
-    borderColor: '#007AFF',
+  input: {
+    height: 52,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: '#212529',
+    backgroundColor: 'transparent',
   },
   inputDisabled: {
-    backgroundColor: '#f8f9fa',
-    color: '#6c757d',
+    opacity: 0.6,
+  },
+  hintText: {
+    fontSize: 11,
+    color: '#868e96',
+    marginTop: 6,
+    marginLeft: 4,
   },
   passwordContainer: {
-    position: 'relative',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   passwordInput: {
-    height: 56,
-    borderWidth: 1.5,
-    borderColor: '#e9ecef',
-    borderRadius: 12,
+    flex: 1,
+    height: 52,
     paddingHorizontal: 16,
-    paddingRight: 60,
-    backgroundColor: 'white',
     fontSize: 16,
+    color: '#212529',
+    backgroundColor: 'transparent',
   },
   eyeButton: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    height: 56,
-    width: 56,
+    width: 52,
+    height: 52,
     justifyContent: 'center',
     alignItems: 'center',
   },
   eyeIcon: {
-    fontSize: 22,
+    fontSize: 20,
   },
   eyeIconDisabled: {
     opacity: 0.5,
   },
   pickerContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   label: {
     fontSize: 14,
@@ -374,53 +483,60 @@ const styles = StyleSheet.create({
   },
   genderButton: {
     width: '48%',
-    paddingVertical: 14,
     marginBottom: 12,
-    backgroundColor: '#f8f9fa',
     borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1.5,
+    overflow: 'hidden',
+    borderWidth: 1,
     borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  genderButtonSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+  genderButtonGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  genderButtonActive: {
+    borderColor: '#2b8a3e',
+    borderWidth: 2,
   },
   genderButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.5,
   },
   genderText: {
-    color: '#495057',
-    fontWeight: '500',
-  },
-  genderTextSelected: {
-    color: 'white',
+    color: '#2b8a3e',
     fontWeight: '600',
+    fontSize: 15,
+  },
+  genderTextActive: {
+    color: 'white',
+    fontWeight: '700',
   },
   genderTextDisabled: {
     color: '#adb5bd',
   },
   button: {
-    height: 58,
-    backgroundColor: '#007AFF',
     borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-    shadowColor: '#007AFF',
+    marginTop: 16,
+    marginBottom: 20,
+    overflow: 'hidden',
+    shadowColor: '#2b8a3e',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 4,
   },
-  buttonWithIcon: {
+  buttonGradient: {
+    height: 56,
     flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     gap: 8,
   },
   buttonDisabled: {
-    backgroundColor: '#adb5bd',
-    shadowOpacity: 0,
+    opacity: 0.6,
   },
   buttonText: {
     color: 'white',
@@ -432,45 +548,60 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  termsContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   termsText: {
-    fontSize: 12,
-    color: '#6c757d',
+    fontSize: 13,
+    color: '#868e96',
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 18,
+    lineHeight: 20,
+  },
+  termsLinks: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4,
   },
   link: {
-    color: '#007AFF',
+    color: '#2b8a3e',
     textDecorationLine: 'underline',
+    fontWeight: '600',
+    fontSize: 13,
   },
   loginLink: {
     alignItems: 'center',
+    paddingVertical: 12,
+    marginBottom: 10,
   },
   loginLinkText: {
     fontSize: 15,
-    color: '#6c757d',
+    color: '#868e96',
   },
   loginLinkBold: {
-    color: '#007AFF',
+    color: '#2b8a3e',
     fontWeight: '700',
+    fontSize: 16,
+    textDecorationLine: 'underline',
   },
   messageBox: {
-    padding: 16,
+    padding: 14,
     borderRadius: 12,
-    marginBottom: 24,
+    marginBottom: 20,
     borderWidth: 1,
-  },
-  successBox: {
-    backgroundColor: '#d4edda',
-    borderColor: '#c3e6cb',
-  },
-  errorBox: {
-    backgroundColor: '#f8d7da',
-    borderColor: '#f5c6cb',
+    borderColor: '#e9ecef',
   },
   messageText: {
     textAlign: 'center',
     fontSize: 14,
-    color: '#155724',
+    lineHeight: 20,
+  },
+  successText: {
+    color: '#2b8a3e',
+  },
+  errorText: {
+    color: '#fa5252',
   },
 });

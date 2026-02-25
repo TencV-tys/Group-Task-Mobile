@@ -1,4 +1,4 @@
-// HomeScreen.tsx - UPDATED without upcoming tasks
+// HomeScreen.tsx - UPDATED with cleaner UI and proper icon colors
 import React, { useEffect, useState } from 'react';
 import { 
   View, 
@@ -14,9 +14,11 @@ import {
   Alert
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useHomeData } from '../homeHook/useHomeHook';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { useNotifications } from '../notificationHook/useNotifications';
+import * as SecureStore from 'expo-secure-store';
 
 const { width } = Dimensions.get('window');
 
@@ -70,13 +72,9 @@ export default function HomeScreen({ navigation }: any) {
   const currentWeekTasks = homeData?.currentWeekTasks || [];
 
   const handleViewGroups = () => {
-    console.log("🔍 Attempting to navigate to 'MyGroups' screen");
-    
     try {
       navigation.navigate('MyGroups');
-      console.log("✅ Navigation to MyGroups successful");
     } catch (error) {
-      console.error("❌ Navigation error:", error);
       Alert.alert('Navigation Error', 'Could not navigate to groups');
     }
   };
@@ -98,18 +96,13 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const handleGroupPress = (group: any) => {
-    console.log("🔍 Attempting to navigate to 'GroupTasks' screen");
-    console.log("With group ID:", group?.id);
-    
     try {
       navigation.navigate('GroupTasks', { 
         groupId: group.id,
         groupName: group.name,
         userRole: group.role || 'MEMBER'
       });
-      console.log("✅ Navigation to GroupTasks successful");
     } catch (error) {
-      console.error("❌ Navigation error:", error);
       Alert.alert('Navigation Error', 'Could not navigate to group tasks');
     }
   };
@@ -122,7 +115,7 @@ export default function HomeScreen({ navigation }: any) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading your dashboard...</Text>
         </View>
       </SafeAreaView>
@@ -133,13 +126,20 @@ export default function HomeScreen({ navigation }: any) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={64} color="#FF3B30" />
+          <MaterialCommunityIcons name="alert-circle" size={64} color="#fa5252" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity 
             style={styles.retryButton}
             onPress={refreshHomeData}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -149,22 +149,23 @@ export default function HomeScreen({ navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
+        <View>
           <Text style={styles.headerTitle}>Dashboard</Text>
           <Text style={styles.headerSubtitle}>
-            Welcome to GroupTask
+            Welcome back, {user.fullName?.split(' ')[0] || 'User'}!
           </Text>
         </View>
+        
         <View style={styles.headerRight}>
           {/* Notification Button */}
           <TouchableOpacity 
-            style={styles.notificationButton}
+            style={styles.iconButton}
             onPress={handleViewNotifications}
           >
-            <MaterialCommunityIcons name="bell" size={24} color="#4F46E5" />
+            <MaterialCommunityIcons name="bell-outline" size={24} color="#495057" />
             {unreadCount > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </Text>
               </View>
@@ -173,13 +174,13 @@ export default function HomeScreen({ navigation }: any) {
 
           {/* Swap Request Button */}
           <TouchableOpacity 
-            style={styles.swapButton}
+            style={styles.iconButton}
             onPress={handleViewPendingSwapRequests}
           >
             <MaterialCommunityIcons name="swap-horizontal" size={24} color="#4F46E5" />
             {totalPendingForMe > 0 && (
-              <View style={styles.swapBadge}>
-                <Text style={styles.swapBadgeText}>{totalPendingForMe}</Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{totalPendingForMe}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -190,10 +191,7 @@ export default function HomeScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Profile')}
           >
             {user.avatarUrl ? (
-              <Image 
-                source={{ uri: user.avatarUrl }} 
-                style={styles.avatar} 
-              />
+              <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Text style={styles.avatarText}>
@@ -206,6 +204,7 @@ export default function HomeScreen({ navigation }: any) {
       </View>
 
       <ScrollView
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -214,129 +213,110 @@ export default function HomeScreen({ navigation }: any) {
               loadPendingForMe();
               loadUnreadCount();
             }}
-            colors={['#007AFF']}
-            tintColor="#007AFF"
+            colors={['#2b8a3e']}
+            tintColor="#2b8a3e"
           />
         }
-        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.welcomeCard}>
-          <View style={styles.welcomeContent}>
-            <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.userName}>
-              {user.fullName || 'User'} 👋
+        {/* Points Card */}
+        <LinearGradient
+          colors={['#2b8a3e', '#1e6b2c']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.pointsCard}
+        >
+          <View style={styles.pointsCardContent}>
+            <View>
+              <Text style={styles.pointsCardLabel}>Total Points</Text>
+              <Text style={styles.pointsCardValue}>{user.totalPoints || 0}</Text>
+            </View>
+            <View style={styles.pointsCardIcon}>
+              <MaterialCommunityIcons name="trophy" size={32} color="white" />
+            </View>
+          </View>
+          <View style={styles.pointsCardFooter}>
+            <Text style={styles.pointsCardFooterText}>
+              {stats.pointsThisWeek || 0} points this week
             </Text>
-            {user.email && (
-              <Text style={styles.userEmail}>{user.email}</Text>
+          </View>
+        </LinearGradient>
+
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          <TouchableOpacity 
+            style={styles.statCard}
+            onPress={handleViewGroups}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.statIconContainer, { backgroundColor: '#e8f5e9' }]}>
+              <MaterialCommunityIcons name="account-group" size={24} color="#2b8a3e" />
+            </View>
+            <Text style={styles.statNumber}>{stats.groupsCount || 0}</Text>
+            <Text style={styles.statLabel}>Groups</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.statCard}
+            onPress={() => {
+              if (groups.length > 0) handleGroupPress(groups[0]);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.statIconContainer, { backgroundColor: '#fff3e0' }]}>
+              <MaterialCommunityIcons name="calendar-clock" size={24} color="#e67700" />
+            </View>
+            <Text style={styles.statNumber}>{stats.tasksDue || 0}</Text>
+            <Text style={styles.statLabel}>Due This Week</Text>
+            {stats.overdueTasks > 0 && (
+              <View style={styles.overdueBadge}>
+                <Text style={styles.overdueBadgeText}>{stats.overdueTasks} overdue</Text>
+              </View>
             )}
-          </View>
-          <View style={styles.pointsBadge}>
-            <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
-            <Text style={styles.pointsText}>{user.totalPoints || 0}</Text>
-          </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.statCard}
+            onPress={handleViewCompletedTasks}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.statIconContainer, { backgroundColor: '#e8f5e9' }]}>
+              <MaterialCommunityIcons name="check-circle" size={24} color="#2b8a3e" />
+            </View>
+            <Text style={styles.statNumber}>{stats.completedTasks || 0}</Text>
+            <Text style={styles.statLabel}>Completed</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.statCard}
+            onPress={handleViewSwapRequests}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.statIconContainer, { backgroundColor: '#ede7f6' }]}>
+              <MaterialCommunityIcons name="swap-horizontal" size={24} color="#4F46E5" />
+            </View>
+            <Text style={styles.statNumber}>{stats.swapRequests || 0}</Text>
+            <Text style={styles.statLabel}>Swap Requests</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Overview</Text>
-          
-          <View style={styles.statsGrid}>
-            <TouchableOpacity 
-              style={styles.statCard}
-              onPress={handleViewGroups}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.statIcon, { backgroundColor: '#4CD964' }]}>
-                <MaterialCommunityIcons name="account-group" size={22} color="white" />
-              </View>
-              <View style={styles.statContent}>
-                <Text style={styles.statNumber}>{stats.groupsCount || 0}</Text>
-                <Text style={styles.statLabel}>Groups</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
-            </TouchableOpacity>
-            
-            {stats.groupsCount > 0 && stats.tasksDue > 0 && (
-              <TouchableOpacity 
-                style={[styles.statCard, styles.urgentCard]}
-                onPress={() => {
-                  if (groups.length > 0) {
-                    handleGroupPress(groups[0]);
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.statIcon, { backgroundColor: '#FF9500' }]}>
-                  <MaterialCommunityIcons name="clipboard-clock" size={22} color="white" />
-                </View>
-                <View style={styles.statContent}>
-                  <Text style={[styles.statNumber, styles.urgentNumber]}>
-                    {stats.tasksDue || 0}
-                  </Text>
-                  <Text style={styles.statLabel}>Due This Week</Text>
-                  {stats.overdueTasks > 0 && (
-                    <Text style={styles.overdueBadge}>
-                      {stats.overdueTasks} overdue
-                    </Text>
-                  )}
-                </View>
-                <MaterialCommunityIcons 
-                  name="alert-circle" 
-                  size={18} 
-                  color="#FF3B30" 
-                />
-              </TouchableOpacity>
-            )}
-            
-            <TouchableOpacity 
-              style={styles.statCard}
-              onPress={handleViewCompletedTasks}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.statIcon, { backgroundColor: '#34c759' }]}>
-                <MaterialCommunityIcons name="check-circle" size={22} color="white" />
-              </View>
-              <View style={styles.statContent}>
-                <Text style={styles.statNumber}>{stats.completedTasks || 0}</Text>
-                <Text style={styles.statLabel}>Completed</Text>
-                {stats.completionRate > 0 && (
-                  <Text style={styles.completionRate}>
-                    {stats.completionRate.toFixed(0)}% completion rate
-                  </Text>
-                )}
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.statCard}
-              onPress={handleViewSwapRequests}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.statIcon, { backgroundColor: '#4F46E5' }]}>
-                <MaterialCommunityIcons name="swap-horizontal" size={22} color="white" />
-              </View>
-              <View style={styles.statContent}>
-                <Text style={styles.statNumber}>{stats.swapRequests || 0}</Text>
-                <Text style={styles.statLabel}>My Swap Requests</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
+        {/* Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          
           <View style={styles.quickActionsGrid}>
             <TouchableOpacity 
               style={styles.quickActionCard}
               onPress={() => navigation.navigate('CreateGroup')}
               activeOpacity={0.7}
             >
-              <View style={[styles.actionIcon, { backgroundColor: '#4CD964' }]}>
-                <MaterialCommunityIcons name="plus-circle" size={28} color="white" />
-              </View>
-              <Text style={styles.actionTitle}>Create Group</Text>
+              <LinearGradient
+                colors={['#2b8a3e', '#1e6b2c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionIcon}
+              >
+                <MaterialCommunityIcons name="plus" size={24} color="white" />
+              </LinearGradient>
+              <Text style={styles.quickActionTitle}>Create Group</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -344,10 +324,15 @@ export default function HomeScreen({ navigation }: any) {
               onPress={() => navigation.navigate('JoinGroup')}
               activeOpacity={0.7}
             >
-              <View style={[styles.actionIcon, { backgroundColor: '#007AFF' }]}>
-                <MaterialCommunityIcons name="link" size={28} color="white" />
-              </View>
-              <Text style={styles.actionTitle}>Join Group</Text>
+              <LinearGradient
+                colors={['#2b8a3e', '#1e6b2c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionIcon}
+              >
+                <MaterialCommunityIcons name="link" size={24} color="white" />
+              </LinearGradient>
+              <Text style={styles.quickActionTitle}>Join Group</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -355,27 +340,25 @@ export default function HomeScreen({ navigation }: any) {
               onPress={handleViewSwapRequests}
               activeOpacity={0.7}
             >
-              <View style={[styles.actionIcon, { backgroundColor: '#4F46E5' }]}>
-                <MaterialCommunityIcons name="swap-horizontal" size={28} color="white" />
-              </View>
-              <Text style={styles.actionTitle}>My Swaps</Text>
-              {stats.swapRequests > 0 && (
-                <View style={styles.actionBadge}>
-                  <Text style={styles.actionBadgeText}>{stats.swapRequests}</Text>
-                </View>
-              )}
+              <LinearGradient
+                colors={['#2b8a3e', '#1e6b2c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionIcon}
+              >
+                <MaterialCommunityIcons name="swap-horizontal" size={24} color="white" />
+              </LinearGradient>
+              <Text style={styles.quickActionTitle}>My Swaps</Text>
             </TouchableOpacity>
           </View>
         </View>
 
+        {/* Your Groups */}
         {groups.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Your Groups</Text>
-              <TouchableOpacity 
-                onPress={handleViewGroups}
-                activeOpacity={0.6}
-              >
+              <TouchableOpacity onPress={handleViewGroups}>
                 <Text style={styles.seeAllText}>See All</Text>
               </TouchableOpacity>
             </View>
@@ -385,7 +368,7 @@ export default function HomeScreen({ navigation }: any) {
               showsHorizontalScrollIndicator={false}
               style={styles.groupsScroll}
             >
-              {groups.slice(0, 4).map((group: any) => (
+              {groups.slice(0, 5).map((group: any) => (
                 <TouchableOpacity 
                   key={group.id}
                   style={styles.groupCard}
@@ -393,42 +376,39 @@ export default function HomeScreen({ navigation }: any) {
                   activeOpacity={0.7}
                 >
                   {group.avatarUrl ? (
-                    <Image 
-                      source={{ uri: group.avatarUrl }} 
-                      style={styles.groupAvatar} 
-                    />
+                    <Image source={{ uri: group.avatarUrl }} style={styles.groupAvatar} />
                   ) : (
-                    <View style={styles.groupIcon}>
-                      <Text style={styles.groupIconText}>
+                    <LinearGradient
+                      colors={['#2b8a3e', '#1e6b2c']}
+                      style={styles.groupAvatarPlaceholder}
+                    >
+                      <Text style={styles.groupAvatarText}>
                         {group.name?.charAt(0) || 'G'}
                       </Text>
-                    </View>
+                    </LinearGradient>
                   )}
                   <Text style={styles.groupName} numberOfLines={1}>
                     {group.name || 'Group'}
                   </Text>
-                  <Text style={styles.groupStats}>
-                    {group.stats?.yourTasksThisWeek || 0} tasks this week
-                  </Text>
-                  <Text style={[
-                    styles.groupRole,
-                    group.role === 'ADMIN' && styles.adminRole
-                  ]}>
-                    {group.role || 'Member'}
-                  </Text>
+                  <View style={styles.groupRoleBadge}>
+                    <Text style={[
+                      styles.groupRole,
+                      group.role === 'ADMIN' && styles.adminRole
+                    ]}>
+                      {group.role === 'ADMIN' ? 'Admin' : 'Member'}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
         )}
 
-        <View style={[styles.section, { marginBottom: 30 }]}>
+        {/* Recent Activity */}
+        <View style={[styles.section, styles.lastSection]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <TouchableOpacity 
-              onPress={handleViewNotifications}
-              activeOpacity={0.6}
-            >
+            <TouchableOpacity onPress={handleViewNotifications}>
               <Text style={styles.seeAllText}>View All</Text>
             </TouchableOpacity>
           </View>
@@ -443,23 +423,21 @@ export default function HomeScreen({ navigation }: any) {
                   onPress={handleViewNotifications}
                 >
                   <View style={[
-                    styles.activityIconContainer,
-                    { backgroundColor: activity.type === 'task' ? '#34c759' : 
-                                      activity.type === 'group' ? '#007AFF' : 
-                                      activity.type === 'swap' ? '#4F46E5' : '#6c757d' }
+                    styles.activityIcon,
+                    { backgroundColor: activity.type === 'task' ? '#e8f5e9' : '#f8f9fa' }
                   ]}>
                     <MaterialCommunityIcons 
-                      name={activity.icon || 'information'} 
-                      size={16} 
-                      color="white" 
+                      name={activity.icon || 'bell-outline'} 
+                      size={20} 
+                      color={activity.type === 'task' ? '#2b8a3e' : '#495057'} 
                     />
                   </View>
                   <View style={styles.activityContent}>
-                    <Text style={styles.activityText} numberOfLines={2}>
+                    <Text style={styles.activityText} numberOfLines={1}>
                       {activity.title || activity.message}
                     </Text>
                     <Text style={styles.activityTime}>
-                      {activity.timeAgo || 'Recently'}
+                      {activity.timeAgo || 'Just now'}
                     </Text>
                   </View>
                   {!activity.read && <View style={styles.unreadDot} />}
@@ -481,7 +459,6 @@ export default function HomeScreen({ navigation }: any) {
   );
 }
 
-// Keep all styles exactly the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -497,9 +474,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
   },
-  headerLeft: {
-    flex: 1,
-  },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -507,130 +481,159 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#6c757d',
+    color: '#868e96',
     marginTop: 2,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
-  notificationButton: {
+  iconButton: {
     position: 'relative',
     padding: 8,
   },
-  notificationBadge: {
+  badge: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#FF3B30',
-    borderRadius: 12,
-    minWidth: 20,
-    height: 20,
+    top: 4,
+    right: 4,
+    backgroundColor: '#fa5252',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
     borderWidth: 2,
     borderColor: 'white',
   },
-  notificationBadgeText: {
+  badgeText: {
     color: 'white',
     fontSize: 10,
-    fontWeight: 'bold',
-  },
-  swapButton: {
-    position: 'relative',
-    padding: 8,
-  },
-  swapBadge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: '#EF4444',
-    borderRadius: 12,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    borderWidth: 2,
-    borderColor: 'white',
-  },
-  swapBadgeText: {
-    color: 'white',
-    fontSize: 11,
     fontWeight: 'bold',
   },
   profileButton: {
     padding: 4,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   avatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#007AFF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e9ecef',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#495057',
   },
-  welcomeCard: {
+  pointsCard: {
+    margin: 16,
+    marginBottom: 8,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#2b8a3e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  pointsCardContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  pointsCardLabel: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.9)',
+    marginBottom: 4,
+  },
+  pointsCardValue: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  pointsCardIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pointsCardFooter: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.2)',
+  },
+  pointsCardFooterText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    marginBottom: 24,
+  },
+  statCard: {
+    width: '46%',
     backgroundColor: 'white',
-    margin: 16,
-    padding: 20,
     borderRadius: 16,
+    padding: 16,
+    margin: '2%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    position: 'relative',
   },
-  welcomeContent: {
-    flex: 1,
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  welcomeText: {
-    fontSize: 14,
-    color: '#6c757d',
-  },
-  userName: {
-    fontSize: 24,
+  statNumber: {
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#212529',
-    marginTop: 2,
+    marginBottom: 4,
   },
-  userEmail: {
+  statLabel: {
     fontSize: 14,
-    color: '#6c757d',
-    marginTop: 4,
+    color: '#868e96',
   },
-  pointsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF3CD',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 4,
+  overdueBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#fff5f5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  pointsText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#856404',
+  overdueBadgeText: {
+    fontSize: 10,
+    color: '#fa5252',
+    fontWeight: '600',
   },
   section: {
     paddingHorizontal: 16,
     marginBottom: 24,
+  },
+  lastSection: {
+    marginBottom: 30,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -645,68 +648,8 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  statsGrid: {
-    gap: 12,
-  },
-  statCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  urgentCard: {
-    backgroundColor: '#FFF3E0',
-    borderWidth: 1,
-    borderColor: '#FFE0B2',
-  },
-  statIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  statContent: {
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#212529',
-  },
-  urgentNumber: {
-    color: '#FF9500',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#6c757d',
-    marginTop: 2,
-  },
-  overdueBadge: {
-    fontSize: 11,
-    color: '#FF3B30',
-    backgroundColor: '#FFEBEE',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginTop: 4,
-    alignSelf: 'flex-start',
-  },
-  completionRate: {
-    fontSize: 12,
-    color: '#34c759',
-    marginTop: 4,
-    fontWeight: '500',
+    color: '#2b8a3e',
+    fontWeight: '600',
   },
   quickActionsGrid: {
     flexDirection: 'row',
@@ -715,104 +658,90 @@ const styles = StyleSheet.create({
   quickActionCard: {
     flex: 1,
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-    position: 'relative',
+    shadowRadius: 8,
+    elevation: 2,
   },
-  actionIcon: {
+  quickActionIcon: {
     width: 56,
     height: 56,
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
+    shadowColor: '#2b8a3e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  actionTitle: {
+  quickActionTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#212529',
     textAlign: 'center',
-  },
-  actionBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: '#EF4444',
-    borderRadius: 12,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  actionBadgeText: {
-    color: 'white',
-    fontSize: 11,
-    fontWeight: 'bold',
   },
   groupsScroll: {
     marginHorizontal: -16,
     paddingHorizontal: 16,
   },
   groupCard: {
-    width: 140,
+    width: 120,
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     marginRight: 12,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowRadius: 8,
+    elevation: 2,
   },
   groupAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     marginBottom: 12,
   },
-  groupIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#007AFF',
+  groupAvatarPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
-  groupIconText: {
-    fontSize: 20,
+  groupAvatarText: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
   },
   groupName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#212529',
     textAlign: 'center',
     marginBottom: 4,
   },
-  groupStats: {
-    fontSize: 12,
-    color: '#6c757d',
-    textAlign: 'center',
-    marginBottom: 8,
+  groupRoleBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
   },
   groupRole: {
-    fontSize: 11,
-    color: '#6c757d',
-    textAlign: 'center',
+    fontSize: 10,
+    color: '#868e96',
+    fontWeight: '500',
   },
   adminRole: {
-    color: '#007AFF',
+    color: '#2b8a3e',
     fontWeight: '600',
   },
   activityContainer: {
@@ -823,7 +752,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -831,10 +760,10 @@ const styles = StyleSheet.create({
     elevation: 1,
     position: 'relative',
   },
-  activityIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  activityIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
@@ -846,11 +775,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#212529',
     marginBottom: 2,
-    lineHeight: 20,
   },
   activityTime: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#868e96',
   },
   unreadDot: {
     position: 'absolute',
@@ -859,24 +787,24 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2b8a3e',
   },
   emptyState: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    shadowRadius: 8,
+    elevation: 2,
   },
   emptyStateText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6c757d',
+    color: '#868e96',
     marginTop: 16,
     marginBottom: 8,
   },
@@ -890,12 +818,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 100,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#6c757d',
+    color: '#868e96',
   },
   errorContainer: {
     flex: 1,
@@ -905,16 +832,17 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#dc3545',
+    color: '#fa5252',
     textAlign: 'center',
     marginVertical: 20,
-    lineHeight: 24,
   },
   retryButton: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  retryButtonGradient: {
+    paddingHorizontal: 32,
+    paddingVertical: 14,
   },
   retryButtonText: {
     color: 'white',

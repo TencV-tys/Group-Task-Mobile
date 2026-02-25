@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// src/screens/FeedbackScreen.tsx - FIXED input rendering
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -8,8 +9,10 @@ import {
   ScrollView,
   TextInput,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { useFeedback } from '../feedbackHook/useFeedback';
@@ -73,7 +76,7 @@ export default function FeedbackScreen({ navigation }: any) {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#007AFF" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
@@ -85,13 +88,25 @@ export default function FeedbackScreen({ navigation }: any) {
           onPress={() => navigation.navigate('FeedbackHistory')}
           style={styles.historyButton}
         >
-          <MaterialCommunityIcons name="history" size={24} color="#007AFF" />
+          <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.historyButtonGradient}
+          >
+            <MaterialCommunityIcons name="history" size={18} color="#495057" />
+          </LinearGradient>
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Form Card */}
-        <View style={styles.formCard}>
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.formCard}
+        >
           {/* Type Picker */}
           <View style={styles.pickerContainer}>
             <Text style={styles.label}>Feedback Type *</Text>
@@ -100,9 +115,15 @@ export default function FeedbackScreen({ navigation }: any) {
                 selectedValue={type}
                 onValueChange={setType}
                 style={styles.picker}
+                dropdownIconColor="#495057"
               >
                 {FEEDBACK_TYPES.map(option => (
-                  <Picker.Item key={option.value} label={option.label} value={option.value} />
+                  <Picker.Item 
+                    key={option.value} 
+                    label={option.label} 
+                    value={option.value} 
+                    color="#212529"
+                  />
                 ))}
               </Picker>
             </View>
@@ -116,9 +137,15 @@ export default function FeedbackScreen({ navigation }: any) {
                 selectedValue={category}
                 onValueChange={setCategory}
                 style={styles.picker}
+                dropdownIconColor="#495057"
               >
                 {CATEGORIES.map(option => (
-                  <Picker.Item key={option.value} label={option.label} value={option.value} />
+                  <Picker.Item 
+                    key={option.value} 
+                    label={option.label} 
+                    value={option.value}
+                    color="#212529"
+                  />
                 ))}
               </Picker>
             </View>
@@ -127,15 +154,18 @@ export default function FeedbackScreen({ navigation }: any) {
           {/* Message Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Your Feedback *</Text>
-            <TextInput
-              style={styles.messageInput}
-              multiline
-              numberOfLines={8}
-              placeholder="Tell us what you think..."
-              value={message}
-              onChangeText={setMessage}
-              textAlignVertical="top"
-            />
+            <View style={styles.messageInputWrapper}>
+              <TextInput
+                style={styles.messageInput}
+                multiline
+                numberOfLines={6}
+                placeholder="Tell us what you think..."
+                placeholderTextColor="#adb5bd"
+                value={message}
+                onChangeText={setMessage}
+                textAlignVertical="top"
+              />
+            </View>
           </View>
 
           {/* Submit Button */}
@@ -144,37 +174,70 @@ export default function FeedbackScreen({ navigation }: any) {
             onPress={handleSubmit}
             disabled={submitting}
           >
-            {submitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="send" size={20} color="#fff" />
-                <Text style={styles.submitButtonText}>Submit Feedback</Text>
-              </>
-            )}
+            <LinearGradient
+              colors={submitting ? ['#f8f9fa', '#e9ecef'] : ['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.submitButtonGradient}
+            >
+              {submitting ? (
+                <ActivityIndicator size="small" color="#495057" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="send" size={18} color="white" />
+                  <Text style={styles.submitButtonText}>Submit Feedback</Text>
+                </>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
 
           <Text style={styles.note}>
             Your feedback helps us make the app better for everyone!
           </Text>
-        </View>
+        </LinearGradient>
 
         {/* Quick Tips */}
-        <View style={styles.tipsCard}>
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.tipsCard}
+        >
           <Text style={styles.tipsTitle}>💡 Quick Tips</Text>
           <View style={styles.tipItem}>
-            <MaterialCommunityIcons name="bug" size={18} color="#FF3B30" />
+            <LinearGradient
+              colors={['#fff5f5', '#ffe3e3']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.tipIcon}
+            >
+              <MaterialCommunityIcons name="bug" size={16} color="#fa5252" />
+            </LinearGradient>
             <Text style={styles.tipText}>Report bugs with details of what happened</Text>
           </View>
           <View style={styles.tipItem}>
-            <MaterialCommunityIcons name="lightbulb" size={18} color="#FF9500" />
+            <LinearGradient
+              colors={['#fff3bf', '#ffec99']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.tipIcon}
+            >
+              <MaterialCommunityIcons name="lightbulb" size={16} color="#e67700" />
+            </LinearGradient>
             <Text style={styles.tipText}>Suggest features you'd like to see</Text>
           </View>
           <View style={styles.tipItem}>
-            <MaterialCommunityIcons name="message" size={18} color="#34C759" />
+            <LinearGradient
+              colors={['#d3f9d8', '#b2f2bb']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.tipIcon}
+            >
+              <MaterialCommunityIcons name="message" size={16} color="#2b8a3e" />
+            </LinearGradient>
             <Text style={styles.tipText}>Be specific - it helps us understand better</Text>
           </View>
-        </View>
+        </LinearGradient>
       </ScrollView>
     </SafeAreaView>
   );
@@ -194,117 +257,131 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
+    minHeight: 60,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   titleContainer: {
     flex: 1,
     alignItems: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212529',
   },
   subtitle: {
-    fontSize: 12,
-    color: '#6c757d',
+    fontSize: 11,
+    color: '#868e96',
+    marginTop: 2,
   },
   historyButton: {
-    width: 40,
-    height: 40,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  historyButtonGradient: {
+    width: 36,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#f1f3f5',
   },
   content: {
     padding: 16,
     paddingBottom: 32,
   },
   formCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   pickerContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
     color: '#495057',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   pickerWrapper: {
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderRadius: 8,
-    overflow: 'hidden',
     backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    borderRadius: 10,
+    overflow: 'hidden',
   },
   picker: {
-    height: 50,
+    height: Platform.OS === 'ios' ? 150 : 48,
+    width: '100%',
+    color: '#212529',
   },
   inputContainer: {
     marginBottom: 20,
   },
-  messageInput: {
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    minHeight: 150,
+  messageInputWrapper: {
     backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  messageInput: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    minHeight: 120,
+    color: '#212529',
     textAlignVertical: 'top',
   },
   submitButton: {
-    backgroundColor: '#007AFF',
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  submitButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 8,
+    padding: 14,
     gap: 8,
-    marginBottom: 12,
   },
   buttonDisabled: {
-    backgroundColor: '#adb5bd',
+    opacity: 0.6,
   },
   submitButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   note: {
-    fontSize: 12,
-    color: '#6c757d',
+    fontSize: 11,
+    color: '#868e96',
     textAlign: 'center',
+    fontStyle: 'italic',
   },
   tipsCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   tipsTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#212529',
     marginBottom: 12,
@@ -312,12 +389,22 @@ const styles = StyleSheet.create({
   tipItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginBottom: 10,
+    gap: 10,
+    marginBottom: 8,
+  },
+  tipIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   tipText: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 13,
     color: '#495057',
+    lineHeight: 18,
   },
-}); 
+});

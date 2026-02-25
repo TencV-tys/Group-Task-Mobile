@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// src/screens/FullLeaderboardScreen.tsx - UPDATED with dark gray primary and token checking
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,22 +9,72 @@ import {
   ActivityIndicator,
   Image,
   RefreshControl,
+  Alert,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
+import * as SecureStore from 'expo-secure-store';
 
 export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const { groupId, groupName } = route.params;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [authError, setAuthError] = useState(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        console.warn('🔐 FullLeaderboardScreen: No auth token available');
+        setAuthError(true);
+        return false;
+      }
+      console.log('✅ FullLeaderboardScreen: Auth token found');
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('❌ FullLeaderboardScreen: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     loadLeaderboardData();
   }, [groupId]);
 
+  // Show auth error if needed
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
+
   const loadLeaderboardData = async () => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     try {
       // Using TaskService.getTaskStatistics which already has pointsByUser
       const result = await TaskService.getTaskStatistics(groupId);
@@ -32,6 +83,12 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
         const sortedUsers = Object.values(result.statistics.pointsByUser)
           .sort((a: any, b: any) => b.totalPoints - a.totalPoints);
         setLeaderboard(sortedUsers);
+      } else {
+        // Check if error is auth-related
+        if (result.message?.toLowerCase().includes('token') || 
+            result.message?.toLowerCase().includes('auth')) {
+          setAuthError(true);
+        }
       }
     } catch (error) {
       console.error('Error loading leaderboard:', error);
@@ -49,29 +106,39 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const getRankIcon = (index: number) => {
     switch (index) {
       case 0:
-        return <Ionicons name="trophy" size={24} color="#FFD700" />;
+        return <MaterialCommunityIcons name="trophy" size={24} color="#FFD700" />;
       case 1:
-        return <Ionicons name="trophy" size={22} color="#C0C0C0" />;
+        return <MaterialCommunityIcons name="trophy" size={22} color="#C0C0C0" />;
       case 2:
-        return <Ionicons name="trophy" size={20} color="#CD7F32" />;
+        return <MaterialCommunityIcons name="trophy" size={20} color="#CD7F32" />;
       default:
         return <Text style={styles.rankNumber}>{index + 1}</Text>;
     }
   };
 
   const renderLeaderboardItem = ({ item, index }: { item: any; index: number }) => (
-    <View style={[
-      styles.leaderboardItem,
-      index === 0 && styles.firstPlace,
-      index === 1 && styles.secondPlace,
-      index === 2 && styles.thirdPlace,
-    ]}>
+    <LinearGradient
+      colors={['#ffffff', '#f8f9fa']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[
+        styles.leaderboardItem,
+        index === 0 && styles.firstPlace,
+        index === 1 && styles.secondPlace,
+        index === 2 && styles.thirdPlace,
+      ]}
+    >
       <View style={styles.rankContainer}>
         {getRankIcon(index)}
       </View>
 
       <View style={styles.userContainer}>
-        <View style={styles.avatar}>
+        <LinearGradient
+          colors={['#f8f9fa', '#e9ecef']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.avatar}
+        >
           {item.avatarUrl ? (
             <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
           ) : (
@@ -79,7 +146,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
               {item.userName?.charAt(0).toUpperCase() || '?'}
             </Text>
           )}
-        </View>
+        </LinearGradient>
         
         <View style={styles.userInfo}>
           <Text style={styles.userName} numberOfLines={1}>
@@ -95,27 +162,51 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
         <Text style={styles.pointsValue}>{item.totalPoints}</Text>
         <Text style={styles.pointsLabel}>points</Text>
       </View>
-    </View>
+    </LinearGradient>
   );
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Loading leaderboard...</Text>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#495057" />
+          <Text style={styles.loadingText}>Loading leaderboard...</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1F2937" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Leaderboard</Text>
-        <Text style={styles.groupName} numberOfLines={1}>{groupName}</Text>
+        <TouchableOpacity 
+          onPress={handleRefresh} 
+          style={styles.refreshButton}
+          disabled={refreshing}
+        >
+          {refreshing ? (
+            <ActivityIndicator size="small" color="#495057" />
+          ) : (
+            <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+          )}
+        </TouchableOpacity>
       </View>
+
+      {/* Group Name Banner */}
+      <LinearGradient
+        colors={['#f8f9fa', '#e9ecef']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.groupBanner}
+      >
+        <MaterialCommunityIcons name="account-group" size={16} color="#495057" />
+        <Text style={styles.groupBannerText}>{groupName}</Text>
+      </LinearGradient>
 
       <FlatList
         data={leaderboard}
@@ -123,7 +214,12 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
         keyExtractor={(item, index) => `${item.userId}-${index}`}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={handleRefresh}
+            colors={['#495057']}
+            tintColor="#495057"
+          />
         }
         ListHeaderComponent={
           <View style={styles.statsHeader}>
@@ -135,7 +231,14 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="trophy-outline" size={64} color="#D1D5DB" />
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.emptyIconContainer}
+            >
+              <MaterialCommunityIcons name="trophy-outline" size={48} color="#adb5bd" />
+            </LinearGradient>
             <Text style={styles.emptyTitle}>No Data Yet</Text>
             <Text style={styles.emptyText}>
               Complete tasks to earn points and appear on the leaderboard
@@ -150,7 +253,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#f8f9fa',
   },
   centerContainer: {
     flex: 1,
@@ -159,8 +262,8 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 14,
+    color: '#868e96',
   },
   header: {
     flexDirection: 'row',
@@ -168,67 +271,92 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#e9ecef',
+    minHeight: 60,
   },
   backButton: {
-    padding: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
   },
-  groupName: {
+  refreshButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  groupBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  groupBannerText: {
     fontSize: 14,
-    color: '#6B7280',
-    maxWidth: 120,
+    color: '#495057',
+    fontWeight: '500',
   },
   listContent: {
     padding: 16,
-    paddingTop: 0,
   },
   statsHeader: {
     marginBottom: 16,
   },
   statsTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#212529',
     marginBottom: 4,
   },
   statsSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
+    fontSize: 13,
+    color: '#868e96',
   },
   leaderboardItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   firstPlace: {
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#F59E0B',
+    borderColor: '#ffd43b',
+    borderWidth: 2,
   },
   secondPlace: {
-    backgroundColor: '#F3F4F6',
-    borderWidth: 1,
-    borderColor: '#9CA3AF',
+    borderColor: '#ced4da',
+    borderWidth: 2,
   },
   thirdPlace: {
-    backgroundColor: '#FFEDD5',
-    borderWidth: 1,
-    borderColor: '#D97706',
+    borderColor: '#d97706',
+    borderWidth: 2,
   },
   rankContainer: {
     width: 40,
@@ -236,9 +364,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   rankNumber: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#6B7280',
+    color: '#868e96',
   },
   userContainer: {
     flex: 1,
@@ -250,17 +378,18 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#4F46E5',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   avatarImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   avatarText: {
-    color: '#FFFFFF',
+    color: '#495057',
     fontSize: 18,
     fontWeight: '600',
   },
@@ -268,43 +397,54 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
     marginBottom: 2,
   },
   userStats: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#868e96',
   },
   pointsContainer: {
     alignItems: 'center',
     minWidth: 60,
   },
   pointsValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#4F46E5',
+    color: '#2b8a3e',
   },
   pointsLabel: {
-    fontSize: 10,
-    color: '#6B7280',
+    fontSize: 9,
+    color: '#868e96',
   },
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 48,
   },
+  emptyIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#868e96',
     textAlign: 'center',
     paddingHorizontal: 32,
+    lineHeight: 20,
   },
-});
+}); 

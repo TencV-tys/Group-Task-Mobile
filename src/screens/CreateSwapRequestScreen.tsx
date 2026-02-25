@@ -1,4 +1,4 @@
-// src/screens/CreateSwapRequestScreen.tsx - COMPLETE FIXED VERSION
+// src/screens/CreateSwapRequestScreen.tsx - UPDATED with dark gray primary color
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -13,9 +13,10 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { GroupMembersService } from '../services/GroupMemberService';
@@ -101,7 +102,7 @@ export const CreateSwapRequestScreen = () => {
   useEffect(() => {
     if (assignmentId) {
       checkSwapAvailability();
-    }
+    } 
   }, [assignmentId, swapScope]);
 
   const loadGroupMembers = async () => {
@@ -110,13 +111,7 @@ export const CreateSwapRequestScreen = () => {
       console.log('📥 Loading members for group:', groupId);
       const result = await GroupMembersService.getGroupMembers(groupId);
       
-      console.log('📦 Raw members result:', JSON.stringify(result, null, 2));
-      
       if (result.success) {
-        if (result.members && result.members.length > 0) {
-          console.log('📋 First member structure:', JSON.stringify(result.members[0], null, 2));
-        }
-        
         const activeMembers = (result.members || []).filter((m: any) => m.isActive !== false);
         setMembers(activeMembers);
         console.log(`✅ Loaded ${activeMembers.length} active members`);
@@ -185,16 +180,6 @@ export const CreateSwapRequestScreen = () => {
     }
 
     try {
-      console.log('📝 Submitting swap request:', {
-        assignmentId,
-        reason: reason.trim() || undefined,
-        targetUserId,
-        expiresAt: calculateExpiryDate(),
-        scope: swapScope,
-        selectedDay: swapScope === 'day' ? (selectedDay || undefined) : undefined,
-        selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
-      });
-
       const result = await createSwapRequest({
         assignmentId,
         reason: reason.trim() || undefined,
@@ -204,8 +189,6 @@ export const CreateSwapRequestScreen = () => {
         selectedDay: swapScope === 'day' ? (selectedDay || undefined) : undefined,
         selectedTimeSlotId: swapScope === 'day' ? (selectedTimeSlotId || undefined) : undefined,
       });
-
-      console.log('📦 Swap request result:', result);
 
       if (result.success) {
         Alert.alert(
@@ -256,15 +239,16 @@ export const CreateSwapRequestScreen = () => {
 
   if (checking || loadingMembers) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4F46E5" />
-        <Text style={styles.loadingText}>Checking availability...</Text>
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#495057" />
+          <Text style={styles.loadingText}>Checking availability...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   const isDailyTask = executionFrequency === 'DAILY';
-  const hasMultipleTimeSlots = timeSlots && timeSlots.length > 1;
   const formattedDueDate = dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A';
 
   if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pending')) {
@@ -272,13 +256,13 @@ export const CreateSwapRequestScreen = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Request Swap</Text>
-          <View style={{ width: 40 }} />
+          <View style={{ width: 36 }} />
         </View>
         <View style={styles.centerContainer}>
-          <Ionicons name="time" size={64} color="#F59E0B" />
+          <MaterialCommunityIcons name="clock-alert" size={64} color="#e67700" />
           <Text style={styles.pendingTitle}>Pending Request Exists</Text>
           <Text style={styles.pendingText}>
             You already have a pending swap request for this assignment.
@@ -292,7 +276,14 @@ export const CreateSwapRequestScreen = () => {
               }
             }}
           >
-            <Text style={styles.viewRequestButtonText}>View Request</Text>
+            <LinearGradient
+              colors={['#495057', '#343a40']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.viewRequestButtonGradient}
+            >
+              <Text style={styles.viewRequestButtonText}>View Request</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -305,21 +296,32 @@ export const CreateSwapRequestScreen = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#1F2937" />
+            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Request Swap</Text>
-          <View style={{ width: 40 }} />
+          <View style={{ width: 36 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Assignment Info Card */}
-          <View style={styles.assignmentCard}>
+          <LinearGradient
+            colors={['#ffffff', '#f8f9fa']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.assignmentCard}
+          >
             <View style={styles.cardHeader}>
-              <View style={styles.taskIconContainer}>
-                <Ionicons name="swap-horizontal" size={24} color="#4F46E5" />
-              </View>
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.taskIconContainer}
+              >
+                <MaterialCommunityIcons name="swap-horizontal" size={22} color="#495057" />
+              </LinearGradient>
               <Text style={styles.cardTitle}>Assignment Details</Text>
             </View>
             
@@ -327,106 +329,126 @@ export const CreateSwapRequestScreen = () => {
             
             <View style={styles.detailsGrid}>
               <View style={styles.detailItem}>
-                <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+                <MaterialCommunityIcons name="calendar-outline" size={14} color="#868e96" />
                 <Text style={styles.detailLabel}>Due Date</Text>
                 <Text style={styles.detailValue}>{formattedDueDate}</Text>
               </View>
               
               <View style={styles.detailItem}>
-                <Ionicons name="time-outline" size={16} color="#6B7280" />
+                <MaterialCommunityIcons name="clock-outline" size={14} color="#868e96" />
                 <Text style={styles.detailLabel}>Time</Text>
-                <Text style={styles.detailValue}>{timeSlot || 'Scheduled time'}</Text>
+                <Text style={styles.detailValue}>{timeSlot || 'Scheduled'}</Text>
               </View>
               
               <View style={styles.detailItem}>
-                <Ionicons name="star-outline" size={16} color="#F59E0B" />
+                <MaterialCommunityIcons name="star" size={14} color="#e67700" />
                 <Text style={styles.detailLabel}>Points</Text>
                 <Text style={[styles.detailValue, styles.pointsValue]}>{taskPoints || 0}</Text>
               </View>
             </View>
 
             {selectedDay && swapScope === 'day' && (
-              <View style={styles.assignmentDayBadge}>
-                <Ionicons name="today" size={14} color="#4F46E5" />
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.assignmentDayBadge}
+              >
+                <MaterialCommunityIcons name="calendar-today" size={14} color="#495057" />
                 <Text style={styles.assignmentDayText}>
                   This assignment is for: <Text style={styles.assignmentDayBold}>{selectedDay}</Text>
                 </Text>
-              </View>
+              </LinearGradient>
             )}
             
-            <View style={styles.frequencyBadge}>
-              <Ionicons 
-                name={isDailyTask ? "calendar" : "calendar-week" as any} 
-                size={14} 
-                color="#6B7280" 
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.frequencyBadge}
+            >
+              <MaterialCommunityIcons 
+                name={isDailyTask ? "calendar" : "calendar-week"} 
+                size={12} 
+                color="#495057" 
               />
               <Text style={styles.frequencyText}>
                 {isDailyTask ? 'Daily Task' : 'Weekly Task'}
               </Text>
-            </View>
+            </LinearGradient>
 
-            <View style={[
-              styles.scopeBadge,
-              swapScope === 'week' ? styles.weekScopeBadge : styles.dayScopeBadge
-            ]}>
-              <Ionicons 
-                name={swapScope === 'week' ? 'calendar' : 'today'} 
-                size={14} 
-                color={swapScope === 'week' ? '#6B7280' : '#4F46E5'} 
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.scopeBadge}
+            >
+              <MaterialCommunityIcons 
+                name={swapScope === 'week' ? 'calendar-week' : 'calendar-today'} 
+                size={12} 
+                color="#495057" 
               />
-              <Text style={[
-                styles.scopeBadgeText,
-                swapScope === 'day' && styles.dayScopeBadgeText
-              ]}>
+              <Text style={styles.scopeBadgeText}>
                 {swapScope === 'week' ? 'Swapping entire week' : `Swapping ${selectedDay || 'specific day'}`}
               </Text>
-            </View>
-          </View>
+            </LinearGradient>
+          </LinearGradient>
 
           {!canSwap.canSwap && (
-            <View style={styles.warningCard}>
-              <Ionicons name="warning" size={24} color="#EF4444" />
+            <LinearGradient
+              colors={['#fff5f5', '#ffe3e3']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.warningCard}
+            >
+              <MaterialCommunityIcons name="alert-circle" size={24} color="#fa5252" />
               <View style={styles.warningContent}>
                 <Text style={styles.warningTitle}>Cannot Request Swap</Text>
                 <Text style={styles.warningText}>{canSwap.reason}</Text>
               </View>
-            </View>
+            </LinearGradient>
           )}
 
           {canSwap.canSwap && (
             <>
-              <View style={styles.infoBanner}>
-                <Ionicons name="information-circle" size={24} color="#4F46E5" />
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.infoBanner}
+              >
+                <MaterialCommunityIcons name="information" size={22} color="#495057" />
                 <View style={styles.infoBannerContent}>
                   <Text style={styles.infoBannerTitle}>
                     {swapScope === 'week' ? 'Swap Entire Week' : 'Swap Specific Day'}
                   </Text>
                   <Text style={styles.infoBannerText}>
                     {swapScope === 'week' 
-                      ? 'You\'re swapping ALL your tasks for the entire week. The person who accepts will take over all your assignments this week.'
-                      : `You're swapping the assignment for ${selectedDay || 'this day'}. The person who accepts will take over this day only.`}
+                      ? 'You\'re swapping ALL your tasks for the entire week.'
+                      : `You're swapping the assignment for ${selectedDay || 'this day'}.`}
                   </Text>
                 </View>
-              </View>
+              </LinearGradient>
 
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Swap With</Text>
                 <TouchableOpacity
                   style={styles.selectorButton}
                   onPress={() => setShowMemberSelector(!showMemberSelector)}
+                  activeOpacity={0.7}
                 >
                   <View style={styles.selectorContent}>
-                    <Ionicons 
-                      name={targetUserId ? "person" : "people"} 
-                      size={20} 
-                      color="#4F46E5" 
+                    <MaterialCommunityIcons 
+                      name={targetUserId ? "account" : "account-group"} 
+                      size={18} 
+                      color="#495057" 
                     />
                     <Text style={styles.selectorText}>{getSelectedMemberName()}</Text>
                   </View>
-                  <Ionicons 
+                  <MaterialCommunityIcons 
                     name={showMemberSelector ? "chevron-up" : "chevron-down"} 
-                    size={20} 
-                    color="#6B7280" 
+                    size={18} 
+                    color="#868e96" 
                   />
                 </TouchableOpacity>
 
@@ -438,18 +460,24 @@ export const CreateSwapRequestScreen = () => {
                         setTargetUserId(undefined);
                         setShowMemberSelector(false);
                       }}
+                      activeOpacity={0.7}
                     >
                       <View style={styles.memberInfo}>
-                        <View style={[styles.avatar, styles.anyoneAvatar]}>
-                          <Ionicons name="people" size={20} color="#FFFFFF" />
-                        </View>
+                        <LinearGradient
+                          colors={['#f8f9fa', '#e9ecef']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={[styles.avatar, styles.anyoneAvatar]}
+                        >
+                          <MaterialCommunityIcons name="account-group" size={18} color="#495057" />
+                        </LinearGradient>
                         <View>
                           <Text style={styles.memberName}>Anyone can accept</Text>
                           <Text style={styles.memberRole}>Any group member</Text>
                         </View>
                       </View>
                       {!targetUserId && (
-                        <Ionicons name="checkmark-circle" size={24} color="#4F46E5" />
+                        <MaterialCommunityIcons name="check-circle" size={20} color="#2b8a3e" />
                       )}
                     </TouchableOpacity>
                     
@@ -462,20 +490,29 @@ export const CreateSwapRequestScreen = () => {
                             setTargetUserId(member.userId || member.id);
                             setShowMemberSelector(false);
                           }}
+                          activeOpacity={0.7}
                         >
                           <View style={styles.memberInfo}>
-                            <View style={styles.avatar}>
+                            <LinearGradient
+                              colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={styles.avatar}
+                            >
                               {member.avatarUrl ? (
                                 <Image 
                                   source={{ uri: member.avatarUrl }} 
                                   style={styles.avatarImage} 
                                 />
                               ) : (
-                                <Text style={styles.avatarText}>
+                                <Text style={[
+                                  styles.avatarText,
+                                  { color: member.role === 'ADMIN' ? 'white' : '#495057' }
+                                ]}>
                                   {member.fullName?.charAt(0).toUpperCase() || '?'}
                                 </Text>
                               )}
-                            </View>
+                            </LinearGradient>
                             <View>
                               <Text style={styles.memberName}>{member.fullName || 'Unknown'}</Text>
                               <Text style={styles.memberRole}>
@@ -484,7 +521,7 @@ export const CreateSwapRequestScreen = () => {
                             </View>
                           </View>
                           {targetUserId === (member.userId || member.id) && (
-                            <Ionicons name="checkmark-circle" size={24} color="#4F46E5" />
+                            <MaterialCommunityIcons name="check-circle" size={20} color="#2b8a3e" />
                           )}
                         </TouchableOpacity>
                       ))
@@ -508,15 +545,23 @@ export const CreateSwapRequestScreen = () => {
                         expiresIn === option && styles.expiryOptionActive,
                       ]}
                       onPress={() => setExpiresIn(option)}
+                      activeOpacity={0.7}
                     >
-                      <Text
-                        style={[
-                          styles.expiryOptionText,
-                          expiresIn === option && styles.expiryOptionTextActive,
-                        ]}
+                      <LinearGradient
+                        colors={expiresIn === option ? ['#495057', '#343a40'] : ['#f8f9fa', '#e9ecef']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.expiryOptionGradient}
                       >
-                        {option === 'never' ? 'Never' : option}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.expiryOptionText,
+                            expiresIn === option && styles.expiryOptionTextActive,
+                          ]}
+                        >
+                          {option === 'never' ? 'Never' : option}
+                        </Text>
+                      </LinearGradient>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -524,26 +569,38 @@ export const CreateSwapRequestScreen = () => {
 
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Reason (Optional)</Text>
-                <TextInput
-                  style={styles.reasonInput}
-                  placeholder="Why do you need to swap this task?"
-                  placeholderTextColor="#9CA3AF"
-                  value={reason}
-                  onChangeText={setReason}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.reasonInputGradient}
+                >
+                  <TextInput
+                    style={styles.reasonInput}
+                    placeholder="Why do you need to swap this task?"
+                    placeholderTextColor="#adb5bd"
+                    value={reason}
+                    onChangeText={setReason}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                </LinearGradient>
               </View>
 
-              <View style={styles.infoNote}>
-                <Ionicons name="information-circle" size={20} color="#4F46E5" />
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.infoNote}
+              >
+                <MaterialCommunityIcons name="information" size={18} color="#495057" />
                 <Text style={styles.infoText}>
                   {swapScope === 'week' 
-                    ? 'This will swap ALL your tasks for the current week. After the swap, you will have no assignments for this week.'
-                    : `You're swapping the assignment for ${selectedDay || 'this day'}. The rest of your week's assignments remain yours.`}
+                    ? 'This will swap ALL your tasks for the current week.'
+                    : `You're swapping the assignment for ${selectedDay || 'this day'}.`}
                 </Text>
-              </View>
+              </LinearGradient>
             </>
           )}
         </ScrollView>
@@ -554,21 +611,29 @@ export const CreateSwapRequestScreen = () => {
               style={[styles.submitButton, loading && styles.submitButtonDisabled]}
               onPress={handleSubmit}
               disabled={loading}
+              activeOpacity={0.8}
             >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="swap-horizontal" size={20} color="#FFFFFF" />
-                  <Text style={styles.submitButtonText}>
-                    {swapScope === 'week' 
-                      ? 'Swap Entire Week' 
-                      : selectedDay
-                        ? `Swap ${selectedDay.slice(0, 3)}'s Assignment`
-                        : 'Create Swap Request'}
-                  </Text>
-                </>
-              )}
+              <LinearGradient
+                colors={loading ? ['#f8f9fa', '#e9ecef'] : ['#2b8a3e', '#1e6b2c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.submitButtonGradient}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#495057" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="swap-horizontal" size={18} color="white" />
+                    <Text style={styles.submitButtonText}>
+                      {swapScope === 'week' 
+                        ? 'Swap Entire Week' 
+                        : selectedDay
+                          ? `Swap ${selectedDay.slice(0, 3)}'s Assignment`
+                          : 'Create Swap Request'}
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         )}
@@ -580,7 +645,7 @@ export const CreateSwapRequestScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#f8f9fa',
   },
   keyboardView: {
     flex: 1,
@@ -589,12 +654,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#F9FAFB',
   },
   loadingText: {
     marginTop: 12,
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 14,
+    color: '#868e96',
   },
   header: {
     flexDirection: 'row',
@@ -602,17 +666,28 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: '#e9ecef',
+    minHeight: 60,
   },
   backButton: {
-    padding: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
   },
   scrollContent: {
     padding: 16,
@@ -624,210 +699,205 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   pendingTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#F59E0B',
+    color: '#e67700',
     marginTop: 16,
     marginBottom: 8,
   },
   pendingText: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 14,
+    color: '#868e96',
     textAlign: 'center',
     marginBottom: 24,
+    lineHeight: 20,
   },
   viewRequestButton: {
-    backgroundColor: '#4F46E5',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  viewRequestButtonGradient: {
     paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 12,
   },
   viewRequestButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: 'white',
+    fontSize: 15,
     fontWeight: '600',
   },
   assignmentCard: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
+    gap: 12,
   },
   taskIconContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#EEF2FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
   },
   taskTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#212529',
     marginBottom: 20,
   },
   detailsGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   detailItem: {
     flex: 1,
     alignItems: 'center',
+    gap: 4,
   },
   detailLabel: {
-    fontSize: 12,
-    color: '#6B7280',
+    fontSize: 11,
+    color: '#868e96',
     marginTop: 4,
   },
   detailValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#1F2937',
-    marginTop: 2,
+    color: '#212529',
   },
   pointsValue: {
-    color: '#F59E0B',
+    color: '#e67700',
   },
   assignmentDayBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 16,
     alignSelf: 'flex-start',
     gap: 6,
-    marginTop: 12,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   assignmentDayText: {
-    fontSize: 13,
-    color: '#4B5563',
+    fontSize: 12,
+    color: '#495057',
   },
   assignmentDayBold: {
     fontWeight: '700',
-    color: '#4F46E5',
+    color: '#495057',
   },
   frequencyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 16,
     alignSelf: 'flex-start',
     gap: 6,
-    marginTop: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   frequencyText: {
-    fontSize: 12,
-    color: '#4B5563',
+    fontSize: 11,
+    color: '#495057',
     fontWeight: '500',
   },
   scopeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
     alignSelf: 'flex-start',
     gap: 6,
-    marginTop: 12,
-  },
-  dayScopeBadge: {
-    backgroundColor: '#EEF2FF',
-  },
-  weekScopeBadge: {
-    backgroundColor: '#F3F4F6',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   scopeBadgeText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '500',
-    color: '#6B7280',
-  },
-  dayScopeBadgeText: {
-    color: '#4F46E5',
+    color: '#495057',
   },
   warningCard: {
-    backgroundColor: '#FEF2F2',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    borderWidth: 1,
+    borderColor: '#ffc9c9',
   },
   warningContent: {
     flex: 1,
   },
   warningTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#EF4444',
-    marginBottom: 4,
+    color: '#fa5252',
+    marginBottom: 2,
   },
   warningText: {
-    fontSize: 14,
-    color: '#EF4444',
+    fontSize: 13,
+    color: '#fa5252',
   },
   infoBanner: {
     flexDirection: 'row',
-    backgroundColor: '#EEF2FF',
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
     gap: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   infoBannerContent: {
     flex: 1,
   },
   infoBannerTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#4F46E5',
-    marginBottom: 4,
+    color: '#495057',
+    marginBottom: 2,
   },
   infoBannerText: {
-    fontSize: 14,
-    color: '#1F2937',
-    lineHeight: 20,
+    fontSize: 13,
+    color: '#868e96',
+    lineHeight: 18,
   },
   section: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
+    color: '#212529',
     marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   selectorButton: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#e9ecef',
   },
   selectorContent: {
     flexDirection: 'row',
@@ -835,15 +905,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   selectorText: {
-    fontSize: 16,
-    color: '#1F2937',
+    fontSize: 15,
+    color: '#212529',
   },
   memberList: {
     marginTop: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'white',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#e9ecef',
     padding: 8,
   },
   memberItem: {
@@ -859,35 +929,35 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#4F46E5',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   anyoneAvatar: {
-    backgroundColor: '#9CA3AF',
+    borderColor: '#e9ecef',
   },
   avatarImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
   },
   avatarText: {
-    color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
   },
   memberName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '500',
-    color: '#1F2937',
+    color: '#212529',
+    marginBottom: 2,
   },
   memberRole: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginTop: 2,
+    fontSize: 12,
+    color: '#868e96',
   },
   noMembersContainer: {
     padding: 20,
@@ -895,7 +965,7 @@ const styles = StyleSheet.create({
   },
   noMembersText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#868e96',
   },
   expiryOptions: {
     flexDirection: 'row',
@@ -903,71 +973,77 @@ const styles = StyleSheet.create({
   },
   expiryOption: {
     flex: 1,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  expiryOptionGradient: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     alignItems: 'center',
   },
   expiryOptionActive: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
+    borderColor: '#495057',
   },
   expiryOptionText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
-    color: '#4B5563',
+    color: '#495057',
   },
   expiryOptionTextActive: {
-    color: '#FFFFFF',
+    color: 'white',
+  },
+  reasonInputGradient: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   reasonInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
     padding: 16,
-    fontSize: 16,
-    color: '#1F2937',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    fontSize: 15,
+    color: '#212529',
     minHeight: 100,
+    backgroundColor: 'transparent',
   },
   infoNote: {
     flexDirection: 'row',
-    backgroundColor: '#EEF2FF',
     borderRadius: 12,
     padding: 16,
     gap: 12,
     marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   infoText: {
     flex: 1,
-    fontSize: 14,
-    color: '#4F46E5',
-    lineHeight: 20,
+    fontSize: 13,
+    color: '#495057',
+    lineHeight: 18,
   },
   footer: {
     padding: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'white',
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: '#e9ecef',
   },
   submitButton: {
-    backgroundColor: '#4F46E5',
     borderRadius: 12,
-    padding: 16,
+    overflow: 'hidden',
+  },
+  submitButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 16,
     gap: 8,
   },
   submitButtonDisabled: {
-    backgroundColor: '#9CA3AF',
+    opacity: 0.7,
   },
   submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: 'white',
+    fontSize: 15,
     fontWeight: '600',
   },
 });

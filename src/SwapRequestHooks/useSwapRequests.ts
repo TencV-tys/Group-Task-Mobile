@@ -1,9 +1,9 @@
-// SwapRequestHooks/useSwapRequests.ts - UPDATED WITH SECURESTORE
+// SwapRequestHooks/useSwapRequests.ts - UPDATED WITH TOKEN CHECKING
 import { useState, useEffect, useCallback } from 'react';
 import { SwapRequestFilters, SwapRequest, SwapRequestService } from '../services/SwapRequestService';
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
-
+import { AuthService } from '../services/AuthService';
 export const useSwapRequests = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [myRequests, setMyRequests] = useState<SwapRequest[]>([]);
@@ -12,50 +12,82 @@ export const useSwapRequests = () => {
   const [error, setError] = useState<string | null>(null);
   const [totalMyRequests, setTotalMyRequests] = useState(0);
   const [totalPendingForMe, setTotalPendingForMe] = useState(0);
+  const [authError, setAuthError] = useState(false);
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        console.warn('🔐 useSwapRequests: No auth token available');
+        setAuthError(true);
+        return false;
+      }
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('❌ useSwapRequests: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   // Load user ID from SecureStore on mount
-  useEffect(() => {
-    const loadUserId = async () => {
-      try {
-        // Try to get userData from SecureStore first
-        let userStr = await SecureStore.getItemAsync('userData');
-        
-        // If not found, try 'user' as fallback
-        if (!userStr) {
-          userStr = await SecureStore.getItemAsync('user');
-        }
-        
-        // If still not found, try 'userId' directly
-        if (!userStr) {
-          const userId = await SecureStore.getItemAsync('userId');
-          if (userId) {
-            setUserId(userId);
-            console.log('✅ User ID loaded directly from userId key:', userId);
-            return;
+ // In useSwapRequests.ts
+useEffect(() => {
+  const loadUserId = async () => {
+    try {
+      const userStr = await SecureStore.getItemAsync('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setUserId(user.id); 
+      } else {
+        // If no user data but token exists, fetch user data
+        const token = await SecureStore.getItemAsync('userToken');
+        if (token) {
+          const userData = await AuthService.getCurrentUser();
+          if (userData) {
+            await SecureStore.setItemAsync('user', JSON.stringify(userData));
+            setUserId(userData.id);
           }
         }
-        
-        if (userStr) {
-          const user = JSON.parse(userStr);
-          setUserId(user.id || user._id); // Handle both id and _id formats
-          console.log('✅ User ID loaded from SecureStore:', user.id || user._id);
-          console.log('📦 User data loaded from SecureStore');
-        } else {
-          console.warn('⚠️ No user found in SecureStore');
-          
-          // Debug: Check if token exists
-          const token = await SecureStore.getItemAsync('userToken');
-          console.log('🔐 Token exists in SecureStore:', token ? 'Yes' : 'No');
-        }
-      } catch (error) {
-        console.error('❌ Error loading user ID from SecureStore:', error);
       }
-    };
-    loadUserId();
-  }, []);
+    } catch (error) {
+      console.error('Error loading user:', error);
+    }
+  };
+  loadUserId();
+}, []);
+
+  // Show auth error alert
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              // You might want to navigate to login here, but since this is a hook,
+              // we'll let the component handle navigation
+            }
+          }
+        ]
+      );
+    }
+  }, [authError]);
 
   // Load my swap requests
   const loadMyRequests = useCallback(async (filters?: SwapRequestFilters) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      return;
+    }
+
     if (!userId) {
       console.log('⏸️ Cannot load my requests: No user ID');
       return;
@@ -63,6 +95,7 @@ export const useSwapRequests = () => {
     
     setLoading(true);
     setError(null);
+    setAuthError(false);
     
     try {
       console.log('📥 Loading my requests with filters:', filters);
@@ -86,6 +119,13 @@ export const useSwapRequests = () => {
       } else {
         console.error('❌ Failed to load requests:', response.message);
         setError(response.message || 'Failed to load swap requests');
+        
+        // Check if error is auth-related
+        if (response.message?.toLowerCase().includes('token') || 
+            response.message?.toLowerCase().includes('auth') ||
+            response.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
       }
     } catch (err: any) {
       console.error('❌ Error in loadMyRequests:', err);
@@ -93,10 +133,17 @@ export const useSwapRequests = () => {
     } finally {
       setLoading(false);
     }
-  }, [userId]); 
+  }, [userId, checkToken]); 
 
   // Load pending requests for current user
   const loadPendingForMe = useCallback(async (groupId?: string) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      return;
+    }
+
     if (!userId) {
       console.log('⏸️ Cannot load pending for me: No user ID');
       return;
@@ -104,6 +151,7 @@ export const useSwapRequests = () => {
     
     setLoading(true);
     setError(null);
+    setAuthError(false);
     
     try {
       console.log('📥 Loading pending for me with groupId:', groupId);
@@ -122,6 +170,13 @@ export const useSwapRequests = () => {
       } else {
         console.error('❌ Failed to load pending requests:', response.message);
         setError(response.message || 'Failed to load pending requests');
+        
+        // Check if error is auth-related
+        if (response.message?.toLowerCase().includes('token') || 
+            response.message?.toLowerCase().includes('auth') ||
+            response.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
       }
     } catch (err: any) {
       console.error('❌ Error in loadPendingForMe:', err);
@@ -129,7 +184,7 @@ export const useSwapRequests = () => {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, checkToken]);
 
   // Create swap request
   const createSwapRequest = useCallback(async (data: {
@@ -141,8 +196,19 @@ export const useSwapRequests = () => {
     selectedDay?: string;
     selectedTimeSlotId?: string;
   }) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return { 
+        success: false, 
+        message: 'Authentication required',
+        authError: true 
+      };
+    }
+
     setLoading(true);
     setError(null);
+    setAuthError(false);
     
     try {
       console.log('📝 Creating swap request with data:', data);
@@ -172,6 +238,13 @@ export const useSwapRequests = () => {
       if (response.success) {
         await loadMyRequests();
         await loadPendingForMe();
+      } else {
+        // Check if error is auth-related
+        if (response.message?.toLowerCase().includes('token') || 
+            response.message?.toLowerCase().includes('auth') ||
+            response.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
       }
       
       return response;
@@ -182,12 +255,23 @@ export const useSwapRequests = () => {
     } finally {
       setLoading(false);
     }
-  }, [loadMyRequests, loadPendingForMe]);
+  }, [loadMyRequests, loadPendingForMe, checkToken]);
 
   // Accept swap request
   const acceptSwapRequest = useCallback(async (requestId: string) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return { 
+        success: false, 
+        message: 'Authentication required',
+        authError: true 
+      };
+    }
+
     setLoading(true);
     setError(null);
+    setAuthError(false);
     
     try {
       console.log('✅ Accepting swap request:', requestId);
@@ -217,6 +301,13 @@ export const useSwapRequests = () => {
         }
         
         Alert.alert('Success', successMessage);
+      } else {
+        // Check if error is auth-related
+        if (response.message?.toLowerCase().includes('token') || 
+            response.message?.toLowerCase().includes('auth') ||
+            response.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
       }
       
       return response;
@@ -227,12 +318,23 @@ export const useSwapRequests = () => {
     } finally {
       setLoading(false);
     }
-  }, [loadMyRequests, loadPendingForMe]);
+  }, [loadMyRequests, loadPendingForMe, checkToken]);
 
   // Reject swap request
   const rejectSwapRequest = useCallback(async (requestId: string, reason?: string) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return { 
+        success: false, 
+        message: 'Authentication required',
+        authError: true 
+      };
+    }
+
     setLoading(true);
     setError(null);
+    setAuthError(false);
     
     try {
       console.log('❌ Rejecting swap request:', requestId, 'reason:', reason);
@@ -244,6 +346,13 @@ export const useSwapRequests = () => {
         await loadMyRequests();
         await loadPendingForMe();
         Alert.alert('Success', 'Swap request rejected successfully.');
+      } else {
+        // Check if error is auth-related
+        if (response.message?.toLowerCase().includes('token') || 
+            response.message?.toLowerCase().includes('auth') ||
+            response.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
       }
       
       return response;
@@ -254,12 +363,23 @@ export const useSwapRequests = () => {
     } finally {
       setLoading(false);
     }
-  }, [loadMyRequests, loadPendingForMe]);
+  }, [loadMyRequests, loadPendingForMe, checkToken]);
 
   // Cancel swap request
   const cancelSwapRequest = useCallback(async (requestId: string) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return { 
+        success: false, 
+        message: 'Authentication required',
+        authError: true 
+      };
+    }
+
     setLoading(true);
     setError(null);
+    setAuthError(false);
     
     try {
       console.log('✖️ Cancelling swap request:', requestId);
@@ -271,6 +391,13 @@ export const useSwapRequests = () => {
         await loadMyRequests();
         await loadPendingForMe();
         Alert.alert('Success', 'Swap request cancelled successfully.');
+      } else {
+        // Check if error is auth-related
+        if (response.message?.toLowerCase().includes('token') || 
+            response.message?.toLowerCase().includes('auth') ||
+            response.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
       }
       
       return response;
@@ -281,7 +408,7 @@ export const useSwapRequests = () => {
     } finally {
       setLoading(false);
     }
-  }, [loadMyRequests, loadPendingForMe]);
+  }, [loadMyRequests, loadPendingForMe, checkToken]);
 
   // Check if user has pending requests for an assignment
   const hasPendingRequest = useCallback((assignmentId: string) => {
@@ -304,12 +431,18 @@ export const useSwapRequests = () => {
 
   // Refresh all data
   const refreshAll = useCallback(async (groupId?: string) => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return;
+    }
+
     console.log('🔄 Refreshing all swap data');
     await Promise.all([
       loadMyRequests(),
       loadPendingForMe(groupId)
     ]);
-  }, [loadMyRequests, loadPendingForMe]);
+  }, [loadMyRequests, loadPendingForMe, checkToken]);
 
   return {
     myRequests,
@@ -319,6 +452,7 @@ export const useSwapRequests = () => {
     totalMyRequests,
     totalPendingForMe,
     userId,
+    authError,
     loadMyRequests,
     loadPendingForMe,
     createSwapRequest,

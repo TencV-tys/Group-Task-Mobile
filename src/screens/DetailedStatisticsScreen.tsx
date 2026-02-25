@@ -1,5 +1,5 @@
-// src/screens/DetailedStatisticsScreen.tsx - UPDATED with clean UI and consistent colors
-import React, { useState, useEffect } from 'react';
+// src/screens/DetailedStatisticsScreen.tsx - UPDATED with token checking
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
+import * as SecureStore from 'expo-secure-store';
 
 const { width } = Dimensions.get('window');
 
@@ -20,25 +22,78 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
   const { groupId, groupName } = route.params;
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
+  const [authError, setAuthError] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'all'>('week');
+
+  // Check token before making requests
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        console.warn('🔐 DetailedStatisticsScreen: No auth token available');
+        setAuthError(true);
+        return false;
+      }
+      console.log('✅ DetailedStatisticsScreen: Auth token found');
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      console.error('❌ DetailedStatisticsScreen: Error checking token:', error);
+      setAuthError(true);
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     loadStatistics();
   }, [groupId]);
 
   const loadStatistics = async () => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    setAuthError(false);
+    
     try {
       const result = await TaskService.getTaskStatistics(groupId);
       if (result.success) {
         setStats(result.statistics);
-      } 
+      } else {
+        if (result.message?.toLowerCase().includes('token') || 
+            result.message?.toLowerCase().includes('auth')) {
+          setAuthError(true);
+        }
+      }
     } catch (error) {
       console.error('Error loading statistics:', error);
     } finally {
       setLoading(false);
     }
   };
+
+  // Show auth error if needed
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
 
   const getCompletionRateColor = (rate: number) => {
     if (rate >= 80) return '#2b8a3e';
@@ -68,7 +123,12 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
           <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Statistics</Text>
-        <View style={{ width: 36 }} />
+        <TouchableOpacity 
+          onPress={loadStatistics} 
+          style={styles.refreshButton}
+        >
+          <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -263,6 +323,19 @@ const styles = StyleSheet.create({
     minHeight: 60,
   },
   backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  refreshButton: {
     width: 36,
     height: 36,
     borderRadius: 18,

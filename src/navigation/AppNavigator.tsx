@@ -3,7 +3,6 @@ import { createStackNavigator } from '@react-navigation/stack';
 
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
-import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import HomeScreen from '../screens/HomeScreen';
 import MyGroupScreen from '../screens/myGroupScreen';
 import JoinGroupScreen from '../screens/JoinGroupScreen';
@@ -55,12 +54,7 @@ export default function AppNavigator() {
       
       {/* Password Reset Screens */}
     
-      
-      <Stack.Screen
-        name="ForgotPassword" 
-        component={ForgotPasswordScreen}
-        options={{ headerShown: false }}
-      />
+   
       
 
 

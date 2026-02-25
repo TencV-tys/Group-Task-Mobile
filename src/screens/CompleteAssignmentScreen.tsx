@@ -1,4 +1,5 @@
- import React, { useState, useEffect } from 'react';
+// src/screens/CompleteAssignmentScreen.tsx - UPDATED with clean UI and dark gray primary
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,6 +15,7 @@ import {
   Platform,
   Dimensions
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../services/AssignmentService';
@@ -115,7 +117,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         return {
           title: 'Wrong Day',
           message: `This assignment is due on ${new Date(dueDate).toLocaleDateString()}. Please come back then.`,
-          color: '#6c757d',
+          color: '#868e96',
           icon: 'calendar-clock'
         };
       case 'waiting':
@@ -143,7 +145,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         return {
           title: 'Checking...',
           message: 'Checking submission status',
-          color: '#6c757d',
+          color: '#868e96',
           icon: 'clock'
         };
     }
@@ -262,13 +264,24 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     const isWarning = timeLeft !== null && timeLeft < 600; // Less than 10 minutes
     
     return (
-      <View style={[
-        styles.timeInfoContainer,
-        timeStatus === 'expired' && styles.timeCritical,
-        timeStatus === 'waiting' && styles.timeWarning,
-        timeStatus === 'submission_open' && styles.timeOpen,
-        timeStatus === 'wrong_day' && styles.timeWrongDay
-      ]}>
+      <LinearGradient
+        colors={
+          timeStatus === 'expired' ? ['#fff5f5', '#ffe3e3'] :
+          timeStatus === 'waiting' ? ['#fff3bf', '#ffec99'] :
+          timeStatus === 'submission_open' ? ['#d3f9d8', '#b2f2bb'] :
+          timeStatus === 'wrong_day' ? ['#f8f9fa', '#e9ecef'] :
+          ['#f8f9fa', '#e9ecef']
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          styles.timeInfoContainer,
+          timeStatus === 'expired' && styles.timeCritical,
+          timeStatus === 'waiting' && styles.timeWarning,
+          timeStatus === 'submission_open' && styles.timeOpen,
+          timeStatus === 'wrong_day' && styles.timeWrongDay
+        ]}
+      >
         <View style={styles.timeInfoHeader}>
           <MaterialCommunityIcons 
             name={timeStatusMsg.icon as any} 
@@ -338,12 +351,12 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         </View>
         
         <View style={styles.submissionWindowInfo}>
-          <MaterialCommunityIcons name="information" size={14} color="#6c757d" />
+          <MaterialCommunityIcons name="information" size={14} color="#868e96" />
           <Text style={styles.submissionWindowText}>
             Submit within 30 minutes after {timeSlot.endTime}
           </Text>
         </View>
-      </View>
+      </LinearGradient>
     );
   };
 
@@ -359,32 +372,67 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
           <Image source={{ uri: photo }} style={styles.photoPreview} resizeMode="cover" />
           <View style={styles.photoActions}>
             <TouchableOpacity style={styles.photoActionButton} onPress={pickImage}>
-              <MaterialCommunityIcons name="image-edit" size={16} color="#007AFF" />
-              <Text style={styles.photoActionText}>Change</Text>
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.photoActionGradient}
+              >
+                <MaterialCommunityIcons name="image-edit" size={14} color="#495057" />
+                <Text style={styles.photoActionText}>Change</Text>
+              </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={styles.photoActionButton} onPress={takePhoto}>
-              <MaterialCommunityIcons name="camera" size={16} color="#007AFF" />
-              <Text style={styles.photoActionText}>Retake</Text>
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.photoActionGradient}
+              >
+                <MaterialCommunityIcons name="camera" size={14} color="#495057" />
+                <Text style={styles.photoActionText}>Retake</Text>
+              </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.photoActionButton, styles.removeButton]} 
+              style={styles.photoActionButton} 
               onPress={() => setPhoto(null)}
             >
-              <MaterialCommunityIcons name="delete" size={16} color="#fa5252" />
-              <Text style={[styles.photoActionText, styles.removeText]}>Remove</Text>
+              <LinearGradient
+                colors={['#fff5f5', '#ffe3e3']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.photoActionGradient, styles.removeGradient]}
+              >
+                <MaterialCommunityIcons name="delete" size={14} color="#fa5252" />
+                <Text style={[styles.photoActionText, styles.removeText]}>Remove</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
       ) : (
         <View style={styles.photoUploadOptions}>
           <TouchableOpacity style={styles.photoOption} onPress={takePhoto}>
-            <MaterialCommunityIcons name="camera" size={32} color="#007AFF" />
-            <Text style={styles.photoOptionText}>Take Photo</Text>
+            <LinearGradient
+              colors={['#e7f5ff', '#d0ebff']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.photoOptionGradient}
+            >
+              <MaterialCommunityIcons name="camera" size={28} color="#2b8a3e" />
+              <Text style={styles.photoOptionText}>Take Photo</Text>
+            </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.photoOption} onPress={pickImage}>
-            <MaterialCommunityIcons name="image" size={32} color="#007AFF" />
-            <Text style={styles.photoOptionText}>Choose from Gallery</Text>
+            <LinearGradient
+              colors={['#e7f5ff', '#d0ebff']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.photoOptionGradient}
+            >
+              <MaterialCommunityIcons name="image" size={28} color="#2b8a3e" />
+              <Text style={styles.photoOptionText}>Choose from Gallery</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       )}
@@ -402,19 +450,27 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         Add any additional information about your completion
       </Text>
       
-      <TextInput
-        style={[styles.notesInput, errors.notes && styles.inputError]}
-        value={notes}
-        onChangeText={(text) => {
-          setNotes(text);
-          if (errors.notes) setErrors(prev => ({ ...prev, notes: undefined }));
-        }}
-        placeholder="Describe what you did, any issues encountered, or additional details..."
-        multiline
-        numberOfLines={4}
-        maxLength={500}
-        textAlignVertical="top"
-      />
+      <LinearGradient
+        colors={['#f8f9fa', '#e9ecef']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.notesGradient, errors.notes && styles.inputError]}
+      >
+        <TextInput
+          style={styles.notesInput}
+          value={notes}
+          onChangeText={(text) => {
+            setNotes(text);
+            if (errors.notes) setErrors(prev => ({ ...prev, notes: undefined }));
+          }}
+          placeholder="Describe what you did, any issues encountered, or additional details..."
+          placeholderTextColor="#adb5bd"
+          multiline
+          numberOfLines={4}
+          maxLength={500}
+          textAlignVertical="top"
+        />
+      </LinearGradient>
       
       <View style={styles.notesFooter}>
         <Text style={styles.charCount}>
@@ -433,13 +489,13 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
             onPress={() => navigation.goBack()}
             style={styles.backButton}
-            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
           >
-            <Text style={styles.backButtonText}>←</Text>
+            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
           </TouchableOpacity>
           
           <View style={styles.titleContainer}>
@@ -452,14 +508,19 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.card}>
+          <LinearGradient
+            colors={['#ffffff', '#f8f9fa']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.card}
+          >
             {/* Task Info */}
             <View style={styles.taskInfoSection}>
               <Text style={styles.taskTitle}>{taskTitle}</Text>
               
               <View style={styles.taskDetails}>
                 <View style={styles.taskDetailRow}>
-                  <MaterialCommunityIcons name="calendar" size={16} color="#6c757d" />
+                  <MaterialCommunityIcons name="calendar" size={16} color="#868e96" />
                   <Text style={styles.taskDetailText}>
                     Due: {new Date(dueDate).toLocaleDateString()}
                   </Text>
@@ -467,7 +528,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
                 
                 {timeSlot && (
                   <View style={styles.taskDetailRow}>
-                    <MaterialCommunityIcons name="clock" size={16} color="#6c757d" />
+                    <MaterialCommunityIcons name="clock" size={16} color="#868e96" />
                     <Text style={styles.taskDetailText}>
                       Time Slot: {timeSlot.startTime} - {timeSlot.endTime}
                     </Text>
@@ -496,23 +557,37 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
               disabled={!isSubmittable || submitting}
               activeOpacity={0.8}
             >
-              {submitting ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <View style={styles.submitButtonContent}>
-                  <MaterialCommunityIcons 
-                    name={timeStatus === 'submission_open' ? "check-circle" : "clock"} 
-                    size={22} 
-                    color="white" 
-                  />
-                  <Text style={styles.submitButtonText}>
-                    {timeStatus === 'submission_open' ? 'Submit Completion' : 
-                     timeStatus === 'waiting' ? `Wait Until ${timeSlot?.endTime}` :
-                     timeStatus === 'wrong_day' ? 'Wrong Day - Cannot Submit' :
-                     'Submission Closed'}
-                  </Text>
-                </View>
-              )}
+              <LinearGradient
+                colors={
+                  !isSubmittable || submitting ? ['#f8f9fa', '#e9ecef'] :
+                  timeStatus === 'submission_open' ? ['#2b8a3e', '#1e6b2c'] :
+                  ['#868e96', '#6c757d']
+                }
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.submitButtonGradient}
+              >
+                {submitting ? (
+                  <ActivityIndicator size="small" color={!isSubmittable ? "#495057" : "white"} />
+                ) : (
+                  <View style={styles.submitButtonContent}>
+                    <MaterialCommunityIcons 
+                      name={timeStatus === 'submission_open' ? "check-circle" : "clock"} 
+                      size={20} 
+                      color={!isSubmittable ? "#868e96" : "white"} 
+                    />
+                    <Text style={[
+                      styles.submitButtonText,
+                      !isSubmittable && styles.submitButtonTextDisabled
+                    ]}>
+                      {timeStatus === 'submission_open' ? 'Submit Completion' : 
+                       timeStatus === 'waiting' ? `Wait Until ${timeSlot?.endTime}` :
+                       timeStatus === 'wrong_day' ? 'Wrong Day - Cannot Submit' :
+                       'Submission Closed'}
+                    </Text>
+                  </View>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
             
             {timeStatus === 'wrong_day' && (
@@ -532,7 +607,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
                 The 30-minute grace period has ended. Please contact an administrator.
               </Text>
             )}
-          </View>
+          </LinearGradient>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -556,18 +631,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
-    minHeight: 56,
+    minHeight: 60,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
-    alignItems: 'center'
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#007AFF',
-    fontWeight: '400'
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   titleContainer: {
     flex: 1,
@@ -576,35 +653,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212529',
     textAlign: 'center'
   },
   headerSpacer: {
-    width: 40
+    width: 36
   },
   content: {
     flex: 1,
     padding: 16
   },
   card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   taskInfoSection: {
     marginBottom: 24
   },
   taskTitle: {
-    fontSize: 22,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#212529',
     marginBottom: 12
   },
@@ -617,30 +690,26 @@ const styles = StyleSheet.create({
     gap: 8
   },
   taskDetailText: {
-    fontSize: 15,
-    color: '#6c757d'
+    fontSize: 14,
+    color: '#495057'
   },
   timeInfoContainer: {
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 24,
-    borderWidth: 1
+    borderWidth: 1,
   },
   timeOpen: {
-    backgroundColor: '#d3f9d8',
-    borderColor: '#8ce99a'
+    borderColor: '#b2f2bb',
   },
   timeWarning: {
-    backgroundColor: '#fff3bf',
-    borderColor: '#ffd43b'
+    borderColor: '#ffec99',
   },
   timeCritical: {
-    backgroundColor: '#ffc9c9',
-    borderColor: '#fa5252'
+    borderColor: '#ffc9c9',
   },
   timeWrongDay: {
-    backgroundColor: '#f1f3f5',
-    borderColor: '#dee2e6'
+    borderColor: '#e9ecef',
   },
   timeInfoHeader: {
     flexDirection: 'row',
@@ -649,7 +718,7 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   timeInfoTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600'
   },
   timeWarningText: {
@@ -665,13 +734,13 @@ const styles = StyleSheet.create({
     marginBottom: 8
   },
   timeInstructions: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#495057',
     textAlign: 'center',
     marginBottom: 8
   },
   timeMessage: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#495057',
     textAlign: 'center',
     lineHeight: 20,
@@ -685,13 +754,13 @@ const styles = StyleSheet.create({
     marginTop: 8
   },
   warningText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#e67700',
     fontWeight: '500'
   },
   scheduleInfo: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#868e96',
     textAlign: 'center',
     marginTop: 4
   },
@@ -702,11 +771,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)'
+    borderTopColor: '#e9ecef'
   },
   timeSlotLabel: {
     fontSize: 12,
-    color: '#6c757d',
+    color: '#868e96',
     marginRight: 4
   },
   timeSlotValue: {
@@ -720,47 +789,49 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     marginTop: 8,
-    backgroundColor: 'rgba(108, 117, 125, 0.1)',
+    backgroundColor: '#f8f9fa',
     padding: 8,
-    borderRadius: 6
+    borderRadius: 8,
   },
   submissionWindowText: {
-    fontSize: 12,
-    color: '#6c757d',
+    fontSize: 11,
+    color: '#868e96',
     fontStyle: 'italic'
   },
   section: {
     marginBottom: 24
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#495057',
+    color: '#212529',
     marginBottom: 6
   },
   sectionDescription: {
-    fontSize: 14,
-    color: '#6c757d',
+    fontSize: 13,
+    color: '#868e96',
     marginBottom: 12,
     lineHeight: 18
   },
   photoUploadOptions: {
     flexDirection: 'row',
-    gap: 16
+    gap: 12
   },
   photoOption: {
     flex: 1,
-    backgroundColor: '#e7f5ff',
-    borderRadius: 8,
-    padding: 20,
-    alignItems: 'center',
-    gap: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#a5d8ff'
+    borderColor: '#b2f2bb',
+  },
+  photoOptionGradient: {
+    padding: 16,
+    alignItems: 'center',
+    gap: 10,
   },
   photoOptionText: {
-    fontSize: 14,
-    color: '#1864ab',
+    fontSize: 13,
+    color: '#2b8a3e',
     fontWeight: '500',
     textAlign: 'center'
   },
@@ -770,47 +841,58 @@ const styles = StyleSheet.create({
   photoPreview: {
     width: width - 72,
     height: (width - 72) * 0.75,
-    borderRadius: 8,
-    marginBottom: 12
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   photoActions: {
     flexDirection: 'row',
-    gap: 12
+    gap: 8,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   photoActionButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    minWidth: 80,
+  },
+  photoActionGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#dee2e6'
+    gap: 4,
   },
-  removeButton: {
-    backgroundColor: '#fff5f5',
-    borderColor: '#ffc9c9'
+  removeGradient: {
+    borderWidth: 1,
+    borderColor: '#ffc9c9',
   },
   photoActionText: {
-    fontSize: 14,
-    color: '#007AFF',
+    fontSize: 12,
+    color: '#495057',
     fontWeight: '500'
   },
   removeText: {
     color: '#fa5252'
   },
-  notesInput: {
+  notesGradient: {
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    minHeight: 120,
-    textAlignVertical: 'top'
+    borderColor: '#e9ecef',
+  },
+  notesInput: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#212529',
+    minHeight: 100,
+    textAlignVertical: 'top',
+    backgroundColor: 'transparent',
   },
   inputError: {
-    borderColor: '#fa5252'
+    borderColor: '#fa5252',
   },
   notesFooter: {
     flexDirection: 'row',
@@ -819,24 +901,28 @@ const styles = StyleSheet.create({
     marginTop: 8
   },
   charCount: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#868e96'
   },
   errorText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#fa5252',
     marginTop: 4
   },
   submitButton: {
-    backgroundColor: '#2b8a3e',
-    borderRadius: 8,
-    padding: 18
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  submitButtonGradient: {
+    padding: 16,
+    alignItems: 'center',
   },
   submitButtonDisabled: {
-    backgroundColor: '#868e96'
+    opacity: 0.7,
   },
   submitButtonWrongDay: {
-    backgroundColor: '#868e96'
+    opacity: 0.7,
   },
   submitButtonContent: {
     flexDirection: 'row',
@@ -845,26 +931,29 @@ const styles = StyleSheet.create({
     gap: 8
   },
   submitButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600'
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white'
+  },
+  submitButtonTextDisabled: {
+    color: '#868e96'
   },
   disabledText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#868e96',
     textAlign: 'center',
     marginTop: 12,
     fontStyle: 'italic'
   },
   waitingText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#e67700',
     textAlign: 'center',
     marginTop: 12,
     fontStyle: 'italic'
   },
   expiredMessage: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#fa5252',
     textAlign: 'center',
     marginTop: 12,

@@ -1,3 +1,4 @@
+// src/screens/FeedbackHistoryScreen.tsx - UPDATED with clean UI and dark gray primary
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -10,6 +11,7 @@ import {
   ActivityIndicator,
   RefreshControl
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFeedback } from '../feedbackHook/useFeedback';
 
@@ -104,7 +106,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#007AFF" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
@@ -118,11 +120,18 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
             onPress={handleFilterPress}
             style={[styles.iconButton, filter && styles.activeFilterButton]}
           >
-            <MaterialCommunityIcons 
-              name="filter" 
-              size={22} 
-              color={filter ? '#007AFF' : '#6c757d'} 
-            />
+            <LinearGradient
+              colors={filter ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.iconButtonGradient}
+            >
+              <MaterialCommunityIcons 
+                name="filter" 
+                size={18} 
+                color={filter ? '#2b8a3e' : '#495057'} 
+              />
+            </LinearGradient>
           </TouchableOpacity>
 
           {/* Refresh Button */}
@@ -131,44 +140,69 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
             disabled={loading}
             style={styles.iconButton}
           >
-            {loading ? (
-              <ActivityIndicator size="small" color="#007AFF" />
-            ) : (
-              <MaterialCommunityIcons name="refresh" size={22} color="#007AFF" />
-            )}
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.iconButtonGradient}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#2b8a3e" />
+              ) : (
+                <MaterialCommunityIcons name="refresh" size={18} color="#495057" />
+              )}
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* Stats Summary */}
       {stats && (
-        <View style={styles.statsRow}>
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.statsRow}
+        >
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{stats.total || 0}</Text>
             <Text style={styles.statLabel}>Total</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#FF9500' }]}>{stats.open || 0}</Text>
+            <Text style={[styles.statValue, { color: '#e67700' }]}>{stats.open || 0}</Text>
             <Text style={styles.statLabel}>Open</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#34C759' }]}>{stats.resolved || 0}</Text>
+            <Text style={[styles.statValue, { color: '#2b8a3e' }]}>{stats.resolved || 0}</Text>
             <Text style={styles.statLabel}>Resolved</Text>
           </View>
-        </View>
+        </LinearGradient>
       )}
 
       <ScrollView
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={() => loadFeedback(1, filter)} />
+          <RefreshControl 
+            refreshing={loading} 
+            onRefresh={() => loadFeedback(1, filter)}
+            colors={['#2b8a3e']}
+            tintColor="#2b8a3e"
+          />
         }
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
       >
         {feedbackList.length === 0 ? (
           <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="message-text-outline" size={64} color="#dee2e6" />
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.emptyIconContainer}
+            >
+              <MaterialCommunityIcons name="message-text-outline" size={48} color="#adb5bd" />
+            </LinearGradient>
             <Text style={styles.emptyStateText}>No feedback yet</Text>
             <Text style={styles.emptyStateSubtext}>
               {filter 
@@ -179,25 +213,51 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
               style={styles.submitButton}
               onPress={() => navigation.navigate('Feedback')}
             >
-              <Text style={styles.submitButtonText}>Submit Feedback</Text>
+              <LinearGradient
+                colors={['#2b8a3e', '#1e6b2c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.submitButtonGradient}
+              >
+                <MaterialCommunityIcons name="plus" size={16} color="white" />
+                <Text style={styles.submitButtonText}>Submit Feedback</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         ) : (
           feedbackList.map((item) => (
-            <View key={item.id} style={styles.feedbackCard}>
+            <LinearGradient
+              key={item.id}
+              colors={['#ffffff', '#f8f9fa']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.feedbackCard}
+            >
               {/* Header */}
               <View style={styles.cardHeader}>
                 <View style={styles.typeContainer}>
-                  <MaterialCommunityIcons 
-                    name={getFeedbackIcon(item.type) as any} 
-                    size={20} 
-                    color={getFeedbackColor(item.type)} 
-                  />
+                  <LinearGradient
+                    colors={['#f8f9fa', '#e9ecef']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.typeIcon}
+                  >
+                    <MaterialCommunityIcons 
+                      name={getFeedbackIcon(item.type) as any} 
+                      size={16} 
+                      color={getFeedbackColor(item.type)} 
+                    />
+                  </LinearGradient>
                   <Text style={styles.typeText}>{item.type.replace('_', ' ')}</Text>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+                <LinearGradient
+                  colors={[getStatusColor(item.status), getStatusColor(item.status) + 'dd']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.statusBadge}
+                >
                   <Text style={styles.statusText}>{item.status}</Text>
-                </View>
+                </LinearGradient>
               </View>
 
               {/* Message - Clickable for details */}
@@ -214,9 +274,14 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
               <View style={styles.cardFooter}>
                 <View style={styles.footerLeft}>
                   {item.category && (
-                    <View style={styles.categoryTag}>
+                    <LinearGradient
+                      colors={['#f8f9fa', '#e9ecef']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.categoryTag}
+                    >
                       <Text style={styles.categoryText}>{item.category}</Text>
-                    </View>
+                    </LinearGradient>
                   )}
                   <Text style={styles.date}>
                     {new Date(item.createdAt).toLocaleDateString()}
@@ -233,7 +298,14 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                       })}
                       style={styles.actionButton}
                     >
-                      <MaterialCommunityIcons name="pencil" size={18} color="#007AFF" />
+                      <LinearGradient
+                        colors={['#f8f9fa', '#e9ecef']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.actionButtonGradient}
+                      >
+                        <MaterialCommunityIcons name="pencil" size={14} color="#495057" />
+                      </LinearGradient>
                     </TouchableOpacity>
                   )}
                   
@@ -242,11 +314,18 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                     onPress={() => handleDelete(item.id)}
                     style={styles.actionButton}
                   >
-                    <MaterialCommunityIcons name="delete" size={18} color="#FF3B30" />
+                    <LinearGradient
+                      colors={['#fff5f5', '#ffe3e3']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[styles.actionButtonGradient, styles.deleteButtonGradient]}
+                    >
+                      <MaterialCommunityIcons name="delete" size={14} color="#fa5252" />
+                    </LinearGradient>
                   </TouchableOpacity>
                 </View>
               </View>
-            </View>
+            </LinearGradient>
           ))
         )}
       </ScrollView>
@@ -270,25 +349,25 @@ const getFeedbackIcon = (type: string) => {
 
 const getFeedbackColor = (type: string) => {
   const colors: Record<string, string> = {
-    'BUG': '#FF3B30',
-    'FEATURE_REQUEST': '#FF9500',
-    'GENERAL': '#007AFF',
-    'SUGGESTION': '#5856D6',
-    'COMPLAINT': '#FF3B30',
-    'QUESTION': '#34C759',
-    'OTHER': '#8E8E93'
+    'BUG': '#fa5252',
+    'FEATURE_REQUEST': '#e67700',
+    'GENERAL': '#2b8a3e',
+    'SUGGESTION': '#4F46E5',
+    'COMPLAINT': '#fa5252',
+    'QUESTION': '#2b8a3e',
+    'OTHER': '#868e96'
   };
-  return colors[type] || '#007AFF';
+  return colors[type] || '#2b8a3e';
 };
 
 const getStatusColor = (status: string) => {
   const colors: Record<string, string> = {
-    'OPEN': '#FF9500',
-    'IN_PROGRESS': '#007AFF',
-    'RESOLVED': '#34C759',
-    'CLOSED': '#8E8E93'
+    'OPEN': '#e67700',
+    'IN_PROGRESS': '#2b8a3e',
+    'RESOLVED': '#2b8a3e',
+    'CLOSED': '#868e96'
   };
-  return colors[status] || '#8E8E93';
+  return colors[status] || '#868e96';
 };
 
 const styles = StyleSheet.create({
@@ -305,26 +384,34 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
+    minHeight: 60,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   titleContainer: {
     flex: 1,
     alignItems: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212529',
   },
   subtitle: {
-    fontSize: 12,
-    color: '#6c757d',
+    fontSize: 11,
+    color: '#868e96',
+    marginTop: 2,
   },
   headerRight: {
     flexDirection: 'row',
@@ -332,24 +419,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconButton: {
-    width: 40,
-    height: 40,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  iconButtonGradient: {
+    width: 36,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: '#f1f3f5',
   },
   activeFilterButton: {
-    backgroundColor: '#e7f5ff',
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#2b8a3e',
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    backgroundColor: 'white',
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
@@ -358,18 +446,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#212529',
   },
   statLabel: {
-    fontSize: 11,
-    color: '#6c757d',
+    fontSize: 10,
+    color: '#868e96',
     marginTop: 2,
   },
   statDivider: {
     width: 1,
-    height: 30,
+    height: 24,
     backgroundColor: '#e9ecef',
   },
   content: {
@@ -381,40 +469,53 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 60,
   },
+  emptyIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
   emptyStateText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#6c757d',
-    marginTop: 16,
+    color: '#868e96',
+    marginTop: 8,
   },
   emptyStateSubtext: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#adb5bd',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 4,
     marginBottom: 20,
+    paddingHorizontal: 32,
+    lineHeight: 18,
   },
   submitButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
     borderRadius: 8,
+    overflow: 'hidden',
+  },
+  submitButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    gap: 6,
   },
   submitButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   feedbackCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -427,8 +528,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  typeIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
   typeText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#212529',
   },
@@ -438,7 +548,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 10,
     color: 'white',
     fontWeight: '600',
   },
@@ -458,27 +568,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flex: 1,
+    flexWrap: 'wrap',
   },
   categoryTag: {
-    backgroundColor: '#e9ecef',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 2,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   categoryText: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#495057',
   },
   date: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#adb5bd',
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 6,
   },
   actionButton: {
-    padding: 4,
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  actionButtonGradient: {
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  deleteButtonGradient: {
+    borderColor: '#ffc9c9',
   },
 });

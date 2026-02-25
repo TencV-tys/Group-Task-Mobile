@@ -1,3 +1,4 @@
+// src/screens/AssignmentDetailsScreen.tsx - UPDATED with clean UI and dark gray primary
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -14,6 +15,7 @@ import {
   Dimensions,
   StatusBar 
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../services/AssignmentService';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
@@ -235,7 +237,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           label: '✓ AVAILABLE TO SUBMIT',
           color: '#2b8a3e',
           bgColor: '#d3f9d8',
-          borderColor: '#8ce99a',
+          borderColor: '#b2f2bb',
           icon: 'check-circle',
           description: 'You can submit your completion now',
           buttonText: 'Complete Assignment',
@@ -243,61 +245,61 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
         };
       case 'waiting':
         return {
-          label: '⏳ WAITING FOR SUBMISSION WINDOW',
+          label: '⏳ WAITING',
           color: '#e67700',
           bgColor: '#fff3bf',
-          borderColor: '#ffd43b',
+          borderColor: '#ffec99',
           icon: 'clock',
           description: timeLeft && timeLeft > 0 
-            ? `Submission opens in ${formatTimeLeft(timeLeft)}` 
-            : 'Submit within 30 minutes before/after time slot',
-          buttonText: 'Waiting for Submission Window',
+            ? `Opens in ${formatTimeLeft(timeLeft)}` 
+            : 'Submit within 30 minutes of time slot',
+          buttonText: 'Waiting',
           canSubmit: false
         };
       case 'expired':
         return {
-          label: '❌ SUBMISSION CLOSED',
+          label: '❌ EXPIRED',
           color: '#fa5252',
-          bgColor: '#ffc9c9',
-          borderColor: '#ff8787',
+          bgColor: '#fff5f5',
+          borderColor: '#ffc9c9',
           icon: 'timer-off',
-          description: 'The 30-minute submission window has expired',
-          buttonText: 'Submission Closed',
+          description: 'Submission window has expired',
+          buttonText: 'Expired',
           canSubmit: false
         };
       case 'wrong_day':
         return {
-          label: '📅 NOT DUE TODAY',
-          color: '#6c757d',
-          bgColor: '#f1f3f5',
-          borderColor: '#dee2e6',
+          label: '📅 WRONG DAY',
+          color: '#868e96',
+          bgColor: '#f8f9fa',
+          borderColor: '#e9ecef',
           icon: 'calendar',
           description: assignment 
             ? `Due on ${new Date(assignment.dueDate).toLocaleDateString()}`
-            : 'This assignment is not due today',
-          buttonText: 'Not Due Today',
+            : 'Not due today',
+          buttonText: 'Not Due',
           canSubmit: false
         };
       case 'completed':
         return {
-          label: '✓ ALREADY COMPLETED',
+          label: '✓ COMPLETED',
           color: '#2b8a3e',
           bgColor: '#d3f9d8',
-          borderColor: '#8ce99a',
+          borderColor: '#b2f2bb',
           icon: 'check-circle',
-          description: 'You have already submitted this assignment',
-          buttonText: 'Already Completed',
+          description: 'Already submitted',
+          buttonText: 'Completed',
           canSubmit: false
         };
       default:
         return {
-          label: '⏳ CHECKING STATUS...',
-          color: '#6c757d',
-          bgColor: '#f1f3f5',
-          borderColor: '#dee2e6',
+          label: '⏳ CHECKING',
+          color: '#868e96',
+          bgColor: '#f8f9fa',
+          borderColor: '#e9ecef',
           icon: 'clock',
-          description: 'Verifying submission availability',
-          buttonText: 'Checking...',
+          description: 'Checking status...',
+          buttonText: 'Checking',
           canSubmit: false
         };
     }
@@ -483,7 +485,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
         style={styles.backButton}
         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
       >
-        <Text style={styles.backButtonText}>←</Text>
+        <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
       </TouchableOpacity>
       
       <View style={styles.titleContainer}>
@@ -504,10 +506,12 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
         <View style={styles.completeSection}>
           <Text style={styles.sectionTitle}>Complete This Assignment</Text>
           
-          <View style={[styles.submissionStatusCard, { 
-            backgroundColor: submissionStatusInfo.bgColor,
-            borderColor: submissionStatusInfo.borderColor 
-          }]}>
+          <LinearGradient
+            colors={[submissionStatusInfo.bgColor, submissionStatusInfo.bgColor]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.submissionStatusCard, { borderColor: submissionStatusInfo.borderColor }]}
+          >
             <View style={styles.submissionStatusHeader}>
               <View style={[styles.statusIconContainer, { backgroundColor: submissionStatusInfo.color + '20' }]}>
                 <MaterialCommunityIcons 
@@ -527,18 +531,28 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             </View>
             
             {willBePenalized && penaltyInfo && (
-              <View style={styles.penaltyInfo}>
+              <LinearGradient
+                colors={['#fff3bf', '#ffec99']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.penaltyInfo}
+              >
                 <MaterialCommunityIcons name="alert" size={16} color="#e67700" />
                 <Text style={styles.penaltyText}>
                   Points: {penaltyInfo.finalPoints} / {penaltyInfo.originalPoints} 
                   (Penalty: -{penaltyInfo.penaltyAmount})
                 </Text>
-              </View>
+              </LinearGradient>
             )}
             
             {submissionStatus === 'available' && timeLeft !== null && (
               <View style={styles.timerContainer}>
-                <View style={[styles.timerBadge, timeLeft < 300 ? styles.urgentTimerBadge : styles.normalTimerBadge]}>
+                <LinearGradient
+                  colors={timeLeft < 300 ? ['#ffc9c9', '#ffb3b3'] : ['#d3f9d8', '#b2f2bb']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.timerBadge, timeLeft < 300 && styles.urgentTimerBadge]}
+                >
                   <MaterialCommunityIcons 
                     name={timeLeft < 300 ? "timer-alert" : "timer"} 
                     size={16} 
@@ -547,7 +561,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                   <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : "#2b8a3e" }]}>
                     {formatTimeLeft(timeLeft)} remaining
                   </Text>
-                </View>
+                </LinearGradient>
                 {timeLeft < 300 && (
                   <Text style={styles.urgentMessage}>Submit now! Grace period ending soon.</Text>
                 )}
@@ -556,15 +570,20 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             
             {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
               <View style={styles.waitingContainer}>
-                <View style={styles.waitingBadge}>
+                <LinearGradient
+                  colors={['#fff3bf', '#ffec99']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.waitingBadge}
+                >
                   <MaterialCommunityIcons name="clock-start" size={16} color="#e67700" />
                   <Text style={styles.waitingText}>
                     Opens in {formatTimeLeft(timeLeft)}
                   </Text>
-                </View>
+                </LinearGradient>
               </View>
             )}
-          </View>
+          </LinearGradient>
           
           {submissionStatusInfo.canSubmit ? (
             <TouchableOpacity
@@ -575,22 +594,29 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
               onPress={handleCompleteAssignment}
               activeOpacity={0.8}
             >
-              <View style={styles.completeButtonContent}>
-                <MaterialCommunityIcons 
-                  name={willBePenalized ? "timer-alert" : "check-circle"} 
-                  size={20} 
-                  color="white" 
-                />
-                <Text style={styles.completeButtonText}>{submissionStatusInfo.buttonText}</Text>
-              </View>
-              {timeLeft && timeLeft < 600 && (
-                <View style={styles.completeButtonFooter}>
-                  <MaterialCommunityIcons name="alert" size={14} color="white" />
-                  <Text style={styles.completeButtonSubtext}>
-                    {timeLeft < 300 ? 'Urgent! ' : ''}{formatTimeLeft(timeLeft)} left
-                  </Text>
+              <LinearGradient
+                colors={willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.completeButtonGradient}
+              >
+                <View style={styles.completeButtonContent}>
+                  <MaterialCommunityIcons 
+                    name={willBePenalized ? "timer-alert" : "check-circle"} 
+                    size={20} 
+                    color="white" 
+                  />
+                  <Text style={styles.completeButtonText}>{submissionStatusInfo.buttonText}</Text>
                 </View>
-              )}
+                {timeLeft && timeLeft < 600 && (
+                  <View style={styles.completeButtonFooter}>
+                    <MaterialCommunityIcons name="alert" size={14} color="white" />
+                    <Text style={styles.completeButtonSubtext}>
+                      {timeLeft < 300 ? 'Urgent! ' : ''}{formatTimeLeft(timeLeft)} left
+                    </Text>
+                  </View>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           ) : (
             <View style={styles.disabledButtonContainer}>
@@ -605,14 +631,21 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                   );
                 }}
               >
-                <MaterialCommunityIcons 
-                  name={submissionStatusInfo.icon as any} 
-                  size={20} 
-                  color="#868e96" 
-                />
-                <Text style={styles.disabledButtonText}>
-                  {submissionStatusInfo.buttonText}
-                </Text>
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.disabledButtonGradient}
+                >
+                  <MaterialCommunityIcons 
+                    name={submissionStatusInfo.icon as any} 
+                    size={20} 
+                    color="#868e96" 
+                  />
+                  <Text style={styles.disabledButtonText}>
+                    {submissionStatusInfo.buttonText}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
               <Text style={styles.disabledButtonHint}>
                 ⓘ {submissionStatusInfo.description}
@@ -640,13 +673,20 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
               onPress={handleRequestSwap()}
               activeOpacity={0.8}
             >
-              <View style={styles.swapButtonContent}>
-                <MaterialCommunityIcons name="swap-horizontal" size={20} color="#4F46E5" />
-                <Text style={styles.swapButtonText}>Request Swap</Text>
-              </View>
-              <Text style={styles.swapButtonSubtext}>
-                Find someone to take over this assignment
-              </Text>
+              <LinearGradient
+                colors={['#EEF2FF', '#dbe4ff']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.swapButtonGradient}
+              >
+                <View style={styles.swapButtonContent}>
+                  <MaterialCommunityIcons name="swap-horizontal" size={20} color="#4F46E5" />
+                  <Text style={styles.swapButtonText}>Request Swap</Text>
+                </View>
+                <Text style={styles.swapButtonSubtext}>
+                  Find someone to take over this assignment
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -658,13 +698,20 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
               }}
               activeOpacity={0.8}
             >
-              <View style={styles.swapButtonContent}>
-                <MaterialCommunityIcons name="clock" size={20} color="#F59E0B" />
-                <Text style={styles.pendingSwapText}>Swap Request Pending</Text>
-              </View>
-              <Text style={styles.pendingSwapSubtext}>
-                Tap to view request details
-              </Text>
+              <LinearGradient
+                colors={['#FEF3C7', '#FFE5B4']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.pendingSwapGradient}
+              >
+                <View style={styles.swapButtonContent}>
+                  <MaterialCommunityIcons name="clock" size={20} color="#F59E0B" />
+                  <Text style={styles.pendingSwapText}>Swap Request Pending</Text>
+                </View>
+                <Text style={styles.pendingSwapSubtext}>
+                  Tap to view request details
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
           )}
         </View>
@@ -680,15 +727,23 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       <View style={styles.verificationSection}>
         <Text style={styles.sectionTitle}>Admin Verification</Text>
         
-        <TextInput
-          style={styles.notesInput}
-          value={adminNotes}
-          onChangeText={setAdminNotes}
-          placeholder="Add notes for the user (optional)..."
-          multiline
-          numberOfLines={3}
-          maxLength={500}
-        />
+        <LinearGradient
+          colors={['#f8f9fa', '#e9ecef']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.notesInputGradient}
+        >
+          <TextInput
+            style={styles.notesInput}
+            value={adminNotes}
+            onChangeText={setAdminNotes}
+            placeholder="Add notes for the user (optional)..."
+            placeholderTextColor="#adb5bd"
+            multiline
+            numberOfLines={3}
+            maxLength={500}
+          />
+        </LinearGradient>
         <Text style={styles.charCount}>
           {adminNotes.length}/500 characters
         </Text>
@@ -699,14 +754,21 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             onPress={() => handleVerify(false)}
             disabled={verifying}
           >
-            {verifying ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="close-circle" size={20} color="white" />
-                <Text style={styles.verifyButtonText}>Reject</Text>
-              </>
-            )}
+            <LinearGradient
+              colors={['#fa5252', '#e03131']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.verifyButtonGradient}
+            >
+              {verifying ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="close-circle" size={20} color="white" />
+                  <Text style={styles.verifyButtonText}>Reject</Text>
+                </>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -714,14 +776,21 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             onPress={() => handleVerify(true)}
             disabled={verifying}
           >
-            {verifying ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <>
-                <MaterialCommunityIcons name="check-circle" size={20} color="white" />
-                <Text style={styles.verifyButtonText}>Approve</Text>
-              </>
-            )}
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.verifyButtonGradient}
+            >
+              {verifying ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="check-circle" size={20} color="white" />
+                  <Text style={styles.verifyButtonText}>Approve</Text>
+                </>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -744,10 +813,15 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             style={styles.photo}
             resizeMode="cover"
           />
-          <View style={styles.photoOverlay}>
-            <MaterialCommunityIcons name="magnify" size={32} color="white" />
+          <LinearGradient
+            colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.photoOverlay}
+          >
+            <MaterialCommunityIcons name="magnify" size={28} color="white" />
             <Text style={styles.viewPhotoText}>Tap to view full image</Text>
-          </View>
+          </LinearGradient>
         </TouchableOpacity>
       </View>
     );
@@ -757,7 +831,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     if (loading) {
       return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading assignment...</Text>
         </View>
       );
@@ -766,13 +840,20 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     if (error) {
       return (
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#dc3545" />
+          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={fetchAssignmentDetails}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       );
@@ -788,31 +869,43 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     }
 
     return (
-      <ScrollView style={styles.content}>
-        <View style={styles.card}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.card}
+        >
           {/* Header with status */}
           <View style={styles.headerRow}>
             <Text style={styles.taskTitle} numberOfLines={2}>
               {assignment.task?.title || 'Unknown Task'}
             </Text>
-            <View style={[
-              styles.statusBadge,
-              { backgroundColor: getStatusColor() + '20', borderColor: getStatusColor() }
-            ]}>
+            <LinearGradient
+              colors={[getStatusColor() + '20', getStatusColor() + '10']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.statusBadge, { borderColor: getStatusColor() }]}
+            >
               <MaterialCommunityIcons 
                 name={getStatusIcon()} 
-                size={16} 
+                size={14} 
                 color={getStatusColor()} 
               />
               <Text style={[styles.statusText, { color: getStatusColor() }]}>
                 {getStatusText()}
               </Text>
-            </View>
+            </LinearGradient>
           </View>
 
           {/* User Info */}
           <View style={styles.userInfo}>
-            <View style={styles.avatar}>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatar}
+            >
               {assignment.user?.avatarUrl ? (
                 <Image source={{ uri: assignment.user.avatarUrl }} style={styles.avatarImage} />
               ) : (
@@ -820,7 +913,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                   {assignment.user?.fullName?.charAt(0) || 'U'}
                 </Text>
               )}
-            </View>
+            </LinearGradient>
             <View style={styles.userDetails}>
               <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
               {assignment.completed && assignment.completedAt && (
@@ -841,10 +934,15 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           <View style={styles.detailsGrid}>
             <View style={styles.detailItem}>
               <Text style={styles.detailLabel}>Points</Text>
-              <View style={styles.pointsBadge}>
-                <MaterialCommunityIcons name="star" size={16} color="#e67700" />
+              <LinearGradient
+                colors={['#fff3bf', '#ffec99']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.pointsBadge}
+              >
+                <MaterialCommunityIcons name="star" size={14} color="#e67700" />
                 <Text style={styles.pointsValue}>{assignment.points || 0}</Text>
-              </View>
+              </LinearGradient>
             </View>
             
             <View style={styles.detailItem}>
@@ -878,9 +976,14 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           {assignment.notes && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>User Notes</Text>
-              <View style={styles.notesCard}>
+              <LinearGradient
+                colors={['#e7f5ff', '#d0ebff']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.notesCard}
+              >
                 <Text style={styles.notesText}>{assignment.notes}</Text>
-              </View>
+              </LinearGradient>
             </View>
           )}
 
@@ -888,12 +991,17 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           {assignment.adminNotes && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Admin Feedback</Text>
-              <View style={[
-                styles.adminNotesCard,
-                assignment.verified === false ? styles.rejectedNotes : styles.verifiedNotes
-              ]}>
+              <LinearGradient
+                colors={assignment.verified === false ? ['#fff5f5', '#ffe3e3'] : ['#d3f9d8', '#b2f2bb']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[
+                  styles.adminNotesCard,
+                  assignment.verified === false ? styles.rejectedNotes : styles.verifiedNotes
+                ]}
+              >
                 <Text style={styles.adminNotesText}>{assignment.adminNotes}</Text>
-              </View>
+              </LinearGradient>
             </View>
           )}
 
@@ -901,29 +1009,34 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           {renderVerificationControls()}
 
           {/* Assignment Info */}
-          <View style={styles.infoSection}>
+          <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.infoSection}
+          >
             <View style={styles.infoRow}>
-              <MaterialCommunityIcons name="calendar-week" size={16} color="#6c757d" />
+              <MaterialCommunityIcons name="calendar-week" size={14} color="#868e96" />
               <Text style={styles.infoText}>
                 Rotation Week: {assignment.rotationWeek || 1}
               </Text>
             </View>
             <View style={styles.infoRow}>
-              <MaterialCommunityIcons name="calendar-range" size={16} color="#6c757d" />
+              <MaterialCommunityIcons name="calendar-range" size={14} color="#868e96" />
               <Text style={styles.infoText}>
                 Week: {new Date(assignment.weekStart).toLocaleDateString()} - {new Date(assignment.weekEnd).toLocaleDateString()}
               </Text>
             </View>
             {assignment.task?.group && (
               <View style={styles.infoRow}>
-                <MaterialCommunityIcons name="account-group" size={16} color="#6c757d" />
+                <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
                 <Text style={styles.infoText}>
                   Group: {assignment.task.group.name}
                 </Text>
               </View>
             )}
-          </View>
-        </View>
+          </LinearGradient>
+        </LinearGradient>
       </ScrollView>
     );
   };
@@ -951,18 +1064,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
-    minHeight: 56,
+    minHeight: 60,
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
-    alignItems: 'center'
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#007AFF',
-    fontWeight: '400'
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   titleContainer: {
     flex: 1,
@@ -971,13 +1086,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212529',
     textAlign: 'center'
   },
   headerSpacer: {
-    width: 40
+    width: 36
   },
   loadingContainer: {
     flex: 1,
@@ -987,7 +1102,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#6c757d',
+    color: '#868e96',
     fontSize: 14
   },
   errorContainer: {
@@ -997,17 +1112,19 @@ const styles = StyleSheet.create({
     padding: 20
   },
   errorText: {
-    color: '#dc3545',
+    color: '#fa5252',
     textAlign: 'center',
     marginBottom: 16,
     fontSize: 16,
     marginTop: 12
   },
   retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  retryButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#007AFF',
-    borderRadius: 8
   },
   retryButtonText: {
     color: 'white',
@@ -1021,8 +1138,8 @@ const styles = StyleSheet.create({
     padding: 20
   },
   emptyText: {
-    fontSize: 18,
-    color: '#6c757d',
+    fontSize: 16,
+    color: '#868e96',
     marginTop: 16,
     textAlign: 'center'
   },
@@ -1031,15 +1148,11 @@ const styles = StyleSheet.create({
     padding: 16
   },
   card: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   headerRow: {
     flexDirection: 'row',
@@ -1048,8 +1161,8 @@ const styles = StyleSheet.create({
     marginBottom: 20
   },
   taskTitle: {
-    fontSize: 22,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#212529',
     flex: 1,
     marginRight: 12
@@ -1057,57 +1170,57 @@ const styles = StyleSheet.create({
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 16,
     borderWidth: 1,
-    gap: 6
+    gap: 4
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600'
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 24,
-    backgroundColor: '#f8f9fa',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e9ecef'
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#007AFF',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   avatarImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   avatarText: {
-    color: 'white',
-    fontSize: 20,
-    fontWeight: 'bold'
+    color: '#495057',
+    fontSize: 18,
+    fontWeight: '600'
   },
   userDetails: {
     flex: 1
   },
   userName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212529',
-    marginBottom: 4
+    marginBottom: 2
   },
   completionDate: {
-    fontSize: 14,
-    color: '#6c757d'
+    fontSize: 12,
+    color: '#868e96'
   },
   completeSection: {
     marginBottom: 16
@@ -1124,9 +1237,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   statusIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1134,82 +1247,76 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   submissionStatusLabel: {
-    fontSize: 16,
-    fontWeight: '800',
-    marginBottom: 4,
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
     letterSpacing: 0.5,
   },
   submissionStatusDescription: {
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 12,
+    lineHeight: 18,
   },
   timerContainer: {
     marginTop: 12,
-    marginLeft: 56,
+    marginLeft: 52,
   },
   timerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
     alignSelf: 'flex-start',
-    gap: 6,
+    gap: 4,
   },
-  normalTimerBadge: {
-    backgroundColor: '#d3f9d8',
-  },
-  urgentTimerBadge: {
-    backgroundColor: '#ffc9c9',
-  },
+  normalTimerBadge: {},
+  urgentTimerBadge: {},
   timerText: {
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
   },
   urgentMessage: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#fa5252',
     fontWeight: '600',
-    marginTop: 6,
+    marginTop: 4,
     marginLeft: 4,
   },
   waitingContainer: {
     marginTop: 12,
-    marginLeft: 56,
+    marginLeft: 52,
   },
   waitingBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3bf',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
     alignSelf: 'flex-start',
-    gap: 6,
+    gap: 4,
   },
   waitingText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#e67700',
     fontWeight: '600',
   },
   completeButton: {
-    backgroundColor: '#2b8a3e',
-    borderRadius: 8,
+    borderRadius: 10,
     overflow: 'hidden',
   },
-  lateButton: {
-    backgroundColor: '#e67700',
+  completeButtonGradient: {
+    padding: 14,
   },
+  lateButton: {},
   completeButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    padding: 16,
   },
   completeButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
   },
   completeButtonFooter: {
@@ -1217,35 +1324,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingBottom: 10,
-    backgroundColor: 'rgba(0,0,0,0.1)',
+    marginTop: 8,
   },
   completeButtonSubtext: {
     color: 'white',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
   disabledButtonContainer: {
     marginTop: 8,
   },
   disabledButton: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  disabledButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#f1f3f5',
     padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
   },
   disabledButtonText: {
     color: '#868e96',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
   disabledButtonHint: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#868e96',
     textAlign: 'center',
     marginTop: 8,
@@ -1254,14 +1362,15 @@ const styles = StyleSheet.create({
   penaltyInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3bf',
-    padding: 8,
+    padding: 10,
     borderRadius: 8,
     marginTop: 8,
-    gap: 8
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#ffec99',
   },
   penaltyText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#e67700',
     fontWeight: '600'
   },
@@ -1269,12 +1378,13 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   swapButton: {
-    backgroundColor: '#EEF2FF',
     borderRadius: 12,
-    padding: 16,
+    overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#4F46E5',
-    borderStyle: 'dashed',
+    borderColor: '#dbe4ff',
+  },
+  swapButtonGradient: {
+    padding: 16,
   },
   swapButtonContent: {
     flexDirection: 'row',
@@ -1283,73 +1393,75 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   swapButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#4F46E5',
   },
   swapButtonSubtext: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6B7280',
     marginLeft: 32,
   },
   pendingSwapButton: {
-    backgroundColor: '#FEF3C7',
     borderRadius: 12,
-    padding: 16,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#F59E0B',
   },
+  pendingSwapGradient: {
+    padding: 16,
+  },
   pendingSwapText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#F59E0B',
   },
   pendingSwapSubtext: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#92400E',
     marginLeft: 32,
   },
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    gap: 12,
     marginBottom: 24
   },
   detailItem: {
     width: '48%'
   },
   detailLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#868e96',
-    marginBottom: 4
+    marginBottom: 2
   },
   detailValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
     color: '#212529'
   },
   pointsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3bf',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'flex-start'
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    gap: 4,
   },
   pointsValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#e67700',
-    marginLeft: 6
+    marginLeft: 4
   },
   section: {
     marginBottom: 24
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#495057',
+    color: '#212529',
     marginBottom: 12
   },
   photoContainer: {
@@ -1359,7 +1471,7 @@ const styles = StyleSheet.create({
   },
   photo: {
     width: '100%',
-    height: 250,
+    height: 220,
     backgroundColor: '#f8f9fa'
   },
   photoOverlay: {
@@ -1367,63 +1479,63 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 12,
+    padding: 10,
     alignItems: 'center'
   },
   viewPhotoText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '500',
-    marginTop: 4
+    marginTop: 2
   },
   notesCard: {
-    backgroundColor: '#e7f5ff',
-    padding: 16,
-    borderRadius: 8,
+    padding: 14,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#a5d8ff'
+    borderColor: '#d0ebff',
   },
   notesText: {
-    fontSize: 15,
-    color: '#1864ab',
-    lineHeight: 22
+    fontSize: 14,
+    color: '#2b8a3e',
+    lineHeight: 20
   },
   adminNotesCard: {
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1
+    padding: 14,
+    borderRadius: 10,
+    borderWidth: 1,
   },
   rejectedNotes: {
-    backgroundColor: '#fff5f5',
-    borderColor: '#ffc9c9'
+    borderColor: '#ffc9c9',
   },
   verifiedNotes: {
-    backgroundColor: '#d3f9d8',
-    borderColor: '#8ce99a'
+    borderColor: '#b2f2bb',
   },
   adminNotesText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#495057',
-    lineHeight: 22
+    lineHeight: 20
   },
   verificationSection: {
     marginBottom: 24
   },
-  notesInput: {
+  notesInputGradient: {
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    borderColor: '#e9ecef',
+    marginBottom: 8,
+  },
+  notesInput: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
     minHeight: 100,
     textAlignVertical: 'top',
-    marginBottom: 8
+    backgroundColor: 'transparent',
   },
   charCount: {
     textAlign: 'right',
     color: '#868e96',
-    fontSize: 12,
+    fontSize: 11,
     marginBottom: 16
   },
   verificationButtons: {
@@ -1432,28 +1544,28 @@ const styles = StyleSheet.create({
   },
   verifyButton: {
     flex: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  verifyButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    padding: 16,
-    borderRadius: 8
+    padding: 14,
   },
-  rejectButton: {
-    backgroundColor: '#fa5252'
-  },
-  approveButton: {
-    backgroundColor: '#2b8a3e' 
-  },
+  rejectButton: {},
+  approveButton: {},
   verifyButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600'
   },
   infoSection: {
-    backgroundColor: '#f8f9fa',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
     gap: 8
   },
   infoRow: {
@@ -1462,7 +1574,7 @@ const styles = StyleSheet.create({
     gap: 8
   },
   infoText: {
-    fontSize: 14,
-    color: '#6c757d'
+    fontSize: 13,
+    color: '#495057'
   }
 });

@@ -1,4 +1,4 @@
-// src/hooks/useFeedback.ts - UPDATED WITH SECURESTORE
+// src/hooks/useFeedback.ts - UPDATED - REMOVED POLLING AND FIXED LOADING
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { FeedbackService, Feedback, FeedbackStats } from '../services/FeedbackService';
@@ -40,27 +40,7 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
     }
   }, []);
 
-  // Handle stats update from polling
-  const handleStatsUpdate = useCallback((newStats: FeedbackStats) => {
-    if (isMounted.current) {
-      setStats(newStats);
-    }
-  }, []);
-
-  // Start/stop polling
-  useEffect(() => {
-    // Check token before starting polling
-    checkToken().then(hasToken => {
-      if (hasToken) {
-        FeedbackService.startPolling(handleStatsUpdate);
-      }
-    });
-
-    return () => {
-      isMounted.current = false;
-      FeedbackService.stopPolling(handleStatsUpdate);
-    };
-  }, [handleStatsUpdate, checkToken]);
+  // REMOVED POLLING - No more automatic stats updates
 
   // Submit feedback
   const submitFeedback = useCallback(async (data: { type: string; message: string; category?: string }) => {
@@ -154,10 +134,7 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
       }
 
       if (result.success) {
-        // ✅ FIX: Provide default empty array if undefined
         setFeedbackList(result.feedback || []);
-        
-        // ✅ FIX: Provide default pagination if undefined
         setPagination(result.pagination || {
           page: 1,
           limit: pagination.limit,
@@ -176,30 +153,55 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
     }
   }, [pagination.limit, activeFilter, checkToken]);
 
-  // Load feedback details
+  // Load feedback details - FIXED to properly set selected feedback
   const loadFeedbackDetails = useCallback(async (feedbackId: string) => {
-    try {
-      const hasToken = await checkToken();
-      if (!hasToken) return null;
+  try {
+    const hasToken = await checkToken();
+    if (!hasToken) return null;
 
-      setLoading(true);
-      const result = await FeedbackService.getFeedbackDetails(feedbackId);
+    setLoading(true);
+    console.log(`📥 Loading feedback details for ID: ${feedbackId}`);
+    
+    const result = await FeedbackService.getFeedbackDetails(feedbackId);
+    console.log('📦 Feedback details result:', result);
 
-      if (result.success) {
-        // ✅ FIX: Use feedbackItem for single item response
-        setSelectedFeedback(result.feedbackItem || null);
-        return result.feedbackItem;
+    if (result.success) {
+      // ✅ FIX: Only check the properties that actually exist in FeedbackResponse
+      const feedbackData = result.feedbackItem || result.feedback || null;
+      
+      if (feedbackData) {
+        // If feedbackData is an array (from result.feedback), take the first item
+        const selectedItem = Array.isArray(feedbackData) ? feedbackData[0] : feedbackData;
+        
+        if (selectedItem) {
+          setSelectedFeedback(selectedItem);
+          console.log('✅ Feedback details loaded:', selectedItem.id);
+          return selectedItem;
+        } else {
+          console.error('❌ No feedback data in response');
+          Alert.alert('Error', 'Feedback data not found');
+          return null;
+        }
+      } else {
+        console.error('❌ No feedback data in response');
+        Alert.alert('Error', 'Feedback data not found');
+        return null;
       }
+    } else {
+      console.error('❌ Failed to load feedback:', result.message);
+      Alert.alert('Error', result.message || 'Failed to load feedback details');
       return null;
-    } catch (error) {
-      console.error('❌ Load feedback details error:', error);
-      return null;
-    } finally {
-      setLoading(false);
     }
-  }, [checkToken]);
+  } catch (error) {
+    console.error('❌ Load feedback details error:', error);
+    Alert.alert('Error', 'Failed to load feedback details');
+    return null;
+  } finally {
+    setLoading(false);
+  }
+}, [checkToken]);
 
-  // Load stats (manual refresh)
+  // Load stats (manual refresh only - no polling)
   const loadStats = useCallback(async () => {
     try {
       const hasToken = await checkToken();
@@ -207,7 +209,6 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
 
       const result = await FeedbackService.getMyFeedbackStats();
       if (result.success) {
-        // ✅ FIX: Provide null if undefined
         setStats(result.stats || null);
         console.log('✅ useFeedback: Stats loaded');
       }

@@ -26,6 +26,10 @@ import GroupActivityScreen from '../screens/GroupActivityScreen';
 import MemberContributionsScreen from '../screens/MemberContributionsScreen';
 import TaskCompletionHistoryScreen from '../screens/TaskCompletionHistoryScreen';
 import TodayAssignmentsScreen from '../screens/TodayAssignmentsScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
+import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
+import HelpSupportScreen from '../screens/HelpSupportScreen';
+
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
 import { MySwapRequestsScreen } from '../screens/MySwapRequestScreen';
@@ -51,12 +55,24 @@ export default function AppNavigator() {
         component={SignupScreen}
         options={{ headerShown: false }}
       />
-      
-      {/* Password Reset Screens */}
-    
-   
-      
+      <Stack.Screen 
+  name="PrivacyPolicy" 
+  component={PrivacyPolicyScreen}
+  options={{ headerShown: false }}
+/>
 
+<Stack.Screen 
+  name="TermsOfService" 
+  component={TermsOfServiceScreen}
+  options={{ headerShown: false }}
+/>
+
+<Stack.Screen 
+  name="HelpSupport" 
+  component={HelpSupportScreen}
+  options={{ headerShown: false }}
+/>
+   
 
       {/* Main App Screens */}
       <Stack.Screen 

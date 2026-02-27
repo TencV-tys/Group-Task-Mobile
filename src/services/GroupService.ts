@@ -39,49 +39,62 @@ export class GroupService {
 
   // ========== CREATE GROUP ==========
   static async createGroup(name: string, description?: string) {
-    try {
-      if (!name.trim()) {
-        return {
-          success: false,
-          message: "Group name is required"
-        };
-      }
-
-      console.log(`GroupService: Creating group "${name}"`);
-      
-      const headers = await this.getHeaders();
-      
-      // Only include description if it exists
-      const body: any = {
-        name: name.trim()
-      };
-      
-      if (description && description.trim()) {
-        body.description = description.trim();
-      }
-      
-      const response = await fetch(`${API_URL}/create`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(body),
-      });
-
-      console.log(`GroupService: Response status: ${response.status}`);
-      
-      const result = await response.json();
-      console.log(`GroupService: Result:`, result);
-      
-      return result;
-
-    } catch (e: any) {
-      console.error("GroupService.createGroup error:", e);
+  try {
+    if (!name.trim()) {
       return {
         success: false,
-        message: e.message || "Failed to create group"
+        message: "Group name is required"
       };
     }
-  }
 
+    console.log(`GroupService: Creating group "${name}"`);
+    console.log(`GroupService: Description received:`, description);
+    console.log(`GroupService: Description type:`, typeof description);
+    
+    const headers = await this.getHeaders();
+    
+    // Determine what to send
+    let descriptionValue = null;
+    if (description !== undefined && description !== null) {
+      const trimmed = description.trim();
+      if (trimmed.length > 0) {
+        descriptionValue = trimmed;
+        console.log(`GroupService: Using description:`, trimmed);
+      } else {
+        console.log(`GroupService: Description is empty string, sending null`);
+      }
+    } else {
+      console.log(`GroupService: Description is ${description}, sending null`);
+    }
+    
+    const body = {
+      name: name.trim(),
+      description: descriptionValue
+    };
+    
+    console.log(`GroupService: Final request body:`, body);
+    
+    const response = await fetch(`${API_URL}/create`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+
+    console.log(`GroupService: Response status: ${response.status}`);
+    
+    const result = await response.json();
+    console.log(`GroupService: Result:`, result);
+    
+    return result;
+
+  } catch (e: any) {
+    console.error("GroupService.createGroup error:", e);
+    return {
+      success: false,
+      message: e.message || "Failed to create group"
+    };
+  }
+}
   // ========== GET USER'S GROUPS ==========
   static async getUserGroups() {
     try {

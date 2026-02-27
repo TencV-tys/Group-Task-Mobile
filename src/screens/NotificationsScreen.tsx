@@ -1,4 +1,4 @@
-// src/screens/NotificationsScreen.tsx - UPDATED with consistent header
+// src/screens/NotificationsScreen.tsx - UPDATED with correct color hierarchy
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -274,7 +274,18 @@ export default function NotificationsScreen({ navigation }: any) {
   };
 
   const handleDelete = (notificationId: string) => {
-    deleteNotification(notificationId);
+    Alert.alert(
+      'Delete Notification',
+      'Are you sure you want to delete this notification?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteNotification(notificationId)
+        }
+      ]
+    );
   };
 
   const getNotificationIcon = (type: string): string => {
@@ -423,7 +434,14 @@ export default function NotificationsScreen({ navigation }: any) {
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <MaterialCommunityIcons name="bell-off-outline" size={64} color="#dee2e6" />
+      <LinearGradient
+        colors={['#f8f9fa', '#e9ecef']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.emptyIconContainer}
+      >
+        <MaterialCommunityIcons name="bell-off-outline" size={40} color="#2b8a3e" />
+      </LinearGradient>
       <Text style={styles.emptyTitle}>No notifications</Text>
       <Text style={styles.emptyText}>
         When you get notifications, they'll appear here
@@ -442,7 +460,7 @@ export default function NotificationsScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header - Consistent with other screens */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()} 
@@ -662,6 +680,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 60,
+  },
+  emptyIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   emptyTitle: {
     fontSize: 16,

@@ -1,4 +1,4 @@
-// src/screens/UpdateTaskScreen.tsx - UPDATED with clean UI and dark gray primary
+// src/screens/UpdateTaskScreen.tsx - UPDATED with correct color hierarchy
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -320,7 +320,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#495057" />
+          <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading task data...</Text>
         </View>
       </SafeAreaView>
@@ -459,29 +459,29 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                     <Text style={styles.pointsLimitText}>Max: 10</Text>
                   </LinearGradient>
                 </View>
-                <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[
-                    styles.inputGradient,
-                    !isPointsWithinLimit() && styles.inputErrorGradient
-                  ]}
-                >
-                  <TextInput
+                <View style={styles.pointsInputContainer}>
+                  <LinearGradient
+                    colors={['#f8f9fa', '#e9ecef']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
                     style={[
-                      styles.input,
-                      !isPointsWithinLimit() && styles.inputError
+                      styles.pointsInputGradient,
+                      !isPointsWithinLimit() && styles.inputErrorGradient
                     ]}
-                    placeholder="1-10"
-                    placeholderTextColor="#adb5bd"
-                    value={form.points}
-                    onChangeText={handlePointsChange}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                    editable={!loading}
-                  />
-                </LinearGradient>
+                  >
+                    <TextInput
+                      style={styles.pointsInput}
+                      placeholder="1-10"
+                      placeholderTextColor="#adb5bd"
+                      value={form.points}
+                      onChangeText={handlePointsChange}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      editable={!loading}
+                    />
+                  </LinearGradient>
+                  <Text style={styles.pointsLabel}>points</Text>
+                </View>
                 <Text style={styles.helperText}>
                   Total reward points for this task (1-10)
                 </Text>
@@ -495,7 +495,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
               {/* Points Summary */}
               <View style={styles.pointsSummary}>
                 <View style={styles.pointsSummaryRow}>
-                  <MaterialCommunityIcons name="star" size={14} color="#e67700" />
+                  <MaterialCommunityIcons name="star" size={14} color="#2b8a3e" />
                   <Text style={styles.pointsSummaryText}>
                     Total: <Text style={styles.pointsHighlight}>{form.points}</Text>
                   </Text>
@@ -1032,8 +1032,9 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
-    marginBottom: 6
+    color: '#adb5bd', // SECONDARY: Light Gray
+    marginBottom: 6,
+    marginLeft: 4,
   },
   labelContainer: {
     flexDirection: 'row',
@@ -1050,6 +1051,31 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#fa5252',
     fontWeight: '600',
+  },
+  pointsInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pointsInputGradient: {
+    flex: 1,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  pointsInput: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212529',
+    backgroundColor: 'transparent',
+    textAlign: 'center',
+  },
+  pointsLabel: {
+    fontSize: 14,
+    color: '#495057', // TERTIARY: Dark Gray
+    width: 50,
   },
   inputGradient: {
     borderRadius: 10,
@@ -1109,7 +1135,7 @@ const styles = StyleSheet.create({
   },
   pointsHighlight: {
     fontWeight: '600',
-    color: '#2b8a3e',
+    color: '#2b8a3e', // PRIMARY: Dark Green
   },
   warningRow: {
     flexDirection: 'row',
@@ -1136,12 +1162,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   frequencyButtonActive: {
-    borderColor: '#2b8a3e',
+    borderColor: '#2b8a3e', // PRIMARY: Dark Green
   },
   frequencyButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#495057'
+    color: '#495057' // TERTIARY: Dark Gray
   },
   frequencyButtonTextActive: {
     color: 'white'
@@ -1240,7 +1266,7 @@ const styles = StyleSheet.create({
   pointsBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2b8a3e',
+    color: '#2b8a3e', // PRIMARY: Dark Green
   },
   pointsBadgeErrorText: {
     color: '#fa5252',
@@ -1278,12 +1304,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dayButtonActive: {
-    borderColor: '#2b8a3e',
+    borderColor: '#2b8a3e', // PRIMARY: Dark Green
   },
   dayButtonText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#495057'
+    color: '#495057' // TERTIARY: Dark Gray
   },
   dayButtonTextActive: {
     color: 'white'
@@ -1302,7 +1328,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   toggleSwitchActive: {
-    backgroundColor: '#2b8a3e'
+    backgroundColor: '#2b8a3e' // PRIMARY: Dark Green
   },
   toggleCircle: {
     width: 22,
@@ -1347,7 +1373,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#495057'
+    color: '#495057' // TERTIARY: Dark Gray
   },
   submitButton: {
     flex: 2,
@@ -1423,4 +1449,4 @@ const styles = StyleSheet.create({
   bottomPadding: {
     height: 100,
   },
-}); 
+});

@@ -1,4 +1,4 @@
-// HomeScreen.tsx - UPDATED with cleaner UI and proper icon colors
+// src/screens/HomeScreen.tsx - FIXED with only 3 stat cards and PRIMARY GREEN icons
 import React, { useEffect, useState } from 'react';
 import { 
   View, 
@@ -57,11 +57,11 @@ export default function HomeScreen({ navigation }: any) {
   
   const stats = homeData?.stats || { 
     groupsCount: 0, 
-    tasksDue: 0, 
+    tasksDueThisWeek: 0, 
+    overdueTasks: 0,
     completedTasks: 0,
     totalTasks: 0,
     completionRate: 0,
-    overdueTasks: 0,
     swapRequests: 0,
     pointsThisWeek: 0
   };
@@ -70,6 +70,7 @@ export default function HomeScreen({ navigation }: any) {
   const groups = homeData?.groups || [];
   const leaderboard = homeData?.leaderboard || [];
   const currentWeekTasks = homeData?.currentWeekTasks || [];
+  const overdueTasks = homeData?.overdueTasks || [];
 
   const handleViewGroups = () => {
     try {
@@ -79,10 +80,6 @@ export default function HomeScreen({ navigation }: any) {
     }
   };
 
-  const handleViewCompletedTasks = () => {
-    Alert.alert('Coming Soon', 'Task history screen will show your completed tasks');
-  };
- 
   const handleViewSwapRequests = () => {
     navigation.navigate('MySwapRequests');
   };
@@ -91,8 +88,12 @@ export default function HomeScreen({ navigation }: any) {
     navigation.navigate('PendingSwapRequests');
   };
 
-  const handleViewLeaderboard = () => {
-    Alert.alert('Coming Soon', 'Leaderboard will be implemented soon!');
+  const handleViewAllTasks = () => {
+    if (groups.length > 0) {
+      handleGroupPress(groups[0]);
+    } else {
+      Alert.alert('No Groups', 'Join a group to see your tasks');
+    }
   };
 
   const handleGroupPress = (group: any) => {
@@ -148,60 +149,60 @@ export default function HomeScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Dashboard</Text>
-          <Text style={styles.headerSubtitle}>
-            Welcome back, {user.fullName?.split(' ')[0] || 'User'}!
+       <View style={styles.header}>
+  <View>
+    <Text style={styles.headerTitle}>Dashboard</Text>
+    <Text style={styles.headerSubtitle}>
+      Welcome back, {user.fullName?.split(' ')[0] || 'User'}!
+    </Text>
+  </View>
+  
+  <View style={styles.headerRight}>
+    {/* Notification Button */}
+    <TouchableOpacity 
+      style={styles.iconButton}
+      onPress={handleViewNotifications}
+    >
+      <MaterialCommunityIcons name="bell-outline" size={24} color="#2b8a3e" />
+      {unreadCount > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>
+            {unreadCount > 9 ? '9+' : unreadCount}
           </Text>
         </View>
-        
-        <View style={styles.headerRight}>
-          {/* Notification Button */}
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={handleViewNotifications}
-          >
-            <MaterialCommunityIcons name="bell-outline" size={24} color="#495057" />
-            {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+      )}
+    </TouchableOpacity>
 
-          {/* Swap Request Button */}
-          <TouchableOpacity 
-            style={styles.iconButton}
-            onPress={handleViewPendingSwapRequests}
-          >
-            <MaterialCommunityIcons name="swap-horizontal" size={24} color="#4F46E5" />
-            {totalPendingForMe > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{totalPendingForMe}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          
-          {/* Profile Button */}
-          <TouchableOpacity 
-            style={styles.profileButton}
-            onPress={() => navigation.navigate('Profile')}
-          >
-            {user.avatarUrl ? (
-              <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarText}>
-                  {user.fullName?.charAt(0) || 'U'}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+    {/* Swap Request Button */}
+    <TouchableOpacity 
+      style={styles.iconButton}
+      onPress={handleViewPendingSwapRequests}
+    >
+      <MaterialCommunityIcons name="swap-horizontal" size={24} color="#2b8a3e" />
+      {totalPendingForMe > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{totalPendingForMe}</Text>
         </View>
-      </View>
+      )}
+    </TouchableOpacity>
+    
+    {/* Profile Button */}
+    <TouchableOpacity 
+      style={styles.profileButton}
+      onPress={() => navigation.navigate('Profile')}
+    >
+      {user.avatarUrl ? (
+        <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+      ) : (
+        <View style={styles.avatarPlaceholder}>
+          <Text style={styles.avatarText}>
+            {user.fullName?.charAt(0) || 'U'}
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  </View>
+</View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -241,8 +242,9 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </LinearGradient>
 
-        {/* Stats Grid */}
+        {/* Stats Grid - ONLY 3 CARDS (REMOVED COMPLETED TASKS) */}
         <View style={styles.statsGrid}>
+          {/* Groups Card */}
           <TouchableOpacity 
             style={styles.statCard}
             onPress={handleViewGroups}
@@ -255,17 +257,16 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.statLabel}>Groups</Text>
           </TouchableOpacity>
 
+          {/* Due This Week Card */}
           <TouchableOpacity 
             style={styles.statCard}
-            onPress={() => {
-              if (groups.length > 0) handleGroupPress(groups[0]);
-            }}
+            onPress={handleViewAllTasks}
             activeOpacity={0.7}
           >
-            <View style={[styles.statIconContainer, { backgroundColor: '#fff3e0' }]}>
-              <MaterialCommunityIcons name="calendar-clock" size={24} color="#e67700" />
+            <View style={[styles.statIconContainer, { backgroundColor: '#e8f5e9' }]}>
+              <MaterialCommunityIcons name="calendar-clock" size={24} color="#2b8a3e" />
             </View>
-            <Text style={styles.statNumber}>{stats.tasksDue || 0}</Text>
+            <Text style={styles.statNumber}>{stats.tasksDueThisWeek || 0}</Text>
             <Text style={styles.statLabel}>Due This Week</Text>
             {stats.overdueTasks > 0 && (
               <View style={styles.overdueBadge}>
@@ -274,25 +275,14 @@ export default function HomeScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.statCard}
-            onPress={handleViewCompletedTasks}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.statIconContainer, { backgroundColor: '#e8f5e9' }]}>
-              <MaterialCommunityIcons name="check-circle" size={24} color="#2b8a3e" />
-            </View>
-            <Text style={styles.statNumber}>{stats.completedTasks || 0}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
-          </TouchableOpacity>
-
+          {/* Swap Requests Card */}
           <TouchableOpacity 
             style={styles.statCard}
             onPress={handleViewSwapRequests}
             activeOpacity={0.7}
           >
-            <View style={[styles.statIconContainer, { backgroundColor: '#ede7f6' }]}>
-              <MaterialCommunityIcons name="swap-horizontal" size={24} color="#4F46E5" />
+            <View style={[styles.statIconContainer, { backgroundColor: '#e8f5e9' }]}>
+              <MaterialCommunityIcons name="swap-horizontal" size={24} color="#2b8a3e" />
             </View>
             <Text style={styles.statNumber}>{stats.swapRequests || 0}</Text>
             <Text style={styles.statLabel}>Swap Requests</Text>
@@ -353,6 +343,39 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
+        {/* Overdue Tasks Warning */}
+        {stats.overdueTasks > 0 && (
+          <View style={styles.section}>
+            <TouchableOpacity 
+              style={styles.overdueCard}
+              onPress={handleViewAllTasks}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={['#fff5f5', '#ffe3e3']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.overdueCardGradient}
+              >
+                <View style={styles.overdueCardContent}>
+                  <View style={styles.overdueIconContainer}>
+                    <MaterialCommunityIcons name="alert-circle" size={24} color="#fa5252" />
+                  </View>
+                  <View style={styles.overdueTextContainer}>
+                    <Text style={styles.overdueTitle}>
+                      {stats.overdueTasks} Overdue Task{stats.overdueTasks > 1 ? 's' : ''}
+                    </Text>
+                    <Text style={styles.overdueSubtitle}>
+                      Tap to view and complete them
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color="#fa5252" />
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Your Groups */}
         {groups.length > 0 && (
           <View style={styles.section}>
@@ -404,6 +427,58 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         )}
 
+        {/* Today's Tasks Preview */}
+        {currentWeekTasks.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Tasks Due Soon</Text>
+              <TouchableOpacity onPress={handleViewAllTasks}>
+                <Text style={styles.seeAllText}>View All</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.tasksContainer}>
+              {currentWeekTasks.slice(0, 3).map((task: any) => (
+                <TouchableOpacity 
+                  key={task.id} 
+                  style={styles.taskCard}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    navigation.navigate('AssignmentDetails', { 
+                      assignmentId: task.id,
+                      isAdmin: false 
+                    });
+                  }}
+                >
+                  <View style={[styles.taskIcon, { backgroundColor: '#e8f5e9' }]}>
+                    <MaterialCommunityIcons name="clipboard-text" size={20} color="#2b8a3e" />
+                  </View>
+                  <View style={styles.taskContent}>
+                    <Text style={styles.taskTitle} numberOfLines={1}>
+                      {task.title}
+                    </Text>
+                    <Text style={styles.taskGroup}>{task.groupName}</Text>
+                  </View>
+                  <View style={styles.taskRight}>
+                    <Text style={styles.taskPoints}>+{task.points} pts</Text>
+                    {task.daysLeft !== undefined && (
+                      <Text style={[
+                        styles.taskDaysLeft,
+                        task.daysLeft === 0 && styles.taskDueToday,
+                        task.daysLeft === 1 && styles.taskDueTomorrow
+                      ]}>
+                        {task.daysLeft === 0 ? 'Today' : 
+                         task.daysLeft === 1 ? 'Tomorrow' : 
+                         `${task.daysLeft} days`}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Recent Activity */}
         <View style={[styles.section, styles.lastSection]}>
           <View style={styles.sectionHeader}>
@@ -424,12 +499,12 @@ export default function HomeScreen({ navigation }: any) {
                 >
                   <View style={[
                     styles.activityIcon,
-                    { backgroundColor: activity.type === 'task' ? '#e8f5e9' : '#f8f9fa' }
+                    { backgroundColor: '#e8f5e9' }
                   ]}>
                     <MaterialCommunityIcons 
                       name={activity.icon || 'bell-outline'} 
                       size={20} 
-                      color={activity.type === 'task' ? '#2b8a3e' : '#495057'} 
+                      color="#2b8a3e" 
                     />
                   </View>
                   <View style={styles.activityContent}>
@@ -584,17 +659,18 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   statCard: {
-    width: '46%',
+    width: '30%',
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
-    margin: '2%',
+    margin: '1.5%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
     position: 'relative',
+    alignItems: 'center',
   },
   statIconContainer: {
     width: 48,
@@ -605,26 +681,27 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   statNumber: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#212529',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#868e96',
+    textAlign: 'center',
   },
   overdueBadge: {
     position: 'absolute',
-    top: 12,
-    right: 12,
+    top: 8,
+    right: 8,
     backgroundColor: '#fff5f5',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
   overdueBadgeText: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#fa5252',
     fontWeight: '600',
   },
@@ -686,6 +763,40 @@ const styles = StyleSheet.create({
     color: '#212529',
     textAlign: 'center',
   },
+  overdueCard: {
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  overdueCardGradient: {
+    padding: 16,
+  },
+  overdueCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  overdueIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  overdueTextContainer: {
+    flex: 1,
+  },
+  overdueTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fa5252',
+    marginBottom: 2,
+  },
+  overdueSubtitle: {
+    fontSize: 13,
+    color: '#868e96',
+  },
   groupsScroll: {
     marginHorizontal: -16,
     paddingHorizontal: 16,
@@ -743,6 +854,63 @@ const styles = StyleSheet.create({
   adminRole: {
     color: '#2b8a3e',
     fontWeight: '600',
+  },
+  tasksContainer: {
+    gap: 8,
+  },
+  taskCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  taskIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  taskContent: {
+    flex: 1,
+  },
+  taskTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#212529',
+    marginBottom: 2,
+  },
+  taskGroup: {
+    fontSize: 12,
+    color: '#868e96',
+  },
+  taskRight: {
+    alignItems: 'flex-end',
+  },
+  taskPoints: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2b8a3e',
+    marginBottom: 2,
+  },
+  taskDaysLeft: {
+    fontSize: 11,
+    color: '#868e96',
+  },
+  taskDueToday: {
+    color: '#fa5252',
+    fontWeight: '600',
+  },
+  taskDueTomorrow: {
+    color: '#e67700',
+    fontWeight: '500',
   },
   activityContainer: {
     gap: 8,

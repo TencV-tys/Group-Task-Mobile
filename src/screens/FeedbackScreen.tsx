@@ -1,4 +1,4 @@
-// src/screens/FeedbackScreen.tsx - FIXED input rendering
+// src/screens/FeedbackScreen.tsx - COMPLETELY FIXED with proper picker height
 import React, { useState } from 'react';
 import {
   View,
@@ -94,12 +94,16 @@ export default function FeedbackScreen({ navigation }: any) {
             end={{ x: 1, y: 1 }}
             style={styles.historyButtonGradient}
           >
-            <MaterialCommunityIcons name="history" size={18} color="#495057" />
+            <MaterialCommunityIcons name="history" size={18} color="#2b8a3e" />
           </LinearGradient>
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        contentContainerStyle={styles.content} 
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         {/* Form Card */}
         <LinearGradient
           colors={['#ffffff', '#f8f9fa']}
@@ -115,7 +119,8 @@ export default function FeedbackScreen({ navigation }: any) {
                 selectedValue={type}
                 onValueChange={setType}
                 style={styles.picker}
-                dropdownIconColor="#495057"
+                dropdownIconColor="#2b8a3e"
+                itemStyle={styles.pickerItem}
               >
                 {FEEDBACK_TYPES.map(option => (
                   <Picker.Item 
@@ -137,7 +142,8 @@ export default function FeedbackScreen({ navigation }: any) {
                 selectedValue={category}
                 onValueChange={setCategory}
                 style={styles.picker}
-                dropdownIconColor="#495057"
+                dropdownIconColor="#2b8a3e"
+                itemStyle={styles.pickerItem}
               >
                 {CATEGORIES.map(option => (
                   <Picker.Item 
@@ -151,21 +157,29 @@ export default function FeedbackScreen({ navigation }: any) {
             </View>
           </View>
 
+          {/* Spacer between pickers and input */}
+          <View style={{ height: 20 }} />
+
           {/* Message Input */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Your Feedback *</Text>
-            <View style={styles.messageInputWrapper}>
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.messageInputGradient}
+            >
               <TextInput
                 style={styles.messageInput}
                 multiline
-                numberOfLines={6}
+                numberOfLines={8}
                 placeholder="Tell us what you think..."
                 placeholderTextColor="#adb5bd"
                 value={message}
                 onChangeText={setMessage}
                 textAlignVertical="top"
               />
-            </View>
+            </LinearGradient>
           </View>
 
           {/* Submit Button */}
@@ -300,7 +314,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
   formCard: {
     borderRadius: 16,
@@ -310,13 +324,14 @@ const styles = StyleSheet.create({
     borderColor: '#e9ecef',
   },
   pickerContainer: {
-    marginBottom: 20,
+    marginBottom: 15,
   },
   label: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#495057',
-    marginBottom: 6,
+    color: '#adb5bd',
+    marginBottom: 8,
+    marginLeft: 4,
   },
   pickerWrapper: {
     backgroundColor: '#f8f9fa',
@@ -324,29 +339,39 @@ const styles = StyleSheet.create({
     borderColor: '#e9ecef',
     borderRadius: 10,
     overflow: 'hidden',
+    minHeight: 55,
+    justifyContent: 'center',
   },
   picker: {
-    height: Platform.OS === 'ios' ? 150 : 48,
+    height: Platform.OS === 'ios' ? 180 : 55,
     width: '100%',
+    color: '#212529',
+    marginLeft: Platform.OS === 'android' ? -8 : 0,
+  },
+  pickerItem: {
+    fontSize: 16,
+    height: 120,
     color: '#212529',
   },
   inputContainer: {
     marginBottom: 20,
   },
-  messageInputWrapper: {
-    backgroundColor: '#f8f9fa',
+  messageInputGradient: {
     borderWidth: 1,
     borderColor: '#e9ecef',
     borderRadius: 10,
     overflow: 'hidden',
   },
   messageInput: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 24,
     fontSize: 14,
-    minHeight: 120,
+    minHeight: 150,
     color: '#212529',
+    backgroundColor: '#f8f9fa',
     textAlignVertical: 'top',
+    lineHeight: 20,
   },
   submitButton: {
     borderRadius: 10,

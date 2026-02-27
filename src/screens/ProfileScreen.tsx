@@ -1,4 +1,4 @@
-// src/screens/ProfileScreen.tsx - UPDATED with clean UI and consistent colors
+// src/screens/ProfileScreen.tsx - UPDATED with correct colors and navigation
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -177,15 +177,15 @@ export default function ProfileScreen({ navigation }: any) {
   };
 
   const handleHelpSupport = () => {
-    Alert.alert('Help & Support', 'Email us at: support@grouptask.com');
+    navigation.navigate('HelpSupport');
   };
 
   const handlePrivacyPolicy = () => {
-    Alert.alert('Privacy Policy', 'Our privacy policy will be available soon.');
+    navigation.navigate('PrivacyPolicy');
   };
 
   const handleTermsOfService = () => {
-    Alert.alert('Terms of Service', 'Our terms of service will be available soon.');
+    navigation.navigate('TermsOfService');
   };
 
   const handleSendFeedback = () => {
@@ -266,7 +266,7 @@ export default function ProfileScreen({ navigation }: any) {
           onPress={handleNotifications}
           style={styles.notificationButton}
         >
-          <MaterialCommunityIcons name="bell-outline" size={22} color="#495057" />
+          <MaterialCommunityIcons name="bell-outline" size={22} color="#2b8a3e" />
           {unreadCount > 0 && (
             <LinearGradient
               colors={['#2b8a3e', '#1e6b2c']}
@@ -419,7 +419,7 @@ export default function ProfileScreen({ navigation }: any) {
                   end={{ x: 1, y: 1 }}
                   style={styles.menuIcon}
                 >
-                  <MaterialCommunityIcons name="account-cog" size={18} color="#495057" />
+                  <MaterialCommunityIcons name="account-cog" size={18} color="#2b8a3e" />
                 </LinearGradient>
                 <Text style={[styles.menuText, uploading && styles.disabledText]}>Account Settings</Text>
               </View>
@@ -444,7 +444,7 @@ export default function ProfileScreen({ navigation }: any) {
                   <MaterialCommunityIcons 
                     name={uploading ? "image-sync" : "image-edit"} 
                     size={18} 
-                    color={uploading ? "#868e96" : "#495057"} 
+                    color="#2b8a3e" 
                   />
                 </LinearGradient>
                 <Text style={[styles.menuText, uploading && styles.disabledText]}>
@@ -505,7 +505,7 @@ export default function ProfileScreen({ navigation }: any) {
                   end={{ x: 1, y: 1 }}
                   style={styles.menuIcon}
                 >
-                  <MaterialCommunityIcons name="history" size={18} color="#495057" />
+                  <MaterialCommunityIcons name="history" size={18} color="#2b8a3e" />
                 </LinearGradient>
                 <View style={styles.menuTextContainer}>
                   <Text style={[styles.menuText, uploading && styles.disabledText]}>My Feedback History</Text>
@@ -701,9 +701,6 @@ const styles = StyleSheet.create({
     color: '#212529',
     textAlign: 'center',
   },
-  headerRight: {
-    width: 36,
-  },
   notificationButton: {
     position: 'relative',
     width: 36,
@@ -735,6 +732,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 9,
     fontWeight: 'bold',
+  },
+  headerRight: {
+    width: 36,
   },
   scrollContent: {
     paddingBottom: 24,

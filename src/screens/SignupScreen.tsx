@@ -1,4 +1,4 @@
-// src/screens/SignupScreen.tsx - UPDATED with light green gender buttons and working links
+// src/screens/SignupScreen.tsx - UPDATED with navigation to Terms and Privacy screens
 import React, { useState } from 'react';
 import { 
   View, 
@@ -10,8 +10,7 @@ import {
   ActivityIndicator,
   ScrollView,
   KeyboardAvoidingView,
-  Platform,
-  Linking
+  Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSignupForm } from '../authHook/useSignupForm';
@@ -25,11 +24,11 @@ const GENDER_OPTIONS = [
   { value: 'PREFER_NOT_TO_SAY', label: 'Prefer not to say' }
 ];
 
-// Simple gender picker with light green buttons
+// Simple gender picker with updated colors
 const GenderPicker = ({ selectedValue, onValueChange, disabled }: any) => {
   return (
     <View style={styles.pickerContainer}>
-      <Text style={styles.label}>Gender *</Text>
+      <Text style={styles.inputLabel}>Gender *</Text>
       <View style={styles.pickerRow}>
         {GENDER_OPTIONS.map((gender) => (
           <TouchableOpacity
@@ -44,7 +43,10 @@ const GenderPicker = ({ selectedValue, onValueChange, disabled }: any) => {
             activeOpacity={0.7}
           >
             <LinearGradient
-              colors={selectedValue === gender.value ? ['#2b8a3e', '#1e6b2c'] : ['#d3f9d8', '#b2f2bb']}
+              colors={selectedValue === gender.value 
+                ? ['#2b8a3e', '#1e6b2c'] // Primary green when active
+                : ['#f8f9fa', '#e9ecef'] // Light gray when inactive
+              }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.genderButtonGradient}
@@ -129,7 +131,6 @@ export default function SignupScreen({ navigation }: any) {
     const result = await handleSubmit();
     
     if (result.success) {
-        // SUCCESS: Show success alert and navigate to Home
         Alert.alert(
           '🎉 Success!', 
           'Your account has been created successfully!\n\nYou can update your profile picture anytime from your profile settings.',
@@ -146,19 +147,16 @@ export default function SignupScreen({ navigation }: any) {
             }
         ]);
     } else {
-        // ERROR: Show error message
         Alert.alert('❌ Error', result.message || 'Signup failed. Please try again.');
     }
   };
 
   const handleTermsPress = () => {
-    // You can replace this with your actual terms URL
-    Linking.openURL('https://www.grouptask.com/terms');
+    navigation.navigate('TermsOfService');
   };
 
   const handlePrivacyPress = () => {
-    // You can replace this with your actual privacy URL
-    Linking.openURL('https://www.grouptask.com/privacy');
+    navigation.navigate('PrivacyPolicy');
   };
 
   const handleLoginPress = () => {
@@ -376,27 +374,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: '#2b8a3e',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
   logoText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#2b8a3e',
+    color: '#2b8a3e', // PRIMARY: Dark Green
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
     marginBottom: 8,
     textAlign: 'center',
-    color: '#212529',
+    color: '#212529', // Text Primary
   },
   subtitle: {
     fontSize: 14,
-    color: '#868e96',
+    color: '#868e96', // Text Secondary
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -406,7 +404,7 @@ const styles = StyleSheet.create({
   },
   avatarHint: {
     fontSize: 12,
-    color: '#868e96',
+    color: '#868e96', // Text Secondary
     marginTop: 8,
     fontStyle: 'italic',
   },
@@ -417,7 +415,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#495057',
+    color: '#adb5bd', // SECONDARY: Light Gray
+    marginLeft: 4,
   },
   inputGradient: {
     borderRadius: 12,
@@ -436,7 +435,7 @@ const styles = StyleSheet.create({
   },
   hintText: {
     fontSize: 11,
-    color: '#868e96',
+    color: '#868e96', // Text Secondary
     marginTop: 6,
     marginLeft: 4,
   },
@@ -470,12 +469,6 @@ const styles = StyleSheet.create({
   pickerContainer: {
     marginBottom: 16,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#495057',
-  },
   pickerRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -499,14 +492,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   genderButtonActive: {
-    borderColor: '#2b8a3e',
+    borderColor: '#2b8a3e', // PRIMARY: Dark Green
     borderWidth: 2,
   },
   genderButtonDisabled: {
     opacity: 0.5,
   },
   genderText: {
-    color: '#2b8a3e',
+    color: '#495057', // TERTIARY: Dark Gray (inactive)
     fontWeight: '600',
     fontSize: 15,
   },
@@ -514,15 +507,12 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '700',
   },
-  genderTextDisabled: {
-    color: '#adb5bd',
-  },
   button: {
     borderRadius: 14,
     marginTop: 16,
     marginBottom: 20,
     overflow: 'hidden',
-    shadowColor: '#2b8a3e',
+    shadowColor: '#2b8a3e', // PRIMARY: Dark Green
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -554,7 +544,7 @@ const styles = StyleSheet.create({
   },
   termsText: {
     fontSize: 13,
-    color: '#868e96',
+    color: '#868e96', // Text Secondary
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -566,8 +556,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   link: {
-    color: '#2b8a3e',
-    textDecorationLine: 'underline',
+    color: '#2b8a3e', // PRIMARY: Dark Green
     fontWeight: '600',
     fontSize: 13,
   },
@@ -578,13 +567,12 @@ const styles = StyleSheet.create({
   },
   loginLinkText: {
     fontSize: 15,
-    color: '#868e96',
+    color: '#868e96', // Text Secondary
   },
   loginLinkBold: {
-    color: '#2b8a3e',
+    color: '#2b8a3e', // PRIMARY: Dark Green
     fontWeight: '700',
     fontSize: 16,
-    textDecorationLine: 'underline',
   },
   messageBox: {
     padding: 14,
@@ -599,7 +587,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   successText: {
-    color: '#2b8a3e',
+    color: '#2b8a3e', // PRIMARY: Dark Green
   },
   errorText: {
     color: '#fa5252',

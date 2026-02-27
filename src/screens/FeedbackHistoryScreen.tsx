@@ -1,4 +1,4 @@
-// src/screens/FeedbackHistoryScreen.tsx - UPDATED with clean UI and dark gray primary
+// src/screens/FeedbackHistoryScreen.tsx - UPDATED with correct color hierarchy
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -149,7 +149,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
               {loading ? (
                 <ActivityIndicator size="small" color="#2b8a3e" />
               ) : (
-                <MaterialCommunityIcons name="refresh" size={18} color="#495057" />
+                <MaterialCommunityIcons name="refresh" size={18} color="#2b8a3e" />
               )}
             </LinearGradient>
           </TouchableOpacity>
@@ -201,7 +201,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
               end={{ x: 1, y: 1 }}
               style={styles.emptyIconContainer}
             >
-              <MaterialCommunityIcons name="message-text-outline" size={48} color="#adb5bd" />
+              <MaterialCommunityIcons name="message-text-outline" size={48} color="#2b8a3e" />
             </LinearGradient>
             <Text style={styles.emptyStateText}>No feedback yet</Text>
             <Text style={styles.emptyStateSubtext}>
@@ -304,7 +304,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                         end={{ x: 1, y: 1 }}
                         style={styles.actionButtonGradient}
                       >
-                        <MaterialCommunityIcons name="pencil" size={14} color="#495057" />
+                        <MaterialCommunityIcons name="pencil" size={14} color="#2b8a3e" />
                       </LinearGradient>
                     </TouchableOpacity>
                   )}

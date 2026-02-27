@@ -1,4 +1,4 @@
-// src/screens/FeedbackDetailsScreen.tsx - FIXED update issue
+// src/screens/FeedbackDetailsScreen.tsx - FIXED with proper picker height and colors
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -159,7 +159,14 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
             style={styles.retryButton}
             onPress={() => loadFeedbackDetails(feedbackId)}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.retryButtonGradient}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -185,7 +192,7 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
                 end={{ x: 1, y: 1 }}
                 style={styles.iconButtonGradient}
               >
-                <MaterialCommunityIcons name="pencil" size={18} color="#495057" />
+                <MaterialCommunityIcons name="pencil" size={18} color="#2b8a3e" />
               </LinearGradient>
             </TouchableOpacity>
           )}
@@ -204,17 +211,27 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Status Card */}
-        <View style={styles.statusCard}>
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.statusCard}
+        >
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedFeedback.status) }]}>
             <Text style={styles.statusText}>{selectedFeedback.status}</Text>
           </View>
           <Text style={styles.dateText}>
             {new Date(selectedFeedback.createdAt).toLocaleDateString()}
           </Text>
-        </View>
+        </LinearGradient>
 
         {/* Type Card */}
-        <View style={styles.detailCard}>
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.detailCard}
+        >
           <View style={styles.detailHeader}>
             <View style={[styles.detailIcon, { backgroundColor: '#f1f3f5' }]}>
               <MaterialCommunityIcons 
@@ -231,27 +248,37 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
               <Text style={styles.categoryText}>{selectedFeedback.category}</Text>
             </View>
           )}
-        </View>
+        </LinearGradient>
 
         {/* Message Card */}
-        <View style={styles.detailCard}>
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.detailCard}
+        >
           <View style={styles.detailHeader}>
             <View style={[styles.detailIcon, { backgroundColor: '#f1f3f5' }]}>
-              <MaterialCommunityIcons name="message" size={20} color="#495057" />
+              <MaterialCommunityIcons name="message" size={20} color="#2b8a3e" />
             </View>
             <Text style={styles.detailTitle}>Your Message</Text>
             {canEdit && (
               <TouchableOpacity onPress={handleEdit} style={styles.editMessageButton}>
-                <MaterialCommunityIcons name="pencil" size={16} color="#495057" />
+                <MaterialCommunityIcons name="pencil" size={16} color="#2b8a3e" />
                 <Text style={styles.editMessageText}>Edit</Text>
               </TouchableOpacity>
             )}
           </View>
           <Text style={styles.messageText}>{selectedFeedback.message}</Text>
-        </View>
+        </LinearGradient>
 
         {/* Timeline */}
-        <View style={styles.timelineCard}>
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.timelineCard}
+        >
           <Text style={styles.timelineTitle}>Timeline</Text>
           
           <View style={styles.timelineItem}>
@@ -294,20 +321,25 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
               </View>
             </View>
           )}
-        </View>
+        </LinearGradient>
 
         {/* Edit Note for Resolved/Closed */}
         {!canEdit && (
-          <View style={styles.infoBox}>
+          <LinearGradient
+            colors={['#f1f3f5', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.infoBox}
+          >
             <MaterialCommunityIcons name="information-outline" size={18} color="#868e96" />
             <Text style={styles.infoText}>
               This feedback is {selectedFeedback.status.toLowerCase()} and cannot be edited.
             </Text>
-          </View>
+          </LinearGradient>
         )}
       </ScrollView>
 
-      {/* Edit Modal */}
+      {/* Edit Modal - FIXED PICKER HEIGHT */}
       <Modal
         visible={editModalVisible}
         animationType="slide"
@@ -324,7 +356,7 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {/* Type Picker */}
+              {/* Type Picker - FIXED */}
               <View style={styles.modalField}>
                 <Text style={styles.modalLabel}>Feedback Type *</Text>
                 <View style={styles.pickerWrapper}>
@@ -333,19 +365,22 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
                     onValueChange={setEditType}
                     style={styles.picker}
                     enabled={!updating}
+                    dropdownIconColor="#2b8a3e"
+                    itemStyle={styles.pickerItem}
                   >
                     {FEEDBACK_TYPES.map(option => (
                       <Picker.Item 
                         key={option.value} 
                         label={option.label} 
-                        value={option.value} 
+                        value={option.value}
+                        color="#212529"
                       />
                     ))}
                   </Picker>
                 </View>
               </View>
 
-              {/* Category Picker */}
+              {/* Category Picker - FIXED */}
               <View style={styles.modalField}>
                 <Text style={styles.modalLabel}>Category (Optional)</Text>
                 <View style={styles.pickerWrapper}>
@@ -354,26 +389,37 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
                     onValueChange={setEditCategory}
                     style={styles.picker}
                     enabled={!updating}
+                    dropdownIconColor="#2b8a3e"
+                    itemStyle={styles.pickerItem}
                   >
                     {CATEGORIES.map(option => (
                       <Picker.Item 
                         key={option.value} 
                         label={option.label} 
-                        value={option.value} 
+                        value={option.value}
+                        color="#212529"
                       />
                     ))}
                   </Picker>
                 </View>
               </View>
 
+              {/* Spacer */}
+              <View style={{ height: 10 }} />
+
               {/* Message Input */}
               <View style={styles.modalField}>
                 <Text style={styles.modalLabel}>Your Feedback *</Text>
-                <View style={styles.modalInputWrapper}>
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalInputWrapper}
+                >
                   <TextInput
                     style={styles.modalInput}
                     multiline
-                    numberOfLines={6}
+                    numberOfLines={8}
                     value={editMessage}
                     onChangeText={setEditMessage}
                     textAlignVertical="top"
@@ -381,7 +427,7 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
                     placeholder="Enter your feedback..."
                     placeholderTextColor="#adb5bd"
                   />
-                </View>
+                </LinearGradient>
               </View>
             </ScrollView>
 
@@ -391,18 +437,33 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
                 onPress={() => setEditModalVisible(false)}
                 disabled={updating}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalCancelGradient}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </LinearGradient>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.modalSaveButton, updating && styles.buttonDisabled]}
                 onPress={handleUpdate}
                 disabled={updating}
               >
-                {updating ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <Text style={styles.modalSaveText}>Save Changes</Text>
-                )}
+                <LinearGradient
+                  colors={updating ? ['#f8f9fa', '#e9ecef'] : ['#2b8a3e', '#1e6b2c']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modalSaveGradient}
+                >
+                  {updating ? (
+                    <ActivityIndicator size="small" color="#495057" />
+                  ) : (
+                    <Text style={styles.modalSaveText}>Save Changes</Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>
@@ -530,10 +591,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   retryButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  retryButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#2b8a3e',
-    borderRadius: 8,
   },
   retryButtonText: {
     color: 'white',
@@ -541,7 +604,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statusCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -566,7 +628,6 @@ const styles = StyleSheet.create({
     color: '#868e96',
   },
   detailCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -603,7 +664,8 @@ const styles = StyleSheet.create({
   },
   editMessageText: {
     fontSize: 12,
-    color: '#495057',
+    color: '#2b8a3e',
+    fontWeight: '500',
   },
   typeText: {
     fontSize: 16,
@@ -628,7 +690,6 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   timelineCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -680,7 +741,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#f1f3f5',
     borderRadius: 12,
     padding: 16,
     marginTop: 8,
@@ -692,7 +752,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#868e96',
   },
-  // Modal Styles
+  // Modal Styles - FIXED
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -735,8 +795,9 @@ const styles = StyleSheet.create({
   modalLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#495057',
-    marginBottom: 6,
+    color: '#adb5bd',
+    marginBottom: 8,
+    marginLeft: 4,
   },
   pickerWrapper: {
     backgroundColor: '#f8f9fa',
@@ -744,25 +805,36 @@ const styles = StyleSheet.create({
     borderColor: '#e9ecef',
     borderRadius: 8,
     overflow: 'hidden',
+    minHeight: 55,
+    justifyContent: 'center',
   },
   picker: {
-    height: Platform.OS === 'ios' ? 150 : 48,
+    height: Platform.OS === 'ios' ? 180 : 55,
+    width: '100%',
+    color: '#212529',
+    marginLeft: Platform.OS === 'android' ? -8 : 0,
+  },
+  pickerItem: {
+    fontSize: 16,
+    height: 120,
     color: '#212529',
   },
   modalInputWrapper: {
-    backgroundColor: '#f8f9fa',
     borderWidth: 1,
     borderColor: '#e9ecef',
     borderRadius: 8,
     overflow: 'hidden',
   },
   modalInput: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 12,
-    minHeight: 120,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 24,
+    fontSize: 14,
+    minHeight: 150,
     textAlignVertical: 'top',
     color: '#212529',
+    backgroundColor: '#f8f9fa',
+    lineHeight: 20,
   },
   modalFooter: {
     flexDirection: 'row',
@@ -774,9 +846,11 @@ const styles = StyleSheet.create({
   },
   modalCancelButton: {
     flex: 1,
-    paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: '#f1f3f5',
+    overflow: 'hidden',
+  },
+  modalCancelGradient: {
+    paddingVertical: 14,
     alignItems: 'center',
   },
   modalCancelText: {
@@ -786,13 +860,15 @@ const styles = StyleSheet.create({
   },
   modalSaveButton: {
     flex: 1,
-    paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: '#2b8a3e',
+    overflow: 'hidden',
+  },
+  modalSaveGradient: {
+    paddingVertical: 14,
     alignItems: 'center',
   },
   buttonDisabled: {
-    backgroundColor: '#adb5bd',
+    opacity: 0.6,
   },
   modalSaveText: {
     fontSize: 14,

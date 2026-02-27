@@ -1,4 +1,4 @@
-// src/screens/LoginScreen.tsx - UPDATED with clean UI and consistent styling
+// src/screens/LoginScreen.tsx - Light Gray Secondary, Dark Gray Tertiary
 import React from 'react';
 import { 
   View, 
@@ -29,7 +29,6 @@ export default function LoginScreen({ navigation }: any) {
     const result = await handleSubmit();
     
     if (result?.success) {
-      // SUCCESS: Navigate to HomeScreen
       Alert.alert('Success', 'Logged in successfully!', [
         { 
           text: 'Continue', 
@@ -40,7 +39,6 @@ export default function LoginScreen({ navigation }: any) {
         }
       ]);
     } else if (message) {
-      // ERROR: Show error message
       Alert.alert('Error', message);
     }
   };
@@ -82,7 +80,6 @@ export default function LoginScreen({ navigation }: any) {
             <Text style={styles.subtitle}>Login to continue to GroupTask</Text>
           </View>
           
-          {/* Show message if exists */}
           {message ? (
             <LinearGradient
               colors={message.includes('✅') ? ['#d3f9d8', '#b2f2bb'] : ['#fff5f5', '#ffe3e3']}
@@ -156,7 +153,7 @@ export default function LoginScreen({ navigation }: any) {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={['#2b8a3e', '#1e6b2c']} // Dark green gradient for button
+                colors={['#2b8a3e', '#1e6b2c']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.buttonGradient}
@@ -175,7 +172,6 @@ export default function LoginScreen({ navigation }: any) {
               <View style={styles.divider} />
             </View>
             
-            {/* Sign Up Link */}
             <TouchableOpacity 
               onPress={handleSignUp}
               disabled={loading}
@@ -214,26 +210,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#000',
+    shadowColor: '#2b8a3e',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
   logoText: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#2b8a3e',
+    color: '#2b8a3e', // PRIMARY: Dark Green
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#212529',
+    color: '#212529', // Text Primary
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#868e96',
+    color: '#868e96', // Text Secondary
   },
   formContainer: {
     width: '100%',
@@ -244,7 +240,7 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
+    color: '#adb5bd', // SECONDARY: Light Gray
     marginBottom: 8,
     marginLeft: 4,
   },
@@ -265,9 +261,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   forgotPasswordLink: {
-    color: '#495057',
+    color: '#495057', // TERTIARY: Dark Gray
     fontSize: 14,
-    textDecorationLine: 'underline',
+    fontWeight: '500',
   },
   button: {
     borderRadius: 12,
@@ -306,22 +302,22 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     color: '#868e96',
     fontSize: 14,
+    fontWeight: '500',
   },
   signupContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 16,
   },
   linkText: {
     color: '#868e96',
     fontSize: 16,
   },
   linkBold: {
-    color: '#2b8a3e',
+    color: '#2b8a3e', // PRIMARY: Dark Green
     fontSize: 16,
     fontWeight: '700',
-    textDecorationLine: 'underline',
   },
   messageBox: {
     padding: 16,
@@ -333,10 +329,11 @@ const styles = StyleSheet.create({
   messageText: {
     textAlign: 'center',
     fontSize: 14,
+    fontWeight: '500',
     lineHeight: 20,
   },
   successText: {
-    color: '#2b8a3e',
+    color: '#2b8a3e', // PRIMARY: Dark Green
   },
   errorText: {
     color: '#fa5252',

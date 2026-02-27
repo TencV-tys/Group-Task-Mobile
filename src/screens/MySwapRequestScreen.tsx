@@ -1,4 +1,4 @@
-// src/screens/MySwapRequestsScreen.tsx - UPDATED with clean UI and consistent colors
+// src/screens/MySwapRequestsScreen.tsx - FIXED with green clear filter
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -95,7 +95,7 @@ export const MySwapRequestsScreen = () => {
     }
   };
 
-   const handleCancel = (requestId: string) => {
+  const handleCancel = (requestId: string) => {
     Alert.alert(
       'Cancel Swap Request',
       'Are you sure you want to cancel this swap request?',
@@ -125,6 +125,7 @@ export const MySwapRequestsScreen = () => {
 
   const renderFilterButton = (filter: FilterStatus, label: string) => (
     <TouchableOpacity
+      key={filter}
       style={[styles.filterButton, activeFilter === filter && styles.filterButtonActive]}
       onPress={() => setActiveFilter(filter)}
     >
@@ -189,7 +190,7 @@ export const MySwapRequestsScreen = () => {
         </Text>
         
         <View style={styles.groupContainer}>
-          <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
+          <MaterialCommunityIcons name="account-group" size={14} color="#2b8a3e" />
           <Text style={styles.groupName}>{groupName}</Text>
         </View>
 
@@ -209,7 +210,7 @@ export const MySwapRequestsScreen = () => {
           )}
 
           <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="star" size={14} color="#e67700" />
+            <MaterialCommunityIcons name="star" size={14} color="#2b8a3e" />
             <Text style={styles.detailText}>{points} pts</Text>
           </View>
 
@@ -375,7 +376,7 @@ export const MySwapRequestsScreen = () => {
           style={styles.filterIconButton}
           onPress={() => setActiveFilter('ALL')}
         >
-          <MaterialCommunityIcons name="filter" size={20} color="#495057" />
+          <MaterialCommunityIcons name="filter" size={20} color="#2b8a3e" />
         </TouchableOpacity>
       </View>
 
@@ -414,7 +415,7 @@ export const MySwapRequestsScreen = () => {
               end={{ x: 1, y: 1 }}
               style={styles.emptyIconContainer}
             >
-              <MaterialCommunityIcons name="swap-horizontal" size={40} color="#adb5bd" />
+              <MaterialCommunityIcons name="swap-horizontal" size={40} color="#2b8a3e" />
             </LinearGradient>
             <Text style={styles.emptyTitle}>No Swap Requests</Text>
             <Text style={styles.emptyText}>
@@ -428,7 +429,7 @@ export const MySwapRequestsScreen = () => {
                 onPress={() => setActiveFilter('ALL')}
               >
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={['#2b8a3e', '#1e6b2c']}  // GREEN gradient
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.clearFilterGradient}
@@ -722,7 +723,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: '#2b8a3e',
   },
   clearFilterGradient: {
     paddingHorizontal: 20,
@@ -731,7 +732,7 @@ const styles = StyleSheet.create({
   clearFilterText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#495057',
+    color: 'white',
   },
   loader: {
     marginVertical: 20,

@@ -79,15 +79,23 @@ export function useHomeData() {
     try {
       console.log("📥 useHomeData: Fetching home data...");
       const result = await HomeService.getHomeData();
-      
       if (result.success && result.data) {
-        const processedData = processData(result.data);
-        setHomeData(processedData);
-        setError(null);
-        setAuthError(false);
-        initialLoadDone.current = true;
-        console.log("✅ useHomeData: Home data loaded successfully");
-      } else {
+  const processedData = processData(result.data);
+  setHomeData(processedData);
+  
+  // Add this debug log
+  console.log("📊 Home Data Stats:", {
+    tasksDueThisWeek: processedData.stats.tasksDueThisWeek,
+    overdueTasks: processedData.stats.overdueTasks,
+    groupsCount: processedData.stats.groupsCount,
+    swapRequests: processedData.stats.swapRequests
+  });
+  
+  setError(null);
+  setAuthError(false); 
+  initialLoadDone.current = true;
+  console.log("✅ useHomeData: Home data loaded successfully");
+}else {
         const errorMessage = result.message || 'Failed to load home data';
         console.error("❌ useHomeData: API error:", errorMessage);
         setError(errorMessage);

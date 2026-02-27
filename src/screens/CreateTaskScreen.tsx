@@ -397,38 +397,52 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               </View>
 
               {/* Points Input */}
-              <View style={styles.inputGroup}>
-                <View style={styles.labelContainer}>
-                  <Text style={styles.label}>Total Task Points *</Text>
-                  <LinearGradient
-                    colors={['#fff5f5', '#ffe3e3']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.pointsLimitBadge}
-                  >
-                    <Text style={styles.pointsLimitText}>Max: 10</Text>
-                  </LinearGradient>
-                </View>
-              <LinearGradient
-  colors={['#f8f9fa', '#e9ecef']}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 1 }}
-  style={[
-    styles.inputGradient,
-    !isPointsWithinLimit() && styles.inputErrorGradient  // This handles the visual feedback
-  ]}
->
-  <TextInput style={styles.input}/>
-</LinearGradient>
-                <Text style={styles.helperText}>
-                  Total reward points for this task (1-10)
-                </Text>
-                {!isPointsWithinLimit() && (
-                  <Text style={styles.errorText}>
-                    Points must be between 1 and 10
-                  </Text>
-                )}
-              </View>
+                 
+<View style={styles.inputGroup}>
+  <View style={styles.labelContainer}>
+    <Text style={styles.label}>Total Task Points *</Text>
+    <LinearGradient
+      colors={['#fff5f5', '#ffe3e3']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.pointsLimitBadge}
+    >
+      <Text style={styles.pointsLimitText}>Max: 10</Text>
+    </LinearGradient>
+  </View>
+  
+  <View style={styles.pointsInputContainer}>
+    <LinearGradient
+      colors={['#f8f9fa', '#e9ecef']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[
+        styles.pointsInputGradient,
+        !isPointsWithinLimit() && styles.inputErrorGradient
+      ]}
+    >
+      <TextInput 
+        style={styles.pointsInput}
+        value={form.points}
+        onChangeText={handlePointsChange}
+        placeholder="1-10"
+        placeholderTextColor="#adb5bd"
+        keyboardType="number-pad"
+        maxLength={2}
+      />
+    </LinearGradient>
+    <Text style={styles.pointsLabel}>points</Text>
+  </View>
+  
+  <Text style={styles.helperText}>
+    Total reward points for this task (1-10)
+  </Text>
+  {!isPointsWithinLimit() && (
+    <Text style={styles.errorText}>
+      Points must be between 1 and 10
+    </Text>
+  )}
+</View>
 
               {/* Points Summary */}
               <View style={styles.pointsSummary}>
@@ -1266,5 +1280,30 @@ const styles = StyleSheet.create({
     color: '#495057',
     lineHeight: 18,
     flex: 1,
-  }
+  },
+  pointsInputContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+},
+pointsInputGradient: {
+  flex: 1,
+  borderRadius: 8,
+  borderWidth: 1,
+  borderColor: '#e9ecef',
+},
+pointsInput: {
+  paddingHorizontal: 12,
+  paddingVertical: 12,
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#212529',
+  backgroundColor: 'transparent',
+  textAlign: 'center'
+},
+pointsLabel: {
+  fontSize: 14,
+  color: '#495057',
+  width: 50,
+},
 });

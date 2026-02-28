@@ -1,9 +1,9 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
-import { Text } from 'react-native';
+import { Text, View } from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
-import { SocketProvider } from './src/context/SocketContext'; // Add this import
+import { SocketProvider } from './src/context/SocketContext';
 
 // Define your linking configuration
 const linking = {
@@ -71,10 +71,14 @@ export default function App() {
   console.log("📱 App starting with linking prefixes:", linking.prefixes);
   
   return (
-    <SocketProvider> {/* Wrap with SocketProvider */}
+    <SocketProvider>
       <NavigationContainer 
         linking={linking}
-        fallback={<Text style={{ marginTop: 50, textAlign: 'center' }}>Loading...</Text>}
+        fallback={
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ marginTop: 50, textAlign: 'center' }}>Loading...</Text>
+          </View>
+        }
         onReady={() => {
           console.log("✅ Navigation container ready");
         }}

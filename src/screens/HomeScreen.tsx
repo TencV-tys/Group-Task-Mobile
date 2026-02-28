@@ -18,15 +18,54 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useHomeData } from '../homeHook/useHomeHook';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { useNotifications } from '../notificationHook/useNotifications';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import * as SecureStore from 'expo-secure-store';
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
-  const { loading, refreshing, error, homeData, refreshHomeData, authError } = useHomeData();
+   const { loading, refreshing, error, homeData, refreshHomeData, authError } = useHomeData();
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
-  const { unreadCount, loadUnreadCount } = useNotifications();
+  const { unreadCount, loadUnreadCount, refreshNotifications } = useNotifications();
+const { events, clearNewNotification } = useRealtimeNotifications({
+    onNewNotification: (notification) => {
+      console.log('📢 HomeScreen: New notification received', notification);
+      
+      // Refresh data based on notification type
+      if (notification.type?.includes('TASK') || 
+          notification.type?.includes('ASSIGNMENT') ||
+          notification.type?.includes('SUBMISSION')) {
+        refreshHomeData();
+      }
+      
+      if (notification.type?.includes('SWAP')) {
+        loadPendingForMe();
+      }
+      
+      // Always refresh notification count
+      loadUnreadCount();
+      refreshNotifications();
+    },
+    showAlerts: true,
+    alertTypes: [
+      'SUBMISSION_PENDING',
+      'SUBMISSION_VERIFIED',
+      'SUBMISSION_REJECTED',
+      'SWAP_REQUEST',
+      'SWAP_ACCEPTED',
+      'SWAP_REJECTED',
+      'TASK_ASSIGNED',
+      'POINT_DEDUCTION',
+      'LATE_SUBMISSION'
+    ]
+  });
 
+  // ========== ADD THIS: Handle new notification from socket ==========
+  useEffect(() => {
+    if (events.newNotification) {
+      clearNewNotification();
+    }
+  }, [events.newNotification]);
   useEffect(() => {
     loadPendingForMe();
     loadUnreadCount();

@@ -1,5 +1,5 @@
-// src/screens/PendingSwapRequestsScreen.tsx - UPDATED with clean UI and consistent colors
-import React, { useState, useCallback } from 'react';
+// src/screens/PendingSwapRequestsScreen.tsx - COMPLETE WITH REAL-TIME UPDATES
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,26 +18,141 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
+import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import * as SecureStore from 'expo-secure-store';
 
 export const PendingSwapRequestsScreen = () => {
   const navigation = useNavigation();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
   const {
     pendingForMe,
     loading,
-    error,
     totalPendingForMe,
     loadPendingForMe,
     acceptSwapRequest,
     rejectSwapRequest,
   } = useSwapRequests();
 
+  // ========== REAL-TIME HOOKS ==========
+  const {
+    events: swapEvents,
+    clearSwapRequested,
+    clearSwapResponded,
+    clearSwapAccepted,
+    clearSwapRejected,
+    clearSwapCancelled,
+    clearSwapExpired
+  } = useRealtimeSwapRequests('', currentUserId || '');
+
   const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
+  // Load user ID on mount
+  useEffect(() => {
+    const loadUserId = async () => {
+      try {
+        const userStr = await SecureStore.getItemAsync('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setCurrentUserId(user.id);
+        } else {
+          const userDataStr = await SecureStore.getItemAsync('userData');
+          if (userDataStr) {
+            const userData = JSON.parse(userDataStr);
+            setCurrentUserId(userData.id || userData._id);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
+      }
+    };
+    loadUserId();
+  }, []);
+
+  // ========== HANDLE REAL-TIME EVENTS ==========
+  useEffect(() => {
+    if (swapEvents.swapRequested) {
+      // New request for current user
+      if (swapEvents.swapRequested.toUserId === currentUserId || !swapEvents.swapRequested.toUserId) {
+        Alert.alert(
+          '🔄 New Swap Request',
+          `${swapEvents.swapRequested.fromUserName} wants to swap "${swapEvents.swapRequested.taskTitle}"`,
+          [
+            { text: 'View', onPress: () => handleRefresh() },
+            { text: 'OK' }
+          ]
+        );
+        handleRefresh();
+      }
+      clearSwapRequested();
+    }
+  }, [swapEvents.swapRequested]);
+
+  useEffect(() => {
+    if (swapEvents.swapResponded) {
+      const isAccepted = swapEvents.swapResponded.status === 'ACCEPTED';
+      if (swapEvents.swapResponded.fromUserId === currentUserId) {
+        Alert.alert(
+          isAccepted ? '✅ Swap Accepted' : '❌ Swap Rejected',
+          `${swapEvents.swapResponded.toUserName} has ${isAccepted ? 'accepted' : 'rejected'} your swap request`,
+          [{ text: 'OK' }]
+        );
+      }
+      handleRefresh();
+      clearSwapResponded();
+    }
+  }, [swapEvents.swapResponded]);
+
+  useEffect(() => {
+    if (swapEvents.swapAccepted) {
+      if (swapEvents.swapAccepted.toUserId === currentUserId) {
+        Alert.alert(
+          '✅ Swap Accepted',
+          `You have successfully accepted the swap request`,
+          [{ text: 'OK' }]
+        );
+      }
+      handleRefresh();
+      clearSwapAccepted();
+    }
+  }, [swapEvents.swapAccepted]);
+
+  useEffect(() => {
+    if (swapEvents.swapCancelled) {
+      if (swapEvents.swapCancelled.fromUserId === currentUserId) {
+        Alert.alert(
+          '✖️ Swap Cancelled',
+          `Your swap request has been cancelled`,
+          [{ text: 'OK' }]
+        );
+      }
+      handleRefresh();
+      clearSwapCancelled();
+    }
+  }, [swapEvents.swapCancelled]);
+
+  useEffect(() => {
+    if (swapEvents.swapExpired) {
+      if (swapEvents.swapExpired.fromUserId === currentUserId) {
+        Alert.alert(
+          '⏰ Swap Expired',
+          `Your swap request has expired`,
+          [{ text: 'OK' }]
+        );
+      }
+      handleRefresh();
+      clearSwapExpired();
+    }
+  }, [swapEvents.swapExpired]);
+
   useFocusEffect(
     useCallback(() => {
-      loadPendingForMe();
-    }, [])
+      if (currentUserId) {
+        loadPendingForMe();
+      }
+    }, [currentUserId])
   );
 
   const handleRefresh = async () => {
@@ -88,11 +203,10 @@ export const PendingSwapRequestsScreen = () => {
     );
   };
 
-  const handleViewDetails = (requestId: string) => {
-    // @ts-ignore
-    navigation.navigate('SwapRequestDetails', { requestId });
-  };
-
+const handleViewDetails = (requestId: string) => {
+  // Use type assertion to bypass the TypeScript error
+  (navigation as any).navigate('SwapRequestDetails', { requestId });
+};
   const renderSwapRequest = ({ item }: { item: any }) => {
     const statusColor = SwapRequestService.getStatusColor(item.status);
     const statusLabel = SwapRequestService.getStatusLabel(item.status);
@@ -156,7 +270,6 @@ export const PendingSwapRequestsScreen = () => {
             {taskTitle}
           </Text>
           
-          {/* Scope Badge */}
           <LinearGradient
             colors={scope === 'day' ? ['#EEF2FF', '#dbe4ff'] : ['#f8f9fa', '#e9ecef']}
             start={{ x: 0, y: 0 }}
@@ -181,7 +294,6 @@ export const PendingSwapRequestsScreen = () => {
             </Text>
           </LinearGradient>
           
-          {/* Time Slot Info for Day Swaps */}
           {scope === 'day' && selectedTimeSlot && (
             <LinearGradient
               colors={['#f8f9fa', '#e9ecef']}
@@ -232,14 +344,14 @@ export const PendingSwapRequestsScreen = () => {
             </LinearGradient>
           )}
 
-        {item.expiresAt && (
-  <View style={styles.expiryContainer}>
-    <MaterialCommunityIcons name="clock-outline" size={12} color="#e67700" />
-    <Text style={styles.expiryText}>
-      Expires: {new Date(item.expiresAt).toLocaleDateString()}
-    </Text>
-  </View>
-)}
+          {item.expiresAt && (
+            <View style={styles.expiryContainer}>
+              <MaterialCommunityIcons name="clock-outline" size={12} color="#e67700" />
+              <Text style={styles.expiryText}>
+                Expires: {new Date(item.expiresAt).toLocaleDateString()}
+              </Text>
+            </View>
+          )}
         </View>
 
         {item.status === 'PENDING' && (

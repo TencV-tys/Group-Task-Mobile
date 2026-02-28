@@ -17,6 +17,10 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { TaskService } from '../services/TaskService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
+import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import * as SecureStore from 'expo-secure-store';
 
 export default function TaskDetailsScreen({ navigation, route }: any) {
   const { taskId, groupId, userRole } = route.params || {};
@@ -30,12 +34,77 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const [currentWeekSubmissions, setCurrentWeekSubmissions] = useState<any[]>([]);
   const [todayAssignment, setTodayAssignment] = useState<any>(null);
   const [upcomingAssignments, setUpcomingAssignments] = useState<any[]>([]);
-  
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const isAdmin = userRole === 'ADMIN';
 
   useEffect(() => {
     if (taskId) fetchTaskDetails();
   }, [taskId]);
+
+  useEffect(() => {
+    const loadUserId = async () => {
+      const userStr = await SecureStore.getItemAsync('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setCurrentUserId(user.id);
+      }
+    };
+    loadUserId();
+  }, []);
+
+  // ========== ADD THIS: Real-time hooks ==========
+  const {
+    events: taskEvents,
+    clearTaskUpdated,
+    clearTaskDeleted
+  } = useRealtimeTasks(groupId);
+
+  const {
+    events: assignmentEvents,
+    clearAssignmentCompleted,
+    clearAssignmentVerified
+  } = useRealtimeAssignments(groupId, currentUserId || '');
+
+  useRealtimeNotifications({
+    onNewNotification: (notification) => {
+      if (notification.data?.taskId === taskId) {
+        fetchTaskDetails();
+      }
+    },
+    showAlerts: true
+  });
+
+  // ========== ADD THIS: Handle real-time events ==========
+  useEffect(() => {
+    if (taskEvents.taskUpdated && taskEvents.taskUpdated.id === taskId) {
+      fetchTaskDetails();
+      clearTaskUpdated();
+    }
+  }, [taskEvents.taskUpdated]);
+
+  useEffect(() => {
+    if (taskEvents.taskDeleted && taskEvents.taskDeleted.taskId === taskId) {
+      Alert.alert('🗑️ Task Deleted', 'This task has been deleted', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+      clearTaskDeleted();
+    }
+  }, [taskEvents.taskDeleted]);
+
+  useEffect(() => {
+    if (assignmentEvents.assignmentCompleted) {
+      fetchTaskDetails();
+      clearAssignmentCompleted();
+    }
+  }, [assignmentEvents.assignmentCompleted]);
+
+  useEffect(() => {
+    if (assignmentEvents.assignmentVerified) {
+      fetchTaskDetails();
+      clearAssignmentVerified();
+    }
+  }, [assignmentEvents.assignmentVerified]);
+
 
   useEffect(() => {
     if (task?.userAssignment && !task.userAssignment.completed) {

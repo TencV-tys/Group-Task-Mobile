@@ -23,6 +23,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useGroupMembers } from '../groupHook/useGroupMembers';
 import { useImageUpload } from '../uploadHook/useImageUpload';
+import { useRealtimeGroup } from '../hooks/useRealtimeGroup';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 
 const { width } = Dimensions.get('window');
 
@@ -46,6 +48,15 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     updateMemberRole,
     removeMember
   } = useGroupMembers();
+
+   const {
+    events: groupEvents,
+    clearMemberJoined,
+    clearMemberLeft,
+    clearMemberRoleChanged,
+    clearGroupUpdated,
+    clearRotationCompleted
+  } = useRealtimeGroup(groupId);
 
   const [currentUserRole, setCurrentUserRole] = useState<string>(userRole || 'MEMBER');
   const [currentUserId, setCurrentUserId] = useState<string>('');
@@ -78,6 +89,63 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     }
   });
 
+  useRealtimeNotifications({
+    onNewNotification: (notification) => {
+      if (notification.data?.groupId === groupId) {
+        fetchData();
+      }
+    },
+    showAlerts: true
+  });
+
+  // ========== ADD THIS: Handle real-time group events ==========
+  useEffect(() => {
+    if (groupEvents.memberJoined) {
+      Alert.alert(
+        '👋 New Member',
+        `${groupEvents.memberJoined.userName} joined the group`,
+        [{ text: 'OK' }]
+      );
+      fetchData(true);
+      clearMemberJoined();
+    }
+  }, [groupEvents.memberJoined]);
+
+  useEffect(() => {
+    if (groupEvents.memberLeft) {
+      Alert.alert(
+        '👋 Member Left',
+        `${groupEvents.memberLeft.userName} left the group`,
+        [{ text: 'OK' }]
+      );
+      fetchData(true);
+      clearMemberLeft();
+    }
+  }, [groupEvents.memberLeft]);
+
+  useEffect(() => {
+    if (groupEvents.memberRoleChanged) {
+      Alert.alert(
+        '🔄 Role Changed',
+        `${groupEvents.memberRoleChanged.userName} is now ${groupEvents.memberRoleChanged.newRole}`,
+        [{ text: 'OK' }]
+      );
+      fetchData(true);
+      clearMemberRoleChanged();
+    }
+  }, [groupEvents.memberRoleChanged]);
+
+  useEffect(() => {
+    if (groupEvents.rotationCompleted) {
+      Alert.alert(
+        '🔄 Rotation Completed',
+        `Tasks rotated to week ${groupEvents.rotationCompleted.newWeek}`,
+        [{ text: 'OK' }]
+      );
+      fetchData(true);
+      clearRotationCompleted();
+    }
+  }, [groupEvents.rotationCompleted]);
   // Get current user ID from AsyncStorage
   useEffect(() => {
     const loadCurrentUserId = async () => {

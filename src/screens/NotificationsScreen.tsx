@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNotifications } from '../notificationHook/useNotifications';
 import { NotificationTypes } from '../services/NotificationService';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 
 export default function NotificationsScreen({ navigation }: any) {
   const {
@@ -28,6 +29,20 @@ export default function NotificationsScreen({ navigation }: any) {
     refreshNotifications,
     loadNotifications
   } = useNotifications();
+
+  const { events, clearNewNotification } = useRealtimeNotifications({
+    onNewNotification: (notification) => {
+      console.log('📢 NotificationsScreen: New notification received', notification);
+      refreshNotifications();
+    },
+    showAlerts: false // Don't show alerts on notifications screen
+  });
+
+  useEffect(() => {
+    if (events.newNotification) {
+      clearNewNotification();
+    }
+  }, [events.newNotification]);
 
   const [refreshing, setRefreshing] = useState(false);
 

@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+// src/screens/GroupTasksScreen.tsx - COMPLETE WITH REAL-TIME UPDATES
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,7 +11,7 @@ import {
   RefreshControl,
   Alert,
   Dimensions,
-  StatusBar
+  StatusBar 
 } from 'react-native';
 import { TaskService } from '../services/TaskService';
 import { AssignmentService } from '../services/AssignmentService';
@@ -19,7 +20,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SettingsModal } from '../components/SettingsModal';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import * as SecureStore from 'expo-secure-store';
-
+import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
+import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
+import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function GroupTasksScreen({ navigation, route }: any) {
@@ -36,9 +40,149 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [showTodaySection, setShowTodaySection] = useState(false);
   const [authError, setAuthError] = useState(false);
   const [nextActiveTime, setNextActiveTime] = useState<string | null>(null);
-  const [loadingUser, setLoadingUser] = useState(true); // Add this
+  const [loadingUser, setLoadingUser] = useState(true);
   
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
+
+  // ========== REAL-TIME HOOKS ==========
+  const {
+    events: taskEvents,
+    clearTaskCreated,
+    clearTaskUpdated,
+    clearTaskDeleted,
+    clearTaskAssigned
+  } = useRealtimeTasks(groupId);
+
+  const {
+    events: assignmentEvents,
+    clearAssignmentCompleted,
+    clearAssignmentPendingVerification,
+    clearAssignmentVerified
+  } = useRealtimeAssignments(groupId, currentUserId || '');
+
+  const {
+    events: swapEvents,
+    clearSwapCreated
+  } = useRealtimeSwapRequests(groupId, currentUserId || '');
+
+  const { isConnected } = useRealtimeNotifications({
+    onNewNotification: (data) => {
+      if (data.type === 'SUBMISSION_PENDING' && userRole === 'ADMIN') {
+        Alert.alert(
+          '📝 New Submission',
+          data.message,
+          [
+            { text: 'View', onPress: () => navigation.navigate('PendingVerifications', { groupId, groupName, userRole }) },
+            { text: 'Later' }
+          ]
+        );
+      }
+    },
+    showAlerts: false
+  });
+
+  // ========== HANDLE REAL-TIME EVENTS ==========
+  useEffect(() => {
+    if (taskEvents.taskCreated) {
+      Alert.alert(
+        '📢 New Task',
+        `Task "${taskEvents.taskCreated.title}" has been created`,
+        [
+          { text: 'View', onPress: () => handleViewTaskDetails(taskEvents.taskCreated.id) },
+          { text: 'OK' }
+        ]
+      );
+      fetchTasks(true);
+      clearTaskCreated();
+    }
+  }, [taskEvents.taskCreated]);
+
+  useEffect(() => {
+    if (taskEvents.taskUpdated) {
+      fetchTasks(true);
+      clearTaskUpdated();
+    }
+  }, [taskEvents.taskUpdated]);
+
+  useEffect(() => {
+    if (taskEvents.taskDeleted) {
+      Alert.alert(
+        '🗑️ Task Deleted',
+        `Task "${taskEvents.taskDeleted.taskTitle}" has been deleted`,
+        [{ text: 'OK' }]
+      );
+      fetchTasks(true);
+      clearTaskDeleted();
+    }
+  }, [taskEvents.taskDeleted]);
+
+  useEffect(() => {
+    if (taskEvents.taskAssigned) {
+      if (taskEvents.taskAssigned.assignedTo === currentUserId) {
+        Alert.alert(
+          '📋 New Assignment',
+          `You've been assigned: "${taskEvents.taskAssigned.taskTitle}"`,
+          [
+            { text: 'View', onPress: () => handleViewTaskDetails(taskEvents.taskAssigned.taskId) },
+            { text: 'OK' }
+          ]
+        );
+      }
+      fetchTasks(true);
+      clearTaskAssigned();
+    }
+  }, [taskEvents.taskAssigned]);
+
+  useEffect(() => {
+    if (assignmentEvents.assignmentCompleted) {
+      if (assignmentEvents.assignmentCompleted.completedBy !== currentUserId) {
+        Alert.alert(
+          '✅ Task Completed',
+          `${assignmentEvents.assignmentCompleted.completedByName} completed "${assignmentEvents.assignmentCompleted.taskTitle}"`,
+          [{ text: 'OK' }]
+        );
+      }
+      fetchTasks(true);
+      clearAssignmentCompleted();
+    }
+  }, [assignmentEvents.assignmentCompleted]);
+
+  useEffect(() => {
+    if (assignmentEvents.assignmentVerified) {
+      if (assignmentEvents.assignmentVerified.userId === currentUserId) {
+        Alert.alert(
+          '✅ Verified',
+          `Your submission for "${assignmentEvents.assignmentVerified.taskTitle}" has been verified!`,
+          [{ text: 'OK' }]
+        );
+      }
+      fetchTasks(true);
+      clearAssignmentVerified();
+    }
+  }, [assignmentEvents.assignmentVerified]);
+
+  useEffect(() => {
+    if (assignmentEvents.assignmentPendingVerification && userRole === 'ADMIN') {
+      fetchTasks(true);
+      clearAssignmentPendingVerification();
+    }
+  }, [assignmentEvents.assignmentPendingVerification]);
+
+  useEffect(() => {
+    if (swapEvents.swapCreated) {
+      if (swapEvents.swapCreated.toUserId === currentUserId || !swapEvents.swapCreated.toUserId) {
+        Alert.alert(
+          '🔄 New Swap Request',
+          `${swapEvents.swapCreated.fromUserName} wants to swap "${swapEvents.swapCreated.taskTitle}"`,
+          [
+            { text: 'View', onPress: () => navigation.navigate('PendingSwapRequests') },
+            { text: 'Later' }
+          ]
+        );
+      }
+      clearSwapCreated();
+    }
+  }, [swapEvents.swapCreated]);
 
   // Check token before making requests
   const checkToken = useCallback(async (): Promise<boolean> => {
@@ -75,7 +219,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       } catch (error) {
         console.error('Error getting current user:', error);
       } finally {
-        setLoadingUser(false); // Set loading false when done
+        setLoadingUser(false);
       }
     };
     
@@ -83,7 +227,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   }, []);
 
   useEffect(() => {
-    if (groupId && !loadingUser) { // Only fetch if user loading is done
+    if (groupId && !loadingUser) {
       fetchTasks();
       loadPendingForMe(groupId);
     }
@@ -99,7 +243,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return unsubscribe;
   }, [navigation, groupId, loadingUser]);
 
-  // Helper function to find today's assignments
   const findTodayAssignments = (tasks: any[]) => {
     const today = new Date().toDateString();
     return tasks.filter(task => {
@@ -109,32 +252,32 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     });
   };
 
-  // Calculate next active time for today's tasks
- const calculateNextActiveTime = (tasks: any[]) => {
-  const now = new Date();
-  let nextTime: Date | null = null;
+  const calculateNextActiveTime = (tasks: any[]) => {
+    const now = new Date();
+    let nextTime: Date | null = null;
 
-  tasks.forEach(task => {
-    if (task.userAssignment?.timeSlot) {
-      const [hours, minutes] = task.userAssignment.timeSlot.startTime.split(':').map(Number);
-      const startTime = new Date();
-      startTime.setHours(hours, minutes, 0, 0);
-      
-      if (startTime > now) {
-        if (!nextTime || startTime < nextTime) {
-          nextTime = startTime;
+    tasks.forEach(task => {
+      if (task.userAssignment?.timeSlot) {
+        const [hours, minutes] = task.userAssignment.timeSlot.startTime.split(':').map(Number);
+        const startTime = new Date();
+        startTime.setHours(hours, minutes, 0, 0);
+        
+        if (startTime > now) {
+          if (!nextTime || startTime < nextTime) {
+            nextTime = startTime;
+          }
         }
       }
-    }
-  });
+    });
 
-  if (nextTime) {
-    const hours = (nextTime as Date).getHours();
-    const minutes = (nextTime as Date).getMinutes();
-    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-  }
-  return null;
-};
+    if (nextTime) {
+      const hours = (nextTime as Date).getHours();
+      const minutes = (nextTime as Date).getMinutes();
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    }
+    return null;
+  };
+
   const fetchTasks = async (isRefreshing = false) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -203,12 +346,10 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         const uniqueMyTasks = Array.from(taskMap.values());
         setMyTasks(uniqueMyTasks);
         
-        // Find and set today's assignments
         const todayTasks = findTodayAssignments(uniqueMyTasks);
         setTodayAssignments(todayTasks);
         setShowTodaySection(todayTasks.length > 0);
         
-        // Calculate next active time
         const nextTime = calculateNextActiveTime(todayTasks);
         setNextActiveTime(nextTime);
       } else {
@@ -231,7 +372,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     }
   };
 
-  // Show auth error alert
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -287,7 +427,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     const currentMinute = now.getMinutes();
     const currentInMinutes = currentHour * 60 + currentMinute;
 
-    // Find next active time
     let nextTime: Date | null = null;
 
     for (const slot of timeSlots) {
@@ -588,7 +727,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     });
   };
 
-  // Handle viewing all today's tasks
   const handleViewAllTodayTasks = async () => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -782,39 +920,41 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         <Text style={styles.title} numberOfLines={1}>
           {groupName || 'Tasks'}
         </Text>
-        <Text style={styles.subtitle}>
-          {selectedTab === 'all' ? 'All Tasks' : 'My Tasks'}
-        </Text>
+        <View style={styles.connectionStatus}>
+          <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#2b8a3e' : '#fa5252' }]} />
+          <Text style={styles.connectionText}>
+            {isConnected ? 'Live' : 'Offline'}
+          </Text>
+        </View>
       </View>
       
-     <View style={styles.headerRight}>
-  <TouchableOpacity 
-    style={styles.swapButton}
-    onPress={handleNavigateToSwapRequests}
-    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-  >
-    <MaterialCommunityIcons name="swap-horizontal" size={24} color="#495057" />
-    {totalPendingForMe > 0 && totalPendingForMe !== undefined && (
-      <View style={styles.swapBadge}>
-        <Text style={styles.swapBadgeText}>
-          {totalPendingForMe?.toString() || '0'}
-        </Text>
+      <View style={styles.headerRight}>
+        <TouchableOpacity 
+          style={styles.swapButton}
+          onPress={handleNavigateToSwapRequests}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
+          <MaterialCommunityIcons name="swap-horizontal" size={24} color="#495057" />
+          {totalPendingForMe > 0 && totalPendingForMe !== undefined && (
+            <View style={styles.swapBadge}>
+              <Text style={styles.swapBadgeText}>
+                {totalPendingForMe?.toString() || '0'}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.settingsButton}
+          onPress={() => setShowSettingsModal(true)}
+          hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+        >
+          <MaterialCommunityIcons name="cog" size={24} color="#495057" />
+        </TouchableOpacity>
       </View>
-    )}
-  </TouchableOpacity>
-  
-  <TouchableOpacity 
-    style={styles.settingsButton}
-    onPress={() => setShowSettingsModal(true)}
-    hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
-  >
-    <MaterialCommunityIcons name="cog" size={24} color="#495057" />
-  </TouchableOpacity>
-</View>
     </LinearGradient>
   );
 
-  // Render today's assignments section at the top
   const renderTodaySection = () => {
     if (!showTodaySection || selectedTab !== 'my') return null;
     
@@ -886,44 +1026,44 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   };
 
   const renderTodayFAB = () => {
-  if (!showTodaySection || selectedTab !== 'my') return null;
-  
-  const hasSubmittableNow = todayAssignments.some(task => task.isSubmittableNow);
-  
-  return (
-    <TouchableOpacity
-      style={styles.todayFAB}
-      onPress={handleViewAllTodayTasks}
-      activeOpacity={0.8}
-    >
-      <LinearGradient
-        colors={hasSubmittableNow ? ['#2b8a3e', '#1e6b2c'] : ['#fa5252', '#e03131']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.todayFABContent}
+    if (!showTodaySection || selectedTab !== 'my') return null;
+    
+    const hasSubmittableNow = todayAssignments.some(task => task.isSubmittableNow);
+    
+    return (
+      <TouchableOpacity
+        style={styles.todayFAB}
+        onPress={handleViewAllTodayTasks}
+        activeOpacity={0.8}
       >
-        <MaterialCommunityIcons 
-          name={hasSubmittableNow ? "check-circle" : "calendar-clock"} 
-          size={24} 
-          color="white" 
-        />
-        <View style={styles.todayFABTextContainer}>
-          <Text style={styles.todayFABTitle}> {/* ✅ Wrap in Text */}
-            {hasSubmittableNow ? 'Ready to Submit!' : 'Today\'s Tasks'}
-          </Text>
-          <Text style={styles.todayFABCount}> {/* ✅ Wrap in Text */}
-            {hasSubmittableNow 
-              ? `${todayAssignments.filter(t => t.isSubmittableNow).length} can submit now`
-              : nextActiveTime 
-                ? `Opens at ${nextActiveTime}`
-                : `${todayAssignments.length} due today`}
-          </Text>
-        </View>
-        <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-};
+        <LinearGradient
+          colors={hasSubmittableNow ? ['#2b8a3e', '#1e6b2c'] : ['#fa5252', '#e03131']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.todayFABContent}
+        >
+          <MaterialCommunityIcons 
+            name={hasSubmittableNow ? "check-circle" : "calendar-clock"} 
+            size={24} 
+            color="white" 
+          />
+          <View style={styles.todayFABTextContainer}>
+            <Text style={styles.todayFABTitle}>
+              {hasSubmittableNow ? 'Ready to Submit!' : 'Today\'s Tasks'}
+            </Text>
+            <Text style={styles.todayFABCount}>
+              {hasSubmittableNow 
+                ? `${todayAssignments.filter(t => t.isSubmittableNow).length} can submit now`
+                : nextActiveTime 
+                  ? `Opens at ${nextActiveTime}`
+                  : `${todayAssignments.length} due today`}
+            </Text>
+          </View>
+          <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   const renderTask = ({ item }: any) => {
     const isAdmin = userRole === 'ADMIN';
@@ -934,7 +1074,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     const submissionStatus = item.submissionStatus;
     const willBePenalized = item.willBePenalized;
     
-    // Check if this task is due today
     const isDueToday = () => {
       if (!item.userAssignment?.dueDate) return false;
       const today = new Date().toDateString();
@@ -954,7 +1093,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       }
     };
 
-    // Determine gradient colors based on task status
     const getGradientColors = (): [string, string] => {
       if (isCompleted) {
         return ['#f8f9fa', '#e9ecef'];
@@ -983,7 +1121,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             isMyTasksView && isDueToday() && !isCompleted && styles.todayTaskCard
           ]}
         >
-          {/* Today's Assignment Badge */}
           {isMyTasksView && isDueToday() && !isCompleted && (
             <View style={styles.todayBadge}>
               <MaterialCommunityIcons name="clock-alert" size={14} color="#fff" />
@@ -1064,7 +1201,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
                   </LinearGradient>
                 )}
 
-                {/* Due Today Indicator */}
                 {isMyTasksView && isDueToday() && !isCompleted && (
                   <LinearGradient
                     colors={['#fff5f5', '#ffe3e3']}
@@ -1084,7 +1220,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           
           {isMyTasksView && !isCompleted && (
             <>
-              {/* TODAY'S ASSIGNMENT BUTTON */}
               {isDueToday() && (
                 <TouchableOpacity
                   onPress={(e) => {
@@ -1125,7 +1260,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
                 </TouchableOpacity>
               )}
 
-              {/* Complete Now button (for non-today tasks) */}
               {!isDueToday() && isSubmittableNow && (
                 <TouchableOpacity
                   onPress={(e) => {
@@ -1327,7 +1461,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         renderContent()
       )}
 
-      {/* Today's Tasks FAB */}
       {renderTodayFAB()}
 
       {userRole === 'ADMIN' && selectedTab === 'all' && (
@@ -1393,7 +1526,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         style={styles.bottomTab}
       >
         <TouchableOpacity 
-          style={[styles.tabButton, selectedTab === 'all' && styles.activeTabButton]}
+          style={styles.tabButton}
           onPress={() => setSelectedTab('all')}
           activeOpacity={0.7}
         >
@@ -1410,7 +1543,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.tabButton, selectedTab === 'my' && styles.activeTabButton]}
+          style={styles.tabButton}
           onPress={() => setSelectedTab('my')}
           activeOpacity={0.7}
         >
@@ -1486,11 +1619,21 @@ const styles = StyleSheet.create({
     color: '#212529',
     textAlign: 'center'
   },
-  subtitle: {
-    fontSize: 12,
-    color: '#868e96',
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
     marginTop: 2,
-    textAlign: 'center'
+  },
+  connectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  connectionText: {
+    fontSize: 10,
+    color: '#868e96',
   },
   headerRight: {
     flexDirection: 'row',
@@ -1566,17 +1709,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     position: 'relative'
-  },
-  completedTaskCard: {
-    opacity: 0.9
-  },
-  submittableTaskCard: {
-    borderWidth: 2,
-    borderColor: '#2b8a3e'
-  },
-  penaltyTaskCard: {
-    borderWidth: 2,
-    borderColor: '#e67700'
   },
   todayTaskCard: {
     borderWidth: 2,
@@ -1754,9 +1886,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden'
   },
-  lateButton: {
-    backgroundColor: '#e67700',
-  },
   completeNowContent: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1903,7 +2032,6 @@ const styles = StyleSheet.create({
     flex: 1,
     height: '100%'
   },
-  activeTabButton: {},
   tabIconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1919,7 +2047,6 @@ const styles = StyleSheet.create({
     color: '#495057', 
     fontWeight: '600' 
   },
-  // Today's section styles
   todaySection: {
     borderRadius: 12,
     padding: 16,

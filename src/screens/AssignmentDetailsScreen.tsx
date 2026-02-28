@@ -20,6 +20,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../services/AssignmentService';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
+import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import * as SecureStore from 'expo-secure-store';
 
 const { width } = Dimensions.get('window');
 
@@ -40,7 +43,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     finalPoints: number;
     penaltyAmount: number;
   } | null>(null);
-  
+    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { hasPendingRequest, getPendingRequestForAssignment } = useSwapRequests();
 
   useEffect(() => {
@@ -55,6 +58,64 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       return () => clearInterval(timer);
     }
   }, [assignment, timeLeft]);
+
+ useEffect(() => {
+    const loadUserId = async () => {
+      const userStr = await SecureStore.getItemAsync('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setCurrentUserId(user.id);
+      }
+    };
+    loadUserId();
+  }, []);
+
+  // ========== ADD THIS: Real-time hooks ==========
+  const {
+    events: assignmentEvents,
+    clearAssignmentVerified,
+    clearAssignmentRejected
+  } = useRealtimeAssignments('', currentUserId || '');
+
+  useRealtimeNotifications({
+    onNewNotification: (notification) => {
+      if (notification.data?.assignmentId === assignmentId) {
+        if (notification.type === 'SUBMISSION_VERIFIED' || 
+            notification.type === 'SUBMISSION_REJECTED') {
+          fetchAssignmentDetails();
+          if (onVerified) onVerified();
+        }
+      }
+    },
+    showAlerts: true
+  });
+
+  // ========== ADD THIS: Handle real-time verification ==========
+  useEffect(() => {
+    if (assignmentEvents.assignmentVerified && 
+        assignmentEvents.assignmentVerified.assignmentId === assignmentId) {
+      Alert.alert(
+        '✅ Verified',
+        'This assignment has been verified',
+        [{ text: 'OK', onPress: () => fetchAssignmentDetails() }]
+      );
+      if (onVerified) onVerified();
+      clearAssignmentVerified();
+    }
+  }, [assignmentEvents.assignmentVerified]);
+
+  useEffect(() => {
+    if (assignmentEvents.assignmentRejected && 
+        assignmentEvents.assignmentRejected.assignmentId === assignmentId) {
+      Alert.alert(
+        '❌ Rejected',
+        'This assignment has been rejected',
+        [{ text: 'OK', onPress: () => fetchAssignmentDetails() }]
+      );
+      if (onVerified) onVerified();
+      clearAssignmentRejected();
+    }
+  }, [assignmentEvents.assignmentRejected]);
 
   const fetchAssignmentDetails = async () => {
     setLoading(true);

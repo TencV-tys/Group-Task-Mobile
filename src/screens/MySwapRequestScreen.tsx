@@ -19,6 +19,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
 import * as SecureStore from 'expo-secure-store';
+import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 
 type FilterStatus = 'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
 
@@ -39,7 +41,14 @@ export const MySwapRequestsScreen = () => {
   const [userLoading, setUserLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const limit = 20;
-
+  const {
+    events: swapEvents,
+    clearSwapResponded,
+    clearSwapAccepted,
+    clearSwapRejected,
+    clearSwapCancelled,
+    clearSwapExpired
+  } = useRealtimeSwapRequests('', userId || '');
   // Load user ID on mount from SecureStore
   useEffect(() => {
     const loadUserId = async () => {
@@ -63,6 +72,35 @@ export const MySwapRequestsScreen = () => {
     };
     loadUserId();
   }, []);
+
+  useEffect(() => {
+    if (swapEvents.swapResponded) {
+      const isAccepted = swapEvents.swapResponded.status === 'ACCEPTED';
+      Alert.alert(
+        isAccepted ? '✅ Swap Accepted' : '❌ Swap Rejected',
+        `Your swap request was ${isAccepted ? 'accepted' : 'rejected'}`,
+        [{ text: 'OK' }]
+      );
+      loadRequests();
+      clearSwapResponded();
+    }
+  }, [swapEvents.swapResponded]);
+
+  useEffect(() => {
+    if (swapEvents.swapCancelled) {
+      Alert.alert('✖️ Swap Cancelled', 'Your swap request was cancelled', [{ text: 'OK' }]);
+      loadRequests();
+      clearSwapCancelled();
+    }
+  }, [swapEvents.swapCancelled]);
+
+  useEffect(() => {
+    if (swapEvents.swapExpired) {
+      Alert.alert('⏰ Swap Expired', 'Your swap request has expired', [{ text: 'OK' }]);
+      loadRequests();
+      clearSwapExpired();
+    }
+  }, [swapEvents.swapExpired]);
 
   useFocusEffect(
     useCallback(() => {

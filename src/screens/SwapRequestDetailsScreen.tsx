@@ -16,6 +16,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
+import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import * as SecureStore from 'expo-secure-store';
 
 type SwapRequestDetailsRouteParams = {
@@ -39,6 +41,15 @@ export const SwapRequestDetailsScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
+   const {
+    events: swapEvents,
+    clearSwapResponded,
+    clearSwapAccepted,
+    clearSwapRejected,
+    clearSwapCancelled,
+    clearSwapExpired
+  } = useRealtimeSwapRequests('', currentUserId || '');
+
   useEffect(() => {
     loadCurrentUser();
     loadRequestDetails();
@@ -61,6 +72,55 @@ export const SwapRequestDetailsScreen = () => {
       console.error('Error loading user:', error);
     }
   };
+ useRealtimeNotifications({
+    onNewNotification: (notification) => {
+      if (notification.data?.swapRequestId === requestId) {
+        loadRequestDetails();
+      }
+    },
+    showAlerts: true
+  });
+
+  // ========== ADD THIS: Handle real-time events for this specific request ==========
+  useEffect(() => {
+    if (swapEvents.swapResponded && swapEvents.swapResponded.swapRequestId === requestId) {
+      loadRequestDetails();
+      clearSwapResponded();
+    }
+  }, [swapEvents.swapResponded]);
+
+  useEffect(() => {
+    if (swapEvents.swapAccepted && swapEvents.swapAccepted.swapRequestId === requestId) {
+      Alert.alert('✅ Swap Accepted', 'The swap request was accepted', [{ text: 'OK' }]);
+      loadRequestDetails();
+      clearSwapAccepted();
+    }
+  }, [swapEvents.swapAccepted]);
+
+  useEffect(() => {
+    if (swapEvents.swapRejected && swapEvents.swapRejected.swapRequestId === requestId) {
+      Alert.alert('❌ Swap Rejected', 'The swap request was rejected', [{ text: 'OK' }]);
+      loadRequestDetails();
+      clearSwapRejected();
+    }
+  }, [swapEvents.swapRejected]);
+
+  useEffect(() => {
+    if (swapEvents.swapCancelled && swapEvents.swapCancelled.swapRequestId === requestId) {
+      Alert.alert('✖️ Swap Cancelled', 'This swap request was cancelled', [{ text: 'OK' }]);
+      loadRequestDetails();
+      clearSwapCancelled();
+    }
+  }, [swapEvents.swapCancelled]);
+
+  useEffect(() => {
+    if (swapEvents.swapExpired && swapEvents.swapExpired.swapRequestId === requestId) {
+      Alert.alert('⏰ Swap Expired', 'This swap request has expired', [{ text: 'OK' }]);
+      loadRequestDetails();
+      clearSwapExpired();
+    }
+  }, [swapEvents.swapExpired]);
+
 
   const loadRequestDetails = async () => {
     setLoading(true);

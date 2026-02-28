@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
 import { Text } from 'react-native';
 import AppNavigator from './src/navigation/AppNavigator';
+import { SocketProvider } from './src/context/SocketContext'; // Add this import
 
 // Define your linking configuration
 const linking = {
@@ -18,7 +19,7 @@ const linking = {
       // Auth Screens
       Login: 'login',
       Signup: 'signup',
-      ForgotPassword: 'forgot-password', // YOU NEED THIS!
+      ForgotPassword: 'forgot-password',
       
       // Main App Screens
       Home: 'home',
@@ -65,18 +66,21 @@ const linking = {
     };
   },
 };
+
 export default function App() {
   console.log("📱 App starting with linking prefixes:", linking.prefixes);
   
   return (
-    <NavigationContainer 
-      linking={linking}
-      fallback={<Text style={{ marginTop: 50, textAlign: 'center' }}>Loading...</Text>}
-      onReady={() => {
-        console.log("✅ Navigation container ready");
-      }}
-    >
-      <AppNavigator />
-    </NavigationContainer>
+    <SocketProvider> {/* Wrap with SocketProvider */}
+      <NavigationContainer 
+        linking={linking}
+        fallback={<Text style={{ marginTop: 50, textAlign: 'center' }}>Loading...</Text>}
+        onReady={() => {
+          console.log("✅ Navigation container ready");
+        }}
+      >
+        <AppNavigator />
+      </NavigationContainer>
+    </SocketProvider>
   );
 }

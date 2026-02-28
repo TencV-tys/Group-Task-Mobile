@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { NotificationService, Notification, NotificationTypes } from '../services/NotificationService';
 import * as SecureStore from 'expo-secure-store';
+import { useSocket } from '../context/SocketContext';
 
 interface PaginationInfo {
   page: number;
@@ -22,7 +23,7 @@ export const useNotifications = () => {
     total: 0,
     pages: 0
   });
-
+const { on, off, isConnected } = useSocket();
   // Check token before making requests from SecureStore
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
@@ -195,7 +196,38 @@ export const useNotifications = () => {
   useEffect(() => {
     refreshNotifications();
   }, []);
+useEffect(() => {
+  if (!isConnected) return;
 
+  console.log('🎧 Setting up real-time notification listener');
+
+  const handleNewNotification = (data: any) => {
+    console.log('📢 Real-time: New notification', data);
+    
+    // Add to notifications list
+    if (data.notification) {
+      setNotifications(prev => [data.notification, ...prev]);
+      if (!data.notification.read) {
+        setUnreadCount(prev => prev + 1);
+      }
+    } else if (data) {
+      // Handle case where data itself is the notification
+      setNotifications(prev => [data, ...prev]);
+      if (!data.read) {
+        setUnreadCount(prev => prev + 1);
+      }
+    }
+    
+    // Refresh unread count
+    loadUnreadCount();
+  };
+
+  on('notification:new', handleNewNotification);
+
+  return () => {
+    off('notification:new', handleNewNotification);
+  };
+}, [isConnected, loadUnreadCount]); // Add loadUnreadCount to dependencies
   return {
     // State
     loading,

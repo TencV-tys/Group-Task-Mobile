@@ -344,4 +344,21 @@ export class TaskService {
       };
     }
   }
+  // Add this method to your TaskService class
+static async getRotationStatus(groupId: string) {
+  try {
+    const headers = await this.getHeaders(false);
+    const response = await fetch(`${API_URL}/group/${groupId}/rotation-status`, {
+      method: 'GET',
+      headers,
+    });
+    return await response.json();
+  } catch (error: any) {
+    console.error('TaskService.getRotationStatus error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to get rotation status'
+    };
+  }
+}
 }

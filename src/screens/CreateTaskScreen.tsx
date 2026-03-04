@@ -1,5 +1,4 @@
-// src/screens/CreateTaskScreen.tsx - UPDATED with clean UI and dark gray primary
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react'; // ✅ ADDED useEffect
 import {
   View,
   Text,
@@ -17,6 +16,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCreateTask } from '../taskHook/useCreateTask';
+import { useRotationStatus } from '../hooks/useRotationStatus'; // ✅ ADDED new hook
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TimeSlotModal } from '../components/TimeSlotModal';
 import { DAY_OF_WEEK_OPTIONS, formatTimeDisplay } from '../utils/timeUtils';
@@ -24,6 +24,9 @@ import { DAY_OF_WEEK_OPTIONS, formatTimeDisplay } from '../utils/timeUtils';
 export default function CreateTaskScreen({ navigation, route }: any) {
   const { groupId, groupName } = route.params || {};
   const { loading, error, success, createTask, reset } = useCreateTask();
+  
+  // ✅ NEW: Rotation status hook
+  const { status, checkStatus, getTaskRecommendation } = useRotationStatus(groupId);
   
   const scrollViewRef = useRef<ScrollView>(null);
   const [showTimeSlotModal, setShowTimeSlotModal] = useState(false);
@@ -51,6 +54,13 @@ export default function CreateTaskScreen({ navigation, route }: any) {
       points?: string;
     }>,
   });
+
+  // ✅ NEW: Check rotation status on mount
+  useEffect(() => {
+    if (groupId) {
+      checkStatus();
+    }
+  }, [groupId]);
 
   const handleSubmit = async () => {
     Keyboard.dismiss();
@@ -291,6 +301,9 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     );
   };
 
+  // ✅ NEW: Get recommendation for display
+  const recommendation = getTaskRecommendation();
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -334,6 +347,46 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 <Text style={styles.groupNote}>
                   This task will be added to the group's rotation
                 </Text>
+              </LinearGradient>
+            )}
+
+            {/* ✅ NEW: Rotation Status Warning - Only shows when needed */}
+            {status && !status.hasEnoughTasks && status.totalTasks > 0 && (
+              <LinearGradient
+                colors={['#fff3bf', '#ffec99']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.warningContainer}
+              >
+                <View style={styles.warningContent}>
+                  <MaterialCommunityIcons name="alert" size={20} color="#e67700" />
+                  <View style={styles.warningTextContainer}>
+                    <Text style={styles.warningTitle}>Rotation Warning</Text>
+                    <Text style={styles.warningMessage}>
+                      {recommendation?.message}
+                    </Text>
+                  </View>
+                </View>
+              </LinearGradient>
+            )}
+
+            {/* ✅ NEW: Info when no tasks yet */}
+            {status && status.totalTasks === 0 && (
+              <LinearGradient
+                colors={['#e7f5ff', '#d0ebff']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.infoContainer}
+              >
+                <View style={styles.warningContent}>
+                  <MaterialCommunityIcons name="information" size={20} color="#2b8a3e" />
+                  <View style={styles.warningTextContainer}>
+                    <Text style={styles.infoTitle}>No Tasks Yet</Text>
+                    <Text style={styles.infoMessage}>
+                      Create your first recurring task to start the rotation.
+                    </Text>
+                  </View>
+                </View>
               </LinearGradient>
             )}
 
@@ -397,52 +450,51 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               </View>
 
               {/* Points Input */}
-                 
-<View style={styles.inputGroup}>
-  <View style={styles.labelContainer}>
-    <Text style={styles.label}>Total Task Points *</Text>
-    <LinearGradient
-      colors={['#fff5f5', '#ffe3e3']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.pointsLimitBadge}
-    >
-      <Text style={styles.pointsLimitText}>Max: 10</Text>
-    </LinearGradient>
-  </View>
-  
-  <View style={styles.pointsInputContainer}>
-    <LinearGradient
-      colors={['#f8f9fa', '#e9ecef']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[
-        styles.pointsInputGradient,
-        !isPointsWithinLimit() && styles.inputErrorGradient
-      ]}
-    >
-      <TextInput 
-        style={styles.pointsInput}
-        value={form.points}
-        onChangeText={handlePointsChange}
-        placeholder="1-10"
-        placeholderTextColor="#adb5bd"
-        keyboardType="number-pad"
-        maxLength={2}
-      />
-    </LinearGradient>
-    <Text style={styles.pointsLabel}>points</Text>
-  </View>
-  
-  <Text style={styles.helperText}>
-    Total reward points for this task (1-10)
-  </Text>
-  {!isPointsWithinLimit() && (
-    <Text style={styles.errorText}>
-      Points must be between 1 and 10
-    </Text>
-  )}
-</View>
+              <View style={styles.inputGroup}>
+                <View style={styles.labelContainer}>
+                  <Text style={styles.label}>Total Task Points *</Text>
+                  <LinearGradient
+                    colors={['#fff5f5', '#ffe3e3']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.pointsLimitBadge}
+                  >
+                    <Text style={styles.pointsLimitText}>Max: 10</Text>
+                  </LinearGradient>
+                </View>
+                
+                <View style={styles.pointsInputContainer}>
+                  <LinearGradient
+                    colors={['#f8f9fa', '#e9ecef']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[
+                      styles.pointsInputGradient,
+                      !isPointsWithinLimit() && styles.inputErrorGradient
+                    ]}
+                  >
+                    <TextInput 
+                      style={styles.pointsInput}
+                      value={form.points}
+                      onChangeText={handlePointsChange}
+                      placeholder="1-10"
+                      placeholderTextColor="#adb5bd"
+                      keyboardType="number-pad"
+                      maxLength={2}
+                    />
+                  </LinearGradient>
+                  <Text style={styles.pointsLabel}>points</Text>
+                </View>
+                
+                <Text style={styles.helperText}>
+                  Total reward points for this task (1-10)
+                </Text>
+                {!isPointsWithinLimit() && (
+                  <Text style={styles.errorText}>
+                    Points must be between 1 and 10
+                  </Text>
+                )}
+              </View>
 
               {/* Points Summary */}
               <View style={styles.pointsSummary}>
@@ -901,6 +953,51 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginLeft: 24,
   },
+  // ✅ NEW: Warning styles
+  warningContainer: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ffec99',
+  },
+  infoContainer: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#b2f2bb',
+  },
+  warningContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  warningTextContainer: {
+    flex: 1,
+  },
+  warningTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#e67700',
+    marginBottom: 2,
+  },
+  warningMessage: {
+    fontSize: 13,
+    color: '#e67700',
+    lineHeight: 18,
+  },
+  infoTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2b8a3e',
+    marginBottom: 2,
+  },
+  infoMessage: {
+    fontSize: 13,
+    color: '#2b8a3e',
+    lineHeight: 18,
+  },
   formSection: {
     borderRadius: 16,
     padding: 20,
@@ -1260,12 +1357,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: '#e9ecef',
-  },
-  infoTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 12,
   },
   infoList: {
     gap: 6,

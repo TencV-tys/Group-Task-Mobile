@@ -6,7 +6,7 @@ export interface RotationAnalysis {
   activeMembers: number;
   totalTasks: number;
   recurringTasks: number;
-  tasksPerMember: number;
+  tasksPerMember: number; 
   hasEnoughTasks: boolean;
   tasksNeeded: number;
   warning: string | null;
@@ -18,26 +18,28 @@ export function useRotationStatus(groupId: string) {
   const [error, setError] = useState<string | null>(null);
 
   const checkStatus = useCallback(async () => {
-    if (!groupId) return;
+  if (!groupId) return;
+  
+  setLoading(true); 
+  setError(null);
+  
+  try {
+    console.log('📡 Fetching rotation status for:', groupId);
+    const result = await TaskService.getRotationStatus(groupId);
+    console.log('📦 Rotation status result:', result);
     
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // You'll need to add this endpoint to your TaskService
-      const result = await TaskService.getRotationStatus(groupId);
-      
-      if (result.success) {
-        setStatus(result.data);
-      } else {
-        setError(result.message || 'Failed to check rotation status');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error checking rotation status');
-    } finally {
-      setLoading(false);
+    if (result.success) {
+      setStatus(result.data);
+    } else {
+      setError(result.message || 'Failed to check rotation status');
     }
-  }, [groupId]);
+  } catch (err: any) {
+    console.error('❌ Error in checkStatus:', err);
+    setError(err.message || 'Error checking rotation status');
+  } finally {
+    setLoading(false);
+  } 
+}, [groupId]);
 
   const getTaskRecommendation = useCallback(() => {
     if (!status) return null;

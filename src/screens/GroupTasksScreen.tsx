@@ -1,4 +1,3 @@
-// src/screens/GroupTasksScreen.tsx - COMPLETE WITH REAL-TIME UPDATES
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -14,10 +13,10 @@ import {
   StatusBar 
 } from 'react-native';
 import { TaskService } from '../services/TaskService';
-import { AssignmentService } from '../services/AssignmentService';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SettingsModal } from '../components/SettingsModal';
+import { useRotationStatus } from '../hooks/useRotationStatus';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import * as SecureStore from 'expo-secure-store';
 import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
@@ -42,6 +41,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [nextActiveTime, setNextActiveTime] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   
+  // ========== ROTATION STATUS ==========
+  const { status: rotationStatus, checkStatus } = useRotationStatus(groupId);
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
 
   // ========== REAL-TIME HOOKS ==========
@@ -184,6 +185,13 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     }
   }, [swapEvents.swapCreated]);
 
+  // ========== CHECK ROTATION STATUS (ADMIN ONLY) ==========
+  useEffect(() => {
+    if (groupId && userRole === 'ADMIN') {
+      checkStatus();
+    }
+  }, [groupId, tasks.length, userRole]);
+
   // Check token before making requests
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
@@ -243,14 +251,31 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return unsubscribe;
   }, [navigation, groupId, loadingUser]);
 
-  const findTodayAssignments = (tasks: any[]) => {
-    const today = new Date().toDateString();
-    return tasks.filter(task => {
-      if (!task.userAssignment?.dueDate) return false;
-      const dueDate = new Date(task.userAssignment.dueDate).toDateString();
-      return today === dueDate && !task.userAssignment.completed;
+  const handleViewRotationSchedule = () => {
+    navigation.navigate('RotationSchedule', {
+      groupId,
+      groupName,
+      userRole
     });
   };
+
+ const findTodayAssignments = (tasks: any[]) => {
+  const today = new Date().toDateString();
+  console.log('📅 Today is:', today);
+  
+  return tasks.filter(task => {
+    if (!task.userAssignment?.dueDate) {
+      console.log('❌ Task has no dueDate:', task.title);
+      return false;
+    }
+    const dueDate = new Date(task.userAssignment.dueDate).toDateString();
+    const isToday = today === dueDate && !task.userAssignment.completed;
+    
+    console.log(`📅 Task "${task.title}" due: ${dueDate}, isToday: ${isToday}`);
+    
+    return isToday;
+  });
+};
 
   const calculateNextActiveTime = (tasks: any[]) => {
     const now = new Date();
@@ -391,116 +416,113 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   }, [authError]);
 
   const checkTaskTimeValidity = (task: any) => {
-    const result = {
-      isSubmittableNow: false,
-      timeLeft: null as number | null,
-      submissionStatus: 'waiting' as 'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed',
-      willBePenalized: false,
-      activeTimeSlot: null as any,
-      nextActiveTime: null as string | null
-    };
-
-    if (!task.userAssignment || task.userAssignment.completed) {
-      result.submissionStatus = 'completed';
-      return result;
-    }
-
-    const now = new Date();
-    const dueDate = new Date(task.userAssignment.dueDate);
-    const today = now.toDateString();
-    const assignmentDay = dueDate.toDateString();
-    
-    if (today !== assignmentDay) {
-      result.submissionStatus = 'wrong_day';
-      return result;
-    }
-
-    const timeSlots = task.timeSlots || (task.userAssignment.timeSlot ? [task.userAssignment.timeSlot] : []);
-    
-    if (timeSlots.length === 0) {
-      result.isSubmittableNow = true;
-      result.submissionStatus = 'available';
-      return result;
-    }
-
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentInMinutes = currentHour * 60 + currentMinute;
-
-    let nextTime: Date | null = null;
-
-    for (const slot of timeSlots) {
-      const [startHour, startMinute] = slot.startTime.split(':').map(Number);
-      const startInMinutes = startHour * 60 + startMinute;
-      
-      if (startInMinutes > currentInMinutes) {
-        const startTime = new Date();
-        startTime.setHours(startHour, startMinute, 0, 0);
-        if (!nextTime || startTime < nextTime) {
-          nextTime = startTime;
-        }
-      }
-    }
-
-    if (nextTime) {
-      const hours = nextTime.getHours();
-      const minutes = nextTime.getMinutes();
-      result.nextActiveTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-    }
-
-    for (const slot of timeSlots) {
-      const [endHour, endMinute] = slot.endTime.split(':').map(Number);
-      const endInMinutes = endHour * 60 + endMinute;
-      
-      const canSubmitStart = endInMinutes - 30;
-      const canSubmitEnd = endInMinutes + 30;
-      
-      if (currentInMinutes >= canSubmitStart && currentInMinutes <= canSubmitEnd) {
-        result.isSubmittableNow = true;
-        result.activeTimeSlot = slot;
-        result.submissionStatus = 'available';
-        result.willBePenalized = currentInMinutes > endInMinutes;
-        
-        const endTime = new Date();
-        endTime.setHours(endHour, endMinute, 0, 0);
-        const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
-        const timeLeftMs = gracePeriodEnd.getTime() - now.getTime();
-        result.timeLeft = Math.max(0, Math.floor(timeLeftMs / 1000));
-        
-        break;
-      } else if (currentInMinutes < canSubmitStart) {
-        const endTime = new Date();
-        endTime.setHours(endHour, endMinute, 0, 0);
-        const submissionStart = new Date(endTime.getTime() - 30 * 60000);
-        const timeUntilMs = submissionStart.getTime() - now.getTime();
-        
-        if (timeUntilMs > 0) {
-          result.timeLeft = Math.ceil(timeUntilMs / 1000);
-          result.submissionStatus = 'waiting';
-        }
-      }
-    }
-
-    if (!result.isSubmittableNow && result.submissionStatus === 'waiting') {
-      const latestSlot = [...timeSlots].sort((a, b) => {
-        const aEnd = parseInt(a.endTime.split(':')[0]) * 60 + parseInt(a.endTime.split(':')[1]);
-        const bEnd = parseInt(b.endTime.split(':')[0]) * 60 + parseInt(b.endTime.split(':')[1]);
-        return bEnd - aEnd;
-      })[0];
-      
-      if (latestSlot) {
-        const [endHour, endMinute] = latestSlot.endTime.split(':').map(Number);
-        const graceEnd = endHour * 60 + endMinute + 30;
-        
-        if (currentInMinutes > graceEnd) {
-          result.submissionStatus = 'expired';
-          result.timeLeft = 0;
-        }
-      }
-    }
-
-    return result;
+  const result = {
+    isSubmittableNow: false,
+    timeLeft: null as number | null,
+    submissionStatus: 'waiting' as 'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed',
+    willBePenalized: false,
+    activeTimeSlot: null as any,
+    nextActiveTime: null as string | null,
+    statusMessage: '' as string,
+    opensAfter: '' as string
   };
+
+  if (!task.userAssignment || task.userAssignment.completed) {
+    result.submissionStatus = 'completed';
+    result.statusMessage = 'Already completed';
+    return result;
+  }
+
+  const now = new Date();
+  const dueDate = new Date(task.userAssignment.dueDate);
+  const today = now.toDateString();
+  const assignmentDay = dueDate.toDateString();
+  
+  // Check if it's the correct day
+  if (today !== assignmentDay) {
+    result.submissionStatus = 'wrong_day';
+    result.statusMessage = `Due on ${dueDate.toLocaleDateString()}`;
+    return result;
+  }
+
+  const timeSlots = task.timeSlots || (task.userAssignment.timeSlot ? [task.userAssignment.timeSlot] : []);
+  
+  if (timeSlots.length === 0) {
+    result.isSubmittableNow = true;
+    result.submissionStatus = 'available';
+    result.statusMessage = 'Available now';
+    return result;
+  }
+
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+  const currentInMinutes = currentHour * 60 + currentMinute;
+
+  for (const slot of timeSlots) {
+    const [startHour, startMinute] = slot.startTime.split(':').map(Number);
+    const [endHour, endMinute] = slot.endTime.split(':').map(Number);
+    
+    const startInMinutes = startHour * 60 + startMinute;
+    const endInMinutes = endHour * 60 + endMinute;
+    
+    // Submission window: 30 minutes AFTER the end time
+    const submissionStart = endInMinutes; // Exactly at end time
+    const gracePeriodEnd = endInMinutes + 30; // 30 minutes after end
+    
+    // Format the end time for display
+    const endTimeFormatted = new Date();
+    endTimeFormatted.setHours(endHour, endMinute, 0, 0);
+    const opensAfterTime = endTimeFormatted.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+    
+    // Case 1: Before the end time (can't submit yet)
+    if (currentInMinutes < submissionStart) {
+      result.submissionStatus = 'waiting';
+      result.statusMessage = `Opens after ${opensAfterTime}`;
+      result.opensAfter = opensAfterTime;
+      
+      // Calculate time until submission opens
+      const timeUntilMs = (submissionStart - currentInMinutes) * 60000;
+      result.timeLeft = Math.ceil(timeUntilMs / 1000);
+      result.nextActiveTime = opensAfterTime;
+      break;
+    }
+    
+    // Case 2: Within the 30-minute submission window
+    else if (currentInMinutes >= submissionStart && currentInMinutes <= gracePeriodEnd) {
+      result.isSubmittableNow = true;
+      result.activeTimeSlot = slot;
+      result.submissionStatus = 'available';
+      
+      // Check if it's late (after end time but within grace period)
+      const isLate = currentInMinutes > endInMinutes;
+      result.willBePenalized = isLate;
+      
+      // Calculate time left in grace period
+      const timeLeftMs = (gracePeriodEnd - currentInMinutes) * 60000;
+      result.timeLeft = Math.max(0, Math.floor(timeLeftMs / 1000));
+      
+      if (isLate) {
+        result.statusMessage = `⚠️ Late submission - ${Math.floor(result.timeLeft / 60)} minutes left`;
+      } else {
+        result.statusMessage = `✅ Ready to submit - ${Math.floor(result.timeLeft / 60)} minutes left`;
+      }
+      break;
+    }
+    
+    // Case 3: After grace period
+    else {
+      result.submissionStatus = 'expired';
+      result.statusMessage = 'Submission window closed';
+      result.timeLeft = 0;
+    }
+  }
+
+  return result;
+};
 
   const formatTimeLeft = (seconds: number) => {
     if (seconds >= 3600) {
@@ -926,6 +948,20 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             {isConnected ? 'Live' : 'Offline'}
           </Text>
         </View>
+        
+        {/* 🔴 ROTATION WARNING - ONLY FOR ADMINS */}
+        {userRole === 'ADMIN' && rotationStatus && !rotationStatus.hasEnoughTasks && rotationStatus.totalTasks > 0 && (
+          <TouchableOpacity 
+            style={styles.rotationWarningBadge}
+            onPress={handleViewRotationSchedule}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="alert" size={14} color="#e67700" />
+            <Text style={styles.rotationWarningText}>
+              Need {rotationStatus.tasksNeeded} more task{rotationStatus.tasksNeeded > 1 ? 's' : ''}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
       
       <View style={styles.headerRight}>
@@ -1025,46 +1061,51 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     );
   };
 
-  const renderTodayFAB = () => {
-    if (!showTodaySection || selectedTab !== 'my') return null;
-    
-    const hasSubmittableNow = todayAssignments.some(task => task.isSubmittableNow);
-    
-    return (
-      <TouchableOpacity
-        style={styles.todayFAB}
-        onPress={handleViewAllTodayTasks}
-        activeOpacity={0.8}
+const renderTodayFAB = () => {
+  if (!showTodaySection || selectedTab !== 'my') return null;
+  
+  const hasSubmittableNow = todayAssignments.some(task => task.isSubmittableNow);
+  const nextTask = todayAssignments.find(task => !task.isSubmittableNow && task.submissionStatus === 'waiting');
+  
+  // Get the opening time for the next task
+  const openingTime = nextTask?.opensAfter || '';
+  
+  return (
+    <TouchableOpacity
+      style={styles.todayFAB}
+      onPress={handleViewAllTodayTasks}
+      activeOpacity={0.8}
+    >
+      <LinearGradient
+        colors={hasSubmittableNow 
+          ? ['#2b8a3e', '#1e6b2c']  // Green for ready to submit
+          : ['#fa5252', '#e03131']} // Red for waiting
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.todayFABContent}
       >
-        <LinearGradient
-          colors={hasSubmittableNow ? ['#2b8a3e', '#1e6b2c'] : ['#fa5252', '#e03131']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.todayFABContent}
-        >
-          <MaterialCommunityIcons 
-            name={hasSubmittableNow ? "check-circle" : "calendar-clock"} 
-            size={24} 
-            color="white" 
-          />
-          <View style={styles.todayFABTextContainer}>
-            <Text style={styles.todayFABTitle}>
-              {hasSubmittableNow ? 'Ready to Submit!' : 'Today\'s Tasks'}
-            </Text>
-            <Text style={styles.todayFABCount}>
-              {hasSubmittableNow 
-                ? `${todayAssignments.filter(t => t.isSubmittableNow).length} can submit now`
-                : nextActiveTime 
-                  ? `Opens at ${nextActiveTime}`
-                  : `${todayAssignments.length} due today`}
-            </Text>
-          </View>
-          <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
-        </LinearGradient>
-      </TouchableOpacity>
-    );
-  };
-
+        <MaterialCommunityIcons 
+          name={hasSubmittableNow ? "check-circle" : "clock-start"} 
+          size={24} 
+          color="white" 
+        />
+        <View style={styles.todayFABTextContainer}>
+          <Text style={styles.todayFABTitle}>
+            {hasSubmittableNow ? 'Ready to Submit!' : 'Today\'s Tasks'}
+          </Text>
+          <Text style={styles.todayFABCount}>
+            {hasSubmittableNow 
+              ? `${todayAssignments.filter(t => t.isSubmittableNow).length} can submit now`
+              : openingTime 
+                ? `Opens after ${openingTime}`
+                : `${todayAssignments.length} due today`}
+          </Text>
+        </View>
+        <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+};
   const renderTask = ({ item }: any) => {
     const isAdmin = userRole === 'ADMIN';
     const isCompleted = item.assignment?.completed || item.userAssignment?.completed;
@@ -1221,44 +1262,44 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           {isMyTasksView && !isCompleted && (
             <>
               {isDueToday() && (
-                <TouchableOpacity
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    handleViewTodayAssignment();
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <LinearGradient
-                    colors={isSubmittableNow 
-                      ? (willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c'])
-                      : ['#fa5252', '#e03131']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.todayAssignmentButton}
-                  >
-                    <View style={styles.todayAssignmentContent}>
-                      <MaterialCommunityIcons 
-                        name={isSubmittableNow ? (willBePenalized ? "timer-alert" : "check-circle") : "clock-alert"} 
-                        size={20} 
-                        color="white" 
-                      />
-                      <Text style={styles.todayAssignmentText}>
-                        {isSubmittableNow 
-                          ? (willBePenalized ? 'Submit Late' : 'Complete Now')
-                          : 'View Today\'s Assignment'}
-                      </Text>
-                      {!isSubmittableNow && timeLeft && timeLeft > 0 && (
-                        <View style={styles.timeLeftBadge}>
-                          <Text style={styles.timeLeftText}>
-                            {formatTimeLeft(timeLeft)}
-                          </Text>
-                        </View>
-                      )}
-                      <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
-              )}
+  <TouchableOpacity
+    onPress={(e) => {
+      e.stopPropagation();
+      handleViewTodayAssignment();
+    }}
+    activeOpacity={0.8}
+  >
+    <LinearGradient
+      colors={isSubmittableNow 
+        ? (willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c'])
+        : ['#868e96', '#6c757d']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.todayAssignmentButton}
+    >
+      <View style={styles.todayAssignmentContent}>
+        <MaterialCommunityIcons 
+          name={isSubmittableNow ? (willBePenalized ? "timer-alert" : "check-circle") : "clock-start"} 
+          size={20} 
+          color="white" 
+        />
+        <Text style={styles.todayAssignmentText}>
+          {isSubmittableNow 
+            ? (willBePenalized ? 'Submit Late' : 'Complete Now')
+            : `Opens after ${item.opensAfter || '5:00 PM'}`}
+        </Text>
+        {isSubmittableNow && timeLeft && (
+          <View style={styles.timeLeftBadge}>
+            <Text style={styles.timeLeftText}>
+              {Math.floor(timeLeft / 60)}m left
+            </Text>
+          </View>
+        )}
+        <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+      </View>
+    </LinearGradient>
+  </TouchableOpacity>
+)}
 
               {!isDueToday() && isSubmittableNow && (
                 <TouchableOpacity
@@ -1295,19 +1336,19 @@ export default function GroupTasksScreen({ navigation, route }: any) {
                 </TouchableOpacity>
               )}
               
-              {!isDueToday() && submissionStatus === 'waiting' && timeLeft && timeLeft > 0 && (
-                <LinearGradient
-                  colors={['#fff3bf', '#ffec99']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.timeLeftContainer}
-                >
-                  <MaterialCommunityIcons name="timer" size={14} color="#e67700" />
-                  <Text style={styles.timeLeftLabel}>
-                    Opens in {formatTimeLeft(timeLeft)}
-                  </Text>
-                </LinearGradient>
-              )}
+            {!isDueToday() && submissionStatus === 'waiting' && (
+  <LinearGradient
+    colors={['#fff3bf', '#ffec99']}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={styles.timeLeftContainer}
+  >
+    <MaterialCommunityIcons name="clock-start" size={14} color="#e67700" />
+    <Text style={styles.timeLeftLabel}>
+      {item.statusMessage || `Opens after ${item.opensAfter}`}
+    </Text>
+  </LinearGradient>
+)}
               
               {!isDueToday() && submissionStatus === 'expired' && (
                 <LinearGradient
@@ -1439,6 +1480,80 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       
       {renderHeader()}
 
+           {/* 🔴 ROTATION BANNER - ONLY FOR ADMINS */}
+      {userRole === 'ADMIN' && selectedTab === 'all'  && rotationStatus && rotationStatus.totalTasks > 0 && (
+        <TouchableOpacity 
+          style={styles.rotationBanner}
+          onPress={handleViewRotationSchedule}
+          activeOpacity={0.9}
+        >
+          <LinearGradient
+            colors={
+              !rotationStatus.hasEnoughTasks 
+                ? ['#fff3bf', '#ffec99'] // Warning yellow
+                : rotationStatus.totalTasks === rotationStatus.totalMembers
+                  ? ['#d3f9d8', '#b2f2bb'] // Success green
+                  : ['#e7f5ff', '#d0ebff'] // Info blue
+            }
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.rotationBannerGradient}
+          >
+            <MaterialCommunityIcons 
+              name={
+                !rotationStatus.hasEnoughTasks 
+                  ? "alert" 
+                  : rotationStatus.totalTasks === rotationStatus.totalMembers
+                    ? "check-circle"
+                    : "information"
+              } 
+              size={20} 
+              color={
+                !rotationStatus.hasEnoughTasks 
+                  ? "#e67700" 
+                  : rotationStatus.totalTasks === rotationStatus.totalMembers
+                    ? "#2b8a3e"
+                    : "#2b8a3e"
+              } 
+            />
+            <View style={styles.rotationBannerText}>
+              <Text style={[
+                styles.rotationBannerTitle,
+                !rotationStatus.hasEnoughTasks && styles.warningTitle,
+                rotationStatus.totalTasks === rotationStatus.totalMembers && styles.successTitle,
+              ]}>
+                {!rotationStatus.hasEnoughTasks 
+                  ? '⚠️ Rotation Warning' 
+                  : rotationStatus.totalTasks === rotationStatus.totalMembers
+                    ? '✅ Perfect Rotation'
+                    : 'ℹ️ Rotation Info'}
+              </Text>
+              <Text style={[
+                styles.rotationBannerMessage,
+                !rotationStatus.hasEnoughTasks && styles.warningMessage,
+                rotationStatus.totalTasks === rotationStatus.totalMembers && styles.successMessage,
+              ]}>
+                {!rotationStatus.hasEnoughTasks 
+                  ? `You have ${rotationStatus.totalMembers} members but only ${rotationStatus.totalTasks} recurring tasks. Need ${rotationStatus.tasksNeeded} more task${rotationStatus.tasksNeeded > 1 ? 's' : ''} for perfect rotation.`
+                  : rotationStatus.totalTasks === rotationStatus.totalMembers
+                    ? `Perfect! ${rotationStatus.totalTasks} tasks for ${rotationStatus.totalMembers} members - one task each. Rotation is balanced.`
+                    : `You have ${rotationStatus.totalTasks} tasks for ${rotationStatus.totalMembers} members - some members will get multiple tasks.`}
+              </Text>
+            </View>
+            <MaterialCommunityIcons 
+              name="chevron-right" 
+              size={20} 
+              color={
+                !rotationStatus.hasEnoughTasks 
+                  ? "#e67700" 
+                  : rotationStatus.totalTasks === rotationStatus.totalMembers
+                    ? "#2b8a3e"
+                    : "#2b8a3e"
+              } 
+            />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
       {error ? (
         <View style={styles.errorContainer}>
           <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
@@ -1573,7 +1688,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -2211,5 +2325,72 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     flex: 1,
     textAlign: 'center'
-  }
+  },
+  rotationWarningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3bf',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#ffec99',
+  },
+  rotationWarningText: {
+    fontSize: 10,
+    color: '#e67700',
+    fontWeight: '600',
+  },
+  rotationBanner: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  rotationBannerGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  rotationBannerText: {
+    flex: 1,
+  },
+  rotationBannerTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#e67700',
+    marginBottom: 2,
+  },
+  rotationBannerMessage: {
+    fontSize: 13,
+    color: '#e67700',
+    lineHeight: 18,
+  },
+  warningTitle: {
+    color: '#e67700',
+  },
+  warningMessage: {
+    color: '#e67700',
+  },
+  successTitle: {
+    color: '#2b8a3e',
+  },
+  successMessage: {
+    color: '#2b8a3e',
+  },
+  infoTitle: {
+    color: '#2b8a3e',
+  },
+  infoMessage: {
+    color: '#2b8a3e',
+  },
 });

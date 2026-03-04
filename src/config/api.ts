@@ -15,8 +15,8 @@ export const getBackendIP = (): string => {
   }
   
   // If device is on 10.219.65.x (your hotspot), backend is at 10.219.65.2
-  if (currentIP.startsWith('10.219.65.')) {
-    return '10.219.65.2';
+  if (currentIP.startsWith('10.123.17.')) {
+    return '10.123.17.2';
   }
 
     if (currentIP.startsWith('172.28.15.')) {

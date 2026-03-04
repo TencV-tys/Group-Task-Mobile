@@ -63,7 +63,8 @@ export const NotificationTypes = {
   
   // Other
   MENTION: 'MENTION',
-  REMINDER: 'REMINDER'
+  REMINDER: 'REMINDER',
+   DAILY_TASK_REMINDER: 'DAILY_TASK_REMINDER',
 } as const;
 
 export type NotificationType = typeof NotificationTypes[keyof typeof NotificationTypes];

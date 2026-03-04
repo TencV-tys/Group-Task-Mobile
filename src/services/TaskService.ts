@@ -348,11 +348,34 @@ export class TaskService {
 static async getRotationStatus(groupId: string) {
   try {
     const headers = await this.getHeaders(false);
+    console.log('📡 Fetching rotation status from:', `${API_URL}/group/${groupId}/rotation-status`);
+    
     const response = await fetch(`${API_URL}/group/${groupId}/rotation-status`, {
       method: 'GET',
       headers,
     });
-    return await response.json();
+    
+    // Log response status
+    console.log('📡 Response status:', response.status);
+    console.log('📡 Response headers:', response.headers);
+    
+    // Get the response as text first
+    const responseText = await response.text();
+    console.log('📦 Raw response:', responseText);
+    
+    // Try to parse it
+    try {
+      const data = JSON.parse(responseText);
+      console.log('✅ Parsed data:', data);
+      return data;
+    } catch (parseError) {
+      console.error('❌ Failed to parse JSON. Raw response:', responseText);
+      return {
+        success: false,
+        message: 'Invalid response from server'
+      };
+    }
+    
   } catch (error: any) {
     console.error('TaskService.getRotationStatus error:', error);
     return {
@@ -361,4 +384,4 @@ static async getRotationStatus(groupId: string) {
     };
   }
 }
-}
+} 

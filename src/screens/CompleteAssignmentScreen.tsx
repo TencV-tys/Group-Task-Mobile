@@ -1,4 +1,4 @@
-// src/screens/CompleteAssignmentScreen.tsx - UPDATED with clean UI and dark gray primary
+// src/screens/CompleteAssignmentScreen.tsx - UPDATED with 25-minute late threshold
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -32,6 +32,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   const [notes, setNotes] = useState('');
   const [errors, setErrors] = useState<{ photo?: string; notes?: string }>({});
   const [timeStatus, setTimeStatus] = useState<'waiting' | 'submission_open' | 'expired' | 'wrong_day'>('waiting');
+  const [isLate, setIsLate] = useState(false);
 
   useEffect(() => {
     if (timeSlot && dueDate) {
@@ -54,40 +55,50 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         return;
       }
       
-      // Parse end time
+      // Parse end time (this is when submission should OPEN)
       const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
       
-      // Create end time object for today
-      const endTime = new Date(now);
-      endTime.setHours(endHour, endMinute, 0, 0);
+      // Create end time object for today (submission OPENS at this time)
+      const submissionOpenTime = new Date(now);
+      submissionOpenTime.setHours(endHour, endMinute, 0, 0);
       
       // Grace period: 30 minutes after end time
-      const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000); // 30 min after end
+      const gracePeriodEnd = new Date(submissionOpenTime.getTime() + 30 * 60000);
       
-      // Check current time against schedule
-      if (now < endTime) {
-        // Before end time - waiting
+      // Late threshold: 25 minutes after end time
+      const lateThreshold = new Date(submissionOpenTime.getTime() + 25 * 60000);
+      
+      // Current time in milliseconds
+      const currentTime = now.getTime();
+      const openTime = submissionOpenTime.getTime();
+      const lateTime = lateThreshold.getTime();
+      const graceEndTime = gracePeriodEnd.getTime();
+      
+      if (currentTime < openTime) {
+        // Before end time - WAITING (cannot submit yet)
         setTimeStatus('waiting');
         setIsSubmittable(false);
-        const timeUntilEnd = endTime.getTime() - now.getTime();
-        setTimeLeft(Math.floor(timeUntilEnd / 1000));
-      } else if (now >= endTime && now <= gracePeriodEnd) {
-        // Within grace period - can submit
-        setTimeStatus('submission_open');
-        const timeUntilGraceEnd = gracePeriodEnd.getTime() - now.getTime();
+        setIsLate(false);
+        const timeUntilOpen = Math.floor((openTime - currentTime) / 1000);
+        setTimeLeft(timeUntilOpen);
         
-        if (timeUntilGraceEnd <= 0) {
-          setTimeStatus('expired');
-          setIsSubmittable(false);
-          setTimeLeft(0);
-        } else {
-          setIsSubmittable(true);
-          setTimeLeft(Math.floor(timeUntilGraceEnd / 1000));
-        }
+      } else if (currentTime >= openTime && currentTime <= graceEndTime) {
+        // Within submission window (after end time, before grace period ends)
+        setTimeStatus('submission_open');
+        setIsSubmittable(true);
+        
+        // Check if late (submitted after the 25-minute threshold)
+        const late = currentTime > lateTime;
+        setIsLate(late);
+        
+        const timeLeftMs = graceEndTime - currentTime;
+        setTimeLeft(Math.floor(timeLeftMs / 1000));
+        
       } else {
-        // After grace period
+        // After grace period - EXPIRED
         setTimeStatus('expired');
         setIsSubmittable(false);
+        setIsLate(false);
         setTimeLeft(0);
       }
     };
@@ -112,6 +123,15 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   };
 
   const getTimeStatusMessage = () => {
+    if (timeStatus === 'submission_open' && isLate) {
+      return {
+        title: '⚠️ LATE SUBMISSION',
+        message: 'You are submitting after 5:25 PM. Points will be reduced.',
+        color: '#e67700',
+        icon: 'timer-alert'
+      };
+    }
+    
     switch (timeStatus) {
       case 'wrong_day':
         return {
@@ -122,15 +142,15 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         };
       case 'waiting':
         return {
-          title: 'Waiting for Time Slot',
-          message: 'Submit after the time slot ends',
+          title: 'Opens After Time Slot',
+          message: `Submit after ${timeSlot?.endTime}`,
           color: '#e67700',
-          icon: 'clock-alert'
+          icon: 'clock-start'
         };
       case 'submission_open':
         return {
           title: 'Submission Open',
-          message: 'Submit your completion now',
+          message: 'Submit your completion now (on-time until 5:25 PM)',
           color: '#2b8a3e',
           icon: 'check-circle'
         };
@@ -214,7 +234,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
       Alert.alert(
         'Cannot Submit',
         timeStatus === 'waiting' ? 
-          `Submit after ${timeSlot?.endTime} on the due date` :
+          `Submission opens at ${timeSlot?.endTime}` :
           'Submission time has passed. Please contact an administrator if this is an error.',
         [{ text: 'OK' }]
       );
@@ -234,7 +254,9 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
       if (result.success) {
         Alert.alert(
           'Success!',
-          'Assignment submitted successfully. Waiting for admin verification.',
+          result.isLate 
+            ? 'Assignment submitted late. Points will be reduced. Waiting for admin verification.'
+            : 'Assignment submitted successfully. Waiting for admin verification.',
           [
             {
               text: 'OK',
@@ -263,11 +285,30 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     const isCritical = timeLeft !== null && timeLeft < 300; // Less than 5 minutes
     const isWarning = timeLeft !== null && timeLeft < 600; // Less than 10 minutes
     
+    // Format the opening time
+    const openTimeFormatted = new Date();
+    const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
+    openTimeFormatted.setHours(endHour, endMinute, 0, 0);
+    const openTimeString = openTimeFormatted.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+    
+    // Format late threshold time (25 minutes after end)
+    const lateThresholdTime = new Date(openTimeFormatted.getTime() + 25 * 60000);
+    const lateThresholdString = lateThresholdTime.toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+    
     return (
       <LinearGradient
         colors={
           timeStatus === 'expired' ? ['#fff5f5', '#ffe3e3'] :
           timeStatus === 'waiting' ? ['#fff3bf', '#ffec99'] :
+          timeStatus === 'submission_open' && isLate ? ['#fff3bf', '#ffec99'] :
           timeStatus === 'submission_open' ? ['#d3f9d8', '#b2f2bb'] :
           timeStatus === 'wrong_day' ? ['#f8f9fa', '#e9ecef'] :
           ['#f8f9fa', '#e9ecef']
@@ -278,7 +319,8 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
           styles.timeInfoContainer,
           timeStatus === 'expired' && styles.timeCritical,
           timeStatus === 'waiting' && styles.timeWarning,
-          timeStatus === 'submission_open' && styles.timeOpen,
+          timeStatus === 'submission_open' && isLate && styles.timeWarning,
+          timeStatus === 'submission_open' && !isLate && styles.timeOpen,
           timeStatus === 'wrong_day' && styles.timeWrongDay
         ]}
       >
@@ -307,14 +349,25 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
               {formatTime(timeLeft)}
             </Text>
             <Text style={styles.timeInstructions}>
-              Grace period ends in {formatTime(timeLeft)}
+              {isLate 
+                ? 'Late submission - points will be reduced' 
+                : `On-time until ${lateThresholdString} - submit now!`}
             </Text>
             
-            {isWarning && (
+            {isWarning && !isLate && (
               <View style={styles.warningMessage}>
                 <MaterialCommunityIcons name="alert-circle" size={16} color="#e67700" />
                 <Text style={styles.warningText}>
-                  {isCritical ? 'Hurry! Grace period almost over!' : 'Grace period ending soon'}
+                  {isCritical ? 'Late threshold approaching!' : 'On-time window ending soon'}
+                </Text>
+              </View>
+            )}
+            
+            {isLate && (
+              <View style={styles.warningMessage}>
+                <MaterialCommunityIcons name="timer-alert" size={16} color="#e67700" />
+                <Text style={styles.warningText}>
+                  Submitting late - points will be reduced
                 </Text>
               </View>
             )}
@@ -325,13 +378,11 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
               {formatTime(timeLeft)}
             </Text>
             <Text style={styles.timeInstructions}>
-              Time slot ends in {formatTime(timeLeft)}
+              Submission opens at {openTimeString}
             </Text>
             <Text style={styles.scheduleInfo}>
-              Submit between {timeSlot.endTime} - {(() => {
-                const [hour, minute] = timeSlot.endTime.split(':').map(Number);
-                const graceEnd = new Date();
-                graceEnd.setHours(hour, minute + 30, 0, 0);
+              On-time: {openTimeString} - {lateThresholdString} | Late: {lateThresholdString} - {(() => {
+                const graceEnd = new Date(openTimeFormatted.getTime() + 30 * 60000);
                 return graceEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
               })()}
             </Text>
@@ -353,7 +404,10 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         <View style={styles.submissionWindowInfo}>
           <MaterialCommunityIcons name="information" size={14} color="#868e96" />
           <Text style={styles.submissionWindowText}>
-            Submit within 30 minutes after {timeSlot.endTime}
+            On-time: Until {lateThresholdString} | Late: Until {(() => {
+              const graceEnd = new Date(openTimeFormatted.getTime() + 30 * 60000);
+              return graceEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            })()}
           </Text>
         </View>
       </LinearGradient>
@@ -560,6 +614,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
               <LinearGradient
                 colors={
                   !isSubmittable || submitting ? ['#f8f9fa', '#e9ecef'] :
+                  timeStatus === 'submission_open' && isLate ? ['#e67700', '#cc5f00'] :
                   timeStatus === 'submission_open' ? ['#2b8a3e', '#1e6b2c'] :
                   ['#868e96', '#6c757d']
                 }
@@ -572,7 +627,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
                 ) : (
                   <View style={styles.submitButtonContent}>
                     <MaterialCommunityIcons 
-                      name={timeStatus === 'submission_open' ? "check-circle" : "clock"} 
+                      name={timeStatus === 'submission_open' ? (isLate ? "timer-alert" : "check-circle") : "clock"} 
                       size={20} 
                       color={!isSubmittable ? "#868e96" : "white"} 
                     />
@@ -580,10 +635,13 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
                       styles.submitButtonText,
                       !isSubmittable && styles.submitButtonTextDisabled
                     ]}>
-                      {timeStatus === 'submission_open' ? 'Submit Completion' : 
-                       timeStatus === 'waiting' ? `Wait Until ${timeSlot?.endTime}` :
-                       timeStatus === 'wrong_day' ? 'Wrong Day - Cannot Submit' :
-                       'Submission Closed'}
+                      {timeStatus === 'submission_open' 
+                        ? (isLate ? 'Submit Late (Points Reduced)' : 'Submit On-Time')
+                       : timeStatus === 'waiting' 
+                        ? `Opens at ${timeSlot?.endTime}`
+                       : timeStatus === 'wrong_day' 
+                        ? 'Wrong Day'
+                       : 'Submission Closed'}
                     </Text>
                   </View>
                 )}
@@ -598,7 +656,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             
             {timeStatus === 'waiting' && timeLeft !== null && (
               <Text style={styles.waitingText}>
-                Submit after {timeSlot?.endTime} (in {formatTime(timeLeft)})
+                Submission opens at {timeSlot?.endTime} ({formatTime(timeLeft)} remaining)
               </Text>
             )}
             

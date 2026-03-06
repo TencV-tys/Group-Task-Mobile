@@ -1,4 +1,4 @@
-// src/screens/AssignmentDetailsScreen.tsx - UPDATED with clean UI and dark gray primary
+// src/screens/AssignmentDetailsScreen.tsx - UPDATED with matching timing logic
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -37,13 +37,13 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isSubmittable, setIsSubmittable] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<'available' | 'waiting' | 'expired' | 'wrong_day' | 'completed'>('waiting');
-  const [willBePenalized, setWillBePenalized] = useState(false);
+  const [isLate, setIsLate] = useState(false);
   const [penaltyInfo, setPenaltyInfo] = useState<{
     originalPoints: number;
     finalPoints: number;
     penaltyAmount: number;
   } | null>(null);
-    const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const { hasPendingRequest, getPendingRequestForAssignment } = useSwapRequests();
 
   useEffect(() => {
@@ -57,9 +57,9 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       const timer = startCountdownTimer();
       return () => clearInterval(timer);
     }
-  }, [assignment, timeLeft]);
+  }, [assignment]);
 
- useEffect(() => {
+  useEffect(() => {
     const loadUserId = async () => {
       const userStr = await SecureStore.getItemAsync('user');
       if (userStr) {
@@ -70,7 +70,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     loadUserId();
   }, []);
 
-  // ========== ADD THIS: Real-time hooks ==========
+  // Real-time hooks
   const {
     events: assignmentEvents,
     clearAssignmentVerified,
@@ -90,7 +90,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     showAlerts: true
   });
 
-  // ========== ADD THIS: Handle real-time verification ==========
+  // Handle real-time verification
   useEffect(() => {
     if (assignmentEvents.assignmentVerified && 
         assignmentEvents.assignmentVerified.assignmentId === assignmentId) {
@@ -136,7 +136,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
         if (!result.assignment.completed) {
           await checkTimeValidityWithServer(result.assignment);
         } else {
-          checkTimeValidity(result.assignment);
+          setSubmissionStatus('completed');
         }
       } else {
         setError(result.message || 'Failed to load assignment details');
@@ -156,14 +156,28 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       if (result.success && result.data) {
         setIsSubmittable(result.data.canSubmit);
         setTimeLeft(result.data.timeLeft || null);
-        setWillBePenalized(result.data.willBePenalized || false);
         
-        if (result.data.finalPoints !== undefined && result.data.originalPoints !== undefined) {
+        // Check if late (after 25-minute threshold)
+        const now = new Date();
+        const dueDate = new Date(assignmentData.dueDate);
+        const [endHour, endMinute] = assignmentData.timeSlot?.endTime.split(':').map(Number) || [0, 0];
+        
+        const endTime = new Date(dueDate);
+        endTime.setHours(endHour, endMinute, 0, 0);
+        
+        const lateThreshold = new Date(endTime.getTime() + 25 * 60000); // 25 minutes after end
+        const isLateSubmission = now > lateThreshold;
+        setIsLate(isLateSubmission);
+        
+        if (isLateSubmission && assignmentData.points) {
+          const penaltyAmount = Math.floor(assignmentData.points * 0.5);
           setPenaltyInfo({
-            originalPoints: result.data.originalPoints,
-            finalPoints: result.data.finalPoints,
-            penaltyAmount: result.data.originalPoints - result.data.finalPoints
+            originalPoints: assignmentData.points,
+            finalPoints: assignmentData.points - penaltyAmount,
+            penaltyAmount
           });
+        } else {
+          setPenaltyInfo(null);
         }
         
         if (result.data.canSubmit) {
@@ -206,57 +220,71 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     if (assignmentData.timeSlot) {
       const [endHour, endMinute] = assignmentData.timeSlot.endTime.split(':').map(Number);
       
-      const currentHour = now.getHours();
-      const currentMinute = now.getMinutes();
-      const currentInMinutes = currentHour * 60 + currentMinute;
-      const endInMinutes = endHour * 60 + endMinute;
+      const endTime = new Date(assignmentDate);
+      endTime.setHours(endHour, endMinute, 0, 0);
       
-      const canSubmitStart = endInMinutes - 30;
-      const canSubmitEnd = endInMinutes + 30;
+      const lateThreshold = new Date(endTime.getTime() + 25 * 60000); // 25 minutes after end
+      const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000); // 30 minutes after end
       
-      const canSubmit = currentInMinutes >= canSubmitStart && currentInMinutes <= canSubmitEnd;
-      setIsSubmittable(canSubmit);
+      const currentTime = now.getTime();
+      const endTimeMs = endTime.getTime();
+      const lateThresholdMs = lateThreshold.getTime();
+      const graceEndMs = gracePeriodEnd.getTime();
       
-      // Check if late (after end time but within grace period)
-      const isLate = currentInMinutes > endInMinutes && currentInMinutes <= canSubmitEnd;
-      setWillBePenalized(isLate);
-      
-      if (isLate && assignmentData.points) {
-        const penaltyAmount = Math.floor(assignmentData.points * 0.5);
-        setPenaltyInfo({
-          originalPoints: assignmentData.points,
-          finalPoints: assignmentData.points - penaltyAmount,
-          penaltyAmount
-        });
+      // Check if before end time
+      if (currentTime < endTimeMs) {
+        setIsSubmittable(false);
+        setSubmissionStatus('waiting');
+        setIsLate(false);
+        setPenaltyInfo(null);
+        const timeUntilEnd = Math.floor((endTimeMs - currentTime) / 1000);
+        setTimeLeft(timeUntilEnd);
       }
-      
-      setSubmissionStatus(canSubmit ? 'available' : 
-        currentInMinutes < canSubmitStart ? 'waiting' : 'expired');
-      
-      if (currentInMinutes <= canSubmitEnd) {
-        const endTime = new Date();
-        endTime.setHours(endHour, endMinute, 0, 0);
-        const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
-        const timeLeftMs = gracePeriodEnd.getTime() - now.getTime();
-        setTimeLeft(Math.max(0, Math.floor(timeLeftMs / 1000)));
+      // Check if within grace period
+      else if (currentTime >= endTimeMs && currentTime <= graceEndMs) {
+        setIsSubmittable(true);
+        setSubmissionStatus('available');
+        
+        // Check if late (after 25-minute threshold)
+        const isLateSubmission = currentTime > lateThresholdMs;
+        setIsLate(isLateSubmission);
+        
+        if (isLateSubmission && assignmentData.points) {
+          const penaltyAmount = Math.floor(assignmentData.points * 0.5);
+          setPenaltyInfo({
+            originalPoints: assignmentData.points,
+            finalPoints: assignmentData.points - penaltyAmount,
+            penaltyAmount
+          });
+        } else {
+          setPenaltyInfo(null);
+        }
+        
+        const timeLeftMs = graceEndMs - currentTime;
+        setTimeLeft(Math.floor(timeLeftMs / 1000));
+      }
+      // After grace period
+      else {
+        setIsSubmittable(false);
+        setSubmissionStatus('expired');
+        setIsLate(false);
+        setPenaltyInfo(null);
+        setTimeLeft(0);
       }
     } else {
+      // No time slot - always available
       setIsSubmittable(true);
       setSubmissionStatus('available');
       setTimeLeft(null);
-      setWillBePenalized(false);
+      setIsLate(false);
       setPenaltyInfo(null);
     }
   };
 
   const startCountdownTimer = () => {
     const timer = setInterval(() => {
-      if (timeLeft !== null && timeLeft > 0) {
-        setTimeLeft(prev => (prev !== null ? prev - 1 : null));
-      } else if (timeLeft === 0) {
-        setIsSubmittable(false);
-        setSubmissionStatus('expired');
-        clearInterval(timer);
+      if (assignment && !assignment.completed) {
+        checkTimeValidity(assignment);
       }
     }, 1000);
     return timer;
@@ -277,7 +305,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
   };
 
   const getSubmissionStatusInfo = () => {
-    if (willBePenalized && submissionStatus === 'available') {
+    if (submissionStatus === 'available' && isLate) {
       return {
         label: '⚠️ LATE SUBMISSION',
         color: '#e67700',
@@ -286,8 +314,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
         icon: 'timer-alert',
         description: penaltyInfo 
           ? `You will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}`
-          : 'Late submission - points will be reduced',
-        buttonText: 'Submit (Late)',
+          : 'Late submission - points will be reduced (after 5:25 PM)',
+        buttonText: 'Submit Late (Points Reduced)',
         canSubmit: true
       };
     }
@@ -295,12 +323,12 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     switch (submissionStatus) {
       case 'available':
         return {
-          label: '✓ AVAILABLE TO SUBMIT',
+          label: '✓ ON TIME',
           color: '#2b8a3e',
           bgColor: '#d3f9d8',
           borderColor: '#b2f2bb',
           icon: 'check-circle',
-          description: 'You can submit your completion now',
+          description: 'Submit before 5:25 PM for full points',
           buttonText: 'Complete Assignment',
           canSubmit: true
         };
@@ -313,7 +341,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           icon: 'clock',
           description: timeLeft && timeLeft > 0 
             ? `Opens in ${formatTimeLeft(timeLeft)}` 
-            : 'Submit within 30 minutes of time slot',
+            : 'Submit after time slot ends',
           buttonText: 'Waiting',
           canSubmit: false
         };
@@ -324,7 +352,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           bgColor: '#fff5f5',
           borderColor: '#ffc9c9',
           icon: 'timer-off',
-          description: 'Submission window has expired',
+          description: 'Submission window has closed (after 5:30 PM)',
           buttonText: 'Expired',
           canSubmit: false
         };
@@ -377,11 +405,11 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       return;
     }
     
-    // Show warning for late submissions
-    if (willBePenalized && penaltyInfo) {
+    // Show warning for late submissions (after 5:25 PM)
+    if (isLate && penaltyInfo) {
       Alert.alert(
         'Late Submission',
-        `You are submitting after the scheduled time.\n\nYou will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}.\n\nDo you want to continue?`,
+        `You are submitting after 5:25 PM.\n\nYou will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}.\n\nDo you want to continue?`,
         [
           { text: 'Cancel', style: 'cancel' },
           { 
@@ -392,11 +420,9 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                 taskTitle: assignment.task?.title || 'Unknown Task',
                 dueDate: assignment.dueDate,
                 timeSlot: assignment.timeSlot,
-                isLate: true,
                 onCompleted: () => {
                   fetchAssignmentDetails();
                   if (onVerified) onVerified();
-                  Alert.alert('Success', 'Assignment submitted successfully!');
                 }
               });
             }
@@ -412,7 +438,6 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
         onCompleted: () => {
           fetchAssignmentDetails();
           if (onVerified) onVerified();
-          Alert.alert('Success', 'Assignment submitted successfully!');
         }
       });
     }
@@ -563,6 +588,19 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     if (!assignment?.completed) {
       const submissionStatusInfo = getSubmissionStatusInfo();
       
+      // Format end time and late threshold for display
+      let endTimeStr = '';
+      let lateThresholdStr = '';
+      if (assignment?.timeSlot) {
+        const [endHour, endMinute] = assignment.timeSlot.endTime.split(':').map(Number);
+        const endTime = new Date();
+        endTime.setHours(endHour, endMinute, 0, 0);
+        endTimeStr = endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
+        lateThresholdStr = lateThreshold.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      
       return (
         <View style={styles.completeSection}>
           <Text style={styles.sectionTitle}>Complete This Assignment</Text>
@@ -591,7 +629,21 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
               </View>
             </View>
             
-            {willBePenalized && penaltyInfo && (
+            {assignment?.timeSlot && submissionStatus === 'available' && (
+              <View style={styles.timeWindowInfo}>
+                <Text style={styles.timeWindowText}>
+                  On-time: Until {lateThresholdStr} | Late: {lateThresholdStr} - {(() => {
+                    const [endHour, endMinute] = assignment.timeSlot.endTime.split(':').map(Number);
+                    const endTime = new Date();
+                    endTime.setHours(endHour, endMinute, 0, 0);
+                    const graceEnd = new Date(endTime.getTime() + 30 * 60000);
+                    return graceEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  })()}
+                </Text>
+              </View>
+            )}
+            
+            {isLate && penaltyInfo && (
               <LinearGradient
                 colors={['#fff3bf', '#ffec99']}
                 start={{ x: 0, y: 0 }}
@@ -609,22 +661,26 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             {submissionStatus === 'available' && timeLeft !== null && (
               <View style={styles.timerContainer}>
                 <LinearGradient
-                  colors={timeLeft < 300 ? ['#ffc9c9', '#ffb3b3'] : ['#d3f9d8', '#b2f2bb']}
+                  colors={timeLeft < 300 ? ['#ffc9c9', '#ffb3b3'] : isLate ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[styles.timerBadge, timeLeft < 300 && styles.urgentTimerBadge]}
+                  style={[
+                    styles.timerBadge, 
+                    timeLeft < 300 && styles.urgentTimerBadge,
+                    isLate && styles.lateTimerBadge
+                  ]}
                 >
                   <MaterialCommunityIcons 
-                    name={timeLeft < 300 ? "timer-alert" : "timer"} 
+                    name={timeLeft < 300 ? "timer-alert" : isLate ? "timer-alert" : "timer"} 
                     size={16} 
-                    color={timeLeft < 300 ? "#fa5252" : "#2b8a3e"} 
+                    color={timeLeft < 300 ? "#fa5252" : isLate ? "#e67700" : "#2b8a3e"} 
                   />
-                  <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : "#2b8a3e" }]}>
+                  <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : isLate ? "#e67700" : "#2b8a3e" }]}>
                     {formatTimeLeft(timeLeft)} remaining
                   </Text>
                 </LinearGradient>
                 {timeLeft < 300 && (
-                  <Text style={styles.urgentMessage}>Submit now! Grace period ending soon.</Text>
+                  <Text style={styles.urgentMessage}>Hurry! Grace period ending soon.</Text>
                 )}
               </View>
             )}
@@ -650,20 +706,20 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             <TouchableOpacity
               style={[
                 styles.completeButton,
-                willBePenalized && styles.lateButton
+                isLate && styles.lateButton
               ]}
               onPress={handleCompleteAssignment}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']}
+                colors={isLate ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.completeButtonGradient}
               >
                 <View style={styles.completeButtonContent}>
                   <MaterialCommunityIcons 
-                    name={willBePenalized ? "timer-alert" : "check-circle"} 
+                    name={isLate ? "timer-alert" : "check-circle"} 
                     size={20} 
                     color="white" 
                   />
@@ -1332,6 +1388,7 @@ const styles = StyleSheet.create({
   },
   normalTimerBadge: {},
   urgentTimerBadge: {},
+  lateTimerBadge: {},
   timerText: {
     fontSize: 13,
     fontWeight: '600',
@@ -1434,6 +1491,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#e67700',
     fontWeight: '600'
+  },
+  timeWindowInfo: {
+    marginTop: 12,
+    marginLeft: 52,
+    padding: 8,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  timeWindowText: {
+    fontSize: 11,
+    color: '#868e96',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
   swapSection: {
     marginBottom: 24,

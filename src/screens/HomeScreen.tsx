@@ -1,4 +1,3 @@
-// src/screens/HomeScreen.tsx - FIXED with only 3 stat cards and PRIMARY GREEN icons
 import React, { useEffect, useState } from 'react';
 import { 
   View, 
@@ -24,14 +23,14 @@ import * as SecureStore from 'expo-secure-store';
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
-   const { loading, refreshing, error, homeData, refreshHomeData, authError } = useHomeData();
+  const { loading, refreshing, error, homeData, refreshHomeData, authError } = useHomeData();
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
   const { unreadCount, loadUnreadCount, refreshNotifications } = useNotifications();
-const { events, clearNewNotification } = useRealtimeNotifications({
+  
+  const { events, clearNewNotification } = useRealtimeNotifications({
     onNewNotification: (notification) => {
       console.log('📢 HomeScreen: New notification received', notification);
       
-      // Refresh data based on notification type
       if (notification.type?.includes('TASK') || 
           notification.type?.includes('ASSIGNMENT') ||
           notification.type?.includes('SUBMISSION')) {
@@ -42,7 +41,6 @@ const { events, clearNewNotification } = useRealtimeNotifications({
         loadPendingForMe();
       }
       
-      // Always refresh notification count
       loadUnreadCount();
       refreshNotifications();
     },
@@ -60,18 +58,17 @@ const { events, clearNewNotification } = useRealtimeNotifications({
     ]
   });
 
-  // ========== ADD THIS: Handle new notification from socket ==========
   useEffect(() => {
     if (events.newNotification) {
       clearNewNotification();
     }
   }, [events.newNotification]);
+  
   useEffect(() => {
     loadPendingForMe();
     loadUnreadCount();
   }, []);
 
-  // Show auth error if needed
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -151,6 +148,27 @@ const { events, clearNewNotification } = useRealtimeNotifications({
     navigation.navigate('Notifications');
   };
 
+  const handleCreateGroup = () => {
+    navigation.navigate('CreateGroup', {
+      onGroupCreated: () => {
+        refreshHomeData();
+      }
+    });
+  };
+
+  const handleViewProfile = () => {
+    navigation.navigate('Profile');
+  };
+
+  // ✅ FIXED: Overdue tasks now show message instead of navigating
+  const handleOverdueTaskPress = (task: any) => {
+    Alert.alert(
+      '⚠️ Overdue Task',
+      `"${task.title}" is overdue and cannot be completed.\n\nPlease contact your group admin if you have questions.`,
+      [{ text: 'OK' }]
+    );
+  };
+
   if (loading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
@@ -188,60 +206,44 @@ const { events, clearNewNotification } = useRealtimeNotifications({
 
   return (
     <SafeAreaView style={styles.container}>
-       <View style={styles.header}>
-  <View>
-    <Text style={styles.headerTitle}>Dashboard</Text>
-    <Text style={styles.headerSubtitle}>
-      Welcome back, {user.fullName?.split(' ')[0] || 'User'}!
-    </Text>
-  </View>
-  
-  <View style={styles.headerRight}>
-    {/* Notification Button */}
-    <TouchableOpacity 
-      style={styles.iconButton}
-      onPress={handleViewNotifications}
-    >
-      <MaterialCommunityIcons name="bell-outline" size={24} color="#2b8a3e" />
-      {unreadCount > 0 && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>
-            {unreadCount > 9 ? '9+' : unreadCount}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>Dashboard</Text>
+          <Text style={styles.headerSubtitle}>
+            Welcome back, {user.fullName?.split(' ')[0] || 'User'}!
           </Text>
         </View>
-      )}
-    </TouchableOpacity>
+        
+        <View style={styles.headerRight}>
+          {/* Notification Button */}
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={handleViewNotifications}
+          >
+            <MaterialCommunityIcons name="bell-outline" size={24} color="#2b8a3e" />
+            {unreadCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
 
-    {/* Swap Request Button */}
-    <TouchableOpacity 
-      style={styles.iconButton}
-      onPress={handleViewPendingSwapRequests}
-    >
-      <MaterialCommunityIcons name="swap-horizontal" size={24} color="#2b8a3e" />
-      {totalPendingForMe > 0 && (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{totalPendingForMe}</Text>
+          {/* Swap Request Button */}
+          <TouchableOpacity 
+            style={styles.iconButton}
+            onPress={handleViewPendingSwapRequests}
+          >
+            <MaterialCommunityIcons name="swap-horizontal" size={24} color="#2b8a3e" />
+            {totalPendingForMe > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{totalPendingForMe}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
-      )}
-    </TouchableOpacity>
-    
-    {/* Profile Button */}
-    <TouchableOpacity 
-      style={styles.profileButton}
-      onPress={() => navigation.navigate('Profile')}
-    >
-      {user.avatarUrl ? (
-        <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
-      ) : (
-        <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarText}>
-            {user.fullName?.charAt(0) || 'U'}
-          </Text>
-        </View>
-      )}
-    </TouchableOpacity>
-  </View>
-</View>
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -257,6 +259,7 @@ const { events, clearNewNotification } = useRealtimeNotifications({
             tintColor="#2b8a3e"
           />
         }
+        contentContainerStyle={styles.scrollContent}
       >
         {/* Points Card */}
         <LinearGradient
@@ -281,7 +284,7 @@ const { events, clearNewNotification } = useRealtimeNotifications({
           </View>
         </LinearGradient>
 
-        {/* Stats Grid - ONLY 3 CARDS (REMOVED COMPLETED TASKS) */}
+        {/* Stats Grid - 3 CARDS */}
         <View style={styles.statsGrid}>
           {/* Groups Card */}
           <TouchableOpacity 
@@ -328,90 +331,43 @@ const { events, clearNewNotification } = useRealtimeNotifications({
           </TouchableOpacity>
         </View>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity 
-              style={styles.quickActionCard}
-              onPress={() => navigation.navigate('CreateGroup')}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={['#2b8a3e', '#1e6b2c']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.quickActionIcon}
-              >
-                <MaterialCommunityIcons name="plus" size={24} color="white" />
-              </LinearGradient>
-              <Text style={styles.quickActionTitle}>Create Group</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickActionCard}
-              onPress={() => navigation.navigate('JoinGroup')}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={['#2b8a3e', '#1e6b2c']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.quickActionIcon}
-              >
-                <MaterialCommunityIcons name="link" size={24} color="white" />
-              </LinearGradient>
-              <Text style={styles.quickActionTitle}>Join Group</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickActionCard}
-              onPress={handleViewSwapRequests}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={['#2b8a3e', '#1e6b2c']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.quickActionIcon}
-              >
-                <MaterialCommunityIcons name="swap-horizontal" size={24} color="white" />
-              </LinearGradient>
-              <Text style={styles.quickActionTitle}>My Swaps</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Overdue Tasks Warning */}
-        {stats.overdueTasks > 0 && (
+        {/* Overdue Tasks List - FIXED: Now shows message instead of navigation */}
+        {overdueTasks.length > 0 && (
           <View style={styles.section}>
-            <TouchableOpacity 
-              style={styles.overdueCard}
-              onPress={handleViewAllTasks}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={['#fff5f5', '#ffe3e3']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.overdueCardGradient}
-              >
-                <View style={styles.overdueCardContent}>
-                  <View style={styles.overdueIconContainer}>
-                    <MaterialCommunityIcons name="alert-circle" size={24} color="#fa5252" />
-                  </View>
-                  <View style={styles.overdueTextContainer}>
-                    <Text style={styles.overdueTitle}>
-                      {stats.overdueTasks} Overdue Task{stats.overdueTasks > 1 ? 's' : ''}
+            <Text style={styles.sectionTitle}>⚠️ Overdue Tasks</Text>
+            <View style={styles.overdueList}>
+              {overdueTasks.slice(0, 3).map((task: any) => (
+                <TouchableOpacity
+                  key={task.id}
+                  style={styles.overdueTaskItem}
+                  onPress={() => handleOverdueTaskPress(task)}
+                  activeOpacity={0.7}
+                >
+                  <LinearGradient
+                    colors={['#fff5f5', '#ffe3e3']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.overdueTaskGradient}
+                  >
+                    <MaterialCommunityIcons name="alert-circle" size={20} color="#fa5252" />
+                    <View style={styles.overdueTaskContent}>
+                      <Text style={styles.overdueTaskTitle} numberOfLines={1}>
+                        {task.title}
+                      </Text>
+                      <Text style={styles.overdueTaskGroup}>{task.groupName}</Text>
+                    </View>
+                    <Text style={styles.overdueTaskDays}>
+                      {task.daysOverdue || 1}d overdue
                     </Text>
-                    <Text style={styles.overdueSubtitle}>
-                      Tap to view and complete them
-                    </Text>
-                  </View>
-                  <MaterialCommunityIcons name="chevron-right" size={20} color="#fa5252" />
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
+                  </LinearGradient>
+                </TouchableOpacity>
+              ))}
+              {overdueTasks.length > 3 && (
+                <Text style={styles.moreOverdueText}>
+                  +{overdueTasks.length - 3} more overdue tasks
+                </Text>
+              )}
+            </View>
           </View>
         )}
 
@@ -466,11 +422,11 @@ const { events, clearNewNotification } = useRealtimeNotifications({
           </View>
         )}
 
-        {/* Today's Tasks Preview */}
+        {/* Upcoming Tasks Preview */}
         {currentWeekTasks.length > 0 && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Tasks Due Soon</Text>
+              <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
               <TouchableOpacity onPress={handleViewAllTasks}>
                 <Text style={styles.seeAllText}>View All</Text>
               </TouchableOpacity>
@@ -569,6 +525,39 @@ const { events, clearNewNotification } = useRealtimeNotifications({
           )}
         </View>
       </ScrollView>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={() => navigation.navigate('MyGroups')}
+        >
+          <MaterialCommunityIcons name="account-group" size={24} color="#2b8a3e" />
+          <Text style={styles.navText}>Groups</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.createButton}
+          onPress={handleCreateGroup}
+        >
+          <LinearGradient
+            colors={['#2b8a3e', '#1e6b2c']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.createButtonGradient}
+          >
+            <MaterialCommunityIcons name="plus" size={28} color="white" />
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.navItem}
+          onPress={handleViewProfile}
+        >
+          <MaterialCommunityIcons name="account" size={24} color="#2b8a3e" />
+          <Text style={styles.navText}>Profile</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -626,26 +615,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
-  profileButton: {
-    padding: 4,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#e9ecef',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#495057',
+  scrollContent: {
+    paddingBottom: 80, // Space for bottom nav
   },
   pointsCard: {
     margin: 16,
@@ -767,74 +738,46 @@ const styles = StyleSheet.create({
     color: '#2b8a3e',
     fontWeight: '600',
   },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    gap: 12,
+  // Overdue Task Styles
+  overdueList: {
+    gap: 8,
   },
-  quickActionCard: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  quickActionIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#2b8a3e',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  quickActionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#212529',
-    textAlign: 'center',
-  },
-  overdueCard: {
-    marginBottom: 8,
+  overdueTaskItem: {
     borderRadius: 12,
     overflow: 'hidden',
   },
-  overdueCardGradient: {
-    padding: 16,
-  },
-  overdueCardContent: {
+  overdueTaskGradient: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
     gap: 12,
+    borderWidth: 1,
+    borderColor: '#ffc9c9',
   },
-  overdueIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#fff5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  overdueTextContainer: {
+  overdueTaskContent: {
     flex: 1,
   },
-  overdueTitle: {
-    fontSize: 16,
+  overdueTaskTitle: {
+    fontSize: 15,
     fontWeight: '600',
-    color: '#fa5252',
+    color: '#212529',
     marginBottom: 2,
   },
-  overdueSubtitle: {
+  overdueTaskGroup: {
+    fontSize: 12,
+    color: '#868e96',
+  },
+  overdueTaskDays: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fa5252',
+  },
+  moreOverdueText: {
+    textAlign: 'center',
     fontSize: 13,
     color: '#868e96',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   groupsScroll: {
     marginHorizontal: -16,
@@ -1055,5 +998,50 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Bottom Navigation Styles
+  bottomNav: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 70,
+    backgroundColor: 'white',
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 8,
+  },
+  navItem: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  navText: {
+    fontSize: 11,
+    color: '#868e96',
+    marginTop: 2,
+  },
+  createButton: {
+    marginTop: -20,
+  },
+  createButtonGradient: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#2b8a3e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 });

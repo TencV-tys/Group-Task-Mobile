@@ -1,7 +1,8 @@
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
-import { Text, View } from 'react-native';
+import { Text, View, StatusBar, Platform } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AppNavigator from './src/navigation/AppNavigator';
 import { SocketProvider } from './src/context/SocketContext';
 
@@ -71,20 +72,22 @@ export default function App() {
   console.log("📱 App starting with linking prefixes:", linking.prefixes);
   
   return (
-    <SocketProvider>
-      <NavigationContainer 
-        linking={linking}
-        fallback={
-          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ marginTop: 50, textAlign: 'center' }}>Loading...</Text>
-          </View>
-        }
-        onReady={() => {
-          console.log("✅ Navigation container ready");
-        }}
-      >
-        <AppNavigator />
-      </NavigationContainer>
-    </SocketProvider>
+    <SafeAreaProvider>
+      <SocketProvider>
+        <NavigationContainer 
+          linking={linking}
+          fallback={
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ marginTop: 50, textAlign: 'center' }}>Loading...</Text>
+            </View>
+          }
+          onReady={() => {
+            console.log("✅ Navigation container ready");
+          }}
+        >
+          <AppNavigator />
+        </NavigationContainer>
+      </SocketProvider>
+    </SafeAreaProvider>
   );
 }

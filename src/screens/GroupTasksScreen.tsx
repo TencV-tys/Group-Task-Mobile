@@ -1517,29 +1517,31 @@ const renderTodayFAB = () => {
               } 
             />
             <View style={styles.rotationBannerText}>
-              <Text style={[
-                styles.rotationBannerTitle,
-                !rotationStatus.hasEnoughTasks && styles.warningTitle,
-                rotationStatus.totalTasks === rotationStatus.totalMembers && styles.successTitle,
-              ]}>
-                {!rotationStatus.hasEnoughTasks 
-                  ? '⚠️ Rotation Warning' 
-                  : rotationStatus.totalTasks === rotationStatus.totalMembers
-                    ? '✅ Perfect Rotation'
-                    : 'ℹ️ Rotation Info'}
-              </Text>
-              <Text style={[
-                styles.rotationBannerMessage,
-                !rotationStatus.hasEnoughTasks && styles.warningMessage,
-                rotationStatus.totalTasks === rotationStatus.totalMembers && styles.successMessage,
-              ]}>
-                {!rotationStatus.hasEnoughTasks 
-                  ? `You have ${rotationStatus.totalMembers} members but only ${rotationStatus.totalTasks} recurring tasks. Need ${rotationStatus.tasksNeeded} more task${rotationStatus.tasksNeeded > 1 ? 's' : ''} for perfect rotation.`
-                  : rotationStatus.totalTasks === rotationStatus.totalMembers
-                    ? `Perfect! ${rotationStatus.totalTasks} tasks for ${rotationStatus.totalMembers} members - one task each. Rotation is balanced.`
-                    : `You have ${rotationStatus.totalTasks} tasks for ${rotationStatus.totalMembers} members - some members will get multiple tasks.`}
-              </Text>
-            </View>
+  <Text style={[
+    styles.rotationBannerTitle,
+    !rotationStatus.hasEnoughTasks && styles.warningTitle,
+    rotationStatus.totalTasks === rotationStatus.totalMembers && styles.successTitle,
+    rotationStatus.totalTasks > rotationStatus.totalMembers && styles.warningTitle, // Warning, not info
+  ]}>
+    {!rotationStatus.hasEnoughTasks 
+      ? '⚠️ Rotation Warning' 
+      : rotationStatus.totalTasks === rotationStatus.totalMembers
+        ? '✅ Perfect Rotation'
+        : '⚠️ Rotation Imbalance'}
+  </Text>
+  <Text style={[
+    styles.rotationBannerMessage,
+    !rotationStatus.hasEnoughTasks && styles.warningMessage,
+    rotationStatus.totalTasks === rotationStatus.totalMembers && styles.successMessage,
+    rotationStatus.totalTasks > rotationStatus.totalMembers && styles.warningMessage,
+  ]}>
+    {!rotationStatus.hasEnoughTasks 
+      ? `You have ${rotationStatus.totalMembers} members but only ${rotationStatus.totalTasks} recurring tasks. Need ${rotationStatus.tasksNeeded} more task${rotationStatus.tasksNeeded > 1 ? 's' : ''} for perfect rotation.`
+      : rotationStatus.totalTasks === rotationStatus.totalMembers
+        ? `Perfect! ${rotationStatus.totalTasks} tasks for ${rotationStatus.totalMembers} members - one task each. Rotation is balanced.`
+        : `You have ${rotationStatus.totalTasks} tasks but only ${rotationStatus.totalMembers} members. Cannot have more tasks than members in rotation. Please delete ${rotationStatus.totalTasks - rotationStatus.totalMembers} task${rotationStatus.totalTasks - rotationStatus.totalMembers > 1 ? 's' : ''} or increase members.`}
+  </Text>
+</View>
             <MaterialCommunityIcons 
               name="chevron-right" 
               size={20} 
@@ -1596,7 +1598,7 @@ const renderTodayFAB = () => {
             >
               <View style={styles.floatingButtonInner}>
                 <MaterialCommunityIcons name="clipboard-check" size={22} color="white" />
-                <Text style={styles.floatingButtonText}>Review</Text>
+                <Text style={styles.floatingButtonText}></Text>
               </View>
             </LinearGradient>
           </TouchableOpacity>
@@ -1613,7 +1615,7 @@ const renderTodayFAB = () => {
             >
               <View style={styles.floatingButtonInner}>
                 <MaterialCommunityIcons name="account-switch" size={22} color="white" />
-                <Text style={styles.floatingButtonText}>Assign</Text>
+                <Text style={styles.floatingButtonText}></Text>
               </View>
             </LinearGradient>
           </TouchableOpacity>

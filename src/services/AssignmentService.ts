@@ -244,79 +244,109 @@ export class AssignmentService {
     
     return headers;
   }
-
-  // ========== COMPLETE ASSIGNMENT ==========
-  static async completeAssignment(
-    assignmentId: string, 
-    data: CompleteAssignmentParams
-  ): Promise<CompleteAssignmentResponse> {
-    try {
-      console.log('AssignmentService: Completing assignment', assignmentId, data);
+// ========== COMPLETE ASSIGNMENT ==========
+static async completeAssignment(
+  assignmentId: string, 
+  data: CompleteAssignmentParams
+): Promise<CompleteAssignmentResponse> {
+  try {
+    console.log('AssignmentService: Completing assignment', assignmentId, data);
+    
+    const token = await this.getAuthToken();
+    
+    if (data.photoUri) {
+      // Create FormData for multipart upload
+      const formData = new FormData();
       
-      if (data.photoUri) {
-        const formData = new FormData();
-        if (data.notes) formData.append('notes', data.notes);
-        
-        const filename = data.photoUri.split('/').pop() || 'photo.jpg';
-        formData.append('photo', {
-          uri: data.photoUri,
-          name: filename,
-          type: 'image/jpeg',
-        } as any);
-        
-        const token = await this.getAuthToken();
-        const headers: HeadersInit = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
-          method: 'POST',
-          headers,
-          body: formData,
-        });
-
-        const result = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(result.message || `Failed: ${response.status}`);
-        }
-        
-        if (result.success) {
-          await NotificationService.getUnreadCount();
-        }
-        
-        return result;
-      } else {
-        const headers = await this.getHeaders();
-        
-        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ notes: data.notes }),
-        });
-
-        const result = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(result.message || `Failed: ${response.status}`);
-        }
-        
-        if (result.success) {
-          await NotificationService.getUnreadCount();
-        }
-        
-        return result;
+      // Add notes to formData if present
+      if (data.notes) {
+        formData.append('notes', data.notes);
       }
+      
+      // Add the photo file - use 'photo' field name to match backend
+      const filename = data.photoUri.split('/').pop() || 'photo.jpg';
+      formData.append('photo', { // Changed back to 'photo'
+        uri: data.photoUri,
+        name: filename,
+        type: 'image/jpeg',
+      } as any); 
+        
+      // Prepare headers - DON'T set Content-Type, let browser set it with boundary
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      console.log('📤 Sending multipart form data with photo (field name: "photo")');
+      
+      const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+        method: 'POST',
+        headers,
+        body: formData,
+      });
 
-    } catch (error: any) {
-      console.error('AssignmentService.completeAssignment error:', error);
-      return {
-        success: false,
-        message: error.message || 'Failed to complete assignment',
-      };
+      // Try to parse response
+      let result;
+      const responseText = await response.text();
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', responseText);
+        throw new Error('Invalid server response');
+      }
+      
+      if (!response.ok) {
+        throw new Error(result.message || `Failed: ${response.status}`);
+      }
+      
+      if (result.success) {
+        await NotificationService.getUnreadCount();
+      }
+      
+      return result;
+      
+    } else {
+      // No photo - send as JSON
+      const headers = await this.getHeaders(true); // with JSON content type
+      
+      console.log('📤 Sending JSON data without photo');
+      
+      const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ notes: data.notes }),
+      });
+
+      // Try to parse response
+      let result;
+      const responseText = await response.text();
+      try {
+        result = JSON.parse(responseText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON:', responseText);
+        throw new Error('Invalid server response');
+      }
+      
+      if (!response.ok) {
+        throw new Error(result.message || `Failed: ${response.status}`);
+      }
+      
+      if (result.success) {
+        await NotificationService.getUnreadCount();
+      }
+      
+      return result;
     }
+
+  } catch (error: any) {
+    console.error('AssignmentService.completeAssignment error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to complete assignment',
+    };
   }
+}
+
   
   // ========== VERIFY ASSIGNMENT ==========
   static async verifyAssignment(

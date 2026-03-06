@@ -10,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  Image
+  Image  
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,7 +18,7 @@ import { AuthService } from '../services/AuthService';
 import { useImageUpload } from '../uploadHook/useImageUpload';
 import { useFeedback } from '../feedbackHook/useFeedback';
 import { useNotifications } from '../notificationHook/useNotifications';
-
+import { API_BASE_URL } from '../config/api';
 export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -32,53 +32,67 @@ export default function ProfileScreen({ navigation }: any) {
 
   const { unreadCount, loadUnreadCount } = useNotifications();
 
+ 
   const {
-    uploading,
-    progress,
-    pickImageFromGallery,
-    takePhotoWithCamera,
-    uploadAvatarFromPicker,
-    deleteAvatar
-  } = useImageUpload({
-    onSuccess: (result) => {
-      if (result.data?.user) {
-        setUser(result.data.user);
-        Alert.alert('Success', 'Profile picture updated successfully!');
-      } else if (result.success) {
-        loadUserData();
-        Alert.alert('Success', result.message);
-      }
-    },
-    onError: (error) => {
-      console.error('Upload error:', error);
-      Alert.alert('Error', 'Failed to update profile picture');
+  uploading,
+  progress,
+  pickImageFromGallery,
+  takePhotoWithCamera,
+  uploadAvatarFromPicker,
+  deleteAvatar
+} = useImageUpload({
+  onSuccess: async (result) => {
+    console.log('Upload success result:', result);
+    
+    // Force refresh user data from server
+    await loadUserData(true); // Pass true to force refresh
+    
+    Alert.alert('Success', 'Profile picture updated successfully!');
+  },
+  onError: (error) => {
+    console.error('Upload error:', error);
+    Alert.alert('Error', 'Failed to update profile picture');
+  }
+});
+
+const loadUserData = async (forceRefresh = false) => {
+  try {
+    let userData;
+    if (forceRefresh) {
+      // Force fetch from server
+      userData = await AuthService.fetchFreshUserData();
+    } else {
+      // Get from cache
+      userData = await AuthService.getCurrentUser();
     }
+    
+    console.log('Loaded user data:', userData);
+    console.log('Avatar URL:', userData?.avatarUrl); 
+    setUser(userData);
+    
+    await loadStats();
+    await loadUnreadCount();
+    
+  } catch (error) {
+    console.error('Error loading user data:', error);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
+
+ useEffect(() => {
+  const unsubscribe = navigation.addListener('focus', () => {
+    // Force refresh when screen comes into focus
+    loadUserData(true);
   });
 
-  const loadUserData = async () => {
-    try {
-      const userData = await AuthService.getCurrentUser();
-      console.log('Loaded user data:', userData);
-      setUser(userData);
-      
-      await loadStats();
-      await loadUnreadCount();
-      
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    loadUserData();
-  }, []);
+  return unsubscribe;
+}, [navigation]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadUserData();
+    loadUserData(true);
   };
 
   const handleLogout = () => {
@@ -148,25 +162,30 @@ export default function ProfileScreen({ navigation }: any) {
     }
   };
 
-  const handleRemoveAvatar = async () => {
-    Alert.alert(
-      'Remove Profile Picture',
-      'Are you sure you want to remove your profile picture?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await deleteAvatar();
-            if (result.success) {
-              loadUserData();
-            }
+ const handleRemoveAvatar = async () => {
+  Alert.alert(
+    'Remove Profile Picture',
+    'Are you sure you want to remove your profile picture?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          const result = await deleteAvatar();
+          if (result.success) {
+            // Update user state to remove avatar
+            setUser((prevUser: any) => ({
+              ...prevUser,
+              avatarUrl: null
+            }));
+            Alert.alert('Success', 'Profile picture removed successfully');
           }
         }
-      ]
-    );
-  };
+      }
+    ]
+  );
+};
 
   const handleAccountSettings = () => {
     Alert.alert('Coming Soon', 'Account settings will be available soon!');
@@ -308,64 +327,69 @@ export default function ProfileScreen({ navigation }: any) {
             style={styles.avatarTouchable}
           >
             <View style={styles.avatarContainer}>
-              {uploading ? (
-                <View style={styles.avatarUploadingContainer}>
-                  <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.avatarPlaceholder}
-                  >
-                    <ActivityIndicator size="large" color="#2b8a3e" />
-                  </LinearGradient>
-                  <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.uploadingOverlay}
-                  >
-                    <Text style={styles.uploadingText}>
-                      {Math.round(progress)}%
-                    </Text>
-                  </LinearGradient>
-                </View>
-              ) : user.avatarUrl ? (
-                <>
-                  <Image
-                    source={{ uri: user.avatarUrl }}
-                    style={styles.avatarImage}
-                  />
-                  <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.editIcon}
-                  >
-                    <MaterialCommunityIcons name="camera" size={14} color="white" />
-                  </LinearGradient>
-                </>
-              ) : (
-                <>
-                  <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.avatarPlaceholder}
-                  >
-                    <Text style={styles.avatarText}>
-                      {user.fullName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
-                    </Text>
-                  </LinearGradient>
-                  <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.editIcon}
-                  >
-                    <MaterialCommunityIcons name="camera-plus" size={14} color="white" />
-                  </LinearGradient>
-                </>
-              )}
+          {uploading ? (
+  <View style={styles.avatarUploadingContainer}>
+    <LinearGradient
+      colors={['#f8f9fa', '#e9ecef']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.avatarPlaceholder}
+    >
+      <ActivityIndicator size="large" color="#2b8a3e" />
+    </LinearGradient>
+    <LinearGradient
+      colors={['#2b8a3e', '#1e6b2c']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.uploadingOverlay}
+    >
+      <Text style={styles.uploadingText}>
+        {Math.round(progress)}%
+      </Text>
+    </LinearGradient>
+  </View>
+) : user.avatarUrl ? (
+  <>
+    <Image
+      source={{ uri: user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API_BASE_URL}${user.avatarUrl}` }}
+      style={styles.avatarImage}
+      onError={(e) => {
+        console.log('Avatar load error:', e.nativeEvent.error);
+        // Fallback to placeholder on error
+        setUser({...user, avatarUrl: null});
+      }}
+    />
+    <LinearGradient
+      colors={['#2b8a3e', '#1e6b2c']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.editIcon}
+    >
+      <MaterialCommunityIcons name="camera" size={14} color="white" />
+    </LinearGradient>
+  </>
+) : (
+  <>
+    <LinearGradient
+      colors={['#2b8a3e', '#1e6b2c']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.avatarPlaceholder}
+    >
+      <Text style={styles.avatarText}>
+        {user.fullName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
+      </Text>
+    </LinearGradient>
+    <LinearGradient
+      colors={['#2b8a3e', '#1e6b2c']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.editIcon}
+    >
+      <MaterialCommunityIcons name="camera-plus" size={14} color="white" />
+    </LinearGradient>
+  </>
+)}
             </View>
           </TouchableOpacity>
           

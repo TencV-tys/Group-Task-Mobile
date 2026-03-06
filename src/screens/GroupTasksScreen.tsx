@@ -1,3 +1,4 @@
+// src/screens/GroupTasksScreen.tsx - UPDATED with correct header colors
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -40,6 +41,12 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [authError, setAuthError] = useState(false);
   const [nextActiveTime, setNextActiveTime] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  
+  // ========== TASK CREATION DAY ANALYSIS ==========
+  const [taskCreationDays, setTaskCreationDays] = useState<Map<string, number>>(new Map());
+  const [baselineCreationDay, setBaselineCreationDay] = useState<string>('');
+  const [hasMixedCreationDays, setHasMixedCreationDays] = useState(false);
+  const [tasksNeededForPerfectRotation, setTasksNeededForPerfectRotation] = useState(0);
   
   // ========== ROTATION STATUS ==========
   const { status: rotationStatus, checkStatus } = useRotationStatus(groupId);
@@ -130,6 +137,39 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     const urgency = getTaskUrgencyLevel(task);
     return urgency === 'urgent' || urgency === 'late' || urgency === 'warning';
   };
+
+  // ========== ANALYZE TASK CREATION DAYS ==========
+  const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
+    if (!taskList || taskList.length === 0) return;
+    
+    const dayCounts = new Map<string, number>();
+    let maxCount = 0;
+    let mostCommonDay = '';
+    
+    taskList.forEach(task => {
+      if (task.createdAt) {
+        const date = new Date(task.createdAt);
+        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+        const count = (dayCounts.get(dayName) || 0) + 1;
+        dayCounts.set(dayName, count);
+        
+        if (count > maxCount) {
+          maxCount = count;
+          mostCommonDay = dayName;
+        }
+      }
+    });
+    
+    setTaskCreationDays(dayCounts);
+    setBaselineCreationDay(mostCommonDay);
+    setHasMixedCreationDays(dayCounts.size > 1);
+    
+    // Calculate tasks needed for perfect rotation (1 task per member)
+    if (rotationStatus?.totalMembers) {
+      const needed = Math.max(0, rotationStatus.totalMembers - taskList.length);
+      setTasksNeededForPerfectRotation(needed);
+    }
+  }, [rotationStatus?.totalMembers]);
 
   // ========== HANDLE REAL-TIME EVENTS ==========
   useEffect(() => {
@@ -348,121 +388,120 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   };
 
   const fetchTasks = async (isRefreshing = false) => {
-  const hasToken = await checkToken();
-  if (!hasToken) {
-    setLoading(false);
-    setRefreshing(false);
-    return;
-  }
-
-  if (isRefreshing) {
-    setRefreshing(true);
-  } else {
-    setLoading(true);
-  }
-  setError(null);
-  setAuthError(false);
-
-  try {
-    console.log('Fetching tasks for group:', groupId);
-    
-    const allTasksResult = await TaskService.getGroupTasks(groupId);
-    
-    if (allTasksResult.success) {
-      const processedTasks = (allTasksResult.tasks || []).map((task: any) => {
-        // Find the current user's assignment or any assignment
-        const userAssignment = task.assignments?.find(
-          (a: any) => a.user && a.user.id
-        );
-        
-        // Get week data from the assignment if available
-        const assignment = userAssignment || task.userAssignment;
-        const weekStart = assignment?.weekStart;
-        const weekEnd = assignment?.weekEnd;
-        const rotationWeek = assignment?.rotationWeek;
-        
-        return {
-          ...task,
-          isAssignedToUser: !!userAssignment || !!task.userAssignment,
-          userAssignment: userAssignment || task.userAssignment,
-          // Add week data at task level for easy access
-          weekStart,
-          weekEnd,
-          rotationWeek
-        };
-      });
-      
-      setTasks(processedTasks);
-    } else {
-      setError(allTasksResult.message || 'Failed to load tasks');
-      if (allTasksResult.message?.toLowerCase().includes('token') || 
-          allTasksResult.message?.toLowerCase().includes('auth')) {
-        setAuthError(true);
-      }
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
     }
-    
-    const myTasksResult = await TaskService.getMyTasks(groupId);
-    
-    if (myTasksResult.success && myTasksResult.tasks) {
-      const taskMap = new Map();
+
+    if (isRefreshing) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+    setError(null);
+    setAuthError(false);
+
+    try {
+      console.log('Fetching tasks for group:', groupId);
       
-      myTasksResult.tasks.forEach((task: any) => {
-        if (task && task.id) {
-          const timeValidation = checkTaskTimeValidity(task);
-          const urgencyLevel = getTaskUrgencyLevel(task);
+      const allTasksResult = await TaskService.getGroupTasks(groupId);
+      
+      if (allTasksResult.success) {
+        const processedTasks = (allTasksResult.tasks || []).map((task: any) => {
+          const userAssignment = task.assignments?.find(
+            (a: any) => a.user && a.user.id
+          );
           
-          // Get week data from the assignment
-          const assignment = task.assignment || task.userAssignment;
+          const assignment = userAssignment || task.userAssignment;
           const weekStart = assignment?.weekStart;
           const weekEnd = assignment?.weekEnd;
           const rotationWeek = assignment?.rotationWeek;
           
-          const enhancedTask = {
+          return {
             ...task,
-            isAssignedToUser: true,
-            userAssignment: task.assignment || task.userAssignment,
-            ...timeValidation,
-            urgencyLevel,
-            // Add week data at task level
+            isAssignedToUser: !!userAssignment || !!task.userAssignment,
+            userAssignment: userAssignment || task.userAssignment,
             weekStart,
             weekEnd,
             rotationWeek
           };
-          
-          if (!taskMap.has(task.id)) {
-            taskMap.set(task.id, enhancedTask);
-          }
+        });
+        
+        setTasks(processedTasks);
+        
+        // Analyze task creation days
+        analyzeTaskCreationDays(processedTasks);
+        
+      } else {
+        setError(allTasksResult.message || 'Failed to load tasks');
+        if (allTasksResult.message?.toLowerCase().includes('token') || 
+            allTasksResult.message?.toLowerCase().includes('auth')) {
+          setAuthError(true);
         }
-      });
-      
-      const uniqueMyTasks = Array.from(taskMap.values());
-      setMyTasks(uniqueMyTasks);
-      
-      const todayTasks = findTodayAssignments(uniqueMyTasks);
-      setTodayAssignments(todayTasks);
-      setShowTodaySection(todayTasks.length > 0);
-      
-      const nextTime = calculateNextActiveTime(todayTasks);
-      setNextActiveTime(nextTime);
-    } else {
-      setMyTasks([]);
-      setTodayAssignments([]);
-      setShowTodaySection(false);
-      setNextActiveTime(null);
-      if (myTasksResult.message?.toLowerCase().includes('token') || 
-          myTasksResult.message?.toLowerCase().includes('auth')) {
-        setAuthError(true);
       }
-    }  
-    
-  } catch (err: any) {
-    console.error('Error fetching tasks:', err);
-    setError(err.message || 'Network error');
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-};
+      
+      const myTasksResult = await TaskService.getMyTasks(groupId);
+      
+      if (myTasksResult.success && myTasksResult.tasks) {
+        const taskMap = new Map();
+        
+        myTasksResult.tasks.forEach((task: any) => {
+          if (task && task.id) {
+            const timeValidation = checkTaskTimeValidity(task);
+            const urgencyLevel = getTaskUrgencyLevel(task);
+            
+            const assignment = task.assignment || task.userAssignment;
+            const weekStart = assignment?.weekStart;
+            const weekEnd = assignment?.weekEnd;
+            const rotationWeek = assignment?.rotationWeek;
+            
+            const enhancedTask = {
+              ...task,
+              isAssignedToUser: true,
+              userAssignment: task.assignment || task.userAssignment,
+              ...timeValidation,
+              urgencyLevel,
+              weekStart,
+              weekEnd,
+              rotationWeek
+            };
+            
+            if (!taskMap.has(task.id)) {
+              taskMap.set(task.id, enhancedTask);
+            }
+          }
+        });
+        
+        const uniqueMyTasks = Array.from(taskMap.values());
+        setMyTasks(uniqueMyTasks);
+        
+        const todayTasks = findTodayAssignments(uniqueMyTasks);
+        setTodayAssignments(todayTasks);
+        setShowTodaySection(todayTasks.length > 0);
+        
+        const nextTime = calculateNextActiveTime(todayTasks);
+        setNextActiveTime(nextTime);
+      } else {
+        setMyTasks([]);
+        setTodayAssignments([]);
+        setShowTodaySection(false);
+        setNextActiveTime(null);
+        if (myTasksResult.message?.toLowerCase().includes('token') || 
+            myTasksResult.message?.toLowerCase().includes('auth')) {
+          setAuthError(true);
+        }
+      }  
+      
+    } catch (err: any) {
+      console.error('Error fetching tasks:', err);
+      setError(err.message || 'Network error');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     if (authError) {
@@ -505,7 +544,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     const today = now.toDateString();
     const assignmentDay = dueDate.toDateString();
     
-    // Check if it's the correct day
     if (today !== assignmentDay) {
       result.submissionStatus = 'wrong_day';
       result.statusMessage = `Due on ${dueDate.toLocaleDateString()}`;
@@ -531,12 +569,10 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       
       const endInMinutes = endHour * 60 + endMinute;
       
-      // Submission window: 30 minutes AFTER the end time
-      const submissionStart = endInMinutes; // Exactly at end time
-      const gracePeriodEnd = endInMinutes + 30; // 30 minutes after end
-      const lateThreshold = endInMinutes + 25; // 25 minutes after end (late starts)
+      const submissionStart = endInMinutes;
+      const gracePeriodEnd = endInMinutes + 30;
+      const lateThreshold = endInMinutes + 25;
       
-      // Format the end time for display
       const endTimeFormatted = new Date();
       endTimeFormatted.setHours(endHour, endMinute, 0, 0);
       const opensAfterTime = endTimeFormatted.toLocaleTimeString([], { 
@@ -545,7 +581,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         hour12: true 
       });
       
-      // Format late threshold time
       const lateThresholdTime = new Date();
       lateThresholdTime.setHours(endHour, endMinute + 25, 0, 0);
       const lateThresholdStr = lateThresholdTime.toLocaleTimeString([], { 
@@ -554,30 +589,24 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         hour12: true 
       });
       
-      // Case 1: Before the end time (can't submit yet)
       if (currentInMinutes < submissionStart) {
         result.submissionStatus = 'waiting';
         result.statusMessage = `Opens after ${opensAfterTime}`;
         result.opensAfter = opensAfterTime;
         
-        // Calculate time until submission opens
         const timeUntilMs = (submissionStart - currentInMinutes) * 60000;
         result.timeLeft = Math.ceil(timeUntilMs / 1000);
         result.nextActiveTime = opensAfterTime;
         break;
       }
-      
-      // Case 2: Within the 30-minute submission window
       else if (currentInMinutes >= submissionStart && currentInMinutes <= gracePeriodEnd) {
         result.isSubmittableNow = true;
         result.activeTimeSlot = slot;
         result.submissionStatus = 'available';
         
-        // Check if it's late (after 25-minute threshold but within grace period)
         const isLate = currentInMinutes > lateThreshold;
         result.willBePenalized = isLate;
         
-        // Calculate time left in grace period
         const timeLeftMs = (gracePeriodEnd - currentInMinutes) * 60000;
         result.timeLeft = Math.max(0, Math.floor(timeLeftMs / 1000));
         
@@ -588,8 +617,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         }
         break;
       }
-      
-      // Case 3: After grace period
       else {
         result.submissionStatus = 'expired';
         result.statusMessage = 'Submission window closed';
@@ -850,164 +877,242 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     }
   };
 
-   const renderAssignmentInfo = (task: any) => {
-  const hasAssignment = task.userAssignment || task.assignments?.length > 0;
-  
-  if (!hasAssignment) {
-    return (
-      <View style={styles.unassignedInfo}>
-        <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
-        <Text style={styles.unassignedText}>
-          Not assigned to anyone
-        </Text>
-      </View>
-    );
-  }
-
-  let currentAssignment = null;
-  let assigneeName = 'Unknown';
-  let isAssignedToMe = false;
-  let isCompleted = false;
-  
-  if (selectedTab === 'my') {
-    if (task.userAssignment) {
-      currentAssignment = task.userAssignment;
-      isAssignedToMe = true;
-      assigneeName = 'You';
-      isCompleted = currentAssignment?.completed || false;
-    } else if (task.assignment) {
-      currentAssignment = task.assignment;
-      isAssignedToMe = true;
-      assigneeName = 'You';
-      isCompleted = currentAssignment?.completed || false;
+  const renderAssignmentInfo = (task: any) => {
+    const hasAssignment = task.userAssignment || task.assignments?.length > 0;
+    
+    if (!hasAssignment) {
+      return (
+        <View style={styles.unassignedInfo}>
+          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
+          <Text style={styles.unassignedText}>
+            Not assigned to anyone
+          </Text>
+        </View>
+      );
     }
-  } else {
-    if (task.assignments && task.assignments.length > 0) {
-      if (task.currentAssignee) {
-        currentAssignment = task.assignments.find(
-          (a: any) => a.userId === task.currentAssignee
-        );
-      }
-      
-      if (!currentAssignment) {
-        currentAssignment = task.assignments[0];
-      }
-      
-      if (currentAssignment) {
-        assigneeName = currentAssignment.user?.fullName || 'Unknown';
-        isAssignedToMe = currentAssignment.userId === currentUserId;
-        isCompleted = currentAssignment.completed || false;
-      }
-    } else if (task.userAssignment) {
-      currentAssignment = task.userAssignment;
-      assigneeName = task.userAssignment.user?.fullName || 'Unknown';
-      isAssignedToMe = task.userAssignment.userId === currentUserId;
-      isCompleted = task.userAssignment.completed || false;
-    }
-  }
-  
-  if (!currentAssignment) {
-    return (
-      <View style={styles.unassignedInfo}>
-        <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
-        <Text style={styles.unassignedText}>
-          Not assigned to anyone
-        </Text>
-      </View>
-    );
-  }
 
-  const getAssignmentText = () => {
+    let currentAssignment = null;
+    let assigneeName = 'Unknown';
+    let isAssignedToMe = false;
+    let isCompleted = false;
+    
     if (selectedTab === 'my') {
-      return isCompleted ? 'Completed' : 'Assigned to you';
+      if (task.userAssignment) {
+        currentAssignment = task.userAssignment;
+        isAssignedToMe = true;
+        assigneeName = 'You';
+        isCompleted = currentAssignment?.completed || false;
+      } else if (task.assignment) {
+        currentAssignment = task.assignment;
+        isAssignedToMe = true;
+        assigneeName = 'You';
+        isCompleted = currentAssignment?.completed || false;
+      }
     } else {
-      return isCompleted ? 'Completed' : `Assigned to ${assigneeName}`;
+      if (task.assignments && task.assignments.length > 0) {
+        if (task.currentAssignee) {
+          currentAssignment = task.assignments.find(
+            (a: any) => a.userId === task.currentAssignee
+          );
+        }
+        
+        if (!currentAssignment) {
+          currentAssignment = task.assignments[0];
+        }
+        
+        if (currentAssignment) {
+          assigneeName = currentAssignment.user?.fullName || 'Unknown';
+          isAssignedToMe = currentAssignment.userId === currentUserId;
+          isCompleted = currentAssignment.completed || false;
+        }
+      } else if (task.userAssignment) {
+        currentAssignment = task.userAssignment;
+        assigneeName = task.userAssignment.user?.fullName || 'Unknown';
+        isAssignedToMe = task.userAssignment.userId === currentUserId;
+        isCompleted = task.userAssignment.completed || false;
+      }
     }
-  };
-
-  const getIcon = () => {
-    if (isCompleted) return "check-circle";
-    if (selectedTab === 'my') return "account";
-    return isAssignedToMe ? "account" : "account-clock";
-  };
-
-  const getColor = () => {
-    if (isCompleted) return "#2b8a3e";
-    if (selectedTab === 'my') return "#495057";
-    return isAssignedToMe ? "#495057" : "#868e96";
-  };
-
-  const assignmentText = getAssignmentText();
-  const iconName = getIcon();
-  const iconColor = getColor();
-
-  // Format week display like rotation schedule
-  const formatWeekRange = () => {
-    if (task.weekStart && task.weekEnd) {
-      const start = new Date(task.weekStart);
-      const end = new Date(task.weekEnd);
-      return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+    
+    if (!currentAssignment) {
+      return (
+        <View style={styles.unassignedInfo}>
+          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
+          <Text style={styles.unassignedText}>
+            Not assigned to anyone
+          </Text>
+        </View>
+      );
     }
-    return null;
+
+    const getAssignmentText = () => {
+      if (selectedTab === 'my') {
+        return isCompleted ? 'Completed' : 'Assigned to you';
+      } else {
+        return isCompleted ? 'Completed' : `Assigned to ${assigneeName}`;
+      }
+    };
+
+    const getIcon = () => {
+      if (isCompleted) return "check-circle";
+      if (selectedTab === 'my') return "account";
+      return isAssignedToMe ? "account" : "account-clock";
+    };
+
+    const getColor = () => {
+      if (isCompleted) return "#2b8a3e";
+      if (selectedTab === 'my') return "#495057";
+      return isAssignedToMe ? "#495057" : "#868e96";
+    };
+
+    const assignmentText = getAssignmentText();
+    const iconName = getIcon();
+    const iconColor = getColor();
+
+    const formatWeekRange = () => {
+      if (task.weekStart && task.weekEnd) {
+        const start = new Date(task.weekStart);
+        const end = new Date(task.weekEnd);
+        return `${start.toLocaleDateString()} - ${end.toLocaleDateString()}`;
+      }
+      return null;
+    };
+
+    const weekRange = formatWeekRange();
+
+    return (
+      <View style={[
+        styles.assignmentInfo,
+        isCompleted ? styles.completedAssignment : styles.pendingAssignment,
+        !isCompleted && isAssignedToMe && selectedTab === 'all' && styles.myAssignment
+      ]}>
+        <View style={styles.assignmentHeader}>
+          <MaterialCommunityIcons 
+            name={iconName} 
+            size={16} 
+            color={iconColor} 
+          />
+          <Text style={[
+            styles.assignmentStatus,
+            { color: iconColor }
+          ]}>
+            {assignmentText}
+          </Text>
+        </View>
+        
+        <View style={styles.assignmentDetails}>
+          {weekRange && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Week:</Text> {weekRange}
+            </Text>
+          )}
+          {task.executionFrequency && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Frequency:</Text> {task.executionFrequency.toLowerCase()}
+            </Text>
+          )}
+          {task.selectedDays?.length > 0 && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Days:</Text> {task.selectedDays.join(', ')}
+            </Text>
+          )}
+          {task.timeSlots?.length > 0 && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Time:</Text> {
+                task.timeSlots.slice(0, 2).map((slot: any) => 
+                  `${slot.startTime}-${slot.endTime}${slot.label ? ` (${slot.label})` : ''}`
+                ).join(', ')
+              }
+              {task.timeSlots.length > 2 && `... +${task.timeSlots.length - 2} more`}
+            </Text>
+          )}
+          {currentAssignment?.points !== undefined && currentAssignment.points > 0 && (
+            <Text style={styles.assignmentDetail}>
+              <Text style={styles.detailLabel}>Points:</Text> {currentAssignment.points}
+            </Text>
+          )}
+        </View>
+      </View>
+    );
   };
 
-  const weekRange = formatWeekRange();
+  // ========== RENDER CREATION DAY BANNER ==========
+  const renderCreationDayBanner = () => {
+    if (userRole !== 'ADMIN' || selectedTab !== 'all' || tasks.length === 0) return null;
+    
+    const today = new Date();
+    const todayName = today.toLocaleDateString('en-US', { weekday: 'long' });
+    const isTodayBaseline = todayName === baselineCreationDay;
+    const isPerfectlyBalanced = tasksNeededForPerfectRotation === 0;
+    
+    return (
+      <LinearGradient
+        colors={!hasMixedCreationDays ? ['#d3f9d8', '#b2f2bb'] : ['#fff3bf', '#ffec99']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.creationDayBanner}
+      >
+        <View style={styles.bannerHeader}>
+          <MaterialCommunityIcons 
+            name={!hasMixedCreationDays ? "calendar-check" : "calendar-alert"} 
+            size={24} 
+            color={!hasMixedCreationDays ? "#2b8a3e" : "#e67700"} 
+          />
+          <View style={styles.bannerTextContainer}>
+            <Text style={styles.bannerTitle}>
+              {!hasMixedCreationDays 
+                ? '✅ Consistent Task Creation' 
+                : '⚠️ Mixed Creation Days'}
+            </Text>
+            <Text style={styles.bannerSubtitle}>
+              {!hasMixedCreationDays 
+                ? `All tasks created on ${baselineCreationDay}s`
+                : `Tasks created on: ${Array.from(taskCreationDays.keys()).join(', ')}`}
+            </Text>
+          </View>
+        </View>
 
-  return (
-    <View style={[
-      styles.assignmentInfo,
-      isCompleted ? styles.completedAssignment : styles.pendingAssignment,
-      !isCompleted && isAssignedToMe && selectedTab === 'all' && styles.myAssignment
-    ]}>
-      <View style={styles.assignmentHeader}>
-        <MaterialCommunityIcons 
-          name={iconName} 
-          size={16} 
-          color={iconColor} 
-        />
-        <Text style={[
-          styles.assignmentStatus,
-          { color: iconColor }
-        ]}>
-          {assignmentText}
-        </Text>
-      </View>
-      
-      <View style={styles.assignmentDetails}>
-        {weekRange && (
-          <Text style={styles.assignmentDetail}>
-            <Text style={styles.detailLabel}>Week:</Text> {weekRange}
-          </Text>
+        <View style={styles.bannerStats}>
+          <View style={styles.statRow}>
+            <MaterialCommunityIcons name="format-list-checks" size={16} color="#495057" />
+            <Text style={styles.statText}>
+              {tasks.length} task{tasks.length > 1 ? 's' : ''} created
+            </Text>
+          </View>
+          
+          <View style={styles.statRow}>
+            <MaterialCommunityIcons 
+              name={isTodayBaseline ? "thumb-up" : "calendar-alert"} 
+              size={16} 
+              color={isTodayBaseline ? "#2b8a3e" : "#e67700"} 
+            />
+            <Text style={[styles.statText, isTodayBaseline ? styles.successText : styles.warningText]}>
+              {isTodayBaseline 
+                ? `✓ Today (${todayName}) matches creation day` 
+                : `ℹ️ Today is ${todayName} - tasks should be on ${baselineCreationDay}s`}
+            </Text>
+          </View>
+
+          {!isPerfectlyBalanced && (
+            <View style={styles.tasksNeededBadge}>
+              <MaterialCommunityIcons name="alert" size={14} color="#e67700" />
+              <Text style={styles.tasksNeededText}>
+                Need {tasksNeededForPerfectRotation} more task{tasksNeededForPerfectRotation > 1 ? 's' : ''} for perfect rotation
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {hasMixedCreationDays && (
+          <View style={styles.warningBox}>
+            <MaterialCommunityIcons name="information" size={14} color="#e67700" />
+            <Text style={styles.warningBoxText}>
+              Mixed creation days may cause rotation issues. For clean rotation, create all tasks on the same day of the week ({baselineCreationDay}s).
+            </Text>
+          </View>
         )}
-        {task.executionFrequency && (
-          <Text style={styles.assignmentDetail}>
-            <Text style={styles.detailLabel}>Frequency:</Text> {task.executionFrequency.toLowerCase()}
-          </Text>
-        )}
-        {task.selectedDays?.length > 0 && (
-          <Text style={styles.assignmentDetail}>
-            <Text style={styles.detailLabel}>Days:</Text> {task.selectedDays.join(', ')}
-          </Text>
-        )}
-        {task.timeSlots?.length > 0 && (
-          <Text style={styles.assignmentDetail}>
-            <Text style={styles.detailLabel}>Time:</Text> {
-              task.timeSlots.slice(0, 2).map((slot: any) => 
-                `${slot.startTime}-${slot.endTime}${slot.label ? ` (${slot.label})` : ''}`
-              ).join(', ')
-            }
-            {task.timeSlots.length > 2 && `... +${task.timeSlots.length - 2} more`}
-          </Text>
-        )}
-        {currentAssignment?.points !== undefined && currentAssignment.points > 0 && (
-          <Text style={styles.assignmentDetail}>
-            <Text style={styles.detailLabel}>Points:</Text> {currentAssignment.points}
-          </Text>
-        )}
-      </View>
-    </View>
-  );
-};
+      </LinearGradient>
+    );
+  };
 
   const renderHeader = () => (
     <LinearGradient
@@ -1021,7 +1126,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         style={styles.backButton}
         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
       >
-        <MaterialCommunityIcons name="arrow-left" size={24} color="#2b8a3e" />
+        <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
       </TouchableOpacity>
       
       <View style={styles.titleContainer}>
@@ -1056,7 +1161,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           onPress={handleNavigateToSwapRequests}
           hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
         >
-          <MaterialCommunityIcons name="swap-horizontal" size={24} color="#2b8a3e" />
+          <MaterialCommunityIcons name="swap-horizontal" size={22} color="#2b8a3e" />
           {totalPendingForMe > 0 && totalPendingForMe !== undefined && (
             <View style={styles.swapBadge}>
               <Text style={styles.swapBadgeText}>
@@ -1071,7 +1176,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           onPress={() => setShowSettingsModal(true)}
           hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
         >
-          <MaterialCommunityIcons name="cog" size={24} color="#2b8a3e" />
+          <MaterialCommunityIcons name="cog" size={22} color="#2b8a3e" />
         </TouchableOpacity>
       </View>
     </LinearGradient>
@@ -1080,7 +1185,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const renderTodaySection = () => {
     if (!showTodaySection || selectedTab !== 'my') return null;
     
-    // Group tasks by urgency
     const urgentTasks = todayAssignments.filter(t => t.urgencyLevel === 'urgent');
     const lateTasks = todayAssignments.filter(t => t.urgencyLevel === 'late');
     const warningTasks = todayAssignments.filter(t => t.urgencyLevel === 'warning');
@@ -1116,13 +1220,11 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
         
-        {/* Show late/urgent tasks first */}
         {[...lateTasks, ...urgentTasks, ...warningTasks].slice(0, 3).map((task) => {
           const isLate = task.urgencyLevel === 'late';
           const isUrgent = task.urgencyLevel === 'urgent';
           const isWarning = task.urgencyLevel === 'warning';
           
-          // Format end time and late threshold
           let endTimeStr = '';
           let lateThresholdStr = '';
           if (task.userAssignment?.timeSlot) {
@@ -1217,34 +1319,33 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     const nextTask = todayAssignments.find(task => !task.isSubmittableNow && task.submissionStatus === 'waiting');
     const openingTime = nextTask?.opensAfter || '';
     
-    // Determine FAB color and message based on urgency
-    let fabColors: [string, string] = ['#2b8a3e', '#1e6b2c']; // Dark green primary
+    let fabColors: [string, string] = ['#2b8a3e', '#1e6b2c'];
     let fabIcon: any = "check-circle";
     let fabTitle = "Ready to Submit!";
     let fabMessage = `${todayAssignments.filter(t => t.isSubmittableNow).length} can submit now`;
     
     if (hasLate) {
-      fabColors = ['#e67700', '#cc5f00']; // Orange for late
+      fabColors = ['#e67700', '#cc5f00'];
       fabIcon = "timer-alert";
       fabTitle = "⚠️ LATE SUBMISSIONS";
       fabMessage = `${todayAssignments.filter(t => t.urgencyLevel === 'late').length} tasks are late`;
     } else if (hasUrgent) {
-      fabColors = ['#fa5252', '#e03131']; // Red for urgent
+      fabColors = ['#fa5252', '#e03131'];
       fabIcon = "timer";
       fabTitle = "⏰ URGENT";
       fabMessage = `${todayAssignments.filter(t => t.urgencyLevel === 'urgent').length} tasks ending soon`;
     } else if (hasWarning) {
-      fabColors = ['#e67700', '#cc5f00']; // Orange for warning
+      fabColors = ['#e67700', '#cc5f00'];
       fabIcon = "clock-alert";
       fabTitle = "⏳ Due Soon";
       fabMessage = `${todayAssignments.filter(t => t.urgencyLevel === 'warning').length} tasks due in <2hrs`;
     } else if (hasSubmittableNow) {
-      fabColors = ['#2b8a3e', '#1e6b2c']; // Dark green for ready
+      fabColors = ['#2b8a3e', '#1e6b2c'];
       fabIcon = "check-circle";
       fabTitle = "Ready to Submit!";
       fabMessage = `${todayAssignments.filter(t => t.isSubmittableNow).length} can submit now`;
     } else {
-      fabColors = ['#868e96', '#6c757d']; // Gray for waiting
+      fabColors = ['#868e96', '#6c757d'];
       fabIcon = "clock-start";
       fabTitle = "Today's Tasks";
       fabMessage = openingTime 
@@ -1289,25 +1390,24 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
     const getGradientColors = (): [string, string] => {
       if (isCompleted) {
-        return ['#f8f9fa', '#e9ecef']; // Light gray secondary
+        return ['#f8f9fa', '#e9ecef'];
       }
       if (isMyTasksView && isActiveToday && !isCompleted) {
         if (urgencyLevel === 'late') {
-          return ['#fff3bf', '#ffec99']; // Orange for late
+          return ['#fff3bf', '#ffec99'];
         } else if (urgencyLevel === 'urgent') {
-          return ['#fff5f5', '#ffe3e3']; // Red for urgent
+          return ['#fff5f5', '#ffe3e3'];
         } else if (urgencyLevel === 'warning') {
-          return ['#fff3bf', '#ffec99']; // Orange for warning
+          return ['#fff3bf', '#ffec99'];
         }
-        return ['#fff5f5', '#ffe3e3']; // Default red for active
+        return ['#fff5f5', '#ffe3e3'];
       }
       if (isMyTasksView && isSubmittableNow) {
-        return willBePenalized ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb']; // Orange or green
+        return willBePenalized ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb'];
       }
-      return ['#ffffff', '#f8f9fa']; // White to light gray
+      return ['#ffffff', '#f8f9fa'];
     };
 
-    // Format times for display
     let endTimeStr = '';
     let lateThresholdStr = '';
     if (item.userAssignment?.timeSlot) {
@@ -1361,13 +1461,13 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             <LinearGradient
               colors={
                 isCompleted 
-                  ? ['#2b8a3e', '#1e6b2c'] // Dark green primary
+                  ? ['#2b8a3e', '#1e6b2c']
                   : isActiveToday && isMyTasksView
                     ? (urgencyLevel === 'late' ? ['#e67700', '#cc5f00'] : 
                        urgencyLevel === 'urgent' ? ['#fa5252', '#e03131'] : 
                        urgencyLevel === 'warning' ? ['#e67700', '#cc5f00'] : 
-                       ['#495057', '#343a40']) // Dark gray tertiary
-                    : ['#f8f9fa', '#e9ecef'] // Light gray secondary
+                       ['#495057', '#343a40'])
+                    : ['#f8f9fa', '#e9ecef']
               }
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -1614,7 +1714,13 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         keyExtractor={(item, index) => {
           return item?.id || `task-${index}`;
         }}
-        ListHeaderComponent={renderTodaySection()}
+        ListHeaderComponent={
+          <>
+            {/* Task Creation Day Banner - ONLY for admins in All Tasks tab */}
+            {renderCreationDayBanner()}
+            {renderTodaySection()}
+          </>
+        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1702,10 +1808,10 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           <LinearGradient
             colors={
               !rotationStatus.hasEnoughTasks 
-                ? ['#fff3bf', '#ffec99'] // Warning yellow
+                ? ['#fff3bf', '#ffec99']
                 : rotationStatus.totalTasks === rotationStatus.totalMembers
-                  ? ['#d3f9d8', '#b2f2bb'] // Success green
-                  : ['#e7f5ff', '#d0ebff'] // Info blue
+                  ? ['#d3f9d8', '#b2f2bb']
+                  : ['#e7f5ff', '#d0ebff']
             }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -1929,13 +2035,20 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#dee2e6',
     minHeight: 56,
+    backgroundColor: 'white',
   },
   backButton: {
-    width: 40,
-    height: 40,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   titleContainer: {
     flex: 1,
@@ -1944,7 +2057,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#212529',
     textAlign: 'center'
@@ -2042,7 +2155,7 @@ const styles = StyleSheet.create({
   },
   activeTaskCard: {
     borderWidth: 2,
-    borderColor: '#495057', // Dark gray tertiary
+    borderColor: '#495057',
   },
   taskHeader: {
     flexDirection: 'row',
@@ -2079,7 +2192,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through'
   },
   activeTaskTitle: {
-    color: '#495057', // Dark gray tertiary
+    color: '#495057',
     fontWeight: '700'
   },
   editButton: {
@@ -2354,7 +2467,8 @@ const styles = StyleSheet.create({
     right: 0,
     justifyContent: 'space-around',
     alignItems: 'center',
-    zIndex: 50
+    zIndex: 50,
+    backgroundColor: 'white',
   },
   tabButton: {
     alignItems: 'center',
@@ -2526,7 +2640,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -10,
     right: 10,
-    backgroundColor: '#495057', // Dark gray tertiary
+    backgroundColor: '#495057',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
@@ -2652,4 +2766,86 @@ const styles = StyleSheet.create({
   successMessage: {
     color: '#2b8a3e',
   },
+  // ========== CREATION DAY BANNER STYLES ==========
+  creationDayBanner: {
+    marginHorizontal: 16,
+    marginVertical: 12,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  bannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
+  },
+  bannerTextContainer: {
+    flex: 1,
+  },
+  bannerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#212529',
+    marginBottom: 2,
+  },
+  bannerSubtitle: {
+    fontSize: 13,
+    color: '#868e96',
+  },
+  bannerStats: {
+    gap: 8,
+    marginBottom: 8,
+  },
+  statRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statText: {
+    fontSize: 14,
+    color: '#495057',
+    flex: 1,
+  },
+  successText: {
+    color: '#2b8a3e',
+  },
+  warningText: {
+    color: '#e67700',
+  },
+  tasksNeededBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3bf',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 4,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#ffec99',
+  },
+  tasksNeededText: {
+    fontSize: 13,
+    color: '#e67700',
+    fontWeight: '600',
+    flex: 1,
+  },
+  warningBox: {
+    flexDirection: 'row',
+    backgroundColor: '#fff3bf',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#ffec99',
+  },
+  warningBoxText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#e67700',
+    lineHeight: 18,
+  },
 });
+

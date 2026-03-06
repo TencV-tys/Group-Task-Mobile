@@ -1,4 +1,4 @@
-// components/SettingsModal.tsx - UPDATED with clean UI and consistent colors
+// components/SettingsModal.tsx - UPDATED with green icons and removed rotate button
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -209,37 +209,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       );
     }
   }, [authError, visible]);
-
-  const handleRotateTasks = async () => {
-    const hasToken = await checkToken();
-    if (!hasToken) return;
-
-    Alert.alert(
-      'Rotate Tasks',
-      'This will reassign all recurring tasks to the next week.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Rotate',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await TaskService.rotateTasks(groupId);
-              if (result.success) {
-                Alert.alert('Success', `Tasks rotated to week ${result.newWeek}`);
-                onRefreshTasks?.();
-                loadGroupData();
-              } else { 
-                Alert.alert('Error', result.message || 'Failed to rotate tasks');
-              }
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to rotate tasks');
-            }
-          }
-        }
-      ]
-    );
-  };
 
   const handleSwapEntireWeek = async () => {
     const hasToken = await checkToken();
@@ -485,7 +454,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   end={{ x: 1, y: 1 }}
                   style={styles.sectionIcon}
                 >
-                  <MaterialCommunityIcons name="calendar-sync" size={16} color="#495057" />
+                  <MaterialCommunityIcons name="calendar-sync" size={16} color="#2b8a3e" />
                 </LinearGradient>
                 <Text style={styles.sectionTitle}>Rotation</Text>
               </View>
@@ -500,18 +469,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </Text>
                   )}
                 </View>
-                
-                {isAdmin && (
-                  <TouchableOpacity onPress={handleRotateTasks} style={styles.rotateButton}>
-                    <MaterialCommunityIcons name="rotate-right" size={16} color="#2b8a3e" />
-                    <Text style={styles.rotateButtonText}>Rotate</Text>
-                  </TouchableOpacity>
-                )}
               </View>
 
               <TouchableOpacity onPress={handleViewRotationSchedule} style={styles.menuItem}>
                 <View style={styles.menuItemLeft}>
-                  <MaterialCommunityIcons name="calendar-clock" size={18} color="#495057" />
+                  <MaterialCommunityIcons name="calendar-clock" size={18} color="#2b8a3e" />
                   <Text style={styles.menuItemText}>Rotation Schedule</Text>
                 </View>
                 <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
@@ -527,13 +489,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   end={{ x: 1, y: 1 }}
                   style={styles.sectionIcon}
                 >
-                  <MaterialCommunityIcons name="swap-horizontal" size={16} color="#4F46E5" />
+                  <MaterialCommunityIcons name="swap-horizontal" size={16} color="#2b8a3e" />
                 </LinearGradient>
                 <Text style={styles.sectionTitle}>Week Swap</Text>
               </View>
 
               {loadingMyTasks ? (
-                <ActivityIndicator size="small" color="#4F46E5" style={styles.loader} />
+                <ActivityIndicator size="small" color="#2b8a3e" style={styles.loader} />
               ) : (
                 <View style={[styles.swapCard, !canSwapWeek && styles.swapCardDisabled]}>
                   <View style={styles.swapInfo}>
@@ -557,7 +519,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                     {canSwapWeek && (
                       <View style={styles.taskCountBadge}>
-                        <MaterialCommunityIcons name="clipboard-text" size={12} color="#4F46E5" />
+                        <MaterialCommunityIcons name="clipboard-text" size={12} color="#2b8a3e" />
                         <Text style={styles.taskCountText}>
                           {incompleteCount} incomplete
                         </Text>
@@ -619,14 +581,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     end={{ x: 1, y: 1 }}
                     style={styles.sectionIcon}
                   >
-                    <MaterialCommunityIcons name="shield-account" size={16} color="#495057" />
+                    <MaterialCommunityIcons name="shield-account" size={16} color="#2b8a3e" />
                   </LinearGradient>
                   <Text style={styles.sectionTitle}>Admin</Text>
                 </View>
 
                 <TouchableOpacity onPress={handleViewAssignment} style={styles.menuItem}>
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="account-switch" size={18} color="#495057" />
+                    <MaterialCommunityIcons name="account-switch" size={18} color="#2b8a3e" />
                     <Text style={styles.menuItemText}>Manage Assignments</Text>
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
@@ -634,7 +596,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <TouchableOpacity onPress={handleGroupSettings} style={styles.menuItem}>
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="cog" size={18} color="#495057" />
+                    <MaterialCommunityIcons name="cog" size={18} color="#2b8a3e" />
                     <Text style={styles.menuItemText}>Group Settings</Text>
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
@@ -642,7 +604,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <TouchableOpacity onPress={handleGroupActivity} style={styles.menuItem}>
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="chart-timeline-variant" size={18} color="#495057" />
+                    <MaterialCommunityIcons name="chart-timeline-variant" size={18} color="#2b8a3e" />
                     <Text style={styles.menuItemText}>Group Activity</Text>
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
@@ -650,7 +612,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
                 <TouchableOpacity onPress={handleMemberContributions} style={styles.menuItem}>
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="account-details" size={18} color="#495057" />
+                    <MaterialCommunityIcons name="account-details" size={18} color="#2b8a3e" />
                     <Text style={styles.menuItemText}>Member Contributions</Text>
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
@@ -682,13 +644,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   end={{ x: 1, y: 1 }}
                   style={styles.sectionIcon}
                 >
-                  <MaterialCommunityIcons name="chart-bar" size={16} color="#495057" />
+                  <MaterialCommunityIcons name="chart-bar" size={16} color="#2b8a3e" />
                 </LinearGradient>
                 <Text style={styles.sectionTitle}>Stats</Text>
               </View>
 
               {loadingStats ? (
-                <ActivityIndicator size="small" color="#495057" style={styles.loader} />
+                <ActivityIndicator size="small" color="#2b8a3e" style={styles.loader} />
               ) : groupStats ? (
                 <View style={styles.statsGrid}>
                   <View style={styles.statItem}>
@@ -714,7 +676,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <TouchableOpacity onPress={handleTaskStatistics} style={styles.menuItem}>
                 <View style={styles.menuItemLeft}>
-                  <MaterialCommunityIcons name="chart-box" size={18} color="#495057" />
+                  <MaterialCommunityIcons name="chart-box" size={18} color="#2b8a3e" />
                   <Text style={styles.menuItemText}>Detailed Statistics</Text>
                 </View>
                 <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
@@ -730,13 +692,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   end={{ x: 1, y: 1 }}
                   style={styles.sectionIcon}
                 >
-                  <MaterialCommunityIcons name="podium" size={16} color="#495057" />
+                  <MaterialCommunityIcons name="podium" size={16} color="#2b8a3e" />
                 </LinearGradient>
                 <Text style={styles.sectionTitle}>Leaderboard</Text>
               </View>
 
               {loadingLeaderboard ? (
-                <ActivityIndicator size="small" color="#495057" style={styles.loader} />
+                <ActivityIndicator size="small" color="#2b8a3e" style={styles.loader} />
               ) : leaderboard.length > 0 ? (
                 <View style={styles.leaderboardContainer}>
                   {leaderboard.slice(0, 5).map(renderLeaderboardItem)}
@@ -747,7 +709,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <TouchableOpacity onPress={handleViewFullLeaderboard} style={styles.menuItem}>
                 <View style={styles.menuItemLeft}>
-                  <MaterialCommunityIcons name="trophy" size={18} color="#495057" />
+                  <MaterialCommunityIcons name="trophy" size={18} color="#2b8a3e" />
                   <Text style={styles.menuItemText}>Full Leaderboard</Text>
                 </View>
                 <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
@@ -922,22 +884,6 @@ const styles = StyleSheet.create({
     color: '#868e96',
     marginTop: 4,
   },
-  rotateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#d3f9d8',
-  },
-  rotateButtonText: {
-    color: '#2b8a3e',
-    fontWeight: '600',
-    fontSize: 13,
-  },
   swapCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -946,7 +892,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#4F46E5',
+    borderColor: '#2b8a3e',
   },
   swapCardDisabled: {
     borderColor: '#e9ecef',
@@ -991,11 +937,11 @@ const styles = StyleSheet.create({
   },
   taskCountText: {
     fontSize: 11,
-    color: '#4F46E5',
+    color: '#2b8a3e',
     fontWeight: '600',
   },
   swapActionButton: {
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#2b8a3e',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,

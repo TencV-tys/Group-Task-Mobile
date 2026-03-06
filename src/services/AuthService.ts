@@ -153,4 +153,41 @@ export class AuthService {
         const token = await this.getToken();
         return !!token;
     }
+
+// In your AuthService.ts, add this method
+static async fetchFreshUserData(): Promise<any> {
+  try {
+    console.log('🔄 Fetching fresh user data from server...');
+    
+    const token = await this.getToken();
+    if (!token) {
+      console.log('❌ No token found');
+      return null;
+    }
+
+    const response = await fetch(`${API_URL}/me`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const result = await response.json();
+    console.log('📥 Fresh user data response:', result);
+    
+    if (result.success && result.user) {
+      // Update AsyncStorage with fresh data
+      await AsyncStorage.setItem('user', JSON.stringify(result.user));
+      console.log('✅ Updated user data in AsyncStorage');
+      return result.user;
+    }
+    
+    console.log('❌ Failed to fetch fresh user data:', result.message);
+    return null;
+  } catch (error) {
+    console.error('Error fetching fresh user data:', error);
+    return null;
+  }
+}
 }

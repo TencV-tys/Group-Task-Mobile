@@ -254,7 +254,7 @@ static async completeAssignment(
     
     const token = await this.getAuthToken();
     
-    if (data.photoUri) {
+    if (data.photoUri) { 
       // Create FormData for multipart upload
       const formData = new FormData();
       

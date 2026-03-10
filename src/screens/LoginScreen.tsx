@@ -1,5 +1,5 @@
-// src/screens/LoginScreen.tsx - Light Gray Secondary, Dark Gray Tertiary
-import React from 'react';
+// src/screens/LoginScreen.tsx - UPDATED with eye icon
+import React, { useState } from 'react';
 import { 
   View, 
   Text, 
@@ -16,6 +16,50 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLoginForm } from '../authHook/useLoginForm';
 
+// Password Input with Eye Icon Component
+const PasswordInput = ({ 
+  placeholder, 
+  value, 
+  onChangeText, 
+  editable,
+  showPassword, 
+  togglePasswordVisibility 
+}: any) => {
+  return (
+    <LinearGradient
+      colors={['#f8f9fa', '#e9ecef']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.passwordContainer}
+    >
+      <TextInput
+        style={[
+          styles.passwordInput,
+          !editable && styles.inputDisabled
+        ]}
+        placeholder={placeholder}
+        placeholderTextColor="#adb5bd"
+        value={value}
+        onChangeText={onChangeText}
+        secureTextEntry={!showPassword}
+        editable={editable}
+      />
+      <TouchableOpacity 
+        style={styles.eyeButton}
+        onPress={togglePasswordVisibility}
+        disabled={!editable}
+      >
+        <Text style={[
+          styles.eyeIcon,
+          !editable && styles.eyeIconDisabled
+        ]}>
+          {showPassword ? '👁️' : '👁️‍🗨️'}
+        </Text>
+      </TouchableOpacity>
+    </LinearGradient>
+  );
+};
+
 export default function LoginScreen({ navigation }: any) {
   const {
     formData, 
@@ -24,6 +68,9 @@ export default function LoginScreen({ navigation }: any) {
     handleChange,
     handleSubmit
   } = useLoginForm(); 
+
+  // State for password visibility
+  const [showPassword, setShowPassword] = useState(false);
 
    const handleLogin = async () => {
     const result = await handleSubmit();
@@ -120,22 +167,14 @@ export default function LoginScreen({ navigation }: any) {
             
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Password</Text>
-              <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.inputGradient}
-              >
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your password"
-                  placeholderTextColor="#adb5bd"
-                  value={formData.password}
-                  onChangeText={(text) => handleChange('password', text)}
-                  secureTextEntry
-                  editable={!loading}
-                />
-              </LinearGradient>
+              <PasswordInput
+                placeholder="Enter your password"
+                value={formData.password}
+                onChangeText={(text:any) => handleChange('password', text)}
+                editable={!loading}
+                showPassword={showPassword}
+                togglePasswordVisibility={() => setShowPassword(!showPassword)}
+              />
             </View>
             
             <TouchableOpacity 
@@ -255,6 +294,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#212529',
     backgroundColor: 'transparent',
+  },
+  passwordContainer: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  passwordInput: {
+    flex: 1,
+    height: 52,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: '#212529',
+    backgroundColor: 'transparent',
+  },
+  eyeButton: {
+    width: 52,
+    height: 52,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  eyeIcon: {
+    fontSize: 20,
+  },
+  eyeIconDisabled: {
+    opacity: 0.5,
+  },
+  inputDisabled: {
+    opacity: 0.6,
   },
   forgotPasswordContainer: {
     alignItems: 'flex-end',

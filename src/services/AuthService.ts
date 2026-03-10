@@ -1,4 +1,4 @@
-// src/authServices/AuthService.ts - UPDATED with SecureStore
+// src/authServices/AuthService.ts - UPDATED with updateProfile
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -154,40 +154,160 @@ export class AuthService {
         return !!token;
     }
 
-// In your AuthService.ts, add this method
-static async fetchFreshUserData(): Promise<any> {
-  try {
-    console.log('🔄 Fetching fresh user data from server...');
-    
-    const token = await this.getToken();
-    if (!token) {
-      console.log('❌ No token found');
-      return null;
-    }
+    // Fetch fresh user data from server
+    static async fetchFreshUserData(): Promise<any> {
+      try {
+        console.log('🔄 Fetching fresh user data from server...');
+        
+        const token = await this.getToken();
+        if (!token) {
+          console.log('❌ No token found');
+          return null;
+        }
 
-    const response = await fetch(`${API_URL}/me`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        const response = await fetch(`${API_URL}/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        const result = await response.json();
+        console.log('📥 Fresh user data response:', result);
+        
+        if (result.success && result.user) {
+          // Update AsyncStorage with fresh data
+          await AsyncStorage.setItem('user', JSON.stringify(result.user));
+          console.log('✅ Updated user data in AsyncStorage');
+          return result.user;
+        }
+        
+        console.log('❌ Failed to fetch fresh user data:', result.message);
+        return null;
+      } catch (error) {
+        console.error('Error fetching fresh user data:', error);
+        return null;
       }
-    });
-
-    const result = await response.json();
-    console.log('📥 Fresh user data response:', result);
-    
-    if (result.success && result.user) {
-      // Update AsyncStorage with fresh data
-      await AsyncStorage.setItem('user', JSON.stringify(result.user));
-      console.log('✅ Updated user data in AsyncStorage');
-      return result.user;
     }
-    
-    console.log('❌ Failed to fetch fresh user data:', result.message);
-    return null;
-  } catch (error) {
-    console.error('Error fetching fresh user data:', error);
-    return null;
-  }
-}
+
+    // ===== NEW: Update user profile =====
+    static async updateProfile(data: { fullName: string }): Promise<any> {
+        try {
+            console.log('🔍 Attempting to update profile...');
+            
+            const token = await this.getToken();
+            if (!token) {
+                return {
+                    success: false,
+                    message: "Not authenticated"
+                };
+            }
+
+            const response = await fetch(`${API_URL}/profile`, {
+                method: "PUT",
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            console.log('📥 Update profile response:', result);
+            
+            if (result.success && result.user) {
+                // Update stored user data
+                await storeUserData(result.user, token);
+                console.log('✅ User data updated successfully');
+            }
+
+            return result;
+
+        } catch (error: any) {
+            console.error('Error updating profile:', error);
+            return {
+                success: false,
+                message: error.message || 'Failed to update profile'
+            };
+        }
+    }
+
+    // ===== NEW: Change password =====
+    static async changePassword(data: { currentPassword: string; newPassword: string }): Promise<any> {
+        try {
+            console.log('🔍 Attempting to change password...');
+            
+            const token = await this.getToken();
+            if (!token) {
+                return {
+                    success: false,
+                    message: "Not authenticated"
+                };
+            }
+
+            const response = await fetch(`${API_URL}/change-password`, {
+                method: "POST",
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            console.log('📥 Change password response:', result);
+            
+            return result;
+
+        } catch (error: any) {
+            console.error('Error changing password:', error);
+            return {
+                success: false,
+                message: error.message || 'Failed to change password'
+            };
+        }
+    }
+
+    // ===== NEW: Delete account =====
+    static async deleteAccount(password: string): Promise<any> {
+        try {
+            console.log('🔍 Attempting to delete account...');
+            
+            const token = await this.getToken();
+            if (!token) {
+                return {
+                    success: false,
+                    message: "Not authenticated"
+                };
+            }
+
+            const response = await fetch(`${API_URL}/delete`, {
+                method: "DELETE",
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ password })
+            });
+
+            const result = await response.json();
+            console.log('📥 Delete account response:', result);
+            
+            if (result.success) {
+                // Clear all stored data
+                await AsyncStorage.multiRemove(['user', 'userId']);
+                await SecureStore.deleteItemAsync('userToken');
+            }
+
+            return result;
+
+        } catch (error: any) {
+            console.error('Error deleting account:', error);
+            return {
+                success: false,
+                message: error.message || 'Failed to delete account'
+            };
+        }
+    }
 }

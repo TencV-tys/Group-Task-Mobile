@@ -187,9 +187,10 @@ const loadUserData = async (forceRefresh = false) => {
   );
 };
 
-  const handleAccountSettings = () => {
-    Alert.alert('Coming Soon', 'Account settings will be available soon!');
-  };
+ // Replace the handleAccountSettings function:
+const handleAccountSettings = () => {
+  navigation.navigate('AccountSettings');
+};
 
   const handleNotifications = () => {
     navigation.navigate('Notifications');

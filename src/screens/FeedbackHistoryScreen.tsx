@@ -1,4 +1,4 @@
-// src/screens/FeedbackHistoryScreen.tsx - UPDATED with correct color hierarchy
+// src/screens/FeedbackHistoryScreen.tsx - UPDATED with IN_PROGRESS filter
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -16,7 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFeedback } from '../feedbackHook/useFeedback';
 
 export default function FeedbackHistoryScreen({ navigation, route }: any) {
-  const [filter, setFilterState] = useState<'OPEN' | 'RESOLVED' | null>(route.params?.filter || null);
+  const [filter, setFilterState] = useState<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | null>(route.params?.filter || null);
   
   const {
     loading,
@@ -42,35 +42,42 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
   }, [filter]);
 
   const handleFilterPress = () => {
-    Alert.alert(
-      'Filter Feedback',
-      'Select filter option',
-      [
-        { 
-          text: 'All', 
-          onPress: () => {
-            setFilterState(null);
-            setFilter(null);
-          }
-        },
-        { 
-          text: 'Open', 
-          onPress: () => {
-            setFilterState('OPEN');
-            setFilter('OPEN');
-          }
-        },
-        { 
-          text: 'Resolved', 
-          onPress: () => {
-            setFilterState('RESOLVED');
-            setFilter('RESOLVED');
-          }
-        },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
-  };
+  Alert.alert(
+    'Filter Feedback',
+    'Select filter option',
+    [
+      { 
+        text: 'All', 
+        onPress: () => {
+          setFilterState(null);
+          setFilter(null);
+        }
+      },
+      { 
+        text: 'Open', 
+        onPress: () => {
+          setFilterState('OPEN');
+          setFilter('OPEN');
+        }
+      },
+      { 
+        text: 'In Progress', 
+        onPress: () => {
+          setFilterState('IN_PROGRESS');
+          setFilter('IN_PROGRESS');
+        }
+      },
+      { 
+        text: 'Resolved', 
+        onPress: () => {
+          setFilterState('RESOLVED');
+          setFilter('RESOLVED');
+        }
+      },
+      { text: 'Cancel', style: 'cancel' }
+    ]
+  );
+};
 
   const handleDelete = (feedbackId: string) => {
     Alert.alert(
@@ -95,7 +102,23 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
 
   const getHeaderTitle = () => {
     if (!filter) return 'All Feedback';
-    return filter === 'OPEN' ? 'Open Feedback' : 'Resolved Feedback';
+    switch (filter) {
+      case 'OPEN': return 'Open Feedback';
+      case 'IN_PROGRESS': return 'In Progress Feedback';
+      case 'RESOLVED': return 'Resolved Feedback';
+      default: return 'All Feedback';
+    }
+  };
+
+  // Update stats to include IN_PROGRESS if available
+  const getStatCount = (status: string) => {
+    if (!stats) return 0;
+    
+    if (status === 'OPEN') return stats.open || 0;
+    if (status === 'IN_PROGRESS') return stats.inProgress || 0;
+    if (status === 'RESOLVED') return stats.resolved || 0;
+    if (status === 'TOTAL') return stats.total || 0;
+    return 0;
   };
 
   return (
@@ -156,7 +179,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
         </View>
       </View>
 
-      {/* Stats Summary */}
+      {/* Stats Summary - Updated to show IN_PROGRESS */}
       {stats && (
         <LinearGradient
           colors={['#ffffff', '#f8f9fa']}
@@ -172,6 +195,11 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: '#e67700' }]}>{stats.open || 0}</Text>
             <Text style={styles.statLabel}>Open</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: '#2b8a3e' }]}>{stats.inProgress || 0}</Text>
+            <Text style={styles.statLabel}>In Progress</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
@@ -206,7 +234,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
             <Text style={styles.emptyStateText}>No feedback yet</Text>
             <Text style={styles.emptyStateSubtext}>
               {filter 
-                ? `No ${filter.toLowerCase()} feedback found` 
+                ? `No ${filter === 'IN_PROGRESS' ? 'in progress' : filter.toLowerCase()} feedback found` 
                 : 'Your submitted feedback will appear here'}
             </Text>
             <TouchableOpacity 
@@ -248,7 +276,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                       color={getFeedbackColor(item.type)} 
                     />
                   </LinearGradient>
-                  <Text style={styles.typeText}>{item.type.replace('_', ' ')}</Text>
+                  <Text style={styles.typeText}>{item.type.replace(/_/g, ' ')}</Text>
                 </View>
                 <LinearGradient
                   colors={[getStatusColor(item.status), getStatusColor(item.status) + 'dd']}
@@ -256,7 +284,9 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                   end={{ x: 1, y: 1 }}
                   style={styles.statusBadge}
                 >
-                  <Text style={styles.statusText}>{item.status}</Text>
+                  <Text style={styles.statusText}>
+                    {item.status === 'IN_PROGRESS' ? 'In Progress' : item.status}
+                  </Text>
                 </LinearGradient>
               </View>
 

@@ -29,7 +29,7 @@ import TodayAssignmentsScreen from '../screens/TodayAssignmentsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
-
+import AccountSettingsScreen from '../screens/AccountSettingsScreen';
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
 import { MySwapRequestsScreen } from '../screens/MySwapRequestScreen';
@@ -135,6 +135,11 @@ export default function AppNavigator() {
           headerShown: false
         }}
       /> 
+      <Stack.Screen 
+  name="AccountSettings" 
+  component={AccountSettingsScreen}
+  options={{ headerShown: false }}
+/>
        
       <Stack.Screen 
         name="GroupMembers" 

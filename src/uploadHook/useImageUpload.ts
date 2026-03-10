@@ -8,7 +8,7 @@ import * as SecureStore from 'expo-secure-store';
 interface UseImageUploadProps {
   onSuccess?: (result: any) => void;
   onError?: (error: any) => void;
-}
+} 
 
 export const useImageUpload = ({ onSuccess, onError }: UseImageUploadProps = {}) => {
   const [uploading, setUploading] = useState(false);

@@ -1,4 +1,4 @@
-// src/screens/MyGroupsScreen.tsx - UPDATED with clean UI and consistent colors
+// src/screens/MyGroupsScreen.tsx - UPDATED with Report button
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Alert,
@@ -17,6 +16,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMyGroups } from '../groupHook/useMyGroups';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { ReportModal } from '../components/ReportModal'; // 👈 IMPORT YOUR EXISTING COMPONENT
+import { ReportService } from '../services/ReportService';
+
 export default function MyGroupsScreen({ navigation }: any) {
   const { 
     groups, 
@@ -30,6 +32,8 @@ export default function MyGroupsScreen({ navigation }: any) {
   } = useMyGroups();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [reportModalVisible, setReportModalVisible] = useState(false);
+  const [selectedGroupForReport, setSelectedGroupForReport] = useState<any>(null);
 
   useEffect(() => {
     fetchGroups();
@@ -123,6 +127,18 @@ export default function MyGroupsScreen({ navigation }: any) {
       groupName: group.name,
       userRole: group.userRole || group.role || 'MEMBER'
     });
+  };
+
+  // 👇 NEW: Report handlers
+  const handleReportGroup = (group: any) => {
+    setSelectedGroupForReport(group);
+    setReportModalVisible(true);
+  };
+
+  const handleSubmitReport = async (data: { type: string; description: string }) => {
+    if (!selectedGroupForReport) return;
+    
+    await ReportService.submitGroupReport(selectedGroupForReport.id, data);
   };
 
   const filteredGroups = groups.filter(group => 
@@ -277,6 +293,18 @@ export default function MyGroupsScreen({ navigation }: any) {
               <Text style={styles.actionButtonText}>Manage</Text>
             </TouchableOpacity>
           )}
+
+          {/* 👇 NEW: Report Button - Always visible to all members */}
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.reportButton]}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleReportGroup(item);
+            }}
+          >
+            <MaterialCommunityIcons name="flag" size={16} color="#fa5252" />
+            <Text style={[styles.actionButtonText, styles.reportButtonText]}>Report</Text>
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -464,10 +492,33 @@ export default function MyGroupsScreen({ navigation }: any) {
       </View>
 
       {renderContent()}
+
+      {/* Report Modal */}
+      <ReportModal
+        visible={reportModalVisible}
+        onClose={() => {
+          setReportModalVisible(false);
+          setSelectedGroupForReport(null);
+        }}
+        groupId={selectedGroupForReport?.id}
+        groupName={selectedGroupForReport?.name}
+        onSubmit={handleSubmitReport}
+      />
     </ScreenWrapper>
   );
 }
 
+// Add these new styles
+const additionalStyles = {
+  reportButton: {
+    backgroundColor: '#fff5f5',
+  },
+  reportButtonText: {
+    color: '#fa5252',
+  },
+};
+
+// Merge with existing styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -484,7 +535,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
-  backButton: {
+  backButton: { 
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -682,14 +733,17 @@ const styles = StyleSheet.create({
     borderTopColor: '#f1f3f5',
     paddingTop: 12,
     gap: 8,
+    flexWrap: 'wrap',
   },
   actionButton: {
     flex: 1,
+    minWidth: 70,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
     paddingVertical: 8,
+    paddingHorizontal: 4,
     borderRadius: 8,
     backgroundColor: '#f8f9fa',
   },
@@ -697,6 +751,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     color: '#495057',
+  },
+  // Report button styles
+  reportButton: {
+    backgroundColor: '#fff5f5',
+  },
+  reportButtonText: {
+    color: '#fa5252',
   },
   // Loading & Empty States
   loadingContainer: {
@@ -787,4 +848,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#495057',
   },
-});  
+});

@@ -1,3 +1,4 @@
+// src/screens/HomeScreen.tsx - FIXED bottom navigation
 import React, { useEffect, useState } from 'react';
 import { 
   View, 
@@ -5,7 +6,6 @@ import {
   StyleSheet, 
   TouchableOpacity,
   ScrollView,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Image,
@@ -20,10 +20,12 @@ import { useNotifications } from '../notificationHook/useNotifications';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import * as SecureStore from 'expo-secure-store';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // 👈 ADD THIS
 
 const { width } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets(); // 👈 ADD THIS
   const { loading, refreshing, error, homeData, refreshHomeData, authError } = useHomeData();
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
   const { unreadCount, loadUnreadCount, refreshNotifications } = useNotifications();
@@ -172,18 +174,18 @@ export default function HomeScreen({ navigation }: any) {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading your dashboard...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   if (error && !homeData) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.errorContainer}>
           <MaterialCommunityIcons name="alert-circle" size={64} color="#fa5252" />
           <Text style={styles.errorText}>{error}</Text>
@@ -201,7 +203,7 @@ export default function HomeScreen({ navigation }: any) {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   } 
 
@@ -260,7 +262,11 @@ export default function HomeScreen({ navigation }: any) {
             tintColor="#2b8a3e"
           />
         }
-        contentContainerStyle={styles.scrollContent}
+        // 👇 FIXED: Add bottom padding to account for bottom nav + safe area
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: 70 + insets.bottom }
+        ]}
       >
         {/* Points Card */}
         <LinearGradient
@@ -332,7 +338,7 @@ export default function HomeScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* Overdue Tasks List - FIXED: Now shows message instead of navigation */}
+        {/* Overdue Tasks List */}
         {overdueTasks.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>⚠️ Overdue Tasks</Text>
@@ -527,8 +533,11 @@ export default function HomeScreen({ navigation }: any) {
         </View>
       </ScrollView>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
+      {/* 👇 FIXED: Bottom Navigation with safe area padding */}
+      <View style={[
+        styles.bottomNav,
+        { paddingBottom: insets.bottom }
+      ]}>
         <TouchableOpacity 
           style={styles.navItem}
           onPress={() => navigation.navigate('MyGroups')}
@@ -562,7 +571,6 @@ export default function HomeScreen({ navigation }: any) {
     </ScreenWrapper>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1000,13 +1008,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  // Bottom Navigation Styles
-  bottomNav: {
+    bottomNav: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 70,
     backgroundColor: 'white',
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -1014,6 +1020,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#e9ecef',
     paddingHorizontal: 20,
+    paddingTop: 12, // Add top padding
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.05,
@@ -1045,4 +1052,5 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  
 });

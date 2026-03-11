@@ -26,6 +26,7 @@ import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function GroupTasksScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
@@ -89,6 +90,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     },
     showAlerts: false
   });
+
+  const insets = useSafeAreaInsets();
 
   // ========== TIME-AWARE FUNCTIONS ==========
   const getTaskUrgencyLevel = (task: any) => {
@@ -1766,7 +1769,10 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             </View>
           ) : null
         }
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={[
+  styles.listContainer,
+  { paddingBottom: 70 + insets.bottom } // 👈 ADD BOTTOM SAFE AREA
+]}
       />
     );
   };
@@ -1956,12 +1962,18 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         </View>
       )}
 
-      <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.bottomTab}
-      >
+    <LinearGradient
+  colors={['#ffffff', '#f8f9fa']}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 0 }}
+  style={[
+    styles.bottomTab,
+    { 
+      height: 70 + insets.bottom,
+      paddingBottom: insets.bottom 
+    }
+  ]}
+>
         <TouchableOpacity 
           style={styles.tabButton}
           onPress={() => setSelectedTab('all')}
@@ -2141,7 +2153,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 100
+    paddingBottom: 70
   },
   taskCard: {
     borderRadius: 12,
@@ -2454,23 +2466,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14
   },
-  bottomTab: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#dee2e6',
-    paddingTop: 8,
-    paddingBottom: 8,
-    paddingHorizontal: 16,
-    height: 70,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    zIndex: 50,
-    backgroundColor: 'white',
-  },
+bottomTab: {
+  flexDirection: 'row',
+  borderTopWidth: 1,
+  borderTopColor: '#dee2e6',
+  paddingTop: 8,
+  paddingHorizontal: 16,
+  position: 'absolute',
+  bottom: 0,
+  left: 0,
+  right: 0,
+  justifyContent: 'space-around',
+  alignItems: 'center',
+  zIndex: 50,
+  backgroundColor: 'white',
+  // Remove fixed height and paddingBottom - we'll add these dynamically
+},
   tabButton: {
     alignItems: 'center',
     justifyContent: 'center',

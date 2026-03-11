@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { useFeedback } from '../feedbackHook/useFeedback';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 const FEEDBACK_TYPES = [
   { label: 'Bug Report', value: 'BUG' },
@@ -69,7 +70,7 @@ export default function FeedbackScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -253,7 +254,7 @@ export default function FeedbackScreen({ navigation }: any) {
           </View>
         </LinearGradient>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

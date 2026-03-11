@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
 import * as SecureStore from 'expo-secure-store';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const { groupId, groupName } = route.params;
@@ -167,17 +168,17 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#495057" />
           <Text style={styles.loadingText}>Loading leaderboard...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -246,7 +247,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
           </View>
         }
       />
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 };
 

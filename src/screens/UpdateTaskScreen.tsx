@@ -20,7 +20,7 @@ import { useUpdateTask } from '../taskHook/useUpdateTask';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TimeSlotModal } from '../components/TimeSlotModal';
 import { DAY_OF_WEEK_OPTIONS, formatTimeDisplay } from '../utils/timeUtils';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function UpdateTaskScreen({ navigation, route }: any) {
   const { task, groupId, groupName } = route.params || {};
   const { loading, error, success, updateTask, reset } = useUpdateTask();
@@ -311,7 +311,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
 
   if (!task) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
@@ -323,7 +323,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading task data...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
@@ -344,7 +344,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
@@ -926,7 +926,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
         usedPoints={totalTimeSlotPoints}
         maxPointsPerSlot={10}
       /> 
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

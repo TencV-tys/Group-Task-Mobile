@@ -21,6 +21,7 @@ import { SwapRequestService } from '../services/SwapRequestService';
 import * as SecureStore from 'expo-secure-store';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 type FilterStatus = 'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
 
@@ -325,7 +326,7 @@ export const MySwapRequestsScreen = () => {
   // Show loading state while checking user
   if (userLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
@@ -337,14 +338,14 @@ export const MySwapRequestsScreen = () => {
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading user data...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   // Show message if no user
   if (!userId) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
@@ -369,14 +370,14 @@ export const MySwapRequestsScreen = () => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   // Show loading state for requests
   if (loading && !refreshing && myRequests.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
@@ -398,12 +399,12 @@ export const MySwapRequestsScreen = () => {
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading swap requests...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -484,7 +485,7 @@ export const MySwapRequestsScreen = () => {
           ) : null
         }
       />
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 };
 

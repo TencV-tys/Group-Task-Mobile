@@ -20,6 +20,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { GroupMembersService } from '../services/GroupMemberService';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 type CreateSwapRequestRouteParams = {
   assignmentId: string;
@@ -239,12 +240,12 @@ export const CreateSwapRequestScreen = () => {
 
   if (checking || loadingMembers) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#495057" />
           <Text style={styles.loadingText}>Checking availability...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
@@ -253,7 +254,7 @@ export const CreateSwapRequestScreen = () => {
 
   if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pending')) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
@@ -286,12 +287,12 @@ export const CreateSwapRequestScreen = () => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -638,7 +639,7 @@ export const CreateSwapRequestScreen = () => {
           </View>
         )}
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 };
 

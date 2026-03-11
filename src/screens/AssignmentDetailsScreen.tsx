@@ -23,7 +23,7 @@ import { SwapRequestService } from '../services/SwapRequestService';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import * as SecureStore from 'expo-secure-store';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 const { width } = Dimensions.get('window');
 
 export default function AssignmentDetailsScreen({ navigation, route }: any) {
@@ -1159,11 +1159,11 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       {renderHeader()}
       {renderContent()}
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

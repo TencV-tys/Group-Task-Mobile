@@ -19,6 +19,7 @@ import { useImageUpload } from '../uploadHook/useImageUpload';
 import { useFeedback } from '../feedbackHook/useFeedback';
 import { useNotifications } from '../notificationHook/useNotifications';
 import { API_BASE_URL } from '../config/api';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -218,18 +219,18 @@ const handleAccountSettings = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   if (!user) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity 
             onPress={() => navigation.goBack()}
@@ -265,12 +266,12 @@ const handleAccountSettings = () => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -687,7 +688,7 @@ const handleAccountSettings = () => {
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

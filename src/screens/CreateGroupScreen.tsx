@@ -16,7 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCreateGroup } from '../groupHook/useCreateGroup';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function CreateGroupScreen({ navigation }: any) {
   const [groupName, setGroupName] = useState(''); 
   const [description, setDescription] = useState('');
@@ -60,7 +60,7 @@ export default function CreateGroupScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -230,7 +230,7 @@ export default function CreateGroupScreen({ navigation }: any) {
           </ScrollView>
         </LinearGradient>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

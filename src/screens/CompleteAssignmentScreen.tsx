@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../services/AssignmentService';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 const { width } = Dimensions.get('window');
 
@@ -538,7 +539,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -668,7 +669,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
           </LinearGradient>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

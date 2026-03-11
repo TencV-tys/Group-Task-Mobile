@@ -1,7 +1,11 @@
-// homeHook/useHomeData.ts - UPDATED WITH SECURESTORE
+// homeHook/useHomeData.ts - FIXED with correct parameters
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { HomeService, HomeData } from '../services/HomeService';
 import * as SecureStore from 'expo-secure-store';
+import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
+import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
+import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 
 export function useHomeData() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -9,9 +13,102 @@ export function useHomeData() {
   const [error, setError] = useState<string | null>(null);
   const [homeData, setHomeData] = useState<any>(null);
   const [authError, setAuthError] = useState<boolean>(false);
-
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userGroups, setUserGroups] = useState<string[]>([]); // Store user's groups
+ 
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
+
+  // ===== GET USER ID AND GROUPS ON MOUNT =====
+  useEffect(() => {
+    const getUserData = async () => {
+      const userStr = await SecureStore.getItemAsync('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        setCurrentUserId(user.id);
+        
+        // Extract user's groups from homeData if available
+        if (homeData?.groups) {
+          const groupIds = homeData.groups.map((g: any) => g.id);
+          setUserGroups(groupIds);
+        }
+      }
+    };
+    getUserData();
+  }, [homeData]);
+
+  // ===== REAL-TIME EVENT LISTENERS - FIXED PARAMETERS =====
+  // For tasks, we need to listen to all groups - pass empty string to listen globally
+  const { events: taskEvents } = useRealtimeTasks(''); // Pass empty string for global events
+  
+  // For assignments, we need userId
+  const { events: assignmentEvents } = useRealtimeAssignments('', currentUserId || '');
+  
+  // For swaps, we need userId
+  const { events: swapEvents } = useRealtimeSwapRequests('', currentUserId || '');
+
+  // Refresh when tasks change
+  useEffect(() => {
+    if (taskEvents.taskCreated || 
+        taskEvents.taskUpdated || 
+        taskEvents.taskDeleted ||
+        taskEvents.taskAssigned) {
+      console.log('🔄 Task event detected, refreshing home data...');
+      refreshHomeData();
+    }
+  }, [
+    taskEvents.taskCreated,
+    taskEvents.taskUpdated, 
+    taskEvents.taskDeleted,
+    taskEvents.taskAssigned
+  ]);
+
+  // Refresh when assignments change
+  useEffect(() => {
+    if (assignmentEvents.assignmentCompleted ||
+        assignmentEvents.assignmentVerified ||
+        assignmentEvents.assignmentPendingVerification) {
+      console.log('✅ Assignment event detected, refreshing home data...');
+      refreshHomeData();
+    }
+  }, [
+    assignmentEvents.assignmentCompleted,
+    assignmentEvents.assignmentVerified,
+    assignmentEvents.assignmentPendingVerification
+  ]);
+
+  // Refresh when swap requests change
+  useEffect(() => {
+    if (swapEvents.swapCreated ||
+        swapEvents.swapResponded) {
+      console.log('🔄 Swap event detected, refreshing home data...');
+      refreshHomeData();
+    }
+  }, [
+    swapEvents.swapCreated,
+    swapEvents.swapResponded
+  ]);
+
+  // Listen for notifications that should trigger refresh
+  useRealtimeNotifications({
+    onNewNotification: (notification) => {
+      // Refresh home data for relevant notifications
+      if ([
+        'TASK_ASSIGNED',
+        'SUBMISSION_VERIFIED',
+        'SUBMISSION_REJECTED',
+        'POINTS_EARNED',
+        'SWAP_ACCEPTED',
+        'SWAP_RESPONDED',
+        'LATE_SUBMISSION',
+        'POINT_DEDUCTION'
+      ].includes(notification.type)) {
+        console.log(`🔔 Notification ${notification.type} received, refreshing home data...`);
+        refreshHomeData();
+      }
+    },
+    showAlerts: true
+  });
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {
@@ -80,22 +177,27 @@ export function useHomeData() {
       console.log("📥 useHomeData: Fetching home data...");
       const result = await HomeService.getHomeData();
       if (result.success && result.data) {
-  const processedData = processData(result.data);
-  setHomeData(processedData);
-  
-  // Add this debug log
-  console.log("📊 Home Data Stats:", {
-    tasksDueThisWeek: processedData.stats.tasksDueThisWeek,
-    overdueTasks: processedData.stats.overdueTasks,
-    groupsCount: processedData.stats.groupsCount,
-    swapRequests: processedData.stats.swapRequests
-  });
-  
-  setError(null);
-  setAuthError(false); 
-  initialLoadDone.current = true;
-  console.log("✅ useHomeData: Home data loaded successfully");
-}else {
+        const processedData = processData(result.data);
+        setHomeData(processedData);
+        
+        // Update user groups for socket subscriptions
+        if (processedData.groups) {
+          const groupIds = processedData.groups.map((g: any) => g.id);
+          setUserGroups(groupIds);
+        }
+        
+        console.log("📊 Home Data Stats:", {
+          tasksDueThisWeek: processedData.stats.tasksDueThisWeek,
+          overdueTasks: processedData.stats.overdueTasks,
+          groupsCount: processedData.stats.groupsCount,
+          swapRequests: processedData.stats.swapRequests
+        });
+        
+        setError(null);
+        setAuthError(false); 
+        initialLoadDone.current = true;
+        console.log("✅ useHomeData: Home data loaded successfully");
+      } else {
         const errorMessage = result.message || 'Failed to load home data';
         console.error("❌ useHomeData: API error:", errorMessage);
         setError(errorMessage);
@@ -114,7 +216,7 @@ export function useHomeData() {
     fetchHomeData(true);
   }, [fetchHomeData]);
 
-  // Just load once on mount - NO POLLING
+  // Initial load on mount
   useEffect(() => {
     checkToken().then(hasToken => {
       if (hasToken) {

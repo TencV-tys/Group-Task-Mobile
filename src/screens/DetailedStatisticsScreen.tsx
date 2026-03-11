@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
 import * as SecureStore from 'expo-secure-store';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 const { width } = Dimensions.get('window');
 
 export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
@@ -103,12 +103,12 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading statistics...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
@@ -116,7 +116,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
   const userStats = stats?.userStats || {};
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -292,7 +292,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 };
 

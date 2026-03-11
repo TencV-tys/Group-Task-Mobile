@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { useFeedback } from '../feedbackHook/useFeedback';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 const FEEDBACK_TYPES = [
   { label: 'Bug Report', value: 'BUG' },
@@ -131,20 +132,20 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
   // Show loading state
   if (loading || localLoading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>
             {localLoading ? 'Updating feedback...' : 'Loading feedback...'}
           </Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   if (!selectedFeedback) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
@@ -169,14 +170,14 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   const canEdit = selectedFeedback.status !== 'RESOLVED' && selectedFeedback.status !== 'CLOSED';
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -469,7 +470,7 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

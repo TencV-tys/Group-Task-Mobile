@@ -25,6 +25,7 @@ import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function GroupTasksScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
@@ -1747,21 +1748,21 @@ export default function GroupTasksScreen({ navigation, route }: any) {
                     ? 'Create the first task for your group'
                     : 'No tasks have been created yet'}
               </Text>
-              {userRole === 'ADMIN' && selectedTab === 'all' && (
-                <TouchableOpacity
-                  style={styles.emptyButton}
-                  onPress={handleCreateTask}
-                >
-                  <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.emptyButtonGradient}
-                  >
-                    <Text style={styles.emptyButtonText}>Create First Task</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              )}
+             {userRole === 'ADMIN' && selectedTab === 'all' && (
+  <TouchableOpacity
+    style={styles.emptyButton}
+    onPress={handleCreateTask}
+  >
+    <LinearGradient
+      colors={['#2b8a3e', '#1e6b2c']} // ← DARK GREEN GRADIENT
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.emptyButtonGradient}
+    >
+      <Text style={[styles.emptyButtonText, { color: 'white' }]}>Create First Task</Text>
+    </LinearGradient>
+  </TouchableOpacity>
+)}
             </View>
           ) : null
         }
@@ -1772,28 +1773,28 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
   if (loadingUser) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading user data...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading tasks...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper noBottom={true} style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       
       {renderHeader()}
@@ -2006,7 +2007,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         onNavigateToAssignment={handleNavigateToAssignment}
         onRefreshTasks={() => fetchTasks(true)}
       />
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
@@ -2404,7 +2405,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   emptyButtonText: {
-    color: '#495057',
+    color: 'white',
     fontWeight: '600',
     fontSize: 16
   },

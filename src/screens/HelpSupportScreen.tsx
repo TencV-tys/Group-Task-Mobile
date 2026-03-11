@@ -10,10 +10,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function HelpSupportScreen({ navigation }: any) {
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -313,7 +313,7 @@ export default function HelpSupportScreen({ navigation }: any) {
           </Text>
         </LinearGradient>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

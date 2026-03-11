@@ -16,7 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useJoinGroup } from '../groupHook/useJoinGroup';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function JoinGroupScreen({ navigation, route }: any) {
   const [inviteCode, setInviteCode] = useState('');
   const { loading, error, success, joinedGroup, joinGroup, reset } = useJoinGroup();
@@ -89,7 +89,7 @@ export default function JoinGroupScreen({ navigation, route }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -274,7 +274,7 @@ export default function JoinGroupScreen({ navigation, route }: any) {
           </ScrollView>
         </LinearGradient>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

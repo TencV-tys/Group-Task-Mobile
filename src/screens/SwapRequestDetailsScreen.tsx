@@ -19,7 +19,7 @@ import { SwapRequestService } from '../services/SwapRequestService';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import * as SecureStore from 'expo-secure-store';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 type SwapRequestDetailsRouteParams = {
   requestId: string;
 };
@@ -223,7 +223,7 @@ export const SwapRequestDetailsScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
@@ -235,13 +235,13 @@ export const SwapRequestDetailsScreen = () => {
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading request details...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   if (error || !request) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
             <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
@@ -270,7 +270,7 @@ export const SwapRequestDetailsScreen = () => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
@@ -290,7 +290,7 @@ export const SwapRequestDetailsScreen = () => {
   const canCancel = isPending && isRequester;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
@@ -673,7 +673,7 @@ export const SwapRequestDetailsScreen = () => {
           )}
         </View>
       )}
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 };
 

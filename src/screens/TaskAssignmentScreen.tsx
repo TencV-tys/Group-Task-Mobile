@@ -16,7 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTaskAssignment } from '../taskHook/useTaskAssignment';
-  
+  import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function TaskAssignmentScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
   
@@ -243,17 +243,17 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading assignments...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <LinearGradient
         colors={['#ffffff', '#f8f9fa']}
@@ -582,7 +582,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
           </LinearGradient>
         </View>
       </Modal>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

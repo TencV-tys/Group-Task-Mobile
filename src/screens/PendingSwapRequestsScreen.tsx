@@ -21,6 +21,7 @@ import { SwapRequestService } from '../services/SwapRequestService';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import * as SecureStore from 'expo-secure-store';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export const PendingSwapRequestsScreen = () => {
   const navigation = useNavigation();
@@ -407,17 +408,17 @@ const handleViewDetails = (requestId: string) => {
 
   if (loading && !refreshing && pendingForMe.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading swap requests...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -476,7 +477,7 @@ const handleViewDetails = (requestId: string) => {
           </View>
         }
       />
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 };
 

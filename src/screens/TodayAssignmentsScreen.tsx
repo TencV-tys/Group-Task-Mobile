@@ -14,7 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AssignmentService, TodayAssignment } from '../services/AssignmentService';
 import * as SecureStore from 'expo-secure-store';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function TodayAssignmentsScreen({ navigation, route }: any) {
   const { groupId, groupName } = route.params || {};
   const [loading, setLoading] = useState(true);
@@ -279,7 +279,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
 
   if (authError) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.errorContainer}>
           <MaterialCommunityIcons name="lock-alert" size={64} color="#fa5252" />
           <Text style={styles.errorText}>Authentication Error</Text>
@@ -298,12 +298,12 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       {renderHeader()}
 
@@ -327,7 +327,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
         }
         contentContainerStyle={styles.listContainer}
       />
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

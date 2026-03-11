@@ -15,6 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRotationSchedule } from '../taskHook/useRotationSchedule';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 const { width } = Dimensions.get('window');
 
@@ -401,18 +402,18 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading rotation schedule...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   if (error && isEmpty) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.errorContainer}>
           <MaterialCommunityIcons name="calendar-remove" size={64} color="#fa5252" />
           <Text style={styles.errorText}>Failed to Load Schedule</Text>
@@ -431,12 +432,12 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -769,7 +770,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

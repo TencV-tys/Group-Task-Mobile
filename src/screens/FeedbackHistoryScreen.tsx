@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFeedback } from '../feedbackHook/useFeedback';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function FeedbackHistoryScreen({ navigation, route }: any) {
   const [filter, setFilterState] = useState<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | null>(route.params?.filter || null);
   
@@ -122,7 +122,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -359,7 +359,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           ))
         )}
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

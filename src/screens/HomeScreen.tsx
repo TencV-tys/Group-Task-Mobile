@@ -19,6 +19,7 @@ import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { useNotifications } from '../notificationHook/useNotifications';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import * as SecureStore from 'expo-secure-store';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 const { width } = Dimensions.get('window');
 
@@ -205,7 +206,7 @@ export default function HomeScreen({ navigation }: any) {
   } 
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper noBottom={true} style={styles.container}>
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Dashboard</Text>
@@ -558,7 +559,7 @@ export default function HomeScreen({ navigation }: any) {
           <Text style={styles.navText}>Profile</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

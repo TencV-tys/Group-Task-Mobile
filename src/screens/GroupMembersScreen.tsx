@@ -25,7 +25,7 @@ import { useGroupMembers } from '../groupHook/useGroupMembers';
 import { useImageUpload } from '../uploadHook/useImageUpload';
 import { useRealtimeGroup } from '../hooks/useRealtimeGroup';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 const { width } = Dimensions.get('window');
 
 export default function GroupMembersScreen({ navigation, route }: any) {
@@ -738,12 +738,12 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#2b8a3e" />
           <Text style={styles.loadingText}>Loading group...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
@@ -753,7 +753,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   const isOnlyAdmin = currentUserRole === 'ADMIN' && adminCount <= 1;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <LinearGradient
         colors={['#ffffff', '#f8f9fa']}
@@ -1341,7 +1341,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           </LinearGradient>
         </View>
       </Modal>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

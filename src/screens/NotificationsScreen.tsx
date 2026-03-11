@@ -16,7 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNotifications } from '../notificationHook/useNotifications';
 import { NotificationTypes } from '../services/NotificationService';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function NotificationsScreen({ navigation }: any) {
   const {
     loading,
@@ -474,7 +474,7 @@ export default function NotificationsScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
@@ -531,7 +531,7 @@ export default function NotificationsScreen({ navigation }: any) {
         ListFooterComponent={renderFooter}
         showsVerticalScrollIndicator={false}
       />
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

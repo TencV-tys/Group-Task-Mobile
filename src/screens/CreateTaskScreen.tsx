@@ -20,6 +20,7 @@ import { useRotationStatus } from '../hooks/useRotationStatus'; // ✅ ADDED new
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TimeSlotModal } from '../components/TimeSlotModal';
 import { DAY_OF_WEEK_OPTIONS, formatTimeDisplay } from '../utils/timeUtils';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function CreateTaskScreen({ navigation, route }: any) {
   const { groupId, groupName } = route.params || {};
@@ -305,7 +306,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   const recommendation = getTaskRecommendation();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
@@ -876,7 +877,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
         usedPoints={totalTimeSlotPoints}
         maxPointsPerSlot={10}
       />
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

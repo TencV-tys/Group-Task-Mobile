@@ -16,7 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../services/AssignmentService'; 
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function PendingVerificationsScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
   const [loading, setLoading] = useState(true);
@@ -534,7 +534,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       {renderHeader()}
       {renderStatsBar()}
@@ -605,7 +605,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           contentContainerStyle={styles.listContainer}
         />
       )}
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

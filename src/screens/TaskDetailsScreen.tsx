@@ -21,6 +21,7 @@ import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import * as SecureStore from 'expo-secure-store';
+import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function TaskDetailsScreen({ navigation, route }: any) {
   const { taskId, groupId, userRole } = route.params || {};
@@ -1619,11 +1620,11 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       {renderHeader()}
       {renderContent()}
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

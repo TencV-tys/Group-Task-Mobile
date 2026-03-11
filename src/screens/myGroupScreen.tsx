@@ -16,7 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMyGroups } from '../groupHook/useMyGroups';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
+import { ScreenWrapper } from '../components/ScreenWrapper';
 export default function MyGroupsScreen({ navigation }: any) {
   const { 
     groups, 
@@ -393,7 +393,7 @@ export default function MyGroupsScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       {/* Header */}
       <LinearGradient
         colors={['#ffffff', '#f8f9fa']}
@@ -464,7 +464,7 @@ export default function MyGroupsScreen({ navigation }: any) {
       </View>
 
       {renderContent()}
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

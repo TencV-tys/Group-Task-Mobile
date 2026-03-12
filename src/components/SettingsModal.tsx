@@ -1,6 +1,6 @@
 // components/SettingsModal.tsx - UPDATED with green icons and removed rotate button
 import React, { useEffect, useState, useCallback } from 'react';
-import {
+import { 
   View,
   Text,
   StyleSheet,
@@ -9,7 +9,7 @@ import {
   ScrollView, 
   ActivityIndicator, 
   Alert
-} from 'react-native';
+} from 'react-native'; 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TaskService } from '../services/TaskService';

@@ -167,7 +167,13 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               if (route.params?.onTaskCreated) {
                 route.params.onTaskCreated(result.task);
               }
-              navigation.goBack();
+            navigation.navigate('GroupTasks', {
+  groupId: groupId,
+  groupName: groupName,
+  userRole: 'ADMIN', // or pass the actual userRole if you have it
+  switchToAllTasks: true,
+  refreshTasks: true
+ });
             }
           }
         ]

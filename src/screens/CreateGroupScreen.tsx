@@ -6,8 +6,8 @@ import {
   TextInput, 
   TouchableOpacity, 
   StyleSheet,
-  SafeAreaView,
-  Alert,
+
+  Alert, 
   ActivityIndicator,
   ScrollView,
   KeyboardAvoidingView,

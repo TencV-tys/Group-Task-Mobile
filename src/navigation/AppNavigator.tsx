@@ -30,11 +30,19 @@ import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
 import AccountSettingsScreen from '../screens/AccountSettingsScreen';
+
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
 import { MySwapRequestsScreen } from '../screens/MySwapRequestScreen';
 import { CreateSwapRequestScreen } from '../screens/CreateSwapRequestScreen';
 import { SwapRequestDetailsScreen } from '../screens/SwapRequestDetailsScreen';
+
+// Import Dashboard Screens
+import { AdminDashboardScreen } from '../screens/AdminDashboardScreen';
+import { MemberDashboardScreen } from '../screens/MemberDashboardScreen';
+import { GroupSwapHistoryScreen } from '../screens/GroupSwapHistoryScreen';
+
+// Statistics & Leaderboard
 import { DetailedStatisticsScreen } from '../screens/DetailedStatisticsScreen';
 import { FullLeaderboardScreen } from '../screens/FullLeaderboardScreen';
 
@@ -56,22 +64,22 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
       <Stack.Screen 
-  name="PrivacyPolicy" 
-  component={PrivacyPolicyScreen}
-  options={{ headerShown: false }}
-/>
+        name="PrivacyPolicy" 
+        component={PrivacyPolicyScreen}
+        options={{ headerShown: false }}
+      />
 
-<Stack.Screen 
-  name="TermsOfService" 
-  component={TermsOfServiceScreen}
-  options={{ headerShown: false }}
-/>
+      <Stack.Screen 
+        name="TermsOfService" 
+        component={TermsOfServiceScreen}
+        options={{ headerShown: false }}
+      />
 
-<Stack.Screen 
-  name="HelpSupport" 
-  component={HelpSupportScreen}
-  options={{ headerShown: false }}
-/>
+      <Stack.Screen 
+        name="HelpSupport" 
+        component={HelpSupportScreen}
+        options={{ headerShown: false }}
+      />
    
 
       {/* Main App Screens */}
@@ -136,10 +144,10 @@ export default function AppNavigator() {
         }}
       /> 
       <Stack.Screen 
-  name="AccountSettings" 
-  component={AccountSettingsScreen}
-  options={{ headerShown: false }}
-/>
+        name="AccountSettings" 
+        component={AccountSettingsScreen}
+        options={{ headerShown: false }}
+      />
        
       <Stack.Screen 
         name="GroupMembers" 
@@ -190,6 +198,25 @@ export default function AppNavigator() {
       <Stack.Screen 
         name="PendingVerifications" 
         component={PendingVerificationsScreen} 
+        options={{ headerShown: false }}
+      />
+
+      {/* ===== NEW: Dashboard Screens ===== */}
+      <Stack.Screen
+        name="AdminDashboard"
+        component={AdminDashboardScreen}
+        options={{ headerShown: false }}
+      />
+      
+      <Stack.Screen
+        name="MemberDashboard"
+        component={MemberDashboardScreen}
+        options={{ headerShown: false }}
+      />
+      
+      <Stack.Screen
+        name="GroupSwapHistory"
+        component={GroupSwapHistoryScreen}
         options={{ headerShown: false }}
       />
 
@@ -256,27 +283,28 @@ export default function AppNavigator() {
       />
 
       <Stack.Screen 
-  name="GroupActivity" 
-  component={GroupActivityScreen}
-  options={{ headerShown: false }}
-/>
+        name="GroupActivity" 
+        component={GroupActivityScreen}
+        options={{ headerShown: false }}
+      />
 
-<Stack.Screen 
-  name="MemberContributions" 
-  component={MemberContributionsScreen}
-  options={{ headerShown: false }}
-/>
+      <Stack.Screen 
+        name="MemberContributions" 
+        component={MemberContributionsScreen}
+        options={{ headerShown: false }}
+      />
 
-<Stack.Screen 
-  name="TaskCompletionHistory" 
-  component={TaskCompletionHistoryScreen}
-  options={{ headerShown: false }}
-/>
-<Stack.Screen 
-  name="TodayAssignments" 
-  component={TodayAssignmentsScreen}
-  options={{ headerShown: false }}
-/>
+      <Stack.Screen 
+        name="TaskCompletionHistory" 
+        component={TaskCompletionHistoryScreen}
+        options={{ headerShown: false }}
+      />
+      
+      <Stack.Screen 
+        name="TodayAssignments" 
+        component={TodayAssignmentsScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator>
   );
 }

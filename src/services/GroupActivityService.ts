@@ -13,7 +13,7 @@ export class GroupActivityService {
       console.error('GroupActivityService: Error getting auth token:', error);
       return null;
     }
-  } 
+  }  
 
   private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
     const token = await this.getAuthToken();
@@ -109,4 +109,53 @@ export class GroupActivityService {
       return { success: false, message: error.message };
     }
   }
+
+
+  // Add these methods to your existing GroupActivityService class
+
+// ===== NEW: Get admin dashboard data =====
+static async getAdminDashboard(groupId: string) {
+  try {
+    const headers = await this.getHeaders(false);
+    const response = await fetch(`${API_URL}/${groupId}/admin-dashboard`, {
+      method: 'GET',
+      headers,
+    });
+    return await response.json();
+  } catch (error: any) {
+    console.error('GroupActivityService.getAdminDashboard error:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+// ===== NEW: Get member dashboard data =====
+static async getMemberDashboard(groupId: string) {
+  try {
+    const headers = await this.getHeaders(false);
+    const response = await fetch(`${API_URL}/${groupId}/member-dashboard`, {
+      method: 'GET',
+      headers,
+    });
+    return await response.json();
+  } catch (error: any) {
+    console.error('GroupActivityService.getMemberDashboard error:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+// ===== NEW: Get recent activity for dashboard =====
+static async getRecentActivity(groupId: string, limit: number = 10) {
+  try {
+    const params = new URLSearchParams();
+    params.append('limit', limit.toString());
+    
+    const url = `${API_URL}/${groupId}/recent-activity?${params}`;
+    const headers = await this.getHeaders(false);
+    const response = await fetch(url, { method: 'GET', headers });
+    return await response.json();
+  } catch (error: any) {
+    console.error('GroupActivityService.getRecentActivity error:', error);
+    return { success: false, message: error.message };
+  }
+}
 }

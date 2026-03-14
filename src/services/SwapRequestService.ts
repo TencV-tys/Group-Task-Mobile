@@ -540,6 +540,69 @@ export class SwapRequestService {
     }
   }
 
+
+// Add this method to your existing SwapRequestService class
+
+// ===== NEW: Get group swap requests (for admin history view) =====
+static async getGroupSwapRequests(
+  groupId: string,
+  filters?: {
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }
+) {
+  try {
+    let url = `${API_URL}/group/${groupId}`;
+    const params = new URLSearchParams();
+    
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.limit) params.append('limit', filters.limit.toString());
+    if (filters?.offset) params.append('offset', filters.offset.toString());
+    
+    const queryString = params.toString();
+    if (queryString) url += `?${queryString}`;
+
+    console.log('SwapRequestService: Getting group swap requests', url);
+    
+    const headers = await this.getHeaders(false);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load group swap requests: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    console.log('SwapRequestService: Get group requests response:', result);
+    
+    if (result.success) {
+      return {
+        success: true,
+        data: {
+          requests: result.data?.requests || result.requests || [],
+          total: result.data?.total || result.total || 0,
+          stats: result.data?.stats || result.stats
+        }
+      };
+    }
+    
+    return result;
+
+  } catch (error: any) {
+    console.error('SwapRequestService.getGroupSwapRequests error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to load group swap requests',
+      data: { requests: [], total: 0 }
+    };
+  }
+}
+
   // Check if user can swap (time constraints)
   static canRequestSwap(dueDate: string): { canSwap: boolean; reason?: string } {
     const now = new Date();
@@ -573,4 +636,6 @@ export class SwapRequestService {
   static formatDay(day: string): string {
     return day.charAt(0) + day.slice(1).toLowerCase();
   }
+
+
 }

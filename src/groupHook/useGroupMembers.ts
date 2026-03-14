@@ -1,4 +1,4 @@
-// src/hooks/useGroupMembers.ts - UPDATED WITH SECURESTORE
+// src/hooks/useGroupMembers.ts - UPDATED with maxMembers support
 import { useState, useCallback } from 'react';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { API_BASE_URL } from '../config/api';
@@ -86,15 +86,19 @@ export function useGroupMembers() {
         }
       }
 
-      // Get group info
+      // Get group info - FIXED to include maxMembers
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
         const groupData = groupResult.group || {};
         if (groupData.avatarUrl) {
           groupData.avatarUrl = ensureFullUrl(groupData.avatarUrl);
         }
-        setGroupInfo(groupData);
-        console.log(`✅ useGroupMembers: Loaded group info for ${groupData.name}`);
+        // ===== FIX: Ensure maxMembers is set (default to 6) =====
+        setGroupInfo({
+          ...groupData,
+          maxMembers: groupData.maxMembers || 6
+        });
+        console.log(`✅ useGroupMembers: Loaded group info for ${groupData.name} with maxMembers: ${groupData.maxMembers || 6}`);
       } else {
         console.warn('⚠️ Could not load group info:', groupResult.message);
       }
@@ -124,24 +128,42 @@ export function useGroupMembers() {
     }));
   }, []);
 
-  // Update group info after editing
-  const updateGroupInfo = useCallback(async (groupId: string, updatedGroup: any) => {
+  // ===== NEW: Method to update max members =====
+  const updateMaxMembers = useCallback(async (groupId: string, newMax: number) => {
     try {
       const hasToken = await checkToken();
       if (!hasToken) return { success: false, message: 'Authentication required' };
 
+      // Update local state immediately
       setGroupInfo((prev: any) => ({
         ...prev,
-        ...updatedGroup,
-        avatarUrl: updatedGroup.avatarUrl ? ensureFullUrl(updatedGroup.avatarUrl) : prev?.avatarUrl
+        maxMembers: newMax
       }));
+
       return { success: true };
     } catch (err: any) {
-      console.error('❌ Error updating group info:', err);
+      console.error('❌ Error updating max members locally:', err);
       return { success: false, message: err.message };
     }
-  }, [ensureFullUrl, checkToken]);
+  }, [checkToken]);
 
+  const updateGroupInfo = useCallback(async (groupId: string, updatedGroup: any) => {
+  try {
+    const hasToken = await checkToken();
+    if (!hasToken) return { success: false, message: 'Authentication required' };
+
+    setGroupInfo((prev: any) => ({
+      ...prev,
+      ...updatedGroup,
+      maxMembers: updatedGroup.maxMembers || prev?.maxMembers || 6, // ← This should work but might not be called
+      avatarUrl: updatedGroup.avatarUrl ? ensureFullUrl(updatedGroup.avatarUrl) : prev?.avatarUrl
+    }));
+    return { success: true };
+  } catch (err: any) {
+    console.error('❌ Error updating group info:', err);
+    return { success: false, message: err.message };
+  }
+}, [ensureFullUrl, checkToken]);
   // Transfer ownership
   const transferOwnership = useCallback(async (groupId: string, newAdminId: string) => {
     try {
@@ -292,6 +314,7 @@ export function useGroupMembers() {
     
     // Additional methods
     updateGroupInfo,
+    updateMaxMembers, // ← NEW
     transferOwnership,
     regenerateInviteCode,
     deleteGroup,

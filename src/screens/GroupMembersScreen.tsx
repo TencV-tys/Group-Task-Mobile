@@ -38,8 +38,10 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     groupInfo,
     fetchGroupMembers,
     updateGroupAvatar,
-    removeGroupAvatar,
+    removeGroupAvatar, 
+    updateMaxMembers,
     setMembers,
+    setGroupInfo,
     updateGroupInfo,
     transferOwnership,
     regenerateInviteCode,
@@ -288,32 +290,42 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     }
   };
 
-  // ===== NEW: Handle Update Max Members =====
-  const handleUpdateMaxMembers = async () => {
-    const max = parseInt(newMax);
-    if (isNaN(max) || max < 6 || max > 10) {
-      Alert.alert('Error', 'Please select a number between 6 and 10');
-      return;
-    }
+  // In GroupMembersScreen.tsx - Update handleUpdateMaxMembers
 
-    setUpdatingMax(true);
-    try {
-      const result = await GroupSettingsService.updateMaxMembers(groupId, max);
-      if (result.success && isMounted.current) {
-        Alert.alert('Success', `Group capacity updated to ${max} members`);
-        setShowMaxModal(false);
-        fetchData(true);
-      } else {
-        Alert.alert('Error', result.message || 'Failed to update capacity');
-      }
-    } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update capacity');
-    } finally {
-      if (isMounted.current) {
-        setUpdatingMax(false);
-      }
+// ===== FIXED: Handle Update Max Members =====
+const handleUpdateMaxMembers = async () => {
+  const max = parseInt(newMax);
+  if (isNaN(max) || max < 6 || max > 10) {
+    Alert.alert('Error', 'Please select a number between 6 and 10');
+    return;
+  }
+
+  setUpdatingMax(true);
+  try {
+    const result = await GroupSettingsService.updateMaxMembers(groupId, max);
+    if (result.success && isMounted.current) {
+      // ===== UPDATE LOCAL STATE IMMEDIATELY =====
+      setGroupInfo((prev: any) => ({
+        ...prev,
+        maxMembers: max
+      }));
+      
+      Alert.alert('Success', `Group capacity updated to ${max} members`);
+      setShowMaxModal(false);
+      
+      // Optional: Refresh to confirm from server
+      fetchData(true);
+    } else {
+      Alert.alert('Error', result.message || 'Failed to update capacity');
     }
-  };
+  } catch (err: any) {
+    Alert.alert('Error', err.message || 'Failed to update capacity');
+  } finally {
+    if (isMounted.current) {
+      setUpdatingMax(false);
+    }
+  }
+};
 
   // ===== NEW: Member Limit Banner =====
   const renderMemberLimitBanner = () => {

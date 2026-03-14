@@ -44,7 +44,7 @@ export class GroupSettingsService {
       console.error('Error getting group with limits:', error);
       return { success: false, message: error.message };
     }
-  }
+  } 
 
   // Update max members (admin only)
   static async updateMaxMembers(groupId: string, maxMembers: number) {

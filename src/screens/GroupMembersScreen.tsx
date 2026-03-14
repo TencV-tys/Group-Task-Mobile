@@ -1,32 +1,31 @@
-// src/screens/GroupMembersScreen.tsx - UPDATED with clean UI and consistent colors
-import React, { useEffect, useState } from 'react';
+// src/screens/GroupMembersScreen.tsx - REFACTORED with GroupSettingsService
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Alert,
   Share,
   ScrollView,
-  Dimensions,
   Modal,
   TextInput,
   Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { GroupMembersService } from '../services/GroupMemberService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
+
+import { GroupMembersService } from '../services/GroupMemberService';
+import { GroupSettingsService } from '../services/GroupSettingsService';
 import { useGroupMembers } from '../groupHook/useGroupMembers';
 import { useImageUpload } from '../uploadHook/useImageUpload';
 import { useRealtimeGroup } from '../hooks/useRealtimeGroup';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-const { width } = Dimensions.get('window');
+import { groupMembersStyles as styles } from '../styles/groupMembers.styles';
 
 export default function GroupMembersScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole, inviteCode } = route.params || {};
@@ -49,7 +48,10 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     removeMember
   } = useGroupMembers();
 
-   const {
+  const isMounted = useRef(true);
+  const initialLoadDone = useRef(false);
+
+  const {
     events: groupEvents,
     clearMemberJoined,
     clearMemberLeft,
@@ -69,6 +71,11 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedMemberForTransfer, setSelectedMemberForTransfer] = useState<any>(null);
+  
+  // ===== NEW: Member Limit State =====
+  const [showMaxModal, setShowMaxModal] = useState(false);
+  const [newMax, setNewMax] = useState('6');
+  const [updatingMax, setUpdatingMax] = useState(false);
   
   // Avatar upload hook - for group avatars
   const {
@@ -98,7 +105,21 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     showAlerts: true
   });
 
-  // ========== ADD THIS: Handle real-time group events ==========
+  // ===== TOKEN CHECK =====
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        Alert.alert('Session Expired', 'Please log in again');
+        return false;
+      }
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }, []);
+
+  // ===== HANDLE REAL-TIME GROUP EVENTS =====
   useEffect(() => {
     if (groupEvents.memberJoined) {
       Alert.alert(
@@ -146,19 +167,25 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       clearRotationCompleted();
     }
   }, [groupEvents.rotationCompleted]);
-  // Get current user ID from AsyncStorage
+
+  // Get current user ID from SecureStore
   useEffect(() => {
     const loadCurrentUserId = async () => {
       try {
-        const userId = await AsyncStorage.getItem('userId');
-        if (userId) {
-          setCurrentUserId(userId);
+        const userStr = await SecureStore.getItemAsync('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setCurrentUserId(user.id);
         }
       } catch (err) {
         console.error('Error loading user ID:', err);
       }
     };
     loadCurrentUserId();
+    
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
   // Update user role from members data
@@ -178,16 +205,22 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         name: groupInfo.name || '',
         description: groupInfo.description || ''
       });
+      setNewMax(groupInfo.maxMembers?.toString() || '6');
     }
   }, [groupInfo]);
 
   const fetchData = async (isRefreshing = false) => {
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return;
+    }
     await fetchGroupMembers(groupId, isRefreshing);
   };
 
   useEffect(() => {
-    if (groupId) {
+    if (groupId && !initialLoadDone.current) {
       fetchData();
+      initialLoadDone.current = true;
     }
   }, [groupId]);
 
@@ -208,56 +241,130 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     setShowEditModal(true);
   };
 
- const handleSaveGroupChanges = async () => {
-  // Validate input
-  if (!editingGroup.name.trim()) {
-    Alert.alert('Error', 'Group name is required');
-    return;
-  }
-
-  try {
-    setSavingGroup(true);
-    
-    // Check if group data has actually changed
-    const hasChanged = 
-      editingGroup.name.trim() !== (groupInfo?.name || '') ||
-      editingGroup.description !== (groupInfo?.description || '');
-
-    if (!hasChanged) {
-      Alert.alert('Info', 'No changes detected');
-      setShowEditModal(false);
+  const handleSaveGroupChanges = async () => {
+    if (!editingGroup.name.trim()) {
+      Alert.alert('Error', 'Group name is required');
       return;
     }
 
-    // Call the updateGroup method
-    const result = await GroupMembersService.updateGroup(groupId, {
-      name: editingGroup.name.trim(),
-      description: editingGroup.description.trim()
-    });
-    
-    if (result.success) {
-      // ✅ FIX: Pass both groupId and updated group data
-      updateGroupInfo(groupId, {
-        ...groupInfo,
-        ...result.group,
+    try {
+      setSavingGroup(true);
+      
+      const hasChanged = 
+        editingGroup.name.trim() !== (groupInfo?.name || '') ||
+        editingGroup.description !== (groupInfo?.description || '');
+
+      if (!hasChanged) {
+        Alert.alert('Info', 'No changes detected');
+        setShowEditModal(false);
+        return;
+      }
+
+      const result = await GroupMembersService.updateGroup(groupId, {
         name: editingGroup.name.trim(),
         description: editingGroup.description.trim()
       });
       
-      Alert.alert('Success', 'Group updated successfully');
-      setShowEditModal(false);
-      fetchData(true); // Refresh data to get updated group info
-    } else {
-      Alert.alert('Error', result.message || 'Failed to update group');
+      if (result.success && isMounted.current) {
+        updateGroupInfo(groupId, {
+          ...groupInfo,
+          ...result.group,
+          name: editingGroup.name.trim(),
+          description: editingGroup.description.trim()
+        });
+        
+        Alert.alert('Success', 'Group updated successfully');
+        setShowEditModal(false);
+        fetchData(true);
+      } else {
+        Alert.alert('Error', result.message || 'Failed to update group');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update group');
+    } finally {
+      if (isMounted.current) {
+        setSavingGroup(false);
+      }
     }
-  } catch (err: any) {
-    Alert.alert('Error', err.message || 'Failed to update group');
-  } finally {
-    setSavingGroup(false);
-  }
-};
+  };
 
-  // Handle group avatar selection
+  // ===== NEW: Handle Update Max Members =====
+  const handleUpdateMaxMembers = async () => {
+    const max = parseInt(newMax);
+    if (isNaN(max) || max < 6 || max > 10) {
+      Alert.alert('Error', 'Please select a number between 6 and 10');
+      return;
+    }
+
+    setUpdatingMax(true);
+    try {
+      const result = await GroupSettingsService.updateMaxMembers(groupId, max);
+      if (result.success && isMounted.current) {
+        Alert.alert('Success', `Group capacity updated to ${max} members`);
+        setShowMaxModal(false);
+        fetchData(true);
+      } else {
+        Alert.alert('Error', result.message || 'Failed to update capacity');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update capacity');
+    } finally {
+      if (isMounted.current) {
+        setUpdatingMax(false);
+      }
+    }
+  };
+
+  // ===== NEW: Member Limit Banner =====
+  const renderMemberLimitBanner = () => {
+    if (!groupInfo) return null;
+    
+    const memberCount = members.length;
+    const maxMembers = groupInfo.maxMembers || 6;
+    const isLow = memberCount < 6;
+    const isFull = memberCount >= maxMembers;
+    
+    let bannerColor = isFull ? '#fa5252' : (isLow ? '#e67700' : '#2b8a3e');
+    let bannerBg = isFull ? '#fff5f5' : (isLow ? '#fff3bf' : '#d3f9d8');
+    let message = '';
+    
+    if (isFull) {
+      message = `Group is full (${memberCount}/${maxMembers} members)`;
+    } else if (isLow) {
+      message = `Need ${6 - memberCount} more member${6 - memberCount > 1 ? 's' : ''} to reach minimum (${memberCount}/${maxMembers})`;
+    } else {
+      message = `${memberCount}/${maxMembers} members - Good for rotation`;
+    }
+
+    return (
+      <LinearGradient
+        colors={[bannerBg, bannerBg]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.limitBanner}
+      >
+        <MaterialCommunityIcons 
+          name={isFull ? "alert-circle" : (isLow ? "alert" : "check-circle")} 
+          size={20} 
+          color={bannerColor} 
+        />
+        <Text style={[styles.limitText, { color: bannerColor }]}>
+          {message}
+        </Text>
+        
+        {currentUserRole === 'ADMIN' && (
+          <TouchableOpacity 
+            onPress={() => setShowMaxModal(true)}
+            style={styles.editLimitButton}
+          >
+            <MaterialCommunityIcons name="pencil" size={18} color="#2b8a3e" />
+          </TouchableOpacity>
+        )}
+      </LinearGradient>
+    );
+  };
+
+  // Group avatar handlers
   const handleGroupAvatarSelect = async () => {
     if (currentUserRole !== 'ADMIN') return;
     
@@ -327,13 +434,11 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   };
 
   const handleRemoveMember = async (member: any) => {
-    // Check if it's the current user
     if (member.userId === currentUserId) {
       Alert.alert('Cannot Remove', 'You cannot remove yourself. Use "Leave Group" instead.');
       return;
     }
 
-    // Check if trying to remove the only admin
     if (member.role === 'ADMIN') {
       const adminCount = members.filter(m => m.role === 'ADMIN').length;
       if (adminCount <= 1) {
@@ -369,7 +474,6 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   const handleUpdateRole = async (member: any, newRole: string) => {
     if (member.role === newRole) return;
 
-    // Check if trying to demote the only admin
     if (member.role === 'ADMIN' && newRole === 'MEMBER') {
       const adminCount = members.filter(m => m.role === 'ADMIN').length;
       if (adminCount <= 1) {
@@ -402,7 +506,6 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   };
 
   const handleTransferOwnership = () => {
-    // Get all members except current user
     const otherMembers = members.filter(m => m.userId !== currentUserId);
     
     if (otherMembers.length === 0) {
@@ -498,7 +601,6 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   };
 
   const handleLeaveGroup = () => {
-    // Check if user is the only admin
     if (currentUserRole === 'ADMIN') {
       const adminCount = members.filter(m => m.role === 'ADMIN').length;
       if (adminCount <= 1) {
@@ -779,6 +881,9 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           )}
         </View>
       </LinearGradient>
+
+      {/* Member Limit Banner */}
+      {renderMemberLimitBanner()}
 
       <ScrollView
         refreshControl={
@@ -1341,709 +1446,89 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           </LinearGradient>
         </View>
       </Modal>
+
+      {/* ===== NEW: Max Members Modal ===== */}
+      <Modal
+        visible={showMaxModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowMaxModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <LinearGradient
+            colors={['#ffffff', '#f8f9fa']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.modalContent}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Group Capacity</Text>
+              <TouchableOpacity onPress={() => setShowMaxModal(false)} style={styles.closeButton}>
+                <MaterialCommunityIcons name="close" size={20} color="#868e96" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <Text style={styles.modalSubtitle}>
+                Current: {members.length}/{groupInfo?.maxMembers || 6} members
+              </Text>
+
+              <View style={styles.sliderContainer}>
+                <Text style={styles.sliderLabel}>Max Members: {newMax}</Text>
+                <View style={styles.slider}>
+                  {[6, 7, 8, 9, 10].map((num) => (
+                    <TouchableOpacity
+                      key={num}
+                      style={[
+                        styles.sliderOption,
+                        parseInt(newMax) === num && styles.sliderOptionActive
+                      ]}
+                      onPress={() => setNewMax(num.toString())}
+                      disabled={num < members.length}
+                    >
+                      <Text style={[
+                        styles.sliderOptionText,
+                        parseInt(newMax) === num && styles.sliderOptionTextActive,
+                        num < members.length && styles.sliderOptionDisabled
+                      ]}>
+                        {num}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.modalFooter}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setShowMaxModal(false)}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleUpdateMaxMembers}
+                  disabled={updatingMax}
+                >
+                  <LinearGradient
+                    colors={['#2b8a3e', '#1e6b2c']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.saveButtonGradient}
+                  >
+                    {updatingMax ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <Text style={styles.saveButtonText}>Save</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+      </Modal>
     </ScreenWrapper>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa'
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#868e96',
-    fontSize: 14
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#212529'
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
-  },
-  headerIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  avatarBanner: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
-  },
-  avatarCircleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 20,
-    height: 60,
-    position: 'relative'
-  },
-  avatarContainer: {
-    position: 'absolute',
-  },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white'
-  },
-  avatarImage: {
-    backgroundColor: 'transparent',
-  },
-  moreAvatar: {
-    borderColor: '#e9ecef'
-  },
-  moreAvatarText: {
-    color: '#495057',
-    fontWeight: '600',
-    fontSize: 13
-  },
-  avatarText: {
-    fontWeight: 'bold',
-    fontSize: 16
-  },
-  adminCrown: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: 'white',
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2b8a3e'
-  },
-  groupInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16
-  },
-  groupAvatarContainer: {
-    position: 'relative',
-    marginRight: 16
-  },
-  groupMainAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  groupAvatarImage: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#2b8a3e'
-  },
-  groupAvatarText: {
-    color: 'white',
-    fontSize: 24,
-    fontWeight: 'bold'
-  },
-  uploadingAvatar: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa'
-  },
-  editAvatarIcon: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white'
-  },
-  groupTextInfo: {
-    flex: 1
-  },
-  groupName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 4
-  },
-  groupDescription: {
-    fontSize: 14,
-    color: '#868e96',
-    marginBottom: 8,
-    lineHeight: 20
-  },
-  groupStats: {
-    flexDirection: 'row',
-    gap: 16
-  },
-  statItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4
-  },
-  statText: {
-    fontSize: 13,
-    color: '#495057'
-  },
-  adminActions: {
-    flexDirection: 'row',
-    gap: 12
-  },
-  adminButton: {
-    flex: 1,
-    borderRadius: 8,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  adminButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  adminButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#495057'
-  },
-  editButton: {},
-  shareButton: {},
-  inviteSection: {
-    padding: 20,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12
-  },
-  sectionIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529'
-  },
-  inviteCodeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  inviteCode: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#212529',
-    letterSpacing: 2
-  },
-  inviteInstructions: {
-    fontSize: 13,
-    color: '#868e96',
-    marginBottom: 12
-  },
-  regenerateButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    alignSelf: 'flex-start'
-  },
-  regenerateButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#ffd43b'
-  },
-  regenerateButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#e67700'
-  },
-  warningSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    marginHorizontal: 20,
-    marginTop: 20,
-    borderRadius: 12,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#ffd43b'
-  },
-  warningContent: {
-    flex: 1
-  },
-  warningTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#e67700',
-    marginBottom: 2
-  },
-  warningText: {
-    fontSize: 13,
-    color: '#e67700'
-  },
-  membersSection: {
-    padding: 20
-  },
-  errorContainer: {
-    alignItems: 'center',
-    padding: 30
-  },
-  errorText: {
-    color: '#fa5252',
-    textAlign: 'center',
-    marginVertical: 16,
-    fontSize: 14
-  },
-  retryButton: {
-    borderRadius: 8,
-    overflow: 'hidden'
-  },
-  retryButtonGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 12
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 14
-  },
-  memberCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    position: 'relative'
-  },
-  memberInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12
-  },
-  memberAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  memberAvatarImage: {
-    backgroundColor: 'transparent'
-  },
-  memberAvatarText: {
-    fontWeight: 'bold',
-    fontSize: 16
-  },
-  memberDetails: {
-    flex: 1
-  },
-  memberHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 2
-  },
-  memberName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529'
-  },
-  adminBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 12
-  },
-  adminBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#2b8a3e'
-  },
-  memberEmail: {
-    fontSize: 13,
-    color: '#868e96',
-    marginBottom: 2
-  },
-  memberJoined: {
-    fontSize: 11,
-    color: '#adb5bd'
-  },
-  memberActions: {
-    flexDirection: 'row',
-    gap: 6,
-    alignItems: 'center'
-  },
-  roleButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f8f9fa',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  demoteButton: {
-    backgroundColor: '#fff5f5',
-    borderColor: '#ffc9c9'
-  },
-  removeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#fff5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ffc9c9'
-  },
-  protectedBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ffd43b'
-  },
-  currentUserBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  currentUserBadgeText: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#495057'
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    padding: 40
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#868e96',
-    marginTop: 8
-  },
-  leaveButton: {
-    marginHorizontal: 20,
-    marginBottom: 30,
-    borderRadius: 10,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  leaveButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14
-  },
-  disabledLeaveButton: {
-    opacity: 0.7
-  },
-  leaveButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#fa5252'
-  },
-  disabledLeaveButtonText: {
-    color: '#adb5bd'
-  },
-  // Modal Styles
-  modalContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end'
-  },
-  modalContent: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '90%'
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#212529'
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f8f9fa',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  modalBody: {
-    padding: 20
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e9ecef'
-  },
-  modalCloseButton: {
-    padding: 16,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#e9ecef'
-  },
-  modalCloseText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#495057'
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#868e96'
-  },
-  saveButton: {
-    flex: 1,
-    borderRadius: 8,
-    overflow: 'hidden'
-  },
-  saveButtonGradient: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  saveButtonDisabled: {
-    opacity: 0.7
-  },
-  saveButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: 'white'
-  },
-  saveButtonTextDisabled: {
-    color: '#868e96'
-  },
-  avatarEditSection: {
-    alignItems: 'center',
-    marginBottom: 24
-  },
-  editAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden'
-  },
-  editAvatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2,
-    borderColor: '#2b8a3e'
-  },
-  editAvatarOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  avatarNote: {
-    fontSize: 13,
-    color: '#868e96',
-    marginTop: 8
-  },
-  removeAvatarButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 8,
-    padding: 8
-  },
-  removeAvatarText: {
-    fontSize: 13,
-    color: '#fa5252'
-  },
-  inputGroup: {
-    marginBottom: 20
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#495057',
-    marginBottom: 8
-  },
-  inputGradient: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  textAreaGradient: {
-    minHeight: 80
-  },
-  input: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-    color: '#212529',
-    backgroundColor: 'transparent'
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top'
-  },
-  charCount: {
-    fontSize: 11,
-    color: '#868e96',
-    textAlign: 'right',
-    marginTop: 4
-  },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#e9ecef'
-  },
-  infoText: {
-    fontSize: 13,
-    color: '#868e96',
-    flex: 1,
-    lineHeight: 18
-  },
-  // Settings Modal Items
-  settingsItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    gap: 12
-  },
-  dangerItem: {
-    borderBottomWidth: 0
-  },
-  settingsIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  settingsContent: {
-    flex: 1
-  },
-  settingsTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 2
-  },
-  settingsDescription: {
-    fontSize: 13,
-    color: '#868e96'
-  },
-  dangerText: {
-    color: '#fa5252'
-  }
-});

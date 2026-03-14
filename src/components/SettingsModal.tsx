@@ -1,4 +1,4 @@
-// components/SettingsModal.tsx - UPDATED with green icons and removed rotate button
+// components/SettingsModal.tsx - UPDATED with Swap History for admins
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View,
@@ -325,6 +325,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onClose();
   };
 
+  // ===== NEW: Handle Group Swap History =====
+  const handleGroupSwapHistory = async () => {
+    const hasToken = await checkToken();
+    if (!hasToken) return;
+    navigation.navigate('GroupSwapHistory', { groupId, groupName });
+    onClose();
+  };
+
   const getLeaderboardGradientColors = (index: number): [string, string] => {
     if (index === 0) return ['#fff3bf', '#ffec99']; // Gold
     if (index === 1) return ['#f1f3f5', '#e9ecef']; // Silver
@@ -480,73 +488,107 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Swap Section */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.sectionIcon}
-                >
-                  <MaterialCommunityIcons name="swap-horizontal" size={16} color="#2b8a3e" />
-                </LinearGradient>
-                <Text style={styles.sectionTitle}>Week Swap</Text>
-              </View>
+            {/* ===== UPDATED: Swap Section - Only for members ===== */}
+            {!isAdmin && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <LinearGradient
+                    colors={['#f8f9fa', '#e9ecef']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.sectionIcon}
+                  >
+                    <MaterialCommunityIcons name="swap-horizontal" size={16} color="#2b8a3e" />
+                  </LinearGradient>
+                  <Text style={styles.sectionTitle}>Week Swap</Text>
+                </View>
 
-              {loadingMyTasks ? (
-                <ActivityIndicator size="small" color="#2b8a3e" style={styles.loader} />
-              ) : (
-                <View style={[styles.swapCard, !canSwapWeek && styles.swapCardDisabled]}>
-                  <View style={styles.swapInfo}>
-                    <Text style={styles.swapDescription}>
-                      Swap your week {rotationWeek} tasks
-                    </Text>
-                    
-                    <View style={styles.weekAvailability}>
-                      <MaterialCommunityIcons 
-                        name={canSwapWeek ? "check-circle" : "clock-alert"} 
-                        size={14} 
-                        color={canSwapWeek ? "#2b8a3e" : "#fa5252"} 
-                      />
-                      <Text style={[
-                        styles.weekAvailabilityText,
-                        canSwapWeek ? styles.availableText : styles.unavailableText
-                      ]}>
-                        {canSwapWeek ? getHoursLeftText() : weekSwapReason}
+                {loadingMyTasks ? (
+                  <ActivityIndicator size="small" color="#2b8a3e" style={styles.loader} />
+                ) : (
+                  <View style={[styles.swapCard, !canSwapWeek && styles.swapCardDisabled]}>
+                    <View style={styles.swapInfo}>
+                      <Text style={styles.swapDescription}>
+                        Swap your week {rotationWeek} tasks
                       </Text>
-                    </View>
-
-                    {canSwapWeek && (
-                      <View style={styles.taskCountBadge}>
-                        <MaterialCommunityIcons name="clipboard-text" size={12} color="#2b8a3e" />
-                        <Text style={styles.taskCountText}>
-                          {incompleteCount} incomplete
+                      
+                      <View style={styles.weekAvailability}>
+                        <MaterialCommunityIcons 
+                          name={canSwapWeek ? "check-circle" : "clock-alert"} 
+                          size={14} 
+                          color={canSwapWeek ? "#2b8a3e" : "#fa5252"} 
+                        />
+                        <Text style={[
+                          styles.weekAvailabilityText,
+                          canSwapWeek ? styles.availableText : styles.unavailableText
+                        ]}>
+                          {canSwapWeek ? getHoursLeftText() : weekSwapReason}
                         </Text>
                       </View>
-                    )}
-                  </View>
 
-                  <TouchableOpacity
-                    onPress={handleSwapEntireWeek}
-                    disabled={!canSwapWeek || incompleteCount === 0 || swapLoading}
-                    style={[
-                      styles.swapActionButton,
-                      (!canSwapWeek || incompleteCount === 0) && styles.swapActionDisabled
-                    ]}
+                      {canSwapWeek && (
+                        <View style={styles.taskCountBadge}>
+                          <MaterialCommunityIcons name="clipboard-text" size={12} color="#2b8a3e" />
+                          <Text style={styles.taskCountText}>
+                            {incompleteCount} incomplete
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={handleSwapEntireWeek}
+                      disabled={!canSwapWeek || incompleteCount === 0 || swapLoading}
+                      style={[
+                        styles.swapActionButton,
+                        (!canSwapWeek || incompleteCount === 0) && styles.swapActionDisabled
+                      ]}
+                    >
+                      {swapLoading ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <MaterialCommunityIcons name="swap-horizontal" size={16} color="#fff" />
+                          <Text style={styles.swapActionText}>Swap</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* ===== NEW: Swap History Section - For admins only ===== */}
+            {isAdmin && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <LinearGradient
+                    colors={['#f8f9fa', '#e9ecef']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.sectionIcon}
                   >
-                    {swapLoading ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <>
-                        <MaterialCommunityIcons name="swap-horizontal" size={16} color="#fff" />
-                        <Text style={styles.swapActionText}>Swap</Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
+                    <MaterialCommunityIcons name="swap-horizontal" size={16} color="#2b8a3e" />
+                  </LinearGradient>
+                  <Text style={styles.sectionTitle}>Swap History</Text>
                 </View>
-              )}
-            </View>
+
+                <TouchableOpacity 
+                  onPress={handleGroupSwapHistory} 
+                  style={styles.menuItem}
+                >
+                  <View style={styles.menuItemLeft}>
+                    <MaterialCommunityIcons name="history" size={18} color="#2b8a3e" />
+                    <Text style={styles.menuItemText}>View All Swaps</Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                </TouchableOpacity>
+
+                <Text style={styles.swapHistoryNote}>
+                  See all swap requests in this group, including pending, accepted, and rejected swaps.
+                </Text>
+              </View>
+            )}
 
             {/* History Section - All Members */}
             <View style={styles.section}>
@@ -1079,5 +1121,13 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 10,
     fontWeight: '600',
+  },
+    swapHistoryNote: {
+    fontSize: 12,
+    color: '#868e96',
+    marginTop: 8,
+    marginBottom: 4,
+    paddingHorizontal: 4,
+    fontStyle: 'italic',
   },
 });

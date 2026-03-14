@@ -30,6 +30,7 @@ import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
 import AccountSettingsScreen from '../screens/AccountSettingsScreen';
+import { NeglectedTasksScreen } from '../screens/NeglectedTasksScreen';
 
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
@@ -305,6 +306,12 @@ export default function AppNavigator() {
         component={TodayAssignmentsScreen}
         options={{ headerShown: false }}
       />
-    </Stack.Navigator>
+
+      <Stack.Screen
+  name="NeglectedTasks"
+  component={NeglectedTasksScreen}
+  options={{ headerShown: false }}
+/>
+    </Stack.Navigator> 
   );
 }

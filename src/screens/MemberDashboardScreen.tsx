@@ -561,6 +561,14 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             navigateTo="MySwapRequests"
             navigationParams={{ groupId, groupName }}
           />
+          <StatCard
+    title="My Neglected"
+    value={stats?.myNeglectedCount || 0}
+    icon="timer-off"
+    color="#fa5252"
+    navigateTo="NeglectedTasks"
+    navigationParams={{ groupId, groupName, userRole: 'MEMBER' }}
+  />
         </View>
 
         {/* Today's Tasks */}

@@ -614,6 +614,14 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             navigateTo="GroupMembers"
             navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
+           <StatCard
+    title="Neglected Tasks"
+    value={stats?.neglectedCount || 0}
+    icon="timer-off"
+    color="#fa5252"
+    navigateTo="NeglectedTasks"
+    navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+  />
         </View>
 
         {/* Task Stats - CLICKABLE */}
@@ -798,5 +806,5 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
         onRefreshTasks={() => loadDashboardData(true)}
       />
     </ScreenWrapper>
-  );
+  ); 
 };

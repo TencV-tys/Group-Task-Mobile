@@ -268,12 +268,12 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.container}>
+      <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#495057" />
           <Text style={styles.loadingText}>Loading today's assignments...</Text>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 

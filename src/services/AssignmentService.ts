@@ -724,4 +724,128 @@ static async completeAssignment(
       return false;
     }
   }
+
+// Add these methods to AssignmentService class in AssignmentService.ts
+
+// ========== GET USER NEGLECTED TASKS ==========
+static async getUserNeglectedTasks(filters?: {
+  groupId?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  try {
+    let url = `${API_URL}/neglected/my`;
+    const params = new URLSearchParams();
+    
+    if (filters?.groupId) params.append('groupId', filters.groupId);
+    if (filters?.limit) params.append('limit', filters.limit.toString());
+    if (filters?.offset) params.append('offset', filters.offset.toString());
+    
+    const queryString = params.toString();
+    if (queryString) url += `?${queryString}`;
+
+    console.log('AssignmentService: Getting user neglected tasks', url);
+    
+    const headers = await this.getHeaders(false);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('AssignmentService.getUserNeglectedTasks error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to load neglected tasks',
+      data: { tasks: [], total: 0, count: 0 }
+    };
+  }
+}
+
+// ========== GET GROUP NEGLECTED TASKS (ADMIN ONLY) ==========
+static async getGroupNeglectedTasks(
+  groupId: string,
+  filters?: {
+    memberId?: string;
+    limit?: number;
+    offset?: number;
+  }
+) {
+  try {
+    let url = `${API_URL}/neglected/group/${groupId}`;
+    const params = new URLSearchParams();
+    
+    if (filters?.memberId) params.append('memberId', filters.memberId);
+    if (filters?.limit) params.append('limit', filters.limit.toString());
+    if (filters?.offset) params.append('offset', filters.offset.toString());
+    
+    const queryString = params.toString();
+    if (queryString) url += `?${queryString}`;
+
+    console.log('AssignmentService: Getting group neglected tasks', url);
+    
+    const headers = await this.getHeaders(false);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('AssignmentService.getGroupNeglectedTasks error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to load group neglected tasks',
+      data: { tasks: [], total: 0, count: 0, pointsByUser: {} }
+    };
+  }
+}
+
+// ========== GET NEGLECTED TASKS STATISTICS ==========
+static async getNeglectedStats(groupId: string) {
+  try {
+    const headers = await this.getHeaders(false);
+    
+    const response = await fetch(`${API_URL}/neglected/group/${groupId}/stats`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('AssignmentService.getNeglectedStats error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to load neglected stats',
+      data: { total: 0, totalPointsLost: 0, byUser: {} }
+    };
+  }
+}
+private static formatNeglectedNote(assignment: any): string {
+  if (assignment.notes && assignment.notes.includes('[NEGLECTED]')) {
+    return assignment.notes;
+  }
+  return `[NEGLECTED] Missed submission on ${new Date(assignment.dueDate).toLocaleDateString()}`;
+}
 }

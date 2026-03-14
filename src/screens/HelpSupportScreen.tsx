@@ -1,25 +1,80 @@
-// src/screens/HelpSupportScreen.tsx
-import React from 'react';
+// src/screens/HelpSupportScreen.tsx - UPDATED with token check (no contact)
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
-  ScrollView
+  ScrollView,
+  ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
+
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+
 export default function HelpSupportScreen({ navigation }: any) {
+  const [loading, setLoading] = useState(true);
+
+  // ===== CHECK AUTH STATUS =====
+  const checkAuth = useCallback(async () => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      console.log('🔐 HelpSupport: Auth status:', token ? 'Logged in' : 'Guest');
+    } catch (error) {
+      console.error('Error checking auth:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // ===== REAL-TIME NOTIFICATIONS =====
+  useRealtimeNotifications({
+    onNewNotification: (notification) => {
+      // Just log for now, no UI updates needed for help screen
+      console.log('📢 HelpSupport notification:', notification.type);
+    },
+    showAlerts: false
+  });
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // If can't go back (opened from deep link), go to Login
+      navigation.navigate('Login');
+    }
+  };
+
+  if (loading) {
+    return (
+      <ScreenWrapper style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Help & Support</Text>
+          <View style={{ width: 36 }} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2b8a3e" />
+          <Text style={styles.loadingText}>Loading help content...</Text>
+        </View>
+      </ScreenWrapper>
+    );
+  }
+
   return (
     <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
         
@@ -184,7 +239,7 @@ export default function HelpSupportScreen({ navigation }: any) {
           <Text style={styles.question}>🔹 How do I swap a task?</Text>
           <Text style={styles.answer}>
             Go to the task details and tap "Request Swap". Other members can accept your request. 
-            Once accepted, an admin must approve the swap.
+            Once accepted, the swap will be processed.
           </Text>
         </LinearGradient>
 
@@ -278,7 +333,7 @@ export default function HelpSupportScreen({ navigation }: any) {
           colors={['#ffffff', '#f8f9fa']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.faqCard}
+          style={[styles.faqCard, styles.lastCard]}
         >
           <Text style={styles.question}>🔹 Why can't I submit my task?</Text>
           <Text style={styles.answer}>
@@ -286,37 +341,32 @@ export default function HelpSupportScreen({ navigation }: any) {
             end time through 30 minutes after). Check the time validation on the assignment details page.
           </Text>
         </LinearGradient>
-
-        <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.faqCard, styles.lastCard]}
-        >
-          <Text style={styles.question}>🔹 My points aren't showing up</Text>
-          <Text style={styles.answer}>
-            Points are awarded only after an admin verifies your submission. If you believe points are 
-            missing, contact a group admin or check your notification history.
-          </Text>
-        </LinearGradient>
-
-        {/* Contact Info */}
-        <LinearGradient
-          colors={['#f8f9fa', '#e9ecef']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.contactCard}
-        >
-          <MaterialCommunityIcons name="email-outline" size={20} color="#2b8a3e" />
-          <Text style={styles.contactText}>
-            Still need help? Email us at: support@grouptask.com
-          </Text>
-        </LinearGradient>
       </ScrollView>
+
+      {/* Back to Sign Up / Login Button - Only show if accessed directly */}
+      {!navigation.canGoBack() && (
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.signupButton}
+            onPress={() => navigation.navigate('Signup')}
+          >
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.signupButtonGradient}
+            >
+              <MaterialCommunityIcons name="account-plus" size={20} color="white" />
+              <Text style={styles.signupButtonText}>Create an Account</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScreenWrapper>
   );
 }
 
+// Add these to your styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -354,6 +404,16 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 36,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#868e96',
+    fontSize: 14,
   },
   scrollContent: {
     padding: 16,
@@ -404,7 +464,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   lastCard: {
-    marginBottom: 16,
+    marginBottom: 0,
   },
   question: {
     fontSize: 15,
@@ -417,20 +477,32 @@ const styles = StyleSheet.create({
     color: '#495057',
     lineHeight: 20,
   },
-  contactCard: {
+  footer: {
+    padding: 16,
+    paddingTop: 8,
+    backgroundColor: 'white',
+    borderTopWidth: 1,
+    borderTopColor: '#e9ecef',
+  },
+  signupButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#2b8a3e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  signupButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    marginTop: 8,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
   },
-  contactText: {
-    flex: 1,
-    fontSize: 14,
-    color: '#495057',
-    lineHeight: 20,
+  signupButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

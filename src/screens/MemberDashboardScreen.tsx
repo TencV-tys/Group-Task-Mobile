@@ -1,30 +1,29 @@
-// src/screens/MemberDashboardScreen.tsx - UPDATED with token checking and real-time events
+// src/screens/MemberDashboardScreen.tsx - REFACTORED with clickable stat cards
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import * as SecureStore from 'expo-secure-store';
+
 import { TaskService } from '../services/TaskService';
 import { GroupActivityService } from '../services/GroupActivityService';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
-import * as SecureStore from 'expo-secure-store';
-import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-
-const { width } = Dimensions.get('window');
+import { SettingsModal } from '../components/SettingsModal';
+import { ScreenWrapper } from '../components/ScreenWrapper';
+import { memberDashboardStyles as styles } from '../styles/memberDashboard.styles';
 
 export const MemberDashboardScreen = ({ navigation, route }: any) => {
   const { groupId, groupName } = route.params;
@@ -38,6 +37,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   const [points, setPoints] = useState({ thisWeek: 0, total: 0 });
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
@@ -176,7 +176,6 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     try {
       console.log('📥 Loading member dashboard data for group:', groupId);
 
-      // Use the dedicated member dashboard endpoint
       const dashboardResult = await GroupActivityService.getMemberDashboard(groupId);
       
       if (dashboardResult.success && isMounted.current) {
@@ -187,7 +186,6 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
           total: dashboardResult.data.stats.totalPoints || 0
         });
         
-        // Combine due today and upcoming tasks
         const allTasks = [
           ...(dashboardResult.data.tasks?.dueToday || []),
           ...(dashboardResult.data.tasks?.upcoming || [])
@@ -196,15 +194,12 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         
         initialLoadDone.current = true;
       } else {
-        // Fallback to individual calls if dashboard endpoint fails
         console.log('Falling back to individual API calls...');
         
-        // Get my tasks
         const tasksResult = await TaskService.getMyTasks(groupId);
         if (tasksResult.success && isMounted.current) {
           setMyTasks(tasksResult.tasks || []);
           
-          // Calculate points
           const thisWeek = tasksResult.tasks
             ?.filter((t: any) => {
               const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -219,14 +214,12 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
           setPoints({ thisWeek: thisWeek || 0, total: total || 0 });
         }
 
-        // Get stats
         const statsResult = await TaskService.getTaskStatistics(groupId);
         if (statsResult.success && isMounted.current) {
           setStats(statsResult.statistics);
         }
       }
 
-      // Get pending swaps
       await loadPendingForMe(groupId);
 
     } catch (err: any) {
@@ -250,6 +243,10 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     refreshDashboardData();
   };
 
+  const handleSettingsPress = () => {
+    setShowSettingsModal(true);
+  };
+
   // Handle auth error
   useEffect(() => {
     if (authError) {
@@ -269,28 +266,56 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     }
   }, [authError]);
 
-  const StatCard = ({ title, value, icon, color = '#2b8a3e', subtitle }: any) => (
-    <LinearGradient
-      colors={['#ffffff', '#f8f9fa']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.statCard}
-    >
-      <View style={styles.statHeader}>
-        <LinearGradient
-          colors={[`${color}20`, `${color}10`]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.statIconContainer}
-        >
-          <MaterialCommunityIcons name={icon} size={24} color={color} />
-        </LinearGradient>
-        <Text style={styles.statValue}>{value}</Text>
-      </View>
-      <Text style={styles.statTitle}>{title}</Text>
-      {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
-    </LinearGradient>
-  );
+  // ===== CLICKABLE STAT CARD =====
+  const StatCard = ({ 
+    title, 
+    value, 
+    icon, 
+    color = '#2b8a3e', 
+    subtitle,
+    onPress,
+    navigateTo,
+    navigationParams
+  }: any) => {
+    const handlePress = () => {
+      if (onPress) {
+        onPress();
+      } else if (navigateTo) {
+        navigation.navigate(navigateTo, navigationParams || { groupId, groupName });
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        style={styles.statCard}
+        onPress={handlePress}
+        activeOpacity={0.7}
+        disabled={!navigateTo && !onPress}
+      >
+        <View style={styles.statHeader}>
+          <LinearGradient
+            colors={[`${color}20`, `${color}10`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.statIconContainer}
+          >
+            <MaterialCommunityIcons name={icon} size={24} color={color} />
+          </LinearGradient>
+          <Text style={styles.statValue}>{value}</Text>
+        </View>
+        <Text style={styles.statTitle}>{title}</Text>
+        {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
+        {(navigateTo || onPress) && (
+          <MaterialCommunityIcons 
+            name="chevron-right" 
+            size={16} 
+            color="#adb5bd" 
+            style={{ position: 'absolute', bottom: 12, right: 12 }}
+          />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const TaskCard = ({ task }: { task: any }) => {
     const isCompleted = task.completed || task.assignment?.completed;
@@ -425,7 +450,6 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     );
   }
 
-  // Use dashboard data if available, otherwise fallback to local state
   const pendingTasks = dashboardData?.tasks?.upcoming || myTasks.filter(t => !t.assignment?.completed);
   const completedTasks = dashboardData?.stats?.completedTasks || myTasks.filter(t => t.assignment?.completed).length;
   const tasksDueToday = dashboardData?.tasks?.dueToday || myTasks.filter(t => t.assignment?.isDueToday && !t.assignment?.completed);
@@ -436,10 +460,18 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
+        
         <Text style={styles.headerTitle}>{groupName}</Text>
-        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-          <MaterialCommunityIcons name="refresh" size={22} color="#2b8a3e" />
-        </TouchableOpacity>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+            <MaterialCommunityIcons name="refresh" size={22} color="#2b8a3e" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={handleSettingsPress} style={styles.settingsButton}>
+            <MaterialCommunityIcons name="cog" size={22} color="#2b8a3e" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -494,7 +526,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
           </LinearGradient>
         </View>
 
-        {/* Quick Stats */}
+        {/* Quick Stats - CLICKABLE */}
         <Text style={styles.sectionTitle}>Your Stats</Text>
         <View style={styles.statsGrid}>
           <StatCard
@@ -502,24 +534,32 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             value={pendingTasks.length}
             icon="clock-outline"
             color="#e67700"
+            navigateTo="GroupTasks"
+            navigationParams={{ groupId, groupName, userRole: 'MEMBER', tab: 'my' }}
           />
           <StatCard
             title="Completed"
             value={typeof completedTasks === 'number' ? completedTasks : completedTasks.length}
             icon="check-circle"
             color="#2b8a3e"
+            navigateTo="TaskCompletionHistory"
+            navigationParams={{ groupId, groupName, userRole: 'MEMBER' }}
           />
           <StatCard
             title="Due Today"
             value={tasksDueToday.length}
             icon="calendar-today"
             color="#fa5252"
+            navigateTo="TodayAssignments"
+            navigationParams={{ groupId, groupName }}
           />
           <StatCard
             title="Swap Requests"
             value={totalPendingForMe || 0}
             icon="swap-horizontal"
             color="#2b8a3e"
+            navigateTo="MySwapRequests"
+            navigationParams={{ groupId, groupName }}
           />
         </View>
 
@@ -614,305 +654,16 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <SettingsModal
+        visible={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        groupId={groupId}
+        groupName={groupName}
+        userRole="MEMBER"
+        navigation={navigation}
+        onRefreshTasks={() => loadDashboardData(true)}
+      />
     </ScreenWrapper>
   );
 };
-
-// Add missing styles
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    minHeight: 60,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#868e96',
-  },
-  errorText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#fa5252',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  retryButtonGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  welcomeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 20,
-    shadowColor: '#2b8a3e',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  welcomeContent: {
-    flex: 1,
-    marginRight: 16,
-  },
-  welcomeTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 4,
-  },
-  welcomeSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    marginTop: 16,
-    marginBottom: 12,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 12,
-  },
-  viewAllText: {
-    fontSize: 13,
-    color: '#2b8a3e',
-    fontWeight: '600',
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: (width - 44) / 2,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#212529',
-  },
-  statTitle: {
-    fontSize: 13,
-    color: '#868e96',
-    marginBottom: 2,
-  },
-  statSubtitle: {
-    fontSize: 11,
-    color: '#adb5bd',
-  },
-  pointsContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  pointsCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    alignItems: 'center',
-  },
-  pointsLabel: {
-    fontSize: 13,
-    color: '#868e96',
-    marginBottom: 4,
-  },
-  pointsValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#2b8a3e',
-    marginBottom: 2,
-  },
-  pointsSubtext: {
-    fontSize: 11,
-    color: '#adb5bd',
-  },
-  taskCard: {
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  taskHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  taskIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  taskInfo: {
-    flex: 1,
-  },
-  taskTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 4,
-  },
-  completedTaskTitle: {
-    color: '#868e96',
-    textDecorationLine: 'line-through',
-  },
-  taskMeta: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  pointsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    gap: 2,
-  },
-  pointsText: {
-    fontSize: 10,
-    color: '#e67700',
-    fontWeight: '600',
-  },
-  dueBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  dueBadgeText: {
-    fontSize: 10,
-    color: 'white',
-    fontWeight: '600',
-  },
-  timeSlotContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#f8f9fa',
-    padding: 8,
-    borderRadius: 8,
-  },
-  timeSlotText: {
-    fontSize: 12,
-    color: '#495057',
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
-  },
-  actionCard: {
-    flex: 1,
-    minWidth: (width - 44) / 2,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  actionGradient: {
-    padding: 16,
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'white',
-    textAlign: 'center',
-  },
-});

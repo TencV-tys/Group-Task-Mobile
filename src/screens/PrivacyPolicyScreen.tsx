@@ -1,23 +1,63 @@
-// src/screens/PrivacyPolicyScreen.tsx
-import React from 'react';
+// src/screens/PrivacyPolicyScreen.tsx - UPDATED with token check
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
-  ScrollView
+  ScrollView,
+  ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+
 export default function PrivacyPolicyScreen({ navigation }: any) {
+  const [loading, setLoading] = useState(true);
+
+  // Check auth status (but don't block access)
+  const checkAuth = useCallback(async () => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      console.log('🔐 PrivacyPolicy: Auth status:', token ? 'Logged in' : 'Guest');
+    } catch (error) {
+      console.error('Error checking auth:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkAuth();
+  }, []);
+
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // If can't go back (opened from deep link), go to Login
+      navigation.navigate('Login');
+    }
+  };
+
+  if (loading) {
+    return (
+      <ScreenWrapper style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2b8a3e" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </ScreenWrapper>
+    );
+  }
+
   return (
     <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
-          onPress={() => navigation.goBack()}
+          onPress={handleBack}
           style={styles.backButton}
         >
           <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
@@ -186,11 +226,30 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
             support@grouptask.com
           </Text>
         </LinearGradient>
+
+        {/* Back to Sign Up / Login Button - Only show if accessed directly */}
+        {!navigation.canGoBack() && (
+          <TouchableOpacity
+            style={styles.signupButton}
+            onPress={() => navigation.navigate('Signup')}
+          >
+            <LinearGradient
+              colors={['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.signupButtonGradient}
+            >
+              <MaterialCommunityIcons name="account-plus" size={20} color="white" />
+              <Text style={styles.signupButtonText}>Create an Account</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </ScreenWrapper>
   );
 }
 
+// Add these to your styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -228,6 +287,16 @@ const styles = StyleSheet.create({
   },
   headerRight: {
     width: 36,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#868e96',
   },
   scrollContent: {
     padding: 16,
@@ -285,5 +354,28 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#495057',
     lineHeight: 20,
+  },
+  signupButton: {
+    marginTop: 24,
+    marginBottom: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#2b8a3e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  signupButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+  },
+  signupButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

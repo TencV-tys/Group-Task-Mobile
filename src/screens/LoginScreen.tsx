@@ -1,5 +1,5 @@
-// src/screens/LoginScreen.tsx - UPDATED with ScreenWrapper
-import React, { useState } from 'react';
+// src/screens/LoginScreen.tsx - FIXED (removed clearMessage)
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -11,7 +11,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Linking,
-  ScrollView
+  ScrollView,
+  Keyboard
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLoginForm } from '../authHook/useLoginForm';
@@ -67,27 +68,48 @@ export default function LoginScreen({ navigation }: any) {
     loading, 
     message,
     handleChange,
-    handleSubmit
+    handleSubmit,
+    resetForm
   } = useLoginForm(); 
 
   // State for password visibility
   const [showPassword, setShowPassword] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
-   const handleLogin = async () => {
+  // Handle keyboard visibility
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  const handleLogin = async () => {
+    Keyboard.dismiss();
     const result = await handleSubmit();
     
     if (result?.success) {
       Alert.alert('Success', 'Logged in successfully!', [
         { 
           text: 'Continue', 
-          onPress: () => navigation.reset({
-            index: 0,
-            routes: [{ name: 'Home' }],
-          })
+          onPress: () => {
+            resetForm();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Home' }],
+            });
+          }
         }
       ]);
-    } else if (message) {
-      Alert.alert('Error', message);
     }
   };
 
@@ -96,6 +118,7 @@ export default function LoginScreen({ navigation }: any) {
   };
 
   const handleSignUp = () => {
+    resetForm();
     navigation.navigate('Signup');
   };
  
@@ -104,6 +127,7 @@ export default function LoginScreen({ navigation }: any) {
       <KeyboardAvoidingView 
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <LinearGradient
           colors={['#ffffff', '#f8f9fa']}
@@ -112,9 +136,13 @@ export default function LoginScreen({ navigation }: any) {
           style={styles.gradientContainer}
         >
           <ScrollView 
-            contentContainerStyle={styles.content}
+            contentContainerStyle={[
+              styles.content,
+              keyboardVisible && styles.contentWithKeyboard
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            bounces={false}
           >
             <View style={styles.headerContainer}>
               <LinearGradient
@@ -129,21 +157,26 @@ export default function LoginScreen({ navigation }: any) {
               <Text style={styles.subtitle}>Login to continue to GroupTask</Text>
             </View>
             
-            {message ? (
-              <LinearGradient
-                colors={message.includes('✅') ? ['#d3f9d8', '#b2f2bb'] : ['#fff5f5', '#ffe3e3']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.messageBox}
-              >
-                <Text style={[
-                  styles.messageText,
-                  message.includes('✅') ? styles.successText : styles.errorText
-                ]}>
-                  {message}
-                </Text>
-              </LinearGradient>
-            ) : null}
+            {/* Fixed height message container to prevent layout shift */}
+            <View style={styles.messageContainer}>
+              {message ? (
+                <LinearGradient
+                  colors={message.includes('✅') ? ['#d3f9d8', '#b2f2bb'] : ['#fff5f5', '#ffe3e3']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.messageBox}
+                >
+                  <Text style={[
+                    styles.messageText,
+                    message.includes('✅') ? styles.successText : styles.errorText
+                  ]}>
+                    {message}
+                  </Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.messagePlaceholder} />
+              )}
+            </View>
             
             <View style={styles.formContainer}>
               <View style={styles.inputGroup}>
@@ -229,6 +262,7 @@ export default function LoginScreen({ navigation }: any) {
   );
 }
 
+// Add these to your styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -240,10 +274,15 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
+    minHeight: '100%',
+  },
+  contentWithKeyboard: {
+    justifyContent: 'flex-start',
+    paddingTop: 40,
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
   },
   logoContainer: {
     width: 80,
@@ -272,6 +311,31 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#868e96',
+  },
+  messageContainer: {
+    minHeight: 60,
+    marginBottom: 16,
+  },
+  messageBox: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  messagePlaceholder: {
+    height: 1,
+  },
+  messageText: {
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 20,
+  },
+  successText: {
+    color: '#2b8a3e',
+  },
+  errorText: {
+    color: '#fa5252',
   },
   formContainer: {
     width: '100%',
@@ -390,24 +454,5 @@ const styles = StyleSheet.create({
     color: '#2b8a3e',
     fontSize: 16,
     fontWeight: '700',
-  },
-  messageBox: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  messageText: {
-    textAlign: 'center',
-    fontSize: 14,
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-  successText: {
-    color: '#2b8a3e',
-  },
-  errorText: {
-    color: '#fa5252',
   },
 });

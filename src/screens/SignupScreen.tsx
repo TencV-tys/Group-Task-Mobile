@@ -1,5 +1,5 @@
-// src/screens/SignupScreen.tsx - UPDATED with ScreenWrapper
-import React, { useState } from 'react';
+// src/screens/SignupScreen.tsx - FIXED with stable rendering
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   ScrollView,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Keyboard
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSignupForm } from '../authHook/useSignupForm';
@@ -127,8 +128,27 @@ export default function SignupScreen({ navigation }: any) {
   // State for password visibility
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  // Handle keyboard visibility
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => setKeyboardVisible(true)
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
 
   const onSignupPress = async () => {
+    Keyboard.dismiss();
     const result = await handleSubmit();
     
     if (result.success) {
@@ -147,8 +167,6 @@ export default function SignupScreen({ navigation }: any) {
                 }
             }
         ]);
-    } else {
-        Alert.alert('❌ Error', result.message || 'Signup failed. Please try again.');
     }
   };
 
@@ -161,6 +179,7 @@ export default function SignupScreen({ navigation }: any) {
   };
 
   const handleLoginPress = () => {
+    Keyboard.dismiss();
     navigation.goBack();
   };
 
@@ -169,6 +188,7 @@ export default function SignupScreen({ navigation }: any) {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <LinearGradient
           colors={['#ffffff', '#f8f9fa']}
@@ -177,9 +197,13 @@ export default function SignupScreen({ navigation }: any) {
           style={{ flex: 1 }}
         >
           <ScrollView 
-            contentContainerStyle={styles.container}
+            contentContainerStyle={[
+              styles.container,
+              keyboardVisible && styles.containerWithKeyboard
+            ]}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
+            bounces={false}
           >
             <View style={styles.headerContainer}>
               <LinearGradient
@@ -207,22 +231,26 @@ export default function SignupScreen({ navigation }: any) {
               <Text style={styles.avatarHint}>Tap to add profile picture (optional)</Text>
             </View>
             
-            {/* Message display */}
-            {message ? (
-              <LinearGradient
-                colors={message.includes('✅') || message.includes('📤') ? ['#d3f9d8', '#b2f2bb'] : ['#fff5f5', '#ffe3e3']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.messageBox}
-              >
-                <Text style={[
-                  styles.messageText,
-                  message.includes('✅') || message.includes('📤') ? styles.successText : styles.errorText
-                ]}>
-                  {message}
-                </Text>
-              </LinearGradient>
-            ) : null}
+            {/* Fixed height message container */}
+            <View style={styles.messageContainer}>
+              {message ? (
+                <LinearGradient
+                  colors={message.includes('✅') || message.includes('📤') ? ['#d3f9d8', '#b2f2bb'] : ['#fff5f5', '#ffe3e3']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.messageBox}
+                >
+                  <Text style={[
+                    styles.messageText,
+                    message.includes('✅') || message.includes('📤') ? styles.successText : styles.errorText
+                  ]}>
+                    {message}
+                  </Text>
+                </LinearGradient>
+              ) : (
+                <View style={styles.messagePlaceholder} />
+              )}
+            </View>
             
             {/* Full Name */}
             <View style={styles.inputGroup}>
@@ -361,14 +389,21 @@ export default function SignupScreen({ navigation }: any) {
   );
 }
 
+// Updated styles
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 24,
+    justifyContent: 'center',
+    minHeight: '100%',
+  },
+  containerWithKeyboard: {
+    justifyContent: 'flex-start',
+    paddingTop: 20,
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   logoContainer: {
     width: 70,
@@ -410,6 +445,30 @@ const styles = StyleSheet.create({
     color: '#868e96',
     marginTop: 8,
     fontStyle: 'italic',
+  },
+  messageContainer: {
+    minHeight: 60,
+    marginBottom: 16,
+  },
+  messageBox: {
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  messagePlaceholder: {
+    height: 1,
+  },
+  messageText: {
+    textAlign: 'center',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  successText: {
+    color: '#2b8a3e',
+  },
+  errorText: {
+    color: '#fa5252',
   },
   inputGroup: {
     marginBottom: 16,
@@ -576,23 +635,5 @@ const styles = StyleSheet.create({
     color: '#2b8a3e',
     fontWeight: '700',
     fontSize: 16,
-  },
-  messageBox: {
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  messageText: {
-    textAlign: 'center',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  successText: {
-    color: '#2b8a3e',
-  },
-  errorText: {
-    color: '#fa5252',
   },
 });

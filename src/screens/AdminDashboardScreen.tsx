@@ -1,31 +1,30 @@
-// src/screens/AdminDashboardScreen.tsx - UPDATED with token checking
+// src/screens/AdminDashboardScreen.tsx - FIXED header and stat cards
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Dimensions,
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import * as SecureStore from 'expo-secure-store';
+
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { GroupActivityService } from '../services/GroupActivityService';
 import { useRotationStatus } from '../hooks/useRotationStatus';
-import * as SecureStore from 'expo-secure-store';
-import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-
-const { width } = Dimensions.get('window');
+import { SettingsModal } from '../components/SettingsModal';
+import { ScreenWrapper } from '../components/ScreenWrapper';
+import { adminDashboardStyles as styles } from '../styles/adminDashboard.styles';
 
 export const AdminDashboardScreen = ({ navigation, route }: any) => {
   const { groupId, groupName } = route.params;
@@ -39,6 +38,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [rotationStatus, setRotationStatus] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
@@ -156,79 +156,77 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
     }
   }, []);
 
-  // Add this useEffect to update rotationStatus when status changes
-useEffect(() => {
-  if (status && isMounted.current) {
-    setRotationStatus(status);
-  }
-}, [status]);
-
- const loadDashboardData = async (isRefreshing = false) => {
-  const hasToken = await checkToken();
-  if (!hasToken) {
-    setLoading(false);
-    setRefreshing(false);
-    return;
-  }
-
-  if (isRefreshing) {
-    setRefreshing(true);
-  } else if (!initialLoadDone.current) {
-    setLoading(true);
-  }
-  setError(null);
-
-  try {
-    console.log('📥 Loading admin dashboard data for group:', groupId);
-
-    // Use the new dedicated admin dashboard endpoint
-    const dashboardResult = await GroupActivityService.getAdminDashboard(groupId);
-    
-    if (dashboardResult.success) {
-      if (isMounted.current) {
-        setStats(dashboardResult.data.stats);
-        setMembers(dashboardResult.data.members);
-        setRecentActivity(dashboardResult.data.recentActivity || []);
-        initialLoadDone.current = true;
-      }
-    } else {
-      // Fallback to individual calls if dashboard endpoint fails
-      console.log('Falling back to individual API calls...');
-      
-      const statsResult = await TaskService.getTaskStatistics(groupId);
-      if (statsResult.success && isMounted.current) {
-        setStats(statsResult.statistics);
-      }
-
-      const membersResult = await GroupMembersService.getGroupMembers(groupId);
-      if (membersResult.success && isMounted.current) {
-        setMembers(membersResult.members || []);
-      }
-
-      const activityResult = await GroupActivityService.getRecentActivity(groupId, 5);
-      if (activityResult.success && isMounted.current) {
-        setRecentActivity(activityResult.data || []);
-      }
-    }
-
-    // ===== FIXED: Get rotation status =====
-    await checkStatus(); // This updates the status internally
+  // Update rotationStatus when status changes
+  useEffect(() => {
     if (status && isMounted.current) {
       setRotationStatus(status);
     }
+  }, [status]);
 
-  } catch (err: any) {
-    console.error('❌ Error loading admin dashboard:', err);
-    if (isMounted.current) {
-      setError(err.message || 'Failed to load dashboard data');
-    }
-  } finally {
-    if (isMounted.current) {
+  const loadDashboardData = async (isRefreshing = false) => {
+    const hasToken = await checkToken();
+    if (!hasToken) {
       setLoading(false);
       setRefreshing(false);
+      return;
     }
-  }
-};
+
+    if (isRefreshing) {
+      setRefreshing(true);
+    } else if (!initialLoadDone.current) {
+      setLoading(true);
+    }
+    setError(null);
+
+    try {
+      console.log('📥 Loading admin dashboard data for group:', groupId);
+
+      const dashboardResult = await GroupActivityService.getAdminDashboard(groupId);
+      
+      if (dashboardResult.success) {
+        if (isMounted.current) {
+          setStats(dashboardResult.data.stats);
+          setMembers(dashboardResult.data.members);
+          setRecentActivity(dashboardResult.data.recentActivity || []);
+          initialLoadDone.current = true;
+        }
+      } else {
+        // Fallback to individual calls
+        console.log('Falling back to individual API calls...');
+        
+        const statsResult = await TaskService.getTaskStatistics(groupId);
+        if (statsResult.success && isMounted.current) {
+          setStats(statsResult.statistics);
+        }
+
+        const membersResult = await GroupMembersService.getGroupMembers(groupId);
+        if (membersResult.success && isMounted.current) {
+          setMembers(membersResult.members || []);
+        }
+
+        const activityResult = await GroupActivityService.getRecentActivity(groupId, 5);
+        if (activityResult.success && isMounted.current) {
+          setRecentActivity(activityResult.data || []);
+        }
+      }
+
+      await checkStatus();
+      if (status && isMounted.current) {
+        setRotationStatus(status);
+      }
+
+    } catch (err: any) {
+      console.error('❌ Error loading admin dashboard:', err);
+      if (isMounted.current) {
+        setError(err.message || 'Failed to load dashboard data');
+      }
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  };
 
   const refreshDashboardData = useCallback(() => {
     loadDashboardData(true);
@@ -236,6 +234,10 @@ useEffect(() => {
 
   const handleRefresh = () => {
     refreshDashboardData();
+  };
+
+  const handleSettingsPress = () => {
+    setShowSettingsModal(true);
   };
 
   // Handle auth error
@@ -257,88 +259,127 @@ useEffect(() => {
     }
   }, [authError]);
 
-  const StatCard = ({ title, value, icon, color = '#2b8a3e', subtitle }: any) => (
-    <LinearGradient
-      colors={['#ffffff', '#f8f9fa']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.statCard}
-    >
-      <View style={styles.statHeader}>
-        <LinearGradient
-          colors={[`${color}20`, `${color}10`]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.statIconContainer}
-        >
-          <MaterialCommunityIcons name={icon} size={24} color={color} />
-        </LinearGradient>
-        <Text style={styles.statValue}>{value}</Text>
-      </View>
-      <Text style={styles.statTitle}>{title}</Text>
-      {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
-    </LinearGradient>
-  );
+  // ===== STAT CARD =====
+  const StatCard = ({ 
+    title, 
+    value, 
+    icon, 
+    color = '#2b8a3e', 
+    subtitle,
+    onPress,
+    navigateTo,
+    navigationParams
+  }: any) => {
+    const handlePress = () => {
+      if (onPress) {
+        onPress();
+      } else if (navigateTo) {
+        navigation.navigate(navigateTo, navigationParams || { groupId, groupName });
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        style={styles.statCard}
+        onPress={handlePress}
+        activeOpacity={0.7}
+        disabled={!navigateTo && !onPress}
+      >
+        <View style={styles.statHeader}>
+          <LinearGradient
+            colors={[`${color}20`, `${color}10`]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.statIconContainer}
+          >
+            <MaterialCommunityIcons name={icon} size={24} color={color} />
+          </LinearGradient>
+          <Text style={styles.statValue}>{value}</Text>
+        </View>
+        <Text style={styles.statTitle}>{title}</Text>
+        {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
+        {(navigateTo || onPress) && (
+          <MaterialCommunityIcons 
+            name="chevron-right" 
+            size={16} 
+            color="#adb5bd" 
+            style={{ position: 'absolute', bottom: 12, right: 12 }}
+          />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const MemberCard = ({ member }: { member: any }) => (
-    <LinearGradient
-      colors={member.inRotation ? ['#ffffff', '#f8f9fa'] : ['#f8f9fa', '#e9ecef']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.memberCard}
+    <TouchableOpacity
+      onPress={() => navigation.navigate('MemberContributions', { 
+        groupId, 
+        groupName, 
+        memberId: member.userId,
+        userRole: 'ADMIN'
+      })}
+      activeOpacity={0.7}
     >
-      <View style={styles.memberHeader}>
-        <LinearGradient
-          colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#495057', '#343a40']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.memberAvatar}
-        >
-          <Text style={styles.memberAvatarText}>
-            {member.fullName?.charAt(0).toUpperCase() || '?'}
-          </Text>
-        </LinearGradient>
-        <View style={styles.memberInfo}>
-          <Text style={styles.memberName}>{member.fullName}</Text>
-          <View style={styles.memberBadges}>
-            <LinearGradient
-              colors={member.role === 'ADMIN' ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.roleBadge}
-            >
-              <Text style={[
-                styles.roleBadgeText,
-                member.role === 'ADMIN' && styles.adminRoleText
-              ]}>
-                {member.role}
-              </Text>
-            </LinearGradient>
-            {member.inRotation ? (
+      <LinearGradient
+        colors={member.inRotation ? ['#ffffff', '#f8f9fa'] : ['#f8f9fa', '#e9ecef']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.memberCard}
+      >
+        <View style={styles.memberHeader}>
+          <LinearGradient
+            colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#495057', '#343a40']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.memberAvatar}
+          >
+            <Text style={styles.memberAvatarText}>
+              {member.fullName?.charAt(0).toUpperCase() || '?'}
+            </Text>
+          </LinearGradient>
+          <View style={styles.memberInfo}>
+            <Text style={styles.memberName}>{member.fullName}</Text>
+            <View style={styles.memberBadges}>
               <LinearGradient
-                colors={['#d3f9d8', '#b2f2bb']}
+                colors={member.role === 'ADMIN' ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.rotationBadge}
+                style={styles.roleBadge}
               >
-                <MaterialCommunityIcons name="sync" size={12} color="#2b8a3e" />
-                <Text style={styles.rotationBadgeText}>In Rotation</Text>
+                <Text style={[
+                  styles.roleBadgeText,
+                  member.role === 'ADMIN' && styles.adminRoleText
+                ]}>
+                  {member.role}
+                </Text>
               </LinearGradient>
-            ) : (
-              <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.rotationBadge}
-              >
-                <MaterialCommunityIcons name="sync-off" size={12} color="#868e96" />
-                <Text style={styles.rotationBadgeTextOff}>No Rotation</Text>
-              </LinearGradient>
-            )}
+              {member.inRotation ? (
+                <LinearGradient
+                  colors={['#d3f9d8', '#b2f2bb']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.rotationBadge}
+                >
+                  <MaterialCommunityIcons name="sync" size={12} color="#2b8a3e" />
+                  <Text style={styles.rotationBadgeText}>In Rotation</Text>
+                </LinearGradient>
+              ) : (
+                <LinearGradient
+                  colors={['#f8f9fa', '#e9ecef']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.rotationBadge}
+                >
+                  <MaterialCommunityIcons name="sync-off" size={12} color="#868e96" />
+                  <Text style={styles.rotationBadgeTextOff}>No Rotation</Text>
+                </LinearGradient>
+              )}
+            </View>
           </View>
+          <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
         </View>
-      </View>
-    </LinearGradient>
+      </LinearGradient>
+    </TouchableOpacity>
   );
 
   const ActivityItem = ({ activity }: { activity: any }) => {
@@ -442,10 +483,18 @@ useEffect(() => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
+        
         <Text style={styles.headerTitle}>{groupName}</Text>
-        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-          <MaterialCommunityIcons name="refresh" size={22} color="#2b8a3e" />
-        </TouchableOpacity>
+        
+        <View style={styles.headerRight}>
+          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+            <MaterialCommunityIcons name="refresh" size={22} color="#2b8a3e" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity onPress={handleSettingsPress} style={styles.settingsButton}>
+            <MaterialCommunityIcons name="cog" size={22} color="#2b8a3e" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -478,48 +527,59 @@ useEffect(() => {
 
         {/* Rotation Status */}
         {rotationStatus && (
-          <LinearGradient
-            colors={rotationStatus.hasEnoughTasks ? ['#d3f9d8', '#b2f2bb'] : ['#fff3bf', '#ffec99']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.rotationCard}
+          <TouchableOpacity
+            onPress={() => navigation.navigate('RotationSchedule', { groupId, groupName, userRole: 'ADMIN' })}
+            activeOpacity={0.7}
           >
-            <View style={styles.rotationHeader}>
-              <MaterialCommunityIcons
-                name={rotationStatus.hasEnoughTasks ? "check-circle" : "alert"}
-                size={24}
-                color={rotationStatus.hasEnoughTasks ? "#2b8a3e" : "#e67700"}
-              />
-              <Text style={[
-                styles.rotationTitle,
-                { color: rotationStatus.hasEnoughTasks ? "#2b8a3e" : "#e67700" }
-              ]}>
-                Rotation Status
-              </Text>
-            </View>
-            <Text style={styles.rotationMessage}>
-              {rotationStatus.message}
-            </Text>
-            <View style={styles.rotationStats}>
-              <View style={styles.rotationStat}>
-                <Text style={styles.rotationStatValue}>{rotationStatus.totalMembers}</Text>
-                <Text style={styles.rotationStatLabel}>Members</Text>
-              </View>
-              <View style={styles.rotationStat}>
-                <Text style={styles.rotationStatValue}>{rotationStatus.totalTasks}</Text>
-                <Text style={styles.rotationStatLabel}>Tasks</Text>
-              </View>
-              <View style={styles.rotationStat}>
-                <Text style={styles.rotationStatValue}>
-                  {rotationStatus.tasksPerMember?.toFixed(1) || 0}
+            <LinearGradient
+              colors={rotationStatus.hasEnoughTasks ? ['#d3f9d8', '#b2f2bb'] : ['#fff3bf', '#ffec99']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.rotationCard}
+            >
+              <View style={styles.rotationHeader}>
+                <MaterialCommunityIcons
+                  name={rotationStatus.hasEnoughTasks ? "check-circle" : "alert"}
+                  size={24}
+                  color={rotationStatus.hasEnoughTasks ? "#2b8a3e" : "#e67700"}
+                />
+                <Text style={[
+                  styles.rotationTitle,
+                  { color: rotationStatus.hasEnoughTasks ? "#2b8a3e" : "#e67700" }
+                ]}>
+                  Rotation Status
                 </Text>
-                <Text style={styles.rotationStatLabel}>Per Member</Text>
               </View>
-            </View>
-          </LinearGradient>
+              <Text style={styles.rotationMessage}>
+                {rotationStatus.message}
+              </Text>
+              <View style={styles.rotationStats}>
+                <View style={styles.rotationStat}>
+                  <Text style={styles.rotationStatValue}>{rotationStatus.totalMembers}</Text>
+                  <Text style={styles.rotationStatLabel}>Members</Text>
+                </View>
+                <View style={styles.rotationStat}>
+                  <Text style={styles.rotationStatValue}>{rotationStatus.totalTasks}</Text>
+                  <Text style={styles.rotationStatLabel}>Tasks</Text>
+                </View>
+                <View style={styles.rotationStat}>
+                  <Text style={styles.rotationStatValue}>
+                    {rotationStatus.tasksPerMember?.toFixed(1) || 0}
+                  </Text>
+                  <Text style={styles.rotationStatLabel}>Per Member</Text>
+                </View>
+              </View>
+              <MaterialCommunityIcons 
+                name="chevron-right" 
+                size={20} 
+                color="#adb5bd" 
+                style={{ position: 'absolute', bottom: 16, right: 16 }}
+              />
+            </LinearGradient>
+          </TouchableOpacity>
         )}
 
-        {/* Quick Stats Grid */}
+        {/* Quick Stats Grid - CLICKABLE */}
         <Text style={styles.sectionTitle}>Overview</Text>
         <View style={styles.statsGrid}>
           <StatCard
@@ -527,28 +587,36 @@ useEffect(() => {
             value={members.length}
             icon="account-group"
             color="#2b8a3e"
+            navigateTo="GroupMembers"
+            navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
           <StatCard
             title="Active Members"
             value={members.filter(m => m.isActive).length}
             icon="account-check"
             color="#2b8a3e"
+            navigateTo="GroupMembers"
+            navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
           <StatCard
             title="In Rotation"
             value={membersInRotation.length}
             icon="sync"
             color="#2b8a3e"
+            navigateTo="RotationSchedule"
+            navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
           <StatCard
             title="Admins"
             value={admins.length}
             icon="shield-account"
             color="#2b8a3e"
+            navigateTo="GroupMembers"
+            navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
         </View>
 
-        {/* Task Stats */}
+        {/* Task Stats - CLICKABLE */}
         {stats && (
           <>
             <Text style={styles.sectionTitle}>Task Statistics</Text>
@@ -558,18 +626,24 @@ useEffect(() => {
                 value={stats.totalTasks || 0}
                 icon="format-list-checks"
                 color="#2b8a3e"
+                navigateTo="GroupTasks"
+                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
               />
               <StatCard
                 title="Recurring"
                 value={stats.recurringTasks || 0}
                 icon="repeat"
                 color="#2b8a3e"
+                navigateTo="RotationSchedule"
+                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
               />
               <StatCard
                 title="This Week"
                 value={stats.currentWeek?.totalAssignments || 0}
                 icon="calendar-week"
                 color="#2b8a3e"
+                navigateTo="TaskCompletionHistory"
+                navigationParams={{ groupId, groupName, userRole: 'ADMIN', week: stats.currentWeek?.weekNumber }}
               />
               <StatCard
                 title="Completed"
@@ -577,46 +651,59 @@ useEffect(() => {
                 icon="check-circle"
                 color="#2b8a3e"
                 subtitle={`${stats.currentWeek?.completedPoints || 0} pts`}
+                navigateTo="TaskCompletionHistory"
+                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
               />
             </View>
 
-            {/* Completion Progress */}
-            <LinearGradient
-              colors={['#ffffff', '#f8f9fa']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.progressCard}
+            {/* Completion Progress - CLICKABLE */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole: 'ADMIN' })}
+              activeOpacity={0.7}
             >
-              <View style={styles.progressHeader}>
-                <Text style={styles.progressTitle}>Weekly Completion</Text>
-                <Text style={styles.progressPercentage}>
-                  {stats.currentWeek?.totalAssignments > 0
-                    ? Math.round((stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100)
-                    : 0}%
-                </Text>
-              </View>
-              <View style={styles.progressBarContainer}>
-                <View
-                  style={[
-                    styles.progressBar,
-                    {
-                      width: `${stats.currentWeek?.totalAssignments > 0
-                        ? (stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100
-                        : 0}%`,
-                      backgroundColor: '#2b8a3e'
-                    }
-                  ]}
+              <LinearGradient
+                colors={['#ffffff', '#f8f9fa']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.progressCard}
+              >
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressTitle}>Weekly Completion</Text>
+                  <Text style={styles.progressPercentage}>
+                    {stats.currentWeek?.totalAssignments > 0
+                      ? Math.round((stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100)
+                      : 0}%
+                  </Text>
+                </View>
+                <View style={styles.progressBarContainer}>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: `${stats.currentWeek?.totalAssignments > 0
+                          ? (stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100
+                          : 0}%`,
+                        backgroundColor: '#2b8a3e'
+                      }
+                    ]}
+                  />
+                </View>
+                <View style={styles.progressStats}>
+                  <Text style={styles.progressStatsText}>
+                    {stats.currentWeek?.completedAssignments || 0} of {stats.currentWeek?.totalAssignments || 0} tasks
+                  </Text>
+                  <Text style={styles.progressStatsText}>
+                    {stats.currentWeek?.completedPoints || 0} pts earned
+                  </Text>
+                </View>
+                <MaterialCommunityIcons 
+                  name="chevron-right" 
+                  size={20} 
+                  color="#adb5bd" 
+                  style={{ position: 'absolute', bottom: 16, right: 16 }}
                 />
-              </View>
-              <View style={styles.progressStats}>
-                <Text style={styles.progressStatsText}>
-                  {stats.currentWeek?.completedAssignments || 0} of {stats.currentWeek?.totalAssignments || 0} tasks
-                </Text>
-                <Text style={styles.progressStatsText}>
-                  {stats.currentWeek?.completedPoints || 0} pts earned
-                </Text>
-              </View>
-            </LinearGradient>
+              </LinearGradient>
+            </TouchableOpacity>
           </>
         )}
 
@@ -630,7 +717,7 @@ useEffect(() => {
           </>
         )}
 
-        {/* Members List */}
+        {/* Members List - CLICKABLE */}
         <Text style={styles.sectionTitle}>Team Members</Text>
         {members.map(member => (
           <MemberCard key={member.id} member={member} />
@@ -700,375 +787,16 @@ useEffect(() => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <SettingsModal
+        visible={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        groupId={groupId}
+        groupName={groupName}
+        userRole="ADMIN"
+        navigation={navigation}
+        onRefreshTasks={() => loadDashboardData(true)}
+      />
     </ScreenWrapper>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    minHeight: 60,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#868e96',
-  },
-  errorText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#fa5252',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  retryButtonGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 100,
-  },
-  welcomeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 20,
-    shadowColor: '#2b8a3e',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  welcomeContent: {
-    flex: 1,
-    marginRight: 16,
-  },
-  welcomeTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: 'white',
-    marginBottom: 4,
-  },
-  welcomeSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    marginTop: 16,
-    marginBottom: 12,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 8,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: (width - 44) / 2,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  statIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#212529',
-  },
-  statTitle: {
-    fontSize: 13,
-    color: '#868e96',
-    marginBottom: 2,
-  },
-  statSubtitle: {
-    fontSize: 11,
-    color: '#adb5bd',
-  },
-  rotationCard: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  rotationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  rotationTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  rotationMessage: {
-    fontSize: 13,
-    color: '#495057',
-    marginBottom: 12,
-    lineHeight: 18,
-  },
-  rotationStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
-    paddingTop: 12,
-  },
-  rotationStat: {
-    alignItems: 'center',
-  },
-  rotationStatValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#212529',
-  },
-  rotationStatLabel: {
-    fontSize: 11,
-    color: '#868e96',
-    marginTop: 2,
-  },
-  progressCard: {
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#495057',
-  },
-  progressPercentage: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#2b8a3e',
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#e9ecef',
-    borderRadius: 4,
-    marginBottom: 8,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  progressStatsText: {
-    fontSize: 12,
-    color: '#868e96',
-  },
-  memberCard: {
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  memberHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  memberAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  memberAvatarText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  memberInfo: {
-    flex: 1,
-  },
-  memberName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 4,
-  },
-  memberBadges: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  roleBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  roleBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#495057',
-  },
-  adminRoleText: {
-    color: '#2b8a3e',
-  },
-  rotationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    gap: 2,
-  },
-  rotationBadgeText: {
-    fontSize: 10,
-    color: '#2b8a3e',
-    fontWeight: '600',
-  },
-  rotationBadgeTextOff: {
-    fontSize: 10,
-    color: '#868e96',
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  activityIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  activityContent: {
-    flex: 1,
-  },
-  activityDescription: {
-    fontSize: 14,
-    color: '#212529',
-    marginBottom: 2,
-  },
-  activityTime: {
-    fontSize: 11,
-    color: '#868e96',
-  },
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
-  },
-  actionCard: {
-    flex: 1,
-    minWidth: (width - 44) / 2,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  actionGradient: {
-    padding: 16,
-    alignItems: 'center',
-    gap: 8,
-  },
-  actionText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'white',
-    textAlign: 'center',
-  },
-});

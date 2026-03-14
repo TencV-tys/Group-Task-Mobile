@@ -1,11 +1,10 @@
-// src/screens/AccountSettingsScreen.tsx - UPDATED (Delete Account removed)
-import React, { useState, useEffect } from 'react';
+// src/screens/AccountSettingsScreen.tsx - UPDATED with token check
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Alert,
   ActivityIndicator,
@@ -15,12 +14,17 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as SecureStore from 'expo-secure-store';
+
 import { AuthService } from '../services/AuthService';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+
 export default function AccountSettingsScreen({ navigation }: any) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [authError, setAuthError] = useState(false);
   
   // Form states
   const [fullName, setFullName] = useState('');
@@ -32,24 +36,93 @@ export default function AccountSettingsScreen({ navigation }: any) {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const isMounted = useRef(true);
+
+  // ===== REAL-TIME NOTIFICATIONS =====
+  useRealtimeNotifications({
+    onNewNotification: (notification) => {
+      if (notification.type === 'PROFILE_UPDATED') {
+        loadUserData();
+      }
+    },
+    showAlerts: true
+  });
+
+  // ===== TOKEN CHECK =====
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const token = await SecureStore.getItemAsync('userToken');
+      if (!token) {
+        setAuthError(true);
+        return false;
+      }
+      setAuthError(false);
+      return true;
+    } catch (error) {
+      setAuthError(true);
+      return false;
+    }
+  }, []);
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError]);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const loadUserData = async () => {
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const userData = await AuthService.getCurrentUser();
+      if (isMounted.current) {
+        setUser(userData);
+        setFullName(userData?.fullName || '');
+        setEmail(userData?.email || '');
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+      if (isMounted.current) {
+        Alert.alert('Error', 'Failed to load user data');
+      }
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     loadUserData();
   }, []);
 
-  const loadUserData = async () => {
-    try {
-      const userData = await AuthService.getCurrentUser();
-      setUser(userData);
-      setFullName(userData?.fullName || '');
-      setEmail(userData?.email || '');
-    } catch (error) {
-      console.error('Error loading user:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleUpdateProfile = async () => {
+    const hasToken = await checkToken();
+    if (!hasToken) return;
+
     if (!fullName.trim()) {
       Alert.alert('Error', 'Name cannot be empty');
       return;
@@ -59,20 +132,27 @@ export default function AccountSettingsScreen({ navigation }: any) {
     try {
       const result = await AuthService.updateProfile({ fullName });
       
-      if (result.success) {
+      if (result.success && isMounted.current) {
         Alert.alert('Success', 'Profile updated successfully');
         await loadUserData();
-      } else {
+      } else if (isMounted.current) {
         Alert.alert('Error', result.message || 'Failed to update profile');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update profile');
+      if (isMounted.current) {
+        Alert.alert('Error', error.message || 'Failed to update profile');
+      }
     } finally {
-      setSaving(false);
+      if (isMounted.current) {
+        setSaving(false);
+      }
     }
   };
 
   const handleChangePassword = async () => {
+    const hasToken = await checkToken();
+    if (!hasToken) return;
+
     if (!currentPassword) {
       Alert.alert('Error', 'Current password is required');
       return;
@@ -97,18 +177,22 @@ export default function AccountSettingsScreen({ navigation }: any) {
         newPassword
       });
       
-      if (result.success) {
+      if (result.success && isMounted.current) {
         Alert.alert('Success', 'Password changed successfully');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
-      } else {
+      } else if (isMounted.current) {
         Alert.alert('Error', result.message || 'Failed to change password');
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to change password');
+      if (isMounted.current) {
+        Alert.alert('Error', error.message || 'Failed to change password');
+      }
     } finally {
-      setSaving(false);
+      if (isMounted.current) {
+        setSaving(false);
+      }
     }
   };
 
@@ -132,10 +216,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={!showPassword}
+        editable={!saving}
       />
       <TouchableOpacity 
         style={styles.eyeButton}
         onPress={toggleVisibility}
+        disabled={saving}
       >
         <Text style={styles.eyeIcon}>
           {showPassword ? '👁️' : '👁️‍🗨️'}
@@ -200,11 +286,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
                   style={styles.inputGradient}
                 >
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, saving && styles.inputDisabled]}
                     placeholder="Your full name"
                     placeholderTextColor="#adb5bd"
                     value={fullName}
                     onChangeText={setFullName}
+                    editable={!saving}
                   />
                 </LinearGradient>
               </View>
@@ -321,6 +408,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
   );
 }
 
+// Add these to your styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -409,6 +497,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#212529',
     backgroundColor: 'transparent',
+  },
+  inputDisabled: {
+    opacity: 0.6,
   },
   disabledInput: {
     color: '#868e96',

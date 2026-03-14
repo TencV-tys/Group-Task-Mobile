@@ -291,8 +291,6 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   };
 
   // In GroupMembersScreen.tsx - Update handleUpdateMaxMembers
-
-// ===== FIXED: Handle Update Max Members =====
 const handleUpdateMaxMembers = async () => {
   const max = parseInt(newMax);
   if (isNaN(max) || max < 6 || max > 10) {
@@ -304,16 +302,13 @@ const handleUpdateMaxMembers = async () => {
   try {
     const result = await GroupSettingsService.updateMaxMembers(groupId, max);
     if (result.success && isMounted.current) {
-      // ===== UPDATE LOCAL STATE IMMEDIATELY =====
-      setGroupInfo((prev: any) => ({
-        ...prev,
-        maxMembers: max
-      }));
+      // ===== USE THE DEDICATED FUNCTION =====
+      updateMaxMembers(max); // ← This updates the UI immediately
       
       Alert.alert('Success', `Group capacity updated to ${max} members`);
       setShowMaxModal(false);
       
-      // Optional: Refresh to confirm from server
+      // Optional refresh to confirm
       fetchData(true);
     } else {
       Alert.alert('Error', result.message || 'Failed to update capacity');

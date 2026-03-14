@@ -85,10 +85,14 @@ export function useGroupMembers() {
           setAuthError(true);
         }
       }
-
+ 
       // Get group info - FIXED to include maxMembers
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
+      console.log('📦 RAW API RESPONSE:', JSON.stringify(groupResult, null, 2)); // ← ADD THIS
       if (groupResult.success) {
+             console.log('📦 Group data from API:', groupResult.group.maxMembers); // ← ADD THIS
+  console.log('📦 maxMembers from API:', groupResult.group?.maxMembers); //
+
         const groupData = groupResult.group || {};
         if (groupData.avatarUrl) {
           groupData.avatarUrl = ensureFullUrl(groupData.avatarUrl);
@@ -128,24 +132,13 @@ export function useGroupMembers() {
     }));
   }, []);
 
-  // ===== NEW: Method to update max members =====
-  const updateMaxMembers = useCallback(async (groupId: string, newMax: number) => {
-    try {
-      const hasToken = await checkToken();
-      if (!hasToken) return { success: false, message: 'Authentication required' };
+  const updateMaxMembers = useCallback((newMax: number) => {
+  setGroupInfo((prev: any) => ({
+    ...prev,
+    maxMembers: newMax
+  }));
+}, []);
 
-      // Update local state immediately
-      setGroupInfo((prev: any) => ({
-        ...prev,
-        maxMembers: newMax
-      }));
-
-      return { success: true };
-    } catch (err: any) {
-      console.error('❌ Error updating max members locally:', err);
-      return { success: false, message: err.message };
-    }
-  }, [checkToken]);
 
   const updateGroupInfo = useCallback(async (groupId: string, updatedGroup: any) => {
   try {

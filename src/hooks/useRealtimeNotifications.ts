@@ -1,7 +1,8 @@
+// hooks/useRealtimeNotifications.ts - UPDATED with TokenUtils
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { Alert } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 interface RealtimeNotificationState {
   newNotification: any | null;
@@ -24,20 +25,15 @@ export function useRealtimeNotifications(props?: UseRealtimeNotificationsProps) 
   const { on, off, isConnected } = useSocket();
   const mountedRef = useRef(true);
 
-  // Check token
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        setAuthError(true);
-        return false;
-      }
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   // Clear notification
@@ -110,7 +106,7 @@ export function useRealtimeNotifications(props?: UseRealtimeNotificationsProps) 
       mountedRef.current = false;
       off('notification:new');
     };
-  }, [isConnected, props?.onNewNotification, props?.showAlerts, props?.alertTypes]);
+  }, [isConnected, props?.onNewNotification, props?.showAlerts, props?.alertTypes, checkToken, on, off]);
 
   return {
     // State

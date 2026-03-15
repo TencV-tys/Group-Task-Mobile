@@ -1,8 +1,8 @@
-// notificationHook/useNotifications.ts - UPDATED WITH SECURESTORE
+// notificationHook/useNotifications.ts - UPDATED with TokenUtils
 import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { NotificationService, Notification, NotificationTypes } from '../services/NotificationService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 import { useSocket } from '../context/SocketContext';
 
 interface PaginationInfo {
@@ -23,24 +23,17 @@ export const useNotifications = () => {
     total: 0,
     pages: 0
   });
-const { on, off, isConnected } = useSocket();
-  // Check token before making requests from SecureStore
+  const { on, off, isConnected } = useSocket();
+
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 useNotifications: No auth token available in SecureStore');
-        setAuthError(true);
-        return false;
-      }
-      console.log('✅ useNotifications: Auth token found in SecureStore');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ useNotifications: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   // Load notifications
@@ -196,38 +189,41 @@ const { on, off, isConnected } = useSocket();
   useEffect(() => {
     refreshNotifications();
   }, []);
-useEffect(() => {
-  if (!isConnected) return;
 
-  console.log('🎧 Setting up real-time notification listener');
+  // Real-time notifications
+  useEffect(() => {
+    if (!isConnected) return;
 
-  const handleNewNotification = (data: any) => {
-    console.log('📢 Real-time: New notification', data);
-    
-    // Add to notifications list
-    if (data.notification) {
-      setNotifications(prev => [data.notification, ...prev]);
-      if (!data.notification.read) {
-        setUnreadCount(prev => prev + 1);
+    console.log('🎧 Setting up real-time notification listener');
+
+    const handleNewNotification = (data: any) => {
+      console.log('📢 Real-time: New notification', data);
+      
+      // Add to notifications list
+      if (data.notification) {
+        setNotifications(prev => [data.notification, ...prev]);
+        if (!data.notification.read) {
+          setUnreadCount(prev => prev + 1);
+        }
+      } else if (data) {
+        // Handle case where data itself is the notification
+        setNotifications(prev => [data, ...prev]);
+        if (!data.read) {
+          setUnreadCount(prev => prev + 1);
+        }
       }
-    } else if (data) {
-      // Handle case where data itself is the notification
-      setNotifications(prev => [data, ...prev]);
-      if (!data.read) {
-        setUnreadCount(prev => prev + 1);
-      }
-    }
-    
-    // Refresh unread count
-    loadUnreadCount();
-  };
+      
+      // Refresh unread count
+      loadUnreadCount();
+    };
 
-  on('notification:new', handleNewNotification);
+    on('notification:new', handleNewNotification);
 
-  return () => {
-    off('notification:new', handleNewNotification);
-  };
-}, [isConnected, loadUnreadCount]); // Add loadUnreadCount to dependencies
+    return () => {
+      off('notification:new', handleNewNotification);
+    };
+  }, [isConnected, loadUnreadCount, on, off]);
+
   return {
     // State
     loading,

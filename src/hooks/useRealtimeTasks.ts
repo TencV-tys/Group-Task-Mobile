@@ -1,13 +1,13 @@
+// hooks/useRealtimeTasks.ts - UPDATED with TokenUtils
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 interface RealtimeTaskState {
   taskCreated: any | null;
   taskUpdated: any | null;
   taskDeleted: { taskId: string; taskTitle: string } | null;
   taskAssigned: any | null;
-  // ===== ADD THIS =====
   rotationCompleted: {
     groupId: string;
     newWeek: number;
@@ -26,27 +26,21 @@ export function useRealtimeTasks(groupId: string) {
     taskUpdated: null,
     taskDeleted: null,
     taskAssigned: null,
-    // ===== ADD THIS =====
     rotationCompleted: null
   });
   
   const { on, off, isConnected } = useSocket();
   const mountedRef = useRef(true);
 
-  // Check token
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        setAuthError(true);
-        return false;
-      }
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   // Clear events
@@ -66,7 +60,6 @@ export function useRealtimeTasks(groupId: string) {
     setEvents(prev => ({ ...prev, taskAssigned: null }));
   }, []);
 
-  // ===== ADD THIS =====
   const clearRotationCompleted = useCallback(() => {
     setEvents(prev => ({ ...prev, rotationCompleted: null }));
   }, []);
@@ -77,7 +70,7 @@ export function useRealtimeTasks(groupId: string) {
       taskUpdated: null,
       taskDeleted: null,
       taskAssigned: null,
-      rotationCompleted: null // ← ADD THIS
+      rotationCompleted: null
     });
   }, []);
 
@@ -131,7 +124,6 @@ export function useRealtimeTasks(groupId: string) {
           }
         });
 
-        // ===== ADD THIS =====
         // Rotation completed
         on('rotation:completed', (data: any) => {
           if (data.groupId === groupId && mounted) {
@@ -156,14 +148,13 @@ export function useRealtimeTasks(groupId: string) {
     return () => {
       mounted = false;
       mountedRef.current = false;
-      // Clean up listeners
       off('task:created');
       off('task:updated');
       off('task:deleted');
       off('task:assigned');
-      off('rotation:completed'); // ← ADD THIS
+      off('rotation:completed');
     };
-  }, [groupId, isConnected]);
+  }, [groupId, isConnected, checkToken, on, off]);
 
   return {
     // State
@@ -178,7 +169,7 @@ export function useRealtimeTasks(groupId: string) {
     clearTaskUpdated,
     clearTaskDeleted,
     clearTaskAssigned,
-    clearRotationCompleted, // ← ADD THIS
+    clearRotationCompleted,
     clearAll
   };
-} 
+}

@@ -1,8 +1,8 @@
-// src/hooks/useFeedback.ts - UPDATED - REMOVED POLLING AND FIXED LOADING
+// src/hooks/useFeedback.ts - UPDATED with TokenUtils
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { FeedbackService, Feedback, FeedbackStats } from '../services/FeedbackService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED') => {
   const [loading, setLoading] = useState(false);
@@ -21,23 +21,15 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
 
   const isMounted = useRef(true);
 
-  // Check token before making requests from SecureStore
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 useFeedback: No auth token available in SecureStore');
-        setAuthError(true);
-        return false;
-      }
-      console.log('✅ useFeedback: Auth token found in SecureStore');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ useFeedback: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   // REMOVED POLLING - No more automatic stats updates
@@ -153,53 +145,51 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
     }
   }, [pagination.limit, activeFilter, checkToken]);
 
-  // Load feedback details - FIXED to properly set selected feedback
+  // Load feedback details
   const loadFeedbackDetails = useCallback(async (feedbackId: string) => {
-  try {
-    const hasToken = await checkToken();
-    if (!hasToken) return null;
+    try {
+      const hasToken = await checkToken();
+      if (!hasToken) return null;
 
-    setLoading(true);
-    console.log(`📥 Loading feedback details for ID: ${feedbackId}`);
-    
-    const result = await FeedbackService.getFeedbackDetails(feedbackId);
-    console.log('📦 Feedback details result:', result);
-
-    if (result.success) {
-      // ✅ FIX: Only check the properties that actually exist in FeedbackResponse
-      const feedbackData = result.feedbackItem || result.feedback || null;
+      setLoading(true);
+      console.log(`📥 Loading feedback details for ID: ${feedbackId}`);
       
-      if (feedbackData) {
-        // If feedbackData is an array (from result.feedback), take the first item
-        const selectedItem = Array.isArray(feedbackData) ? feedbackData[0] : feedbackData;
+      const result = await FeedbackService.getFeedbackDetails(feedbackId);
+      console.log('📦 Feedback details result:', result);
+
+      if (result.success) {
+        const feedbackData = result.feedbackItem || result.feedback || null;
         
-        if (selectedItem) {
-          setSelectedFeedback(selectedItem);
-          console.log('✅ Feedback details loaded:', selectedItem.id);
-          return selectedItem;
+        if (feedbackData) {
+          const selectedItem = Array.isArray(feedbackData) ? feedbackData[0] : feedbackData;
+          
+          if (selectedItem) {
+            setSelectedFeedback(selectedItem);
+            console.log('✅ Feedback details loaded:', selectedItem.id);
+            return selectedItem;
+          } else {
+            console.error('❌ No feedback data in response');
+            Alert.alert('Error', 'Feedback data not found');
+            return null;
+          }
         } else {
           console.error('❌ No feedback data in response');
           Alert.alert('Error', 'Feedback data not found');
           return null;
         }
       } else {
-        console.error('❌ No feedback data in response');
-        Alert.alert('Error', 'Feedback data not found');
+        console.error('❌ Failed to load feedback:', result.message);
+        Alert.alert('Error', result.message || 'Failed to load feedback details');
         return null;
       }
-    } else {
-      console.error('❌ Failed to load feedback:', result.message);
-      Alert.alert('Error', result.message || 'Failed to load feedback details');
+    } catch (error) {
+      console.error('❌ Load feedback details error:', error);
+      Alert.alert('Error', 'Failed to load feedback details');
       return null;
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error('❌ Load feedback details error:', error);
-    Alert.alert('Error', 'Failed to load feedback details');
-    return null;
-  } finally {
-    setLoading(false);
-  }
-}, [checkToken]);
+  }, [checkToken]);
 
   // Load stats (manual refresh only - no polling)
   const loadStats = useCallback(async () => {

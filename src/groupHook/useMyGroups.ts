@@ -1,8 +1,8 @@
-// src/hooks/useMyGroups.ts - UPDATED WITH SECURESTORE
+// src/hooks/useMyGroups.ts - UPDATED with TokenUtils
 import { useState, useCallback, useEffect } from 'react';
 import { GroupService } from '../services/GroupService';
 import { GroupMembersService } from '../services/GroupMemberService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 export function useMyGroups() {
   const [groups, setGroups] = useState<any[]>([]);
@@ -11,24 +11,18 @@ export function useMyGroups() {
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<boolean>(false);
 
-  // Check token before making requests from SecureStore
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 useMyGroups: No auth token available in SecureStore');
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => {
         setAuthError(true);
         setError('Please log in again');
-        return false;
       }
-      console.log('✅ useMyGroups: Auth token found in SecureStore');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ useMyGroups: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   // Fetch groups from API

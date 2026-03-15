@@ -1,9 +1,11 @@
-// SwapRequestHooks/useSwapRequests.ts - UPDATED WITH TOKEN CHECKING
+// SwapRequestHooks/useSwapRequests.ts - UPDATED with TokenUtils
 import { useState, useEffect, useCallback } from 'react';
 import { SwapRequestFilters, SwapRequest, SwapRequestService } from '../services/SwapRequestService';
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 import { AuthService } from '../services/AuthService';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+
 export const useSwapRequests = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [myRequests, setMyRequests] = useState<SwapRequest[]>([]);
@@ -14,50 +16,42 @@ export const useSwapRequests = () => {
   const [totalPendingForMe, setTotalPendingForMe] = useState(0);
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests
+  // ✅ UPDATED: Use TokenUtils.checkToken() instead of custom logic
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 useSwapRequests: No auth token available');
-        setAuthError(true);
-        return false;
-      }
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ useSwapRequests: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false, // Don't show alert in hook
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   // Load user ID from SecureStore on mount
- // In useSwapRequests.ts
-useEffect(() => {
-  const loadUserId = async () => {
-    try {
-      const userStr = await SecureStore.getItemAsync('user');
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        setUserId(user.id); 
-      } else {
-        // If no user data but token exists, fetch user data
-        const token = await SecureStore.getItemAsync('userToken');
-        if (token) {
-          const userData = await AuthService.getCurrentUser();
-          if (userData) {
-            await SecureStore.setItemAsync('user', JSON.stringify(userData));
-            setUserId(userData.id);
+  useEffect(() => {
+    const loadUserId = async () => {
+      try {
+        // ✅ Use TokenUtils.getUser()
+        const user = await TokenUtils.getUser();
+        if (user) {
+          setUserId(user.id);
+        } else {
+          // If no user data but token exists, fetch user data
+          const token = await AuthService.getAccessToken();
+          if (token) {
+            const userData = await AuthService.getCurrentUser();
+            if (userData) {
+              await SecureStore.setItemAsync('user', JSON.stringify(userData));
+              setUserId(userData.id);
+            }
           }
         }
+      } catch (error) {
+        console.error('Error loading user:', error);
       }
-    } catch (error) {
-      console.error('Error loading user:', error);
-    }
-  };
-  loadUserId();
-}, []);
+    };
+    loadUserId();
+  }, []);
 
   // Show auth error alert
   useEffect(() => {
@@ -70,8 +64,6 @@ useEffect(() => {
             text: 'OK', 
             onPress: () => {
               setAuthError(false);
-              // You might want to navigate to login here, but since this is a hook,
-              // we'll let the component handle navigation
             }
           }
         ]
@@ -112,7 +104,6 @@ useEffect(() => {
         setMyRequests(requests);
         setTotalMyRequests(total);
         
-        // Log first request for debugging
         if (requests.length > 0) {
           console.log('📋 First request:', JSON.stringify(requests[0], null, 2));
         }
@@ -120,7 +111,6 @@ useEffect(() => {
         console.error('❌ Failed to load requests:', response.message);
         setError(response.message || 'Failed to load swap requests');
         
-        // Check if error is auth-related
         if (response.message?.toLowerCase().includes('token') || 
             response.message?.toLowerCase().includes('auth') ||
             response.message?.toLowerCase().includes('unauthorized')) {
@@ -137,7 +127,6 @@ useEffect(() => {
 
   // Load pending requests for current user
   const loadPendingForMe = useCallback(async (groupId?: string) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -171,7 +160,6 @@ useEffect(() => {
         console.error('❌ Failed to load pending requests:', response.message);
         setError(response.message || 'Failed to load pending requests');
         
-        // Check if error is auth-related
         if (response.message?.toLowerCase().includes('token') || 
             response.message?.toLowerCase().includes('auth') ||
             response.message?.toLowerCase().includes('unauthorized')) {
@@ -196,7 +184,6 @@ useEffect(() => {
     selectedDay?: string;
     selectedTimeSlotId?: string;
   }) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       return { 
@@ -213,7 +200,6 @@ useEffect(() => {
     try {
       console.log('📝 Creating swap request with data:', data);
       
-      // Check if assignment can be swapped first
       const checkResult = await SwapRequestService.checkCanSwap(data.assignmentId);
       
       if (!checkResult.success) {
@@ -230,7 +216,6 @@ useEffect(() => {
         };
       }
       
-      // Create the swap request - service will add auth token from SecureStore
       const response = await SwapRequestService.createSwapRequest(data);
       
       console.log('📦 Create swap request response:', response);
@@ -239,7 +224,6 @@ useEffect(() => {
         await loadMyRequests();
         await loadPendingForMe();
       } else {
-        // Check if error is auth-related
         if (response.message?.toLowerCase().includes('token') || 
             response.message?.toLowerCase().includes('auth') ||
             response.message?.toLowerCase().includes('unauthorized')) {
@@ -259,7 +243,6 @@ useEffect(() => {
 
   // Accept swap request
   const acceptSwapRequest = useCallback(async (requestId: string) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       return { 
@@ -283,7 +266,6 @@ useEffect(() => {
         await loadMyRequests();
         await loadPendingForMe();
         
-        // Get swap details for better message
         const swapRequest = response.data?.swapRequest;
         const scope = response.data?.scope;
         const selectedDay = response.data?.selectedDay;
@@ -302,7 +284,6 @@ useEffect(() => {
         
         Alert.alert('Success', successMessage);
       } else {
-        // Check if error is auth-related
         if (response.message?.toLowerCase().includes('token') || 
             response.message?.toLowerCase().includes('auth') ||
             response.message?.toLowerCase().includes('unauthorized')) {
@@ -322,7 +303,6 @@ useEffect(() => {
 
   // Reject swap request
   const rejectSwapRequest = useCallback(async (requestId: string, reason?: string) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       return { 
@@ -347,7 +327,6 @@ useEffect(() => {
         await loadPendingForMe();
         Alert.alert('Success', 'Swap request rejected successfully.');
       } else {
-        // Check if error is auth-related
         if (response.message?.toLowerCase().includes('token') || 
             response.message?.toLowerCase().includes('auth') ||
             response.message?.toLowerCase().includes('unauthorized')) {
@@ -367,7 +346,6 @@ useEffect(() => {
 
   // Cancel swap request
   const cancelSwapRequest = useCallback(async (requestId: string) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       return { 
@@ -392,7 +370,6 @@ useEffect(() => {
         await loadPendingForMe();
         Alert.alert('Success', 'Swap request cancelled successfully.');
       } else {
-        // Check if error is auth-related
         if (response.message?.toLowerCase().includes('token') || 
             response.message?.toLowerCase().includes('auth') ||
             response.message?.toLowerCase().includes('unauthorized')) {
@@ -431,7 +408,6 @@ useEffect(() => {
 
   // Refresh all data
   const refreshAll = useCallback(async (groupId?: string) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       return;

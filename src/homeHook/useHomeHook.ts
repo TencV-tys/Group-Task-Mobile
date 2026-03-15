@@ -1,7 +1,7 @@
-// homeHook/useHomeData.ts - FIXED with correct parameters
+// homeHook/useHomeData.ts - UPDATED with TokenUtils
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { HomeService, HomeData } from '../services/HomeService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
@@ -22,9 +22,9 @@ export function useHomeData() {
   // ===== GET USER ID AND GROUPS ON MOUNT =====
   useEffect(() => {
     const getUserData = async () => {
-      const userStr = await SecureStore.getItemAsync('user');
-      if (userStr) {
-        const user = JSON.parse(userStr);
+      // ✅ Use TokenUtils.getUser()
+      const user = await TokenUtils.getUser();
+      if (user) {
         setCurrentUserId(user.id);
         
         // Extract user's groups from homeData if available
@@ -110,23 +110,18 @@ export function useHomeData() {
     showAlerts: true
   });
 
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 useHomeData: No auth token available in SecureStore');
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => {
         setAuthError(true);
         setError('Please log in again');
-        return false;
       }
-      console.log('✅ useHomeData: Auth token found in SecureStore');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ useHomeData: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   const processData = useCallback((data: HomeData) => {

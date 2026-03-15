@@ -1,7 +1,7 @@
-// src/hooks/useJoinGroup.ts - UPDATED WITH SECURESTORE
+// src/hooks/useJoinGroup.ts - UPDATED with TokenUtils
 import { useState, useCallback } from 'react';
 import { GroupService } from '../services/GroupService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 export function useJoinGroup() {
   const [loading, setLoading] = useState<boolean>(false);
@@ -10,24 +10,18 @@ export function useJoinGroup() {
   const [joinedGroup, setJoinedGroup] = useState<any>(null);
   const [authError, setAuthError] = useState<boolean>(false);
 
-  // Check token before making requests from SecureStore
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 useJoinGroup: No auth token available in SecureStore');
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => {
         setAuthError(true);
         setError('Please log in again');
-        return false;
       }
-      console.log('✅ useJoinGroup: Auth token found in SecureStore');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ useJoinGroup: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   const joinGroup = useCallback(async (inviteCode: string) => {

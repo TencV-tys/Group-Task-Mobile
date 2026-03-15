@@ -1,7 +1,7 @@
-// src/taskHook/useCreateTask.ts - UPDATED WITH TOKEN CHECK
+// src/taskHook/useCreateTask.ts - UPDATED with TokenUtils
 import { useState, useCallback } from 'react';
 import { TaskService, type CreateTaskData } from '../services/TaskService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 export function useCreateTask() {
   const [loading, setLoading] = useState(false);
@@ -9,23 +9,21 @@ export function useCreateTask() {
   const [success, setSuccess] = useState(false);
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 useCreateTask: No auth token available');
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false, // Don't show alert in hook
+      onAuthError: () => {
         setAuthError(true);
         setError('Please log in again');
-        return false;
       }
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ useCreateTask: Error checking token:', error);
-      setAuthError(true);
-      return false;
+    });
+    
+    setAuthError(!hasToken);
+    if (!hasToken) {
+      setError('Please log in again');
     }
+    return hasToken;
   }, []);
 
   const createTask = async (

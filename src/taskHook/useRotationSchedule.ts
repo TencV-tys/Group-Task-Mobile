@@ -1,5 +1,7 @@
+// hooks/useRotationSchedule.ts - UPDATED with TokenUtils
 import { useState, useEffect, useCallback } from 'react';
 import { TaskService } from '../services/TaskService';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 import { Alert } from 'react-native';
 
 interface ScheduleItem {
@@ -38,6 +40,21 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState(false);
+
+  // ✅ Check token before operations
+  const checkAuth = useCallback(async (): Promise<boolean> => {
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => {
+        setAuthError(true);
+        setError('Authentication required. Please log in again.');
+      }
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
+  }, []);
 
   // Generate week labels
   const generateWeekLabel = useCallback((weekNum: number, currentWeekNum: number): string => {
@@ -142,6 +159,13 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
   // Load rotation schedule
   const loadRotationSchedule = useCallback(async () => {
     try {
+      // ✅ Check authentication first
+      const isAuthenticated = await checkAuth();
+      if (!isAuthenticated) {
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       
@@ -182,6 +206,12 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
         }
         
       } else {
+        // Check if error is auth-related
+        if (result.message?.toLowerCase().includes('token') || 
+            result.message?.toLowerCase().includes('auth') ||
+            result.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
         setError(result.message || 'Failed to load rotation schedule');
       }
     } catch (error: any) {
@@ -191,16 +221,29 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
       setLoading(false);
       setRefreshing(false);
     }
-  }, [groupId, initialWeeks, transformScheduleData, generateWeekLabel]);
+  }, [groupId, initialWeeks, transformScheduleData, generateWeekLabel, checkAuth]);
 
   const rotateTasks = useCallback(async () => {
     try {
+      // ✅ Check authentication first
+      const isAuthenticated = await checkAuth();
+      if (!isAuthenticated) {
+        Alert.alert('Authentication Error', 'Please log in again');
+        return false;
+      }
+
       const result = await TaskService.rotateTasks(groupId);
       if (result.success) {
         Alert.alert('Success', `Tasks rotated to week ${result.newWeek}`);
         await loadRotationSchedule();
         return true;
       } else {
+        // Check if error is auth-related
+        if (result.message?.toLowerCase().includes('token') || 
+            result.message?.toLowerCase().includes('auth') ||
+            result.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
         Alert.alert('Error', result.message || 'Failed to rotate tasks');
         return false;
       }
@@ -208,7 +251,7 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
       Alert.alert('Error', error.message || 'Failed to rotate tasks');
       return false;
     }
-  }, [groupId, loadRotationSchedule]);
+  }, [groupId, loadRotationSchedule, checkAuth]);
 
   // Initialize
   useEffect(() => {
@@ -276,6 +319,7 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     selectedWeek,
     currentWeek,
     error,
+    authError, // 👈 Added authError to return
     selectedWeekData,
     setSelectedWeek,
     loadRotationSchedule,

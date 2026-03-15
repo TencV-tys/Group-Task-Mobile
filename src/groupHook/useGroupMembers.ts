@@ -1,8 +1,8 @@
-// src/hooks/useGroupMembers.ts - UPDATED with maxMembers support
+// src/hooks/useGroupMembers.ts - UPDATED with TokenUtils
 import { useState, useCallback } from 'react';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 export function useGroupMembers() {
   const [loading, setLoading] = useState(false);
@@ -12,24 +12,18 @@ export function useGroupMembers() {
   const [groupInfo, setGroupInfo] = useState<any>(null);
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests from SecureStore
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 useGroupMembers: No auth token available in SecureStore');
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => {
         setAuthError(true);
         setError('Please log in again');
-        return false;
       }
-      console.log('✅ useGroupMembers: Auth token found in SecureStore');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ useGroupMembers: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   // Helper to ensure URLs are complete
@@ -86,18 +80,19 @@ export function useGroupMembers() {
         }
       }
  
-      // Get group info - FIXED to include maxMembers
+      // Get group info
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
-      console.log('📦 RAW API RESPONSE:', JSON.stringify(groupResult, null, 2)); // ← ADD THIS
+      console.log('📦 RAW API RESPONSE:', JSON.stringify(groupResult, null, 2));
+      
       if (groupResult.success) {
-             console.log('📦 Group data from API:', groupResult.group.maxMembers); // ← ADD THIS
-  console.log('📦 maxMembers from API:', groupResult.group?.maxMembers); //
+        console.log('📦 Group data from API:', groupResult.group?.maxMembers);
+        console.log('📦 maxMembers from API:', groupResult.group?.maxMembers);
 
         const groupData = groupResult.group || {};
         if (groupData.avatarUrl) {
           groupData.avatarUrl = ensureFullUrl(groupData.avatarUrl);
         }
-        // ===== FIX: Ensure maxMembers is set (default to 6) =====
+        // Ensure maxMembers is set (default to 6)
         setGroupInfo({
           ...groupData,
           maxMembers: groupData.maxMembers || 6
@@ -133,30 +128,30 @@ export function useGroupMembers() {
   }, []);
 
   const updateMaxMembers = useCallback((newMax: number) => {
-  setGroupInfo((prev: any) => ({
-    ...prev,
-    maxMembers: newMax
-  }));
-}, []);
-
-
-  const updateGroupInfo = useCallback(async (groupId: string, updatedGroup: any) => {
-  try {
-    const hasToken = await checkToken();
-    if (!hasToken) return { success: false, message: 'Authentication required' };
-
     setGroupInfo((prev: any) => ({
       ...prev,
-      ...updatedGroup,
-      maxMembers: updatedGroup.maxMembers || prev?.maxMembers || 6, // ← This should work but might not be called
-      avatarUrl: updatedGroup.avatarUrl ? ensureFullUrl(updatedGroup.avatarUrl) : prev?.avatarUrl
+      maxMembers: newMax
     }));
-    return { success: true };
-  } catch (err: any) {
-    console.error('❌ Error updating group info:', err);
-    return { success: false, message: err.message };
-  }
-}, [ensureFullUrl, checkToken]);
+  }, []);
+
+  const updateGroupInfo = useCallback(async (groupId: string, updatedGroup: any) => {
+    try {
+      const hasToken = await checkToken();
+      if (!hasToken) return { success: false, message: 'Authentication required' };
+
+      setGroupInfo((prev: any) => ({
+        ...prev,
+        ...updatedGroup,
+        maxMembers: updatedGroup.maxMembers || prev?.maxMembers || 6,
+        avatarUrl: updatedGroup.avatarUrl ? ensureFullUrl(updatedGroup.avatarUrl) : prev?.avatarUrl
+      }));
+      return { success: true };
+    } catch (err: any) {
+      console.error('❌ Error updating group info:', err);
+      return { success: false, message: err.message };
+    }
+  }, [ensureFullUrl, checkToken]);
+
   // Transfer ownership
   const transferOwnership = useCallback(async (groupId: string, newAdminId: string) => {
     try {
@@ -307,7 +302,7 @@ export function useGroupMembers() {
     
     // Additional methods
     updateGroupInfo,
-    updateMaxMembers, // ← NEW
+    updateMaxMembers,
     transferOwnership,
     regenerateInviteCode,
     deleteGroup,

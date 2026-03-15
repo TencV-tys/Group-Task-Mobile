@@ -1,8 +1,8 @@
-// src/hooks/useTaskAssignment.ts - UPDATED WITH TOKEN CHECK
+// src/hooks/useTaskAssignment.ts - UPDATED with TokenUtils
 import { useState, useEffect, useCallback } from 'react';
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 export const useTaskAssignment = (groupId: string) => { 
   const [loading, setLoading] = useState(true);
@@ -13,23 +13,18 @@ export const useTaskAssignment = (groupId: string) => {
   const [groupInfo, setGroupInfo] = useState<any>(null);
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 useTaskAssignment: No auth token available');
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => {
         setAuthError(true);
         setError('Please log in again');
-        return false;
       }
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ useTaskAssignment: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   const loadData = useCallback(async (isRefreshing = false) => {

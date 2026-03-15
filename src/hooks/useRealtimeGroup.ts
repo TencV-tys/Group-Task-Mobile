@@ -1,6 +1,7 @@
+// hooks/useRealtimeGroup.ts - UPDATED with TokenUtils
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 interface RealtimeGroupState {
   memberJoined: any | null;
@@ -25,20 +26,15 @@ export function useRealtimeGroup(groupId: string) {
   const { on, off, isConnected } = useSocket();
   const mountedRef = useRef(true);
 
-  // Check token
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        setAuthError(true);
-        return false;
-      }
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   // Clear functions
@@ -149,7 +145,7 @@ export function useRealtimeGroup(groupId: string) {
       off('group:updated');
       off('rotation:completed');
     };
-  }, [groupId, isConnected]);
+  }, [groupId, isConnected, checkToken, on, off]);
 
   return {
     // State

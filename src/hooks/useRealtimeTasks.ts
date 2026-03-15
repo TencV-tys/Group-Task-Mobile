@@ -7,6 +7,14 @@ interface RealtimeTaskState {
   taskUpdated: any | null;
   taskDeleted: { taskId: string; taskTitle: string } | null;
   taskAssigned: any | null;
+  // ===== ADD THIS =====
+  rotationCompleted: {
+    groupId: string;
+    newWeek: number;
+    rotatedTasks: any[];
+    weekStart: Date;
+    weekEnd: Date;
+  } | null;
 }
 
 export function useRealtimeTasks(groupId: string) {
@@ -17,7 +25,9 @@ export function useRealtimeTasks(groupId: string) {
     taskCreated: null,
     taskUpdated: null,
     taskDeleted: null,
-    taskAssigned: null
+    taskAssigned: null,
+    // ===== ADD THIS =====
+    rotationCompleted: null
   });
   
   const { on, off, isConnected } = useSocket();
@@ -56,12 +66,18 @@ export function useRealtimeTasks(groupId: string) {
     setEvents(prev => ({ ...prev, taskAssigned: null }));
   }, []);
 
+  // ===== ADD THIS =====
+  const clearRotationCompleted = useCallback(() => {
+    setEvents(prev => ({ ...prev, rotationCompleted: null }));
+  }, []);
+
   const clearAll = useCallback(() => {
     setEvents({
       taskCreated: null,
       taskUpdated: null,
       taskDeleted: null,
-      taskAssigned: null
+      taskAssigned: null,
+      rotationCompleted: null // ← ADD THIS
     });
   }, []);
 
@@ -115,6 +131,15 @@ export function useRealtimeTasks(groupId: string) {
           }
         });
 
+        // ===== ADD THIS =====
+        // Rotation completed
+        on('rotation:completed', (data: any) => {
+          if (data.groupId === groupId && mounted) {
+            console.log('🔄 Real-time: Rotation completed', data);
+            setEvents(prev => ({ ...prev, rotationCompleted: data }));
+          }
+        });
+
       } catch (err: any) {
         if (mounted) {
           setError(err.message || 'Failed to setup real-time listeners');
@@ -136,6 +161,7 @@ export function useRealtimeTasks(groupId: string) {
       off('task:updated');
       off('task:deleted');
       off('task:assigned');
+      off('rotation:completed'); // ← ADD THIS
     };
   }, [groupId, isConnected]);
 
@@ -152,6 +178,7 @@ export function useRealtimeTasks(groupId: string) {
     clearTaskUpdated,
     clearTaskDeleted,
     clearTaskAssigned,
+    clearRotationCompleted, // ← ADD THIS
     clearAll
   };
-}
+} 

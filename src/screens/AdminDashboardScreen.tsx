@@ -66,7 +66,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
   }, []);
 
   // ===== REAL-TIME EVENT LISTENERS =====
-  const { events: taskEvents } = useRealtimeTasks(groupId);
+  const { events: taskEvents, clearRotationCompleted } = useRealtimeTasks(groupId);
   const { events: assignmentEvents } = useRealtimeAssignments(groupId, currentUserId || '');
   const { events: swapEvents } = useRealtimeSwapRequests(groupId, currentUserId || '');
 
@@ -128,7 +128,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
     },
     showAlerts: true
   });
-
+ 
   useFocusEffect(
     useCallback(() => {
       if (!initialLoadDone.current) {
@@ -136,6 +136,39 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
       }
     }, [groupId])
   );
+
+useEffect(() => {
+  if (taskEvents.rotationCompleted) {
+    console.log('🔄 Admin Dashboard: Rotation completed', taskEvents.rotationCompleted);
+    
+    // Show alert
+    Alert.alert(
+      '🔄 Rotation Completed',
+      `Week ${taskEvents.rotationCompleted.newWeek} has started!\n\n` +
+      `${taskEvents.rotationCompleted.rotatedTasks?.length || 0} tasks were rotated.`,
+      [
+        { 
+          text: 'View Schedule', 
+          onPress: () => {
+            navigation.navigate('RotationSchedule', { 
+              groupId, 
+              groupName, 
+              userRole: 'ADMIN' 
+            });
+            clearRotationCompleted();
+          }
+        },
+        { 
+          text: 'OK',
+          onPress: () => clearRotationCompleted()
+        }
+      ]
+    );
+    
+    // Refresh dashboard data
+    refreshDashboardData();
+  }
+}, [taskEvents.rotationCompleted]);
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     try {

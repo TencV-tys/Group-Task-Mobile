@@ -65,9 +65,47 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   }, []);
 
   // ===== REAL-TIME EVENT LISTENERS =====
-  const { events: taskEvents } = useRealtimeTasks(groupId);
+  const { events: taskEvents, clearRotationCompleted } = useRealtimeTasks(groupId);
   const { events: assignmentEvents } = useRealtimeAssignments(groupId, currentUserId || '');
   const { events: swapEvents } = useRealtimeSwapRequests(groupId, currentUserId || '');
+
+useEffect(() => {
+  if (taskEvents.rotationCompleted) {
+    console.log('🔄 Member Dashboard: Rotation completed', taskEvents.rotationCompleted);
+    
+    // Find MY new tasks from the rotation
+    const myNewTasks = taskEvents.rotationCompleted.rotatedTasks?.filter(
+      (task: any) => task.newAssignee === currentUserId
+    ) || [];
+    
+    Alert.alert(
+      '🔄 New Week Started!',
+      `Week ${taskEvents.rotationCompleted.newWeek} has begun in ${groupName}\n\n` +
+      `You have ${myNewTasks.length} new task(s) assigned.`,
+      [
+        { 
+          text: 'View My Tasks', 
+          onPress: () => {
+            navigation.navigate('GroupTasks', { 
+              groupId, 
+              groupName, 
+              userRole: 'MEMBER',
+              tab: 'my' 
+            });
+            clearRotationCompleted();
+          }
+        },
+        { 
+          text: 'OK',
+          onPress: () => clearRotationCompleted()
+        }
+      ]
+    );
+    
+    // Refresh dashboard data
+    refreshDashboardData();
+  }
+}, [taskEvents.rotationCompleted]);
 
   // Refresh when tasks change
   useEffect(() => {

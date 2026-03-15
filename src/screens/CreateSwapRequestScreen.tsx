@@ -40,7 +40,7 @@ type CreateSwapRequestRouteParams = {
   assignmentDay?: string;
   selectedTimeSlotId?: string;
   scope?: 'week' | 'day';
-};
+}; 
 
 const DAYS_OF_WEEK = [
   'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY'

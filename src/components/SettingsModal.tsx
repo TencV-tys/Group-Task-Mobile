@@ -163,27 +163,38 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
-    const now = new Date();
-    const weekStartDay = new Date(weekStart);
-    weekStartDay.setHours(0, 0, 0, 0);
-    
-    const hoursSinceWeekStart = (now.getTime() - weekStartDay.getTime()) / (1000 * 60 * 60);
-    const isWithinFirst24Hours = hoursSinceWeekStart >= 0 && hoursSinceWeekStart <= 24;
-    
-    if (!isWithinFirst24Hours) {
-      setCanSwapWeek(false);
-      if (hoursSinceWeekStart < 0) {
-        setWeekSwapReason('Week hasn\'t started yet');
-      } else {
-        setWeekSwapReason('Week swap window has closed');
-      }
+const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
+  const now = new Date();
+  const weekStartDay = new Date(weekStart);
+  weekStartDay.setHours(0, 0, 0, 0);
+  
+  const hoursSinceWeekStart = (now.getTime() - weekStartDay.getTime()) / (1000 * 60 * 60);
+  const isWithinFirst24Hours = hoursSinceWeekStart >= 0 && hoursSinceWeekStart <= 24;
+  
+  // Get the day name for better user messaging
+  const weekStartDayName = weekStartDay.toLocaleDateString('en-US', { weekday: 'long' });
+  
+  if (!isWithinFirst24Hours) { 
+    setCanSwapWeek(false);
+    if (hoursSinceWeekStart < 0) {
+      // Week hasn't started yet
+      setWeekSwapReason(`Week starts on ${weekStartDayName}`);
     } else {
-      setCanSwapWeek(true);
-      const hoursLeft = Math.ceil(24 - hoursSinceWeekStart);
-      setWeekSwapReason(`${hoursLeft} hour(s) left to swap`);
+      // Week swap window closed
+      setWeekSwapReason(`Week swap window closed (week started ${weekStartDayName})`);
+    } 
+  } else {
+    setCanSwapWeek(true);
+    const hoursLeft = Math.ceil(24 - hoursSinceWeekStart);
+    const minutesLeft = Math.ceil((24 - hoursSinceWeekStart) * 60);
+    
+    if (hoursLeft < 1) {
+      setWeekSwapReason(`${minutesLeft} minutes left (week started ${weekStartDayName})`);
+    } else {
+      setWeekSwapReason(`${hoursLeft} hour${hoursLeft > 1 ? 's' : ''} left (week started ${weekStartDayName})`);
     }
-  };
+  }
+};
 
   useEffect(() => {
     if (visible) {

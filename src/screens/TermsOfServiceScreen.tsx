@@ -1,4 +1,4 @@
-// src/screens/TermsOfServiceScreen.tsx - UPDATED with token check
+// src/screens/TermsOfServiceScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -11,19 +11,19 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function TermsOfServiceScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // Check if user is authenticated (but don't block access)
+  // ===== CHECK AUTH STATUS USING TOKENUTILS =====
   const checkAuth = useCallback(async () => {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
-      // Just for info, don't block access
-      console.log('🔐 TermsOfService: Auth status:', token ? 'Logged in' : 'Guest');
+      // Get user to check if logged in (non-blocking)
+      const user = await TokenUtils.getUser();
+      console.log('🔐 TermsOfService: Auth status:', user ? 'Logged in' : 'Guest');
     } catch (error) {
       console.error('Error checking auth:', error);
     } finally {
@@ -282,7 +282,7 @@ export default function TermsOfServiceScreen({ navigation }: any) {
   );
 }
 
-// Add these to your styles
+// Styles remain exactly the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,

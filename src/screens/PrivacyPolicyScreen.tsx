@@ -1,4 +1,4 @@
-// src/screens/PrivacyPolicyScreen.tsx - UPDATED with token check
+// src/screens/PrivacyPolicyScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -10,17 +10,18 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function PrivacyPolicyScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
 
-  // Check auth status (but don't block access)
+  // ===== CHECK AUTH STATUS USING TOKENUTILS =====
   const checkAuth = useCallback(async () => {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
-      console.log('🔐 PrivacyPolicy: Auth status:', token ? 'Logged in' : 'Guest');
+      // Get user to check if logged in (non-blocking)
+      const user = await TokenUtils.getUser();
+      console.log('🔐 PrivacyPolicy: Auth status:', user ? 'Logged in' : 'Guest');
     } catch (error) {
       console.error('Error checking auth:', error);
     } finally {

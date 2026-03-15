@@ -1,5 +1,5 @@
-// src/screens/TaskAssignmentScreen.tsx - UPDATED with clean UI and consistent colors
-import React, { useState } from 'react';
+// src/screens/TaskAssignmentScreen.tsx - UPDATED with TokenUtils
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,9 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTaskAssignment } from '../taskHook/useTaskAssignment';
-  import { ScreenWrapper } from '../components/ScreenWrapper';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { ScreenWrapper } from '../components/ScreenWrapper';
+
 export default function TaskAssignmentScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
   
@@ -28,12 +30,31 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     members,
     groupInfo,
     loadData,
-    reassignTask
+    reassignTask,
+    authError // 👈 Make sure this is returned from the hook
   } = useTaskAssignment(groupId);
 
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [showAssigneeModal, setShowAssigneeModal] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
 
   // Get members already assigned to tasks for current week
   const getAssignedMembersForWeek = () => {
@@ -586,6 +607,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   );
 }
 
+// Styles remain exactly the same as your original
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 

@@ -1,4 +1,4 @@
-// src/screens/SwapRequestDetailsScreen.tsx - COMPLETELY FIXED with LinearGradient and colors
+// src/screens/SwapRequestDetailsScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -18,8 +18,9 @@ import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
+
 type SwapRequestDetailsRouteParams = {
   requestId: string;
 };
@@ -40,8 +41,9 @@ export const SwapRequestDetailsScreen = () => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [authError, setAuthError] = useState(false);
 
-   const {
+  const {
     events: swapEvents,
     clearSwapResponded,
     clearSwapAccepted,
@@ -50,29 +52,42 @@ export const SwapRequestDetailsScreen = () => {
     clearSwapExpired
   } = useRealtimeSwapRequests('', currentUserId || '');
 
+  // ===== LOAD USER ID USING TOKENUTILS =====
   useEffect(() => {
+    const loadCurrentUser = async () => {
+      try {
+        const user = await TokenUtils.getUser();
+        if (user) {
+          setCurrentUserId(user.id);
+          console.log('✅ Current user ID:', user.id);
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
+      }
+    };
     loadCurrentUser();
-    loadRequestDetails();
-  }, [requestId]);
+  }, []);
 
-  const loadCurrentUser = async () => {
-    try {
-      // Try to get user from SecureStore
-      let userStr = await SecureStore.getItemAsync('user');
-      if (!userStr) {
-        userStr = await SecureStore.getItemAsync('userData');
-      }
-      
-      if (userStr) {
-        const user = JSON.parse(userStr);
-        setCurrentUserId(user.id || user._id);
-        console.log('✅ Current user ID:', user.id || user._id);
-      }
-    } catch (error) {
-      console.error('Error loading user:', error);
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.goBack();
+            }
+          }
+        ]
+      );
     }
-  };
- useRealtimeNotifications({
+  }, [authError, navigation]);
+
+  useRealtimeNotifications({
     onNewNotification: (notification) => {
       if (notification.data?.swapRequestId === requestId) {
         loadRequestDetails();
@@ -81,7 +96,11 @@ export const SwapRequestDetailsScreen = () => {
     showAlerts: true
   });
 
-  // ========== ADD THIS: Handle real-time events for this specific request ==========
+  useEffect(() => {
+    loadRequestDetails();
+  }, [requestId]);
+
+  // ========== HANDLE REAL-TIME EVENTS ==========
   useEffect(() => {
     if (swapEvents.swapResponded && swapEvents.swapResponded.swapRequestId === requestId) {
       loadRequestDetails();
@@ -121,15 +140,18 @@ export const SwapRequestDetailsScreen = () => {
     }
   }, [swapEvents.swapExpired]);
 
-
   const loadRequestDetails = async () => {
     setLoading(true);
     try {
       console.log('📥 Loading swap request details:', requestId);
       
       // Check token first
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
+      const hasToken = await TokenUtils.checkToken({
+        showAlert: false,
+        onAuthError: () => setAuthError(true)
+      });
+      
+      if (!hasToken) {
         setError('Authentication required. Please log in again.');
         setLoading(false);
         return;
@@ -279,7 +301,7 @@ export const SwapRequestDetailsScreen = () => {
   const statusIcon = SwapRequestService.getStatusIcon(request.status);
   const isPending = request.status === 'PENDING';
   
-  // ✅ CORRECT PERMISSION LOGIC
+  // Permission logic
   const isRequester = request.requestedBy === currentUserId;
   const isTarget = request.targetUserId === currentUserId;
   const isOpenToAnyone = !request.targetUserId;
@@ -675,8 +697,9 @@ export const SwapRequestDetailsScreen = () => {
       )}
     </ScreenWrapper>
   );
-};
+}
 
+// Styles remain exactly the same as your original
 const styles = StyleSheet.create({
   container: {
     flex: 1,

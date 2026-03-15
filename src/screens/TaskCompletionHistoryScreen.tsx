@@ -1,3 +1,4 @@
+// src/screens/TaskCompletionHistoryScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -10,13 +11,14 @@ import {
   RefreshControl,
   StatusBar,
   TextInput,
-  Image
+  Image,
+  Alert
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GroupActivityService } from '../services/GroupActivityService';
 import { TaskService } from '../services/TaskService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function TaskCompletionHistoryScreen({ navigation, route }: any) {
@@ -32,25 +34,35 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   const [searchQuery, setSearchQuery] = useState('');
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests
+  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 TaskCompletionHistoryScreen: No auth token available');
-        setAuthError(true);
-        setError('Please log in again');
-        return false;
-      }
-      console.log('✅ TaskCompletionHistoryScreen: Auth token found');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ TaskCompletionHistoryScreen: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
 
   useEffect(() => {
     const initialize = async () => {
@@ -274,52 +286,51 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
       </View>
 
       {/* Week Filter */}
-     {/* Week Filter */}
-<View style={styles.filterSection}>
-  <Text style={styles.filterLabel}>Filter by Week:</Text>
-  <View style={styles.weekButtons}>
-    <TouchableOpacity
-      style={styles.weekButton}
-      onPress={() => setSelectedWeek(null)}
-    >
-      <LinearGradient
-        colors={!selectedWeek ? ['#495057', '#212529'] : ['#f8f9fa', '#e9ecef']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.weekButtonGradient}
-      >
-        <Text style={[
-          styles.weekButtonText,
-          !selectedWeek && styles.activeWeekText
-        ]}>
-          All
-        </Text>
-      </LinearGradient>
-    </TouchableOpacity>
-    
-    {getWeekOptions().map(week => (
-      <TouchableOpacity
-        key={week}
-        style={styles.weekButton}
-        onPress={() => setSelectedWeek(week)}
-      >
-        <LinearGradient
-          colors={selectedWeek === week ? ['#495057', '#212529'] : ['#f8f9fa', '#e9ecef']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.weekButtonGradient}
-        >
-          <Text style={[
-            styles.weekButtonText,
-            selectedWeek === week && styles.activeWeekText
-          ]}>
-            W{week}
-          </Text>
-        </LinearGradient>
-      </TouchableOpacity>
-    ))}
-  </View>
-</View>
+      <View style={styles.filterSection}>
+        <Text style={styles.filterLabel}>Filter by Week:</Text>
+        <View style={styles.weekButtons}>
+          <TouchableOpacity
+            style={styles.weekButton}
+            onPress={() => setSelectedWeek(null)}
+          >
+            <LinearGradient
+              colors={!selectedWeek ? ['#495057', '#212529'] : ['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.weekButtonGradient}
+            >
+              <Text style={[
+                styles.weekButtonText,
+                !selectedWeek && styles.activeWeekText
+              ]}>
+                All
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          
+          {getWeekOptions().map(week => (
+            <TouchableOpacity
+              key={week}
+              style={styles.weekButton}
+              onPress={() => setSelectedWeek(week)}
+            >
+              <LinearGradient
+                colors={selectedWeek === week ? ['#495057', '#212529'] : ['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.weekButtonGradient}
+              >
+                <Text style={[
+                  styles.weekButtonText,
+                  selectedWeek === week && styles.activeWeekText
+                ]}>
+                  W{week}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
     </LinearGradient>
   );
 
@@ -554,6 +565,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   );
 }
 
+// Styles remain exactly the same as your original
 const styles = StyleSheet.create({
   container: {
     flex: 1,

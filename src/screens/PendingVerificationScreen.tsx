@@ -1,4 +1,4 @@
-// src/screens/PendingVerificationsScreen.tsx - UPDATED with clean UI and consistent colors
+// src/screens/PendingVerificationsScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,19 +15,42 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { AssignmentService } from '../services/AssignmentService'; 
+import { AssignmentService } from '../services/AssignmentService';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
+
 export default function PendingVerificationsScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState(false);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [filter, setFilter] = useState<'pending' | 'verified' | 'rejected'>('pending');
   const [stats, setStats] = useState<any>(null);
   
   const isAdmin = userRole === 'ADMIN';
 
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
+
+  // ===== CHECK ADMIN ACCESS =====
   useEffect(() => {
     if (!isAdmin) {
       Alert.alert('Access Denied', 'Only administrators can access this screen');
@@ -39,6 +62,14 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   }, [groupId, filter]);
 
   const fetchStats = async () => {
+    // Check token first
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    if (!hasToken) return;
+
     try {
       const result = await AssignmentService.getAssignmentStats(groupId);
       if (result.success && result.data) {
@@ -50,6 +81,18 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   };
 
   const fetchSubmissions = async (isRefreshing = false) => {
+    // Check token first
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (isRefreshing) setRefreshing(true);
     else setLoading(true);
     
@@ -127,6 +170,14 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   };
 
   const handleQuickApprove = async (assignmentId: string, taskTitle: string) => {
+    // Check token first
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    if (!hasToken) return;
+
     Alert.alert(
       'Approve Submission',
       `Are you sure you want to approve "${taskTitle}"?`,
@@ -160,6 +211,14 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   };
 
   const handleQuickReject = async (assignmentId: string, taskTitle: string) => {
+    // Check token first
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    if (!hasToken) return;
+
     Alert.alert(
       'Reject Submission',
       `Are you sure you want to reject "${taskTitle}"?`,
@@ -609,6 +668,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   );
 }
 
+// Styles remain exactly the same as your original
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -1,4 +1,4 @@
-// src/screens/ProfileScreen.tsx - REFACTORED with token checking
+// src/screens/ProfileScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -12,13 +12,13 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 
 import { AuthService } from '../services/AuthService';
 import { useImageUpload } from '../uploadHook/useImageUpload';
 import { useFeedback } from '../feedbackHook/useFeedback';
 import { useNotifications } from '../notificationHook/useNotifications';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { API_BASE_URL } from '../config/api';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { profileStyles } from '../styles/profile.styles';
@@ -72,29 +72,23 @@ export default function ProfileScreen({ navigation }: any) {
     showAlerts: true
   });
 
-  // ===== TOKEN CHECK =====
+  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        setAuthError(true);
-        return false;
-      }
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
-  // ===== GET USER ID =====
+  // ===== UPDATED: GET USER ID USING TOKENUTILS =====
   useEffect(() => {
     const getUserId = async () => {
       try {
-        const userStr = await SecureStore.getItemAsync('user');
-        if (userStr) {
-          const user = JSON.parse(userStr);
+        const user = await TokenUtils.getUser(); // 👈 USE TOKENUTILS
+        if (user) {
           setCurrentUserId(user.id);
         }
       } catch (error) {
@@ -125,7 +119,7 @@ export default function ProfileScreen({ navigation }: any) {
         ]
       );
     }
-  }, [authError]);
+  }, [authError, navigation]);
 
   const loadUserData = async (forceRefresh = false) => {
     const hasToken = await checkToken();

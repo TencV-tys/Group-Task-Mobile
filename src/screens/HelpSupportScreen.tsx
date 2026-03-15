@@ -1,4 +1,4 @@
-// src/screens/HelpSupportScreen.tsx - UPDATED with token check (no contact)
+// src/screens/HelpSupportScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -10,19 +10,20 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 
 export default function HelpSupportScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
 
-  // ===== CHECK AUTH STATUS =====
+  // ===== CHECK AUTH STATUS USING TOKENUTILS =====
   const checkAuth = useCallback(async () => {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
-      console.log('🔐 HelpSupport: Auth status:', token ? 'Logged in' : 'Guest');
+      // Get user to check if logged in (non-blocking)
+      const user = await TokenUtils.getUser();
+      console.log('🔐 HelpSupport: Auth status:', user ? 'Logged in' : 'Guest');
     } catch (error) {
       console.error('Error checking auth:', error);
     } finally {
@@ -366,7 +367,6 @@ export default function HelpSupportScreen({ navigation }: any) {
   );
 }
 
-// Add these to your styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,

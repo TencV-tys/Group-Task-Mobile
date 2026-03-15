@@ -1,4 +1,4 @@
-// src/screens/MySwapRequestsScreen.tsx - FIXED with green clear filter
+// src/screens/MySwapRequestsScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { ScreenWrapper } from '../components/ScreenWrapper';
@@ -41,7 +41,9 @@ export const MySwapRequestsScreen = () => {
   const [page, setPage] = useState(0);
   const [userLoading, setUserLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [authError, setAuthError] = useState(false);
   const limit = 20;
+  
   const {
     events: swapEvents,
     clearSwapResponded,
@@ -50,20 +52,18 @@ export const MySwapRequestsScreen = () => {
     clearSwapCancelled,
     clearSwapExpired
   } = useRealtimeSwapRequests('', userId || '');
-  // Load user ID on mount from SecureStore
+
+  // ===== LOAD USER ID USING TOKENUTILS =====
   useEffect(() => {
     const loadUserId = async () => {
       try {
         setUserLoading(true);
-        // Try to get userData from SecureStore
-        let userStr = await SecureStore.getItemAsync('userData');
-        if (!userStr) {
-          userStr = await SecureStore.getItemAsync('user');
-        }
+        const user = await TokenUtils.getUser(); // 👈 USE TOKENUTILS
         
-        if (userStr) {
-          const user = JSON.parse(userStr);
-          setUserId(user.id || user._id);
+        if (user) {
+          setUserId(user.id);
+        } else {
+          console.log('No user found');
         }
       } catch (error) {
         console.error('Error loading user:', error);
@@ -73,6 +73,26 @@ export const MySwapRequestsScreen = () => {
     };
     loadUserId();
   }, []);
+
+  // ===== AUTH ERROR HANDLER =====
+ useEffect(() => {
+  if (authError) {
+    Alert.alert(
+      'Session Expired',
+      'Please log in again',
+      [
+        { 
+          text: 'OK', 
+          onPress: () => {
+            setAuthError(false);
+            // @ts-ignore
+            navigation.navigate('Login');
+          }
+        }
+      ]
+    );
+  }
+}, [authError, navigation]);
 
   useEffect(() => {
     if (swapEvents.swapResponded) {
@@ -468,7 +488,7 @@ export const MySwapRequestsScreen = () => {
                 onPress={() => setActiveFilter('ALL')}
               >
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}  // GREEN gradient
+                  colors={['#2b8a3e', '#1e6b2c']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.clearFilterGradient}

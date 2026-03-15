@@ -1,4 +1,4 @@
-// src/screens/MemberDashboardScreen.tsx - REFACTORED with clickable stat cards
+// src/screens/MemberDashboardScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -21,6 +21,7 @@ import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { SettingsModal } from '../components/SettingsModal';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { memberDashboardStyles as styles } from '../styles/memberDashboard.styles';
@@ -44,13 +45,12 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
 
-  // ===== GET USER ID ON MOUNT =====
+  // ===== GET USER ID USING TOKENUTILS =====
   useEffect(() => {
     const getUserId = async () => {
       try {
-        const userStr = await SecureStore.getItemAsync('user');
-        if (userStr) {
-          const user = JSON.parse(userStr);
+        const user = await TokenUtils.getUser(); // 👈 USE TOKENUTILS
+        if (user) {
           setCurrentUserId(user.id);
         }
       } catch (error) {
@@ -69,43 +69,42 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   const { events: assignmentEvents } = useRealtimeAssignments(groupId, currentUserId || '');
   const { events: swapEvents } = useRealtimeSwapRequests(groupId, currentUserId || '');
 
-useEffect(() => {
-  if (taskEvents.rotationCompleted) {
-    console.log('🔄 Member Dashboard: Rotation completed', taskEvents.rotationCompleted);
-    
-    // Find MY new tasks from the rotation
-    const myNewTasks = taskEvents.rotationCompleted.rotatedTasks?.filter(
-      (task: any) => task.newAssignee === currentUserId
-    ) || [];
-    
-    Alert.alert(
-      '🔄 New Week Started!',
-      `Week ${taskEvents.rotationCompleted.newWeek} has begun in ${groupName}\n\n` +
-      `You have ${myNewTasks.length} new task(s) assigned.`,
-      [
-        { 
-          text: 'View My Tasks', 
-          onPress: () => {
-            navigation.navigate('GroupTasks', { 
-              groupId, 
-              groupName, 
-              userRole: 'MEMBER',
-              tab: 'my' 
-            });
-            clearRotationCompleted();
+  // ===== ROTATION COMPLETED HANDLER =====
+  useEffect(() => {
+    if (taskEvents.rotationCompleted) {
+      console.log('🔄 Member Dashboard: Rotation completed', taskEvents.rotationCompleted);
+      
+      const myNewTasks = taskEvents.rotationCompleted.rotatedTasks?.filter(
+        (task: any) => task.newAssignee === currentUserId
+      ) || [];
+      
+      Alert.alert(
+        '🔄 New Week Started!',
+        `Week ${taskEvents.rotationCompleted.newWeek} has begun in ${groupName}\n\n` +
+        `You have ${myNewTasks.length} new task(s) assigned.`,
+        [
+          { 
+            text: 'View My Tasks', 
+            onPress: () => {
+              navigation.navigate('GroupTasks', { 
+                groupId, 
+                groupName, 
+                userRole: 'MEMBER',
+                tab: 'my' 
+              });
+              clearRotationCompleted();
+            }
+          },
+          { 
+            text: 'OK',
+            onPress: () => clearRotationCompleted()
           }
-        },
-        { 
-          text: 'OK',
-          onPress: () => clearRotationCompleted()
-        }
-      ]
-    );
-    
-    // Refresh dashboard data
-    refreshDashboardData();
-  }
-}, [taskEvents.rotationCompleted]);
+        ]
+      );
+      
+      refreshDashboardData();
+    }
+  }, [taskEvents.rotationCompleted]);
 
   // Refresh when tasks change
   useEffect(() => {
@@ -177,24 +176,35 @@ useEffect(() => {
     }, [groupId])
   );
 
+  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 MemberDashboard: No auth token available');
-        setAuthError(true);
-        setError('Please log in again');
-        return false;
-      }
-      console.log('✅ MemberDashboard: Auth token found');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ MemberDashboard: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
 
   const loadDashboardData = async (isRefreshing = false) => {
     const hasToken = await checkToken();
@@ -284,25 +294,6 @@ useEffect(() => {
   const handleSettingsPress = () => {
     setShowSettingsModal(true);
   };
-
-  // Handle auth error
-  useEffect(() => {
-    if (authError) {
-      Alert.alert(
-        'Session Expired',
-        'Please log in again',
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              setAuthError(false);
-              navigation.navigate('Login');
-            }
-          }
-        ]
-      );
-    }
-  }, [authError]);
 
   // ===== CLICKABLE STAT CARD =====
   const StatCard = ({ 
@@ -600,13 +591,13 @@ useEffect(() => {
             navigationParams={{ groupId, groupName }}
           />
           <StatCard
-    title="My Neglected"
-    value={stats?.myNeglectedCount || 0}
-    icon="timer-off"
-    color="#fa5252"
-    navigateTo="NeglectedTasks"
-    navigationParams={{ groupId, groupName, userRole: 'MEMBER' }}
-  />
+            title="My Neglected"
+            value={stats?.myNeglectedCount || 0}
+            icon="timer-off"
+            color="#fa5252"
+            navigateTo="NeglectedTasks"
+            navigationParams={{ groupId, groupName, userRole: 'MEMBER' }}
+          />
         </View>
 
         {/* Today's Tasks */}

@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.tsx - COMPLETELY FIXED with GroupListener
+// src/screens/HomeScreen.tsx - UPDATED with TokenUtils for user ID
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -13,15 +13,15 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as SecureStore from 'expo-secure-store';
 
 import { useHomeData } from '../homeHook/useHomeHook';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { useNotifications } from '../notificationHook/useNotifications';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { RotationBanner } from '../components/RotationBanner';
-import { GroupListener } from '../components/GroupListener'; // 👈 IMPORT THE NEW COMPONENT
+import { GroupListener } from '../components/GroupListener';
 import { homeStyles as styles } from '../styles/home.styles';
 
 export default function HomeScreen({ navigation }: any) {
@@ -33,13 +33,12 @@ export default function HomeScreen({ navigation }: any) {
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
   const { unreadCount, loadUnreadCount, refreshNotifications } = useNotifications();
 
-  // Get user ID on mount
+  // ===== GET USER ID USING TOKENUTILS =====
   useEffect(() => {
     const getUserId = async () => {
       try {
-        const userStr = await SecureStore.getItemAsync('user');
-        if (userStr) {
-          const user = JSON.parse(userStr);
+        const user = await TokenUtils.getUser(); // 👈 USE TOKENUTILS
+        if (user) {
           setCurrentUserId(user.id);
         }
       } catch (error) {
@@ -95,7 +94,7 @@ export default function HomeScreen({ navigation }: any) {
     loadUnreadCount();
   }, []);
 
-  // Handle auth error
+  // Handle auth error (already from useHomeData)
   useEffect(() => {
     if (authError) {
       Alert.alert(

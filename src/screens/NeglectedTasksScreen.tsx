@@ -1,4 +1,4 @@
-// src/screens/NeglectedTasksScreen.tsx - UPDATED with token check
+// src/screens/NeglectedTasksScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -12,9 +12,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import * as SecureStore from 'expo-secure-store';
 
 import { AssignmentService } from '../services/AssignmentService';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export const NeglectedTasksScreen = ({ navigation, route }: any) => {
@@ -31,21 +31,15 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
 
-  // ===== TOKEN CHECK =====
+  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        setAuthError(true);
-        setError('Please log in again');
-        return false;
-      }
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   // ===== AUTH ERROR HANDLER =====
@@ -59,13 +53,14 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
             text: 'OK', 
             onPress: () => {
               setAuthError(false);
+              // @ts-ignore - navigation type issue
               navigation.navigate('Login');
             }
           }
         ]
       );
     }
-  }, [authError]);
+  }, [authError, navigation]);
 
   useEffect(() => {
     return () => {
@@ -322,7 +317,7 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
   );
 };
 
-// Add these to your styles
+// Styles remain exactly the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,

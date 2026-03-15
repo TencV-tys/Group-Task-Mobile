@@ -1,4 +1,5 @@
-// src/screens/GroupMembersScreen.tsx - REFACTORED with GroupSettingsService
+
+// src/screens/GroupMembersScreen.tsx - Just update checkToken
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
@@ -24,6 +25,7 @@ import { useGroupMembers } from '../groupHook/useGroupMembers';
 import { useImageUpload } from '../uploadHook/useImageUpload';
 import { useRealtimeGroup } from '../hooks/useRealtimeGroup';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { groupMembersStyles as styles } from '../styles/groupMembers.styles';
 
@@ -74,7 +76,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedMemberForTransfer, setSelectedMemberForTransfer] = useState<any>(null);
   
-  // ===== NEW: Member Limit State =====
+  // Member Limit State
   const [showMaxModal, setShowMaxModal] = useState(false);
   const [newMax, setNewMax] = useState('6');
   const [updatingMax, setUpdatingMax] = useState(false);
@@ -107,18 +109,21 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     showAlerts: true
   });
 
-  // ===== TOKEN CHECK =====
+  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => {
         Alert.alert('Session Expired', 'Please log in again');
-        return false;
       }
-      return true;
-    } catch (error) {
-      return false;
-    }
+    });
+    return hasToken;
+  }, []); 
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    // The TokenUtils.checkToken already handles alerts,
+    // but you can add navigation here if needed
   }, []);
 
   // ===== HANDLE REAL-TIME GROUP EVENTS =====
@@ -290,39 +295,35 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     }
   };
 
-  // In GroupMembersScreen.tsx - Update handleUpdateMaxMembers
-const handleUpdateMaxMembers = async () => {
-  const max = parseInt(newMax);
-  if (isNaN(max) || max < 6 || max > 10) {
-    Alert.alert('Error', 'Please select a number between 6 and 10');
-    return;
-  }
-
-  setUpdatingMax(true);
-  try {
-    const result = await GroupSettingsService.updateMaxMembers(groupId, max);
-    if (result.success && isMounted.current) {
-      // ===== USE THE DEDICATED FUNCTION =====
-      updateMaxMembers(max); // ← This updates the UI immediately
-      
-      Alert.alert('Success', `Group capacity updated to ${max} members`);
-      setShowMaxModal(false);
-      
-      // Optional refresh to confirm
-      fetchData(true);
-    } else {
-      Alert.alert('Error', result.message || 'Failed to update capacity');
+  const handleUpdateMaxMembers = async () => {
+    const max = parseInt(newMax);
+    if (isNaN(max) || max < 6 || max > 10) {
+      Alert.alert('Error', 'Please select a number between 6 and 10');
+      return;
     }
-  } catch (err: any) {
-    Alert.alert('Error', err.message || 'Failed to update capacity');
-  } finally {
-    if (isMounted.current) {
-      setUpdatingMax(false);
-    }
-  }
-};
 
-  // ===== NEW: Member Limit Banner =====
+    setUpdatingMax(true);
+    try {
+      const result = await GroupSettingsService.updateMaxMembers(groupId, max);
+      if (result.success && isMounted.current) {
+        updateMaxMembers(max);
+        
+        Alert.alert('Success', `Group capacity updated to ${max} members`);
+        setShowMaxModal(false);
+        
+        fetchData(true);
+      } else {
+        Alert.alert('Error', result.message || 'Failed to update capacity');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to update capacity');
+    } finally {
+      if (isMounted.current) {
+        setUpdatingMax(false);
+      }
+    }
+  };
+
   const renderMemberLimitBanner = () => {
     if (!groupInfo) return null;
     

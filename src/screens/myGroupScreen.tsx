@@ -28,7 +28,8 @@ export default function MyGroupsScreen({ navigation }: any) {
     fetchGroups, 
     refreshGroups,  
     addGroup,
-    updateGroupAvatar
+    updateGroupAvatar,
+    authError
   } = useMyGroups();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,6 +39,16 @@ export default function MyGroupsScreen({ navigation }: any) {
   useEffect(() => {
     fetchGroups();
   }, []);
+
+useEffect(() => {
+  if (authError) {
+    Alert.alert(
+      'Session Expired',
+      'Please log in again',
+      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+    );
+  }
+}, [authError, navigation]);
 
   const handleCreateGroup = () => {
     navigation.navigate('CreateGroup', {

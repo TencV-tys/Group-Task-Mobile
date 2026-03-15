@@ -1,4 +1,4 @@
-// src/screens/PendingSwapRequestsScreen.tsx - COMPLETE WITH REAL-TIME UPDATES
+// src/screens/PendingSwapRequestsScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -20,12 +20,13 @@ import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export const PendingSwapRequestsScreen = () => {
   const navigation = useNavigation();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [authError, setAuthError] = useState(false);
   
   const {
     pendingForMe,
@@ -50,20 +51,15 @@ export const PendingSwapRequestsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // Load user ID on mount
+  // ===== LOAD USER ID USING TOKENUTILS =====
   useEffect(() => {
     const loadUserId = async () => {
       try {
-        const userStr = await SecureStore.getItemAsync('user');
-        if (userStr) {
-          const user = JSON.parse(userStr);
+        const user = await TokenUtils.getUser(); // 👈 USE TOKENUTILS
+        if (user) {
           setCurrentUserId(user.id);
         } else {
-          const userDataStr = await SecureStore.getItemAsync('userData');
-          if (userDataStr) {
-            const userData = JSON.parse(userDataStr);
-            setCurrentUserId(userData.id || userData._id);
-          }
+          console.log('No user found');
         }
       } catch (error) {
         console.error('Error loading user:', error);
@@ -71,6 +67,25 @@ export const PendingSwapRequestsScreen = () => {
     };
     loadUserId();
   }, []);
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              (navigation as any).navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
 
   // ========== HANDLE REAL-TIME EVENTS ==========
   useEffect(() => {
@@ -204,10 +219,11 @@ export const PendingSwapRequestsScreen = () => {
     );
   };
 
-const handleViewDetails = (requestId: string) => {
-  // Use type assertion to bypass the TypeScript error
-  (navigation as any).navigate('SwapRequestDetails', { requestId });
-};
+  const handleViewDetails = (requestId: string) => {
+    // Use type assertion to bypass the TypeScript error
+    (navigation as any).navigate('SwapRequestDetails', { requestId });
+  };
+
   const renderSwapRequest = ({ item }: { item: any }) => {
     const statusColor = SwapRequestService.getStatusColor(item.status);
     const statusLabel = SwapRequestService.getStatusLabel(item.status);
@@ -441,7 +457,7 @@ const handleViewDetails = (requestId: string) => {
         
         <TouchableOpacity
           style={styles.historyButton}
-          onPress={() => navigation.navigate('MySwapRequests' as never)}
+          onPress={() => (navigation as any).navigate('MySwapRequests')}
         >
           <MaterialCommunityIcons name="history" size={22} color="#495057" />
         </TouchableOpacity>
@@ -481,6 +497,7 @@ const handleViewDetails = (requestId: string) => {
   );
 };
 
+// Styles remain exactly the same as your original
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -1,4 +1,5 @@
-// src/screens/GroupTasksScreen.tsx
+
+// src/screens/GroupTasksScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -24,6 +25,7 @@ import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { styles } from '../styles/groupTasks.styles';
 
 type TabType = 'all' | 'my';
@@ -94,29 +96,25 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     clearSwapCreated
   } = useRealtimeSwapRequests(groupId, currentUserId || '');
 
+  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        setAuthError(true);
-        setError('Please log in again');
-        return false;
-      }
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
+  // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
       Alert.alert('Session Expired', 'Please log in again', [
         { text: 'OK', onPress: () => navigation.navigate('Login') }
       ]);
     }
-  }, [authError]);
+  }, [authError, navigation]);
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -507,7 +505,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       navigation.navigate('MemberDashboard', { groupId, groupName, userRole });
     }
   };
-
   const renderAssignmentInfo = (task: any) => {
     const hasAssignment = task.userAssignment || task.assignments?.length > 0;
     if (!hasAssignment) {

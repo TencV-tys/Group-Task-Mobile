@@ -1,4 +1,4 @@
-// src/screens/GroupSwapHistoryScreen.tsx - UPDATED with proper token handling
+// src/screens/GroupSwapHistoryScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
@@ -17,6 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import * as SecureStore from 'expo-secure-store';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
@@ -108,24 +109,35 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
     }, [activeFilter, groupId])
   );
 
+  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 GroupSwapHistory: No auth token available');
-        setAuthError(true);
-        setError('Please log in again');
-        return false;
-      }
-      console.log('✅ GroupSwapHistory: Auth token found');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ GroupSwapHistory: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
 
   const loadRequests = async (resetPage = true) => {
     const hasToken = await checkToken();
@@ -196,25 +208,6 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
       loadRequests(false);
     }
   };
-
-  // Handle auth error
-  useEffect(() => {
-    if (authError) {
-      Alert.alert(
-        'Session Expired',
-        'Please log in again',
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              setAuthError(false);
-              navigation.navigate('Login');
-            }
-          }
-        ]
-      );
-    }
-  }, [authError]);
 
   const renderFilterButton = (filter: FilterStatus, label: string) => (
     <TouchableOpacity

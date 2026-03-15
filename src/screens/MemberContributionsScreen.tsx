@@ -1,3 +1,4 @@
+// src/screens/MemberContributionsScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -8,12 +9,13 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
-  StatusBar
+  StatusBar,
+  Alert
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GroupActivityService } from '../services/GroupActivityService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function MemberContributionsScreen({ navigation, route }: any) {
@@ -25,25 +27,35 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests
+  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 MemberContributionsScreen: No auth token available');
-        setAuthError(true);
-        setError('Please log in again');
-        return false;
-      }
-      console.log('✅ MemberContributionsScreen: Auth token found');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ MemberContributionsScreen: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
 
   useEffect(() => {
     fetchData();

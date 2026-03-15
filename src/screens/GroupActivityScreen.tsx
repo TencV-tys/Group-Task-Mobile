@@ -1,3 +1,4 @@
+// src/screens/GroupActivityScreen.tsx - UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -8,13 +9,15 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
-  StatusBar
+  StatusBar,
+  Alert
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GroupActivityService } from '../services/GroupActivityService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
+
 export default function GroupActivityScreen({ navigation, route }: any) {
   const { groupId, groupName, userRole } = route.params || {};
   const [loading, setLoading] = useState(true);
@@ -23,29 +26,39 @@ export default function GroupActivityScreen({ navigation, route }: any) {
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 GroupActivityScreen: No auth token available');
-        setAuthError(true);
-        setError('Please log in again');
-        return false;
-      }
-      console.log('✅ GroupActivityScreen: Auth token found');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ GroupActivityScreen: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   useEffect(() => {
     fetchActivityData();
   }, [groupId]);
+
+  // ✅ Auth error handler
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
 
   const fetchActivityData = async (isRefreshing = false) => {
     // Check token first
@@ -115,28 +128,28 @@ export default function GroupActivityScreen({ navigation, route }: any) {
         title: 'Members',
         value: summary.totalMembers,
         icon: 'account-group',
-        gradient: ['#f8f9fa', '#e9ecef'] as [string, string], // Light gray
+        gradient: ['#f8f9fa', '#e9ecef'] as [string, string],
         iconColor: '#495057'
       },
       {
         title: 'Tasks',
         value: summary.totalTasks,
         icon: 'format-list-checks',
-        gradient: ['#d3f9d8', '#b2f2bb'] as [string, string], // Light green
+        gradient: ['#d3f9d8', '#b2f2bb'] as [string, string],
         iconColor: '#2b8a3e'
       },
       {
         title: 'Completion',
         value: `${Math.round(summary.points?.completionRate || 0)}%`,
         icon: 'percent',
-        gradient: ['#fff3bf', '#ffec99'] as [string, string], // Light orange
+        gradient: ['#fff3bf', '#ffec99'] as [string, string],
         iconColor: '#e67700'
       },
       {
         title: 'Points',
         value: summary.points?.earned || 0,
         icon: 'star',
-        gradient: ['#ffec99', '#ffe066'] as [string, string], // Gold
+        gradient: ['#ffec99', '#ffe066'] as [string, string],
         iconColor: '#e67700'
       }
     ];
@@ -241,12 +254,11 @@ export default function GroupActivityScreen({ navigation, route }: any) {
     const members = activityData?.memberContributions || [];
     if (members.length === 0) return null;
 
-    // Fixed: Properly typed gradient colors function
     const getMemberGradient = (index: number): [string, string] => {
-      if (index === 0) return ['#fff3bf', '#ffec99']; // Gold for 1st
-      if (index === 1) return ['#f1f3f5', '#e9ecef']; // Silver for 2nd
-      if (index === 2) return ['#f8f9fa', '#dee2e6']; // Bronze for 3rd
-      return ['#ffffff', '#f8f9fa']; // Light gray for others
+      if (index === 0) return ['#fff3bf', '#ffec99'];
+      if (index === 1) return ['#f1f3f5', '#e9ecef'];
+      if (index === 2) return ['#f8f9fa', '#dee2e6'];
+      return ['#ffffff', '#f8f9fa'];
     };
 
     return (
@@ -264,7 +276,6 @@ export default function GroupActivityScreen({ navigation, route }: any) {
         </View>
 
         {members.slice(0, 5).map((member: any, index: number) => {
-          // Fixed: Properly typed conditional styles
           const getRankStyle = () => {
             if (index === 0) return styles.firstPlace;
             if (index === 1) return styles.secondPlace;

@@ -1,4 +1,4 @@
-// src/screens/MemberContributionsScreen.tsx - FIXED with better error handling
+// src/screens/MemberContributionsScreen.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -10,7 +10,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   StatusBar,
-  Alert
+  Alert,
+  Image
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -32,7 +33,7 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     console.log('📥 MemberContributionsScreen params:', { groupId, groupName, memberId, userRole });
   }, [groupId, groupName, memberId, userRole]);
 
-  // ===== UPDATED: Use TokenUtils.checkToken() =====
+  // ===== Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -158,7 +159,87 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     return '#e67700';
   };
 
-  const renderSummary = () => {
+  // ===== Profile Card (centered like Profile Screen) =====
+  const renderProfileCard = () => {
+    if (!data?.member) return null;
+
+    const member = data.member;
+    const initial = member.fullName?.charAt(0).toUpperCase() || '?';
+    const isAdmin = member.role === 'ADMIN';
+
+    return (
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.profileCard}
+      >
+        {/* Centered Avatar */}
+        <View style={styles.avatarContainer}>
+          {member.avatarUrl ? (
+            <Image 
+              source={{ uri: member.avatarUrl }} 
+              style={styles.avatarImage}
+              onError={(e) => {
+                console.log('Avatar load error:', e.nativeEvent.error);
+              }}
+            />
+          ) : (
+            <LinearGradient
+              colors={isAdmin ? ['#2b8a3e', '#1e6b2c'] : ['#495057', '#343a40']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.avatarPlaceholder}
+            >
+              <Text style={styles.avatarText}>{initial}</Text>
+            </LinearGradient>
+          )}
+        </View>
+        
+        {/* Centered Name */}
+        <Text style={styles.userName}>{member.fullName || 'User'}</Text>
+        <Text style={styles.userEmail}>{member.email || ''}</Text>
+        
+        {/* User Stats Row */}
+        <View style={styles.userStats}>
+          <View style={styles.statItem}>
+            <MaterialCommunityIcons name="shield-account" size={14} color="#868e96" />
+            <Text style={styles.statText}>{member.role || 'Member'}</Text>
+          </View>
+          
+          <View style={styles.statDivider} />
+          
+          <View style={styles.statItem}>
+            <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
+            <Text style={styles.statText}>{groupName}</Text>
+          </View>
+          
+          {member.joinedAt && (
+            <>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <MaterialCommunityIcons name="calendar" size={14} color="#868e96" />
+                <Text style={styles.statText}>
+                  Joined {new Date(member.joinedAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                </Text>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Admin Note if applicable */}
+        {isAdmin && data.roleInfo && (
+          <View style={styles.adminNote}>
+            <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
+            <Text style={styles.adminNoteText}>{data.roleInfo.message}</Text>
+          </View>
+        )}
+      </LinearGradient>
+    );
+  };
+
+  // ===== Overall Statistics (separate card) =====
+  const renderOverallStats = () => {
     if (!data?.summary) return null;
 
     const summary = data.summary;
@@ -168,55 +249,55 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         colors={['#ffffff', '#f8f9fa']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.summaryCard}
+        style={styles.statsCard}
       >
-        <Text style={styles.summaryTitle}>Overall Statistics</Text>
+        <Text style={styles.statsTitle}>Overall Statistics</Text>
         
         <View style={styles.statsGrid}>
-          <View style={styles.statItem}>
+          <View style={styles.statBox}>
             <LinearGradient
               colors={['#f8f9fa', '#e9ecef']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.statCircle}
             >
-              <Text style={styles.statValue}>{summary.totalAssignments}</Text>
+              <Text style={styles.statNumber}>{summary.totalAssignments || 0}</Text>
             </LinearGradient>
             <Text style={styles.statLabel}>Total Tasks</Text>
           </View>
           
-          <View style={styles.statItem}>
+          <View style={styles.statBox}>
             <LinearGradient
               colors={['#d3f9d8', '#b2f2bb']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.statCircle}
             >
-              <Text style={styles.statValue}>{summary.completedAssignments}</Text>
+              <Text style={styles.statNumber}>{summary.completedAssignments || 0}</Text>
             </LinearGradient>
             <Text style={styles.statLabel}>Completed</Text>
           </View>
           
-          <View style={styles.statItem}>
+          <View style={styles.statBox}>
             <LinearGradient
               colors={['#fff3bf', '#ffec99']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.statCircle}
             >
-              <Text style={styles.statValue}>{Math.round(summary.completionRate)}%</Text>
+              <Text style={styles.statNumber}>{Math.round(summary.completionRate || 0)}%</Text>
             </LinearGradient>
             <Text style={styles.statLabel}>Completion</Text>
           </View>
           
-          <View style={styles.statItem}>
+          <View style={styles.statBox}>
             <LinearGradient
               colors={['#ffec99', '#ffe066']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.statCircle}
             >
-              <Text style={styles.statValue}>{summary.earnedPoints}</Text>
+              <Text style={styles.statNumber}>{summary.earnedPoints || 0}</Text>
             </LinearGradient>
             <Text style={styles.statLabel}>Points</Text>
           </View>
@@ -356,11 +437,8 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
       </TouchableOpacity>
       <View style={styles.titleContainer}>
         <Text style={styles.title} numberOfLines={1}>
-          {data?.summary?.memberName || 'Member'} Contributions
+          Member Profile
         </Text>
-        {data?.summary?.memberName && (
-          <Text style={styles.subtitle}>Viewing detailed history</Text>
-        )}
       </View>
       <TouchableOpacity 
         onPress={() => fetchData(true)} 
@@ -457,7 +535,13 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
           </View>
         ) : (
           <>
-            {renderSummary()}
+            {/* Profile Card */}
+            {renderProfileCard()}
+            
+            {/* Overall Statistics */}
+            {renderOverallStats()}
+            
+            {/* Weekly Breakdown */}
             <View style={styles.weeksContainer}>
               <Text style={styles.sectionTitle}>Weekly Breakdown</Text>
               {data?.weeks?.length > 0 ? (
@@ -502,11 +586,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#212529'
   },
-  subtitle: {
-    fontSize: 12,
-    color: '#868e96',
-    marginTop: 2
-  },
   refreshButton: {
     width: 40,
     height: 40,
@@ -524,6 +603,10 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     color: '#868e96'
+  },
+  content: {
+    flex: 1,
+    padding: 16
   },
   errorContainer: {
     alignItems: 'center',
@@ -556,11 +639,104 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff'
   },
-  content: {
-    flex: 1,
-    padding: 16
+  // Profile Card Styles
+  profileCard: {
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    alignItems: 'center',
   },
-  summaryCard: {
+  avatarContainer: {
+    marginBottom: 16,
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  avatarText: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  userName: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#212529',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#868e96',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  userStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statText: {
+    fontSize: 13,
+    color: '#495057',
+  },
+  statDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#e9ecef',
+    marginHorizontal: 12,
+  },
+  adminNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#d3f9d8',
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 16,
+    gap: 8,
+  },
+  adminNoteText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#2b8a3e',
+  },
+  // Statistics Card
+  statsCard: {
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -568,34 +744,42 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
-  summaryTitle: {
+  statsTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#212529',
-    marginBottom: 16
+    marginBottom: 16,
+    textAlign: 'center',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between'
   },
-  statItem: {
+  statBox: {
     width: '48%',
     alignItems: 'center',
     marginBottom: 16
   },
   statCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  statValue: {
-    fontSize: 20,
+  statNumber: {
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#212529'
   },
@@ -627,7 +811,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1
+    elevation: 1,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
   weekHeader: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-// src/screens/AdminDashboardScreen.tsx - FULLY UPDATED with TokenUtils
+// src/screens/AdminDashboardScreen.tsx - UPDATED with profile images in MemberCard
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Image // 👈 Add Image import
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -333,11 +334,10 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
     );
   };
 
-  const MemberCard = ({ member }: { member: any }) => (
-       
+// ===== UPDATED MemberCard - Admins don't show rotation badges =====
+const MemberCard = ({ member }: { member: any }) => (
   <TouchableOpacity
     onPress={() => {
-      // 👇 SAFE FALLBACK - use userId if available, otherwise use id
       const memberId = member.userId || member.id;
       
       if (!memberId) {
@@ -355,14 +355,17 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
     }}
     activeOpacity={0.7}
   >
-    
-      <LinearGradient
-        colors={member.inRotation ? ['#ffffff', '#f8f9fa'] : ['#f8f9fa', '#e9ecef']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.memberCard}
-      >
-        <View style={styles.memberHeader}>
+    <LinearGradient
+      colors={member.inRotation ? ['#ffffff', '#f8f9fa'] : ['#f8f9fa', '#e9ecef']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.memberCard}
+    >
+      <View style={styles.memberHeader}>
+        {/* Profile Image or Avatar Placeholder */}
+        {member.avatarUrl ? (
+          <Image source={{ uri: member.avatarUrl }} style={styles.memberAvatarImage} />
+        ) : (
           <LinearGradient
             colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#495057', '#343a40']}
             start={{ x: 0, y: 0 }}
@@ -373,23 +376,29 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
               {member.fullName?.charAt(0).toUpperCase() || '?'}
             </Text>
           </LinearGradient>
-          <View style={styles.memberInfo}>
-            <Text style={styles.memberName}>{member.fullName}</Text>
-            <View style={styles.memberBadges}>
-              <LinearGradient
-                colors={member.role === 'ADMIN' ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.roleBadge}
-              >
-                <Text style={[
-                  styles.roleBadgeText,
-                  member.role === 'ADMIN' && styles.adminRoleText
-                ]}>
-                  {member.role}
-                </Text>
-              </LinearGradient>
-              {member.inRotation ? (
+        )}
+        
+        <View style={styles.memberInfo}>
+          <Text style={styles.memberName}>{member.fullName}</Text>
+          <View style={styles.memberBadges}>
+            {/* Always show role badge */}
+            <LinearGradient
+              colors={member.role === 'ADMIN' ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.roleBadge}
+            >
+              <Text style={[
+                styles.roleBadgeText,
+                member.role === 'ADMIN' && styles.adminRoleText
+              ]}>
+                {member.role}
+              </Text>
+            </LinearGradient>
+            
+            {/* Only show rotation badge for non-admin members */}
+            {member.role !== 'ADMIN' && (
+              member.inRotation ? (
                 <LinearGradient
                   colors={['#d3f9d8', '#b2f2bb']}
                   start={{ x: 0, y: 0 }}
@@ -409,14 +418,16 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
                   <MaterialCommunityIcons name="sync-off" size={12} color="#868e96" />
                   <Text style={styles.rotationBadgeTextOff}>No Rotation</Text>
                 </LinearGradient>
-              )}
-            </View>
+              )
+            )}
           </View>
-          <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
         </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
+        <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+      </View>
+    </LinearGradient>
+  </TouchableOpacity>
+);
+
 
   const ActivityItem = ({ activity }: { activity: any }) => {
     const getIcon = (type: string) => {
@@ -699,13 +710,13 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
                 navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
               />
               <StatCard
-  title="Team Overview"
-  value={members.length}
-  icon="account-group"
-  color="#2b8a3e"
-  navigateTo="TeamOverview"
-  navigationParams={{ groupId, groupName }}
-/>
+                title="Team Overview"
+                value={members.length}
+                icon="account-group"
+                color="#2b8a3e"
+                navigateTo="TeamOverview"
+                navigationParams={{ groupId, groupName }}
+              />
             </View>
 
             {/* Completion Progress - CLICKABLE */}
@@ -769,8 +780,8 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
           </>
         )}
 
-        {/* Members List - CLICKABLE */}
-        <Text style={styles.sectionTitle}>Team Members</Text>
+        {/* ===== FIXED: Changed from "Team Members" to "Group Members" ===== */}
+        <Text style={styles.sectionTitle}>Group Members</Text>
         {members.map(member => (
           <MemberCard key={member.id} member={member} />
         ))}

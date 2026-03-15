@@ -401,4 +401,10 @@ export const adminDashboardStyles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
   },
+  memberAvatarImage: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  marginRight: 12,
+},
 });

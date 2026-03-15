@@ -1,5 +1,5 @@
-// src/components/ReportModal.tsx - FIXED with proper scrolling
-import React, { useState } from 'react';
+// src/components/ReportModal.tsx - UPDATED with TokenUtils
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 const REPORT_REASONS = [
   { value: 'INAPPROPRIATE_CONTENT', label: 'Inappropriate Content', icon: 'alert-octagon' },
@@ -32,6 +33,7 @@ interface ReportModalProps {
   groupId: string;
   groupName: string;
   onSubmit: (data: { type: string; description: string }) => Promise<void>;
+  navigation?: any; // 👈 Add navigation for redirect on auth error
 }
 
 export const ReportModal: React.FC<ReportModalProps> = ({
@@ -39,14 +41,53 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   onClose,
   groupId,
   groupName,
-  onSubmit
+  onSubmit,
+  navigation // 👈 Add navigation prop
 }) => {
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<'reason' | 'description'>('reason');
+  const [authError, setAuthError] = useState(false);
+
+  // ===== Use TokenUtils.checkToken() =====
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
+  }, []);
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError && visible) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              onClose();
+              if (navigation) {
+                navigation.navigate('Login');
+              }
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, visible, navigation, onClose]);
 
   const handleSubmit = async () => {
+    // Check token first
+    const hasToken = await checkToken();
+    if (!hasToken) return;
+
     if (!selectedReason) {
       Alert.alert('Error', 'Please select a reason');
       return;
@@ -69,7 +110,15 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         [{ text: 'OK', onPress: handleClose }]
       );
     } catch (error) {
-      Alert.alert('Error', 'Failed to submit report. Please try again.');
+      // Check if error is auth-related
+      if (error instanceof Error && 
+          (error.message.toLowerCase().includes('token') || 
+           error.message.toLowerCase().includes('auth') ||
+           error.message.toLowerCase().includes('unauthorized'))) {
+        setAuthError(true);
+      } else {
+        Alert.alert('Error', 'Failed to submit report. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -79,12 +128,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     setSelectedReason('');
     setDescription('');
     setStep('reason');
+    setAuthError(false);
     onClose();
   };
 
   const handleBack = () => {
     setStep('reason');
   };
+
+  // If auth error, don't render modal content
+  if (authError) {
+    return null;
+  }
 
   return (
     <Modal
@@ -244,7 +299,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               <TouchableOpacity
                 style={[styles.nextButton, !selectedReason && styles.nextButtonDisabled]}
                 onPress={handleSubmit}
-                disabled={!selectedReason}
+                disabled={!selectedReason || submitting}
               >
                 <LinearGradient
                   colors={selectedReason ? ['#fa5252', '#e03131'] : ['#f8f9fa', '#e9ecef']}
@@ -309,6 +364,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   );
 };
 
+// Styles remain the same...
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -320,7 +376,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
-    flex: 1, // Changed from fixed height to flex
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
@@ -370,12 +426,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   body: {
-    flex: 1, // Take remaining space
+    flex: 1,
     backgroundColor: '#ffffff',
   },
   bodyContent: {
     padding: 16,
-    paddingBottom: 8, // Less padding since we have extra height at bottom
+    paddingBottom: 8,
   },
   groupNameText: {
     fontSize: 14,

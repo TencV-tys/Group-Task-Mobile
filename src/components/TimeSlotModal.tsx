@@ -1,4 +1,4 @@
-// src/components/TimeSlotModal.tsx - COMPLETE WITH AUTO END TIME
+// src/components/TimeSlotModal.tsx - COMPLETE WITH AUTO END TIME AND LABEL OPTIONS
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -15,12 +15,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   convertTo24Hour,
-  convertTo12Hour,
+  convertTo12Hour, 
   validateTimeSlot,
   HOUR_OPTIONS,
   MINUTE_OPTIONS,
   PERIOD_OPTIONS
 } from '../utils/timeUtils';
+
+// 👈 Predefined label options
+const LABEL_OPTIONS = [
+  { value: 'Morning', icon: 'weather-sunset-up', color: '#fab005' },
+  { value: 'Lunch', icon: 'food', color: '#e67700' },
+  { value: 'Evening', icon: 'weather-sunset-down', color: '#5c7cfa' },
+  { value: 'Other', icon: 'dots-horizontal', color: '#868e96' }
+];
 
 interface TimeSlot {
   startTime: string;
@@ -62,6 +70,7 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   });
   
   const [label, setLabel] = useState('');
+  const [customLabel, setCustomLabel] = useState(''); // 👈 For "Other" option
   const [points, setPoints] = useState('');
   const [error, setError] = useState<string>('');
 
@@ -120,12 +129,28 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
       const end12 = convertTo12Hour(editingSlot.endTime);
       setStartTime(start12);
       setEndTime(end12);
-      setLabel(editingSlot.label || '');
+      
+      // Handle label - check if it's one of the predefined options
+      if (editingSlot.label) {
+        const predefinedLabel = LABEL_OPTIONS.find(opt => opt.value === editingSlot.label);
+        if (predefinedLabel) {
+          setLabel(editingSlot.label);
+          setCustomLabel('');
+        } else {
+          setLabel('Other');
+          setCustomLabel(editingSlot.label);
+        }
+      } else {
+        setLabel('');
+        setCustomLabel('');
+      }
+      
       setPoints(editingSlot.points || '');
     } else {
       setStartTime({ hour: '8', minute: '00', period: 'AM' });
       setEndTime({ hour: '9', minute: '00', period: 'AM' });
       setLabel('');
+      setCustomLabel('');
       setPoints('');
     }
     setError('');
@@ -173,11 +198,19 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
       setError(`Total points would exceed task limit of ${totalTaskPoints}`);
       return;
     }
+
+    // Determine final label value
+    let finalLabel = '';
+    if (label === 'Other') {
+      finalLabel = customLabel.trim();
+    } else {
+      finalLabel = label;
+    }
     
     onSave({
       startTime: start24,
       endTime: end24,
-      label: label.trim() || undefined,
+      label: finalLabel || undefined,
       points: points || '0'
     });
   };
@@ -189,6 +222,71 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
       : usedPoints + pointsNum;
     return newTotalPoints > totalTaskPoints;
   };
+
+  // ===== RENDER LABEL OPTIONS =====
+  const renderLabelOptions = () => (
+    <View style={styles.labelOptionsContainer}>
+      <Text style={styles.inputLabel}>
+        <MaterialCommunityIcons name="tag-outline" size={14} color="#495057" /> Label (Optional)
+      </Text>
+      
+      <View style={styles.labelGrid}>
+        {LABEL_OPTIONS.map((option) => (
+          <TouchableOpacity
+            key={option.value}
+            style={[
+              styles.labelOption,
+              label === option.value && styles.labelOptionActive
+            ]}
+            onPress={() => setLabel(option.value)}
+          >
+            <LinearGradient
+              colors={label === option.value 
+                ? [option.color, option.color] 
+                : ['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.labelOptionGradient}
+            >
+              <MaterialCommunityIcons 
+                name={option.icon as any} 
+                size={18} 
+                color={label === option.value ? 'white' : '#495057'} 
+              />
+              <Text style={[
+                styles.labelOptionText,
+                label === option.value && styles.labelOptionTextActive
+              ]}>
+                {option.value}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Custom label input for "Other" */}
+      {label === 'Other' && (
+        <View style={styles.customLabelContainer}>
+          <Text style={styles.customLabelHint}>Enter custom label:</Text>
+          <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.inputGradient}
+          >
+            <TextInput
+              style={styles.input}
+              placeholder="e.g., Night, Weekend, etc."
+              placeholderTextColor="#adb5bd"
+              value={customLabel}
+              onChangeText={setCustomLabel}
+              maxLength={20}
+            />
+          </LinearGradient>
+        </View>
+      )}
+    </View>
+  );
 
   const renderTimePicker = (
     time: { hour: string; minute: string; period: string },
@@ -354,30 +452,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
           </Text>
         </LinearGradient>
         
-        {/* Label Input */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>
-            <MaterialCommunityIcons name="tag-outline" size={14} color="#495057" /> Label (Optional)
-          </Text>
-          <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.inputGradient}
-          >
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., Morning, Lunch, Evening"
-              placeholderTextColor="#adb5bd"
-              value={label}
-              onChangeText={setLabel}
-              maxLength={30}
-            />
-          </LinearGradient>
-          <Text style={styles.helperText}>
-            Helps identify this time slot
-          </Text>
-        </View>
+        {/* Label Input with Options */}
+        {renderLabelOptions()}
         
         {/* Points Input */}
         <View style={styles.inputGroup}>
@@ -666,6 +742,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     </RNModal>
   );
 };
+
+// At the bottom, replace the styles section with this:
 
 const styles = StyleSheet.create({
   modalOverlay: {
@@ -1151,6 +1229,53 @@ const styles = StyleSheet.create({
   saveButtonDisabled: {
     opacity: 0.7,
   },
+  // 👇 Add the new label option styles directly inside styles
+  labelOptionsContainer: {
+    marginBottom: 20,
+  },
+  labelGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  labelOption: {
+    flex: 1,
+    minWidth: '45%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  labelOptionActive: {
+    borderColor: '#2b8a3e',
+  },
+  labelOptionGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    gap: 6,
+  },
+  labelOptionText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#495057',
+  },
+  labelOptionTextActive: {
+    color: 'white',
+  },
+  customLabelContainer: {
+    marginTop: 8,
+  },
+  customLabelHint: {
+    fontSize: 12,
+    color: '#868e96',
+    marginBottom: 4,
+  },
 });
 
 export default TimeSlotModal;
+

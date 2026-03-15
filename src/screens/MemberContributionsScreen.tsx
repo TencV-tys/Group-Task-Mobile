@@ -1,4 +1,4 @@
-// src/screens/MemberContributionsScreen.tsx - UPDATED with TokenUtils
+// src/screens/MemberContributionsScreen.tsx - FIXED with better error handling
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -15,7 +15,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GroupActivityService } from '../services/GroupActivityService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function MemberContributionsScreen({ navigation, route }: any) {
@@ -26,6 +26,11 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
   const [error, setError] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [authError, setAuthError] = useState(false);
+
+  // Debug: Log the params
+  useEffect(() => {
+    console.log('📥 MemberContributionsScreen params:', { groupId, groupName, memberId, userRole });
+  }, [groupId, groupName, memberId, userRole]);
 
   // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
@@ -58,6 +63,12 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
   }, [authError, navigation]);
 
   useEffect(() => {
+    if (!memberId) {
+      console.error('❌ No memberId provided');
+      setError('No member ID provided');
+      setLoading(false);
+      return;
+    }
     fetchData();
   }, [groupId, memberId]);
 
@@ -79,7 +90,11 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     setAuthError(false);
 
     try {
+      console.log(`📥 Fetching contributions for member ${memberId} in group ${groupId}`);
+      
       const result = await GroupActivityService.getMemberContributions(groupId, memberId);
+      
+      console.log('📦 API Response:', result);
       
       if (result.success) {
         setData(result.data);
@@ -91,7 +106,7 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         }
       }
     } catch (err: any) {
-      console.error('Error fetching member data:', err);
+      console.error('❌ Error fetching member data:', err);
       setError(err.message || 'Network error');
     } finally {
       setLoading(false);
@@ -118,7 +133,7 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     if (assignment.verified === false) return '#fa5252';
     return '#e67700';
   };
-
+ 
   // Helper function for status icon name
   const getStatusIcon = (assignment: any): string => {
     if (!assignment.completed) return 'clock-outline';
@@ -343,6 +358,9 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         <Text style={styles.title} numberOfLines={1}>
           {data?.summary?.memberName || 'Member'} Contributions
         </Text>
+        {data?.summary?.memberName && (
+          <Text style={styles.subtitle}>Viewing detailed history</Text>
+        )}
       </View>
       <TouchableOpacity 
         onPress={() => fetchData(true)} 
@@ -403,30 +421,50 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
       <ScrollView
         style={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => fetchData(true)} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={() => fetchData(true)}
+            colors={['#2b8a3e']}
+            tintColor="#2b8a3e"
+          />
         }
       >
         {error ? (
           <View style={styles.errorContainer}>
             <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
             <Text style={styles.errorText}>{error}</Text>
+            <Text style={styles.errorSubtext}>
+              {error.includes('member') ? 'The member might not exist or have no data' : 'Please try again'}
+            </Text>
             <TouchableOpacity style={styles.retryButton} onPress={() => fetchData()}>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={['#2b8a3e', '#1e6b2c']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.retryButtonGradient}
               >
-                <Text style={[styles.retryButtonText, { color: '#495057' }]}>Retry</Text>
+                <Text style={[styles.retryButtonText, { color: '#fff' }]}>Retry</Text>
               </LinearGradient>
             </TouchableOpacity>
+          </View>
+        ) : !data ? (
+          <View style={styles.errorContainer}>
+            <MaterialCommunityIcons name="account-question" size={48} color="#868e96" />
+            <Text style={styles.errorText}>No Data Found</Text>
+            <Text style={styles.errorSubtext}>
+              This member hasn't completed any tasks yet
+            </Text>
           </View>
         ) : (
           <>
             {renderSummary()}
             <View style={styles.weeksContainer}>
               <Text style={styles.sectionTitle}>Weekly Breakdown</Text>
-              {data?.weeks?.map((week: any) => renderWeekDetails(week))}
+              {data?.weeks?.length > 0 ? (
+                data.weeks.map((week: any) => renderWeekDetails(week))
+              ) : (
+                <Text style={styles.noWeeksText}>No weekly data available</Text>
+              )}
             </View>
           </>
         )}
@@ -463,6 +501,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#212529'
+  },
+  subtitle: {
+    fontSize: 12,
+    color: '#868e96',
+    marginTop: 2
   },
   refreshButton: {
     width: 40,
@@ -510,7 +553,8 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     fontWeight: '600',
-    fontSize: 16
+    fontSize: 16,
+    color: '#fff'
   },
   content: {
     flex: 1,
@@ -567,6 +611,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#212529',
     marginBottom: 12
+  },
+  noWeeksText: {
+    textAlign: 'center',
+    color: '#868e96',
+    fontSize: 14,
+    marginTop: 20,
+    fontStyle: 'italic'
   },
   weekCard: {
     borderRadius: 12,
@@ -685,7 +736,7 @@ const styles = StyleSheet.create({
   },
   lateText: {
     fontSize: 9,
-    color: '#e67700',
+    color: '#e67700', 
     fontWeight: '600'
   },
   assignmentNotes: {

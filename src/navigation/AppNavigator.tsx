@@ -31,6 +31,7 @@ import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
 import AccountSettingsScreen from '../screens/AccountSettingsScreen';
 import { NeglectedTasksScreen } from '../screens/NeglectedTasksScreen';
+import { TeamOverviewScreen } from '../screens/TeamOverviewScreen';
 
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
@@ -144,6 +145,12 @@ export default function AppNavigator() {
           headerShown: false
         }}
       /> 
+
+<Stack.Screen name="TeamOverview"
+ component={TeamOverviewScreen}
+    options={{ headerShown: false }}
+ />
+
       <Stack.Screen 
         name="AccountSettings" 
         component={AccountSettingsScreen}

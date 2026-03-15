@@ -334,15 +334,28 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
   };
 
   const MemberCard = ({ member }: { member: any }) => (
-    <TouchableOpacity
-      onPress={() => navigation.navigate('MemberContributions', { 
+       
+  <TouchableOpacity
+    onPress={() => {
+      // 👇 SAFE FALLBACK - use userId if available, otherwise use id
+      const memberId = member.userId || member.id;
+      
+      if (!memberId) {
+        console.error('❌ No member ID available for:', member);
+        Alert.alert('Error', 'Cannot view member details - missing ID');
+        return;
+      }
+      
+      navigation.navigate('MemberContributions', { 
         groupId, 
         groupName, 
-        memberId: member.userId,
+        memberId,
         userRole: 'ADMIN'
-      })}
-      activeOpacity={0.7}
-    >
+      }); 
+    }}
+    activeOpacity={0.7}
+  >
+    
       <LinearGradient
         colors={member.inRotation ? ['#ffffff', '#f8f9fa'] : ['#f8f9fa', '#e9ecef']}
         start={{ x: 0, y: 0 }}
@@ -685,6 +698,14 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
                 navigateTo="TaskCompletionHistory"
                 navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
               />
+              <StatCard
+  title="Team Overview"
+  value={members.length}
+  icon="account-group"
+  color="#2b8a3e"
+  navigateTo="TeamOverview"
+  navigationParams={{ groupId, groupName }}
+/>
             </View>
 
             {/* Completion Progress - CLICKABLE */}

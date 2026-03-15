@@ -1,4 +1,4 @@
-// components/SettingsModal.tsx - UPDATED with Swap History for admins
+// components/SettingsModal.tsx - UPDATED with TokenUtils and Team Overview
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View,
@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 interface SettingsModalProps {
   visible: boolean;
@@ -57,24 +57,36 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const isAdmin = userRole === 'ADMIN';
 
-  // Check token before making requests
+  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 SettingsModal: No auth token available');
-        setAuthError(true);
-        return false;
-      }
-      console.log('✅ SettingsModal: Auth token found');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ SettingsModal: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError && visible) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              onClose();
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, visible, navigation, onClose]);
 
   const loadGroupData = async () => {
     if (!visible) return;
@@ -163,63 +175,41 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
-  const now = new Date();
-  const weekStartDay = new Date(weekStart);
-  weekStartDay.setHours(0, 0, 0, 0);
-  
-  const hoursSinceWeekStart = (now.getTime() - weekStartDay.getTime()) / (1000 * 60 * 60);
-  const isWithinFirst24Hours = hoursSinceWeekStart >= 0 && hoursSinceWeekStart <= 24;
-  
-  // Get the day name for better user messaging
-  const weekStartDayName = weekStartDay.toLocaleDateString('en-US', { weekday: 'long' });
-  
-  if (!isWithinFirst24Hours) { 
-    setCanSwapWeek(false);
-    if (hoursSinceWeekStart < 0) {
-      // Week hasn't started yet
-      setWeekSwapReason(`Week starts on ${weekStartDayName}`);
-    } else {
-      // Week swap window closed
-      setWeekSwapReason(`Week swap window closed (week started ${weekStartDayName})`);
-    } 
-  } else {
-    setCanSwapWeek(true);
-    const hoursLeft = Math.ceil(24 - hoursSinceWeekStart);
-    const minutesLeft = Math.ceil((24 - hoursSinceWeekStart) * 60);
+  const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
+    const now = new Date();
+    const weekStartDay = new Date(weekStart);
+    weekStartDay.setHours(0, 0, 0, 0);
     
-    if (hoursLeft < 1) {
-      setWeekSwapReason(`${minutesLeft} minutes left (week started ${weekStartDayName})`);
+    const hoursSinceWeekStart = (now.getTime() - weekStartDay.getTime()) / (1000 * 60 * 60);
+    const isWithinFirst24Hours = hoursSinceWeekStart >= 0 && hoursSinceWeekStart <= 24;
+    
+    const weekStartDayName = weekStartDay.toLocaleDateString('en-US', { weekday: 'long' });
+    
+    if (!isWithinFirst24Hours) { 
+      setCanSwapWeek(false);
+      if (hoursSinceWeekStart < 0) {
+        setWeekSwapReason(`Week starts on ${weekStartDayName}`);
+      } else {
+        setWeekSwapReason(`Week swap window closed (week started ${weekStartDayName})`);
+      } 
     } else {
-      setWeekSwapReason(`${hoursLeft} hour${hoursLeft > 1 ? 's' : ''} left (week started ${weekStartDayName})`);
+      setCanSwapWeek(true);
+      const hoursLeft = Math.ceil(24 - hoursSinceWeekStart);
+      const minutesLeft = Math.ceil((24 - hoursSinceWeekStart) * 60);
+      
+      if (hoursLeft < 1) {
+        setWeekSwapReason(`${minutesLeft} minutes left (week started ${weekStartDayName})`);
+      } else {
+        setWeekSwapReason(`${hoursLeft} hour${hoursLeft > 1 ? 's' : ''} left (week started ${weekStartDayName})`);
+      }
     }
-  }
-};
+  };
 
   useEffect(() => {
     if (visible) {
       loadGroupData();
     }
   }, [visible]);
-
-  useEffect(() => {
-    if (authError && visible) {
-      Alert.alert(
-        'Session Expired',
-        'Please log in again.',
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              setAuthError(false);
-              onClose();
-              navigation.navigate('Login');
-            }
-          }
-        ]
-      );
-    }
-  }, [authError, visible]);
 
   const handleSwapEntireWeek = async () => {
     const hasToken = await checkToken();
@@ -322,10 +312,11 @@ const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
     onClose();
   };
 
-  const handleMemberContributions = async () => {
+  // ===== UPDATED: Changed from MemberContributions to TeamOverview =====
+  const handleTeamOverview = async () => {
     const hasToken = await checkToken();
     if (!hasToken) return;
-    navigation.navigate('MemberContributions', { groupId, groupName, userRole });
+    navigation.navigate('TeamOverview', { groupId, groupName, userRole });
     onClose();
   };
 
@@ -336,7 +327,6 @@ const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
     onClose();
   };
 
-  // ===== NEW: Handle Group Swap History =====
   const handleGroupSwapHistory = async () => {
     const hasToken = await checkToken();
     if (!hasToken) return;
@@ -412,11 +402,6 @@ const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
   const incompleteCount = myAssignments.filter((t: any) => 
     t.assignment && !t.assignment.completed
   ).length;
-
-  const getWeekDayName = (date: Date | null) => {
-    if (!date) return 'N/A';
-    return date.toLocaleDateString('en-US', { weekday: 'long' });
-  };
 
   const getHoursLeftText = () => {
     if (!weekStartDate) return '';
@@ -499,7 +484,7 @@ const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
               </TouchableOpacity>
             </View>
 
-            {/* ===== UPDATED: Swap Section - Only for members ===== */}
+            {/* Swap Section - Only for members */}
             {!isAdmin && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -569,7 +554,7 @@ const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
               </View>
             )}
 
-            {/* ===== NEW: Swap History Section - For admins only ===== */}
+            {/* Swap History Section - For admins only */}
             {isAdmin && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
@@ -663,10 +648,11 @@ const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
                 </TouchableOpacity>
 
-                <TouchableOpacity onPress={handleMemberContributions} style={styles.menuItem}>
+                {/* ===== UPDATED: Changed from MemberContributions to TeamOverview ===== */}
+                <TouchableOpacity onPress={handleTeamOverview} style={styles.menuItem}>
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="account-details" size={18} color="#2b8a3e" />
-                    <Text style={styles.menuItemText}>Member Contributions</Text>
+                    <MaterialCommunityIcons name="account-group" size={18} color="#2b8a3e" />
+                    <Text style={styles.menuItemText}>Team Overview</Text>
                   </View>
                   <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
                 </TouchableOpacity>
@@ -1133,7 +1119,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
   },
-    swapHistoryNote: {
+  swapHistoryNote: {
     fontSize: 12,
     color: '#868e96',
     marginTop: 8,

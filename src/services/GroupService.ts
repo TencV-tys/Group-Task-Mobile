@@ -1,106 +1,79 @@
-// src/services/GroupService.ts (React Native - FRONTEND) - UPDATED WITH SECURESTORE
+// src/services/GroupService.ts - UPDATED with TokenUtils
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 const API_URL = `${API_BASE_URL}/api/group`;
 
 export class GroupService {
   
-  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
-  private static async getAuthToken(): Promise<string | null> {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
-      return token;
-    } catch (error) {
-      console.error('Error getting auth token:', error);
-      return null;
-    }
-  }
-
-  // ========== GET HEADERS WITH TOKEN ==========
-  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
-    const token = await this.getAuthToken();
-    const headers: HeadersInit = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ Added Authorization header');
-    } else {
-      console.warn('⚠️ No auth token available - request may fail');
-    }
-    
-    if (withJsonContent) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
-  }
+  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
 
   // ========== CREATE GROUP ==========
   static async createGroup(name: string, description?: string) {
-  try {
-    if (!name.trim()) {
+    try {
+      if (!name.trim()) {
+        return {
+          success: false,
+          message: "Group name is required"
+        };
+      }
+
+      console.log(`GroupService: Creating group "${name}"`);
+      console.log(`GroupService: Description received:`, description);
+      
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
+      
+      // Determine what to send
+      let descriptionValue = null;
+      if (description !== undefined && description !== null) {
+        const trimmed = description.trim();
+        if (trimmed.length > 0) {
+          descriptionValue = trimmed;
+          console.log(`GroupService: Using description:`, trimmed);
+        } else {
+          console.log(`GroupService: Description is empty string, sending null`);
+        }
+      } else {
+        console.log(`GroupService: Description is ${description}, sending null`);
+      }
+      
+      const body = {
+        name: name.trim(),
+        description: descriptionValue
+      };
+      
+      console.log(`GroupService: Final request body:`, body);
+      
+      const response = await fetch(`${API_URL}/create`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      console.log(`GroupService: Response status: ${response.status}`);
+      
+      const result = await response.json();
+      console.log(`GroupService: Result:`, result);
+      
+      return result;
+
+    } catch (e: any) {
+      console.error("GroupService.createGroup error:", e);
       return {
         success: false,
-        message: "Group name is required"
+        message: e.message || "Failed to create group"
       };
     }
-
-    console.log(`GroupService: Creating group "${name}"`);
-    console.log(`GroupService: Description received:`, description);
-    console.log(`GroupService: Description type:`, typeof description);
-    
-    const headers = await this.getHeaders();
-    
-    // Determine what to send
-    let descriptionValue = null;
-    if (description !== undefined && description !== null) {
-      const trimmed = description.trim();
-      if (trimmed.length > 0) {
-        descriptionValue = trimmed;
-        console.log(`GroupService: Using description:`, trimmed);
-      } else {
-        console.log(`GroupService: Description is empty string, sending null`);
-      }
-    } else {
-      console.log(`GroupService: Description is ${description}, sending null`);
-    }
-    
-    const body = {
-      name: name.trim(),
-      description: descriptionValue
-    };
-    
-    console.log(`GroupService: Final request body:`, body);
-    
-    const response = await fetch(`${API_URL}/create`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
-
-    console.log(`GroupService: Response status: ${response.status}`);
-    
-    const result = await response.json();
-    console.log(`GroupService: Result:`, result);
-    
-    return result;
-
-  } catch (e: any) {
-    console.error("GroupService.createGroup error:", e);
-    return {
-      success: false,
-      message: e.message || "Failed to create group"
-    };
   }
-}
+
   // ========== GET USER'S GROUPS ==========
   static async getUserGroups() {
     try {
       console.log("GroupService: Getting user groups...");
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/my-groups`, {
         method: "GET",
@@ -135,7 +108,8 @@ export class GroupService {
       const cleanInviteCode = inviteCode.trim().toUpperCase();
       console.log(`GroupService: Joining group with code ${cleanInviteCode}`);
 
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/join`, {
         method: "POST",
@@ -169,7 +143,8 @@ export class GroupService {
 
       console.log(`GroupService: Getting members for group ${groupId}`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${groupId}/members`, {
         method: "GET",
@@ -205,7 +180,8 @@ export class GroupService {
 
       console.log(`GroupService: Updating member ${memberId} rotation in group ${groupId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/members/${memberId}/rotation`, {
         method: "PUT",
@@ -240,7 +216,8 @@ export class GroupService {
 
       console.log(`GroupService: Reordering rotation for group ${groupId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/reorder-rotation`, {
         method: "POST",
@@ -272,7 +249,8 @@ export class GroupService {
 
       console.log(`GroupService: Getting rotation schedule for group ${groupId} (${weeks} weeks)`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${groupId}/rotation-schedule?weeks=${weeks}`, {
         method: "GET",
@@ -303,7 +281,8 @@ export class GroupService {
 
       console.log(`GroupService: Getting details for group ${groupId}`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${groupId}/details`, {
         method: "GET",
@@ -334,7 +313,8 @@ export class GroupService {
 
       console.log(`GroupService: Leaving group ${groupId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/leave`, {
         method: "POST",

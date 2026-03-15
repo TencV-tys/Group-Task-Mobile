@@ -1,4 +1,4 @@
-// src/components/ReportModal.tsx
+// src/components/ReportModal.tsx - FIXED with proper scrolling
 import React, { useState } from 'react';
 import {
   View,
@@ -9,7 +9,9 @@ import {
   TextInput,
   ScrollView,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -91,9 +93,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       transparent={true}
       onRequestClose={handleClose}
     >
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView 
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <View style={styles.modalContent}>
-          {/* Header */}
+          {/* Header - Fixed at top */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               {step === 'description' && (
@@ -116,7 +121,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
+          {/* Scrollable Content - Takes remaining space */}
+          <ScrollView 
+            style={styles.body} 
+            contentContainerStyle={styles.bodyContent}
+            showsVerticalScrollIndicator={true}
+            bounces={true}
+          >
             <Text style={styles.groupNameText}>{groupName}</Text>
             
             {step === 'reason' ? (
@@ -222,9 +233,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 </LinearGradient>
               </>
             )}
+            
+            {/* Add extra padding at bottom to ensure content doesn't get hidden behind footer */}
+            <View style={{ height: 20 }} />
           </ScrollView>
 
-          {/* Footer */}
+          {/* Footer - Fixed at bottom */}
           <View style={styles.footer}>
             {step === 'reason' ? (
               <TouchableOpacity
@@ -290,7 +304,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             )}
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -306,6 +320,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
+    flex: 1, // Changed from fixed height to flex
   },
   header: {
     flexDirection: 'row',
@@ -314,11 +329,16 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
+    backgroundColor: 'white',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    zIndex: 10,
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
   },
   backButton: {
     width: 32,
@@ -339,6 +359,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#212529',
+    flex: 1,
   },
   closeButton: {
     width: 36,
@@ -349,8 +370,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   body: {
+    flex: 1, // Take remaining space
+    backgroundColor: '#ffffff',
+  },
+  bodyContent: {
     padding: 16,
-    maxHeight: 500,
+    paddingBottom: 8, // Less padding since we have extra height at bottom
   },
   groupNameText: {
     fontSize: 14,
@@ -471,6 +496,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#e9ecef',
+    backgroundColor: 'white',
   },
   nextButton: {
     borderRadius: 12,

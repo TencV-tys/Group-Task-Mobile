@@ -1,48 +1,20 @@
-// services/GroupMembersService.ts - UPDATED WITH SECURESTORE
+// services/GroupMembersService.ts - UPDATED with TokenUtils
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 const API_URL = `${API_BASE_URL}/api/group`;
 
 export class GroupMembersService {
   
-  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
-  private static async getAuthToken(): Promise<string | null> {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
-      return token;
-    } catch (error) {
-      console.error('Error getting auth token:', error);
-      return null;
-    }
-  }
-
-  // ========== GET HEADERS WITH TOKEN ==========
-  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
-    const token = await this.getAuthToken();
-    const headers: HeadersInit = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ Added Authorization header');
-    } else {
-      console.warn('⚠️ No auth token available - request may fail');
-    }
-    
-    if (withJsonContent) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
-  }
+  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
 
   // ========== GET GROUP MEMBERS ==========
   static async getGroupMembers(groupId: string) {
     try {
       console.log(`GroupMembersService: Getting members for group ${groupId}`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${groupId}/members`, {
         method: 'GET',
@@ -68,7 +40,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Getting members with rotation for group ${groupId}`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${groupId}/members-rotation`, {
         method: 'GET',
@@ -92,7 +65,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Getting info for group ${groupId}`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${groupId}/info`, {
         method: 'GET',
@@ -116,7 +90,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Getting settings for group ${groupId}`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${groupId}/settings`, {
         method: 'GET',
@@ -140,7 +115,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Removing member ${memberId} from group ${groupId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/members/${memberId}`, {
         method: 'DELETE',
@@ -171,7 +147,8 @@ export class GroupMembersService {
 
       console.log(`GroupMembersService: Updating member ${memberId} role to ${newRole} in group ${groupId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/members/${memberId}/role`, {
         method: 'PUT',
@@ -204,7 +181,8 @@ export class GroupMembersService {
         isActive
       });
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/members/${memberId}/rotation`, {
         method: 'PUT',
@@ -236,7 +214,8 @@ export class GroupMembersService {
 
       console.log(`GroupMembersService: Reordering rotation for group ${groupId}`, newOrder);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/reorder-rotation`, {
         method: 'POST',
@@ -261,7 +240,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Leaving group ${groupId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/leave`, {
         method: 'DELETE',
@@ -285,7 +265,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Getting rotation schedule for group ${groupId} (${weeks} weeks)`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${groupId}/rotation-preview?weeks=${weeks}`, {
         method: 'GET',
@@ -309,7 +290,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Getting group details for ${groupId}`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${groupId}`, {
         method: 'GET',
@@ -333,7 +315,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Getting current week assignments for group ${groupId}`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${groupId}/current-assignments`, {
         method: 'GET',
@@ -357,7 +340,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Updating group ${groupId} with data:`, groupData);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/update`, {
         method: 'PUT',
@@ -382,7 +366,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Transferring ownership of group ${groupId} to user ${newAdminId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/transfer-ownership`, {
         method: 'POST',
@@ -407,7 +392,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Regenerating invite code for group ${groupId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/regenerate-invite`, {
         method: 'POST',
@@ -431,7 +417,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Deleting group ${groupId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/delete`, {
         method: 'DELETE',
@@ -455,7 +442,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Deleting avatar for group ${groupId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${groupId}/avatar`, {
         method: 'DELETE',
@@ -479,7 +467,8 @@ export class GroupMembersService {
     try {
       console.log(`GroupMembersService: Uploading avatar for group ${groupId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_BASE_URL}/api/uploads/group/${groupId}/avatar/base64`, {
         method: 'POST',

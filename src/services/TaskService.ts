@@ -1,6 +1,6 @@
-// src/services/TaskService.ts - UPDATED WITH SECURESTORE
+// src/services/TaskService.ts - UPDATED with TokenUtils
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 const API_URL = `${API_BASE_URL}/api/tasks`;
 
@@ -51,36 +51,7 @@ export type UpdateTaskData = Partial<CreateTaskData>;
 
 export class TaskService {
   
-  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
-  private static async getAuthToken(): Promise<string | null> {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      console.log('🔐 TaskService: Auth token retrieved:', token ? 'Yes' : 'No');
-      return token;
-    } catch (error) {
-      console.error('TaskService: Error getting auth token:', error);
-      return null;
-    }
-  }
-
-  // ========== GET HEADERS WITH TOKEN ==========
-  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
-    const token = await this.getAuthToken();
-    const headers: HeadersInit = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ TaskService: Added Authorization header');
-    } else {
-      console.warn('⚠️ TaskService: No auth token available - request may fail');
-    }
-    
-    if (withJsonContent) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
-  }
+  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
 
   // ========== CREATE TASK ==========
   static async createTask(groupId: string, taskData: CreateTaskData) {
@@ -90,7 +61,8 @@ export class TaskService {
       
       console.log(`TaskService: Creating task for group ${groupId}`, cleanedData);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders() instead of custom method
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/group/${groupId}/create`, {
         method: 'POST',
@@ -137,7 +109,8 @@ export class TaskService {
       
       console.log(`TaskService: Fetching tasks for group ${groupId}`, week ? `week ${week}` : '');
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(url, {
         method: 'GET',
@@ -163,7 +136,8 @@ export class TaskService {
         ? `${API_URL}/group/${groupId}/my-tasks?week=${week}`
         : `${API_URL}/group/${groupId}/my-tasks`;
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(url, {
         method: 'GET',
@@ -185,7 +159,8 @@ export class TaskService {
   // ========== GET TASK DETAILS ==========
   static async getTaskDetails(taskId: string) {
     try {
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'GET',
@@ -207,7 +182,8 @@ export class TaskService {
   // ========== DELETE TASK ==========
   static async deleteTask(taskId: string) {
     try {
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'DELETE',
@@ -232,7 +208,8 @@ export class TaskService {
       // Clean the data for updates too
       const cleanedData = cleanTaskData(taskData);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${taskId}`, {
         method: 'PUT',
@@ -255,7 +232,8 @@ export class TaskService {
   // ========== GET ROTATION SCHEDULE ==========
   static async getRotationSchedule(groupId: string, weeks: number = 4) {
     try {
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/group/${groupId}/schedule?weeks=${weeks}`, {
         method: 'GET',
@@ -277,7 +255,8 @@ export class TaskService {
   // ========== ROTATE TASKS ==========
   static async rotateTasks(groupId: string) {
     try {
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/group/${groupId}/rotate`, {
         method: 'POST',
@@ -301,7 +280,8 @@ export class TaskService {
     try {
       console.log(`TaskService: Reassigning task ${taskId} to user ${targetUserId}`);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${taskId}/reassign`, {
         method: 'POST',
@@ -326,7 +306,8 @@ export class TaskService {
     try {
       console.log(`TaskService: Getting statistics for group ${groupId}`);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/group/${groupId}/statistics`, {
         method: 'GET',
@@ -344,44 +325,43 @@ export class TaskService {
       };
     }
   }
-  // Add this method to your TaskService class
-static async getRotationStatus(groupId: string) {
-  try {
-    const headers = await this.getHeaders(false);
-    console.log('📡 Fetching rotation status from:', `${API_URL}/group/${groupId}/rotation-status`);
-    
-    const response = await fetch(`${API_URL}/group/${groupId}/rotation-status`, {
-      method: 'GET',
-      headers,
-    });
-    
-    // Log response status
-    console.log('📡 Response status:', response.status);
-    console.log('📡 Response headers:', response.headers);
-    
-    // Get the response as text first
-    const responseText = await response.text();
-    console.log('📦 Raw response:', responseText);
-    
-    // Try to parse it
+  
+  // ========== GET ROTATION STATUS ==========
+  static async getRotationStatus(groupId: string) {
     try {
-      const data = JSON.parse(responseText);
-      console.log('✅ Parsed data:', data);
-      return data;
-    } catch (parseError) {
-      console.error('❌ Failed to parse JSON. Raw response:', responseText);
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
+      
+      console.log('📡 Fetching rotation status from:', `${API_URL}/group/${groupId}/rotation-status`);
+      
+      const response = await fetch(`${API_URL}/group/${groupId}/rotation-status`, {
+        method: 'GET',
+        headers,
+      });
+      
+      console.log('📡 Response status:', response.status);
+      
+      const responseText = await response.text();
+      console.log('📦 Raw response:', responseText);
+      
+      try {
+        const data = JSON.parse(responseText);
+        console.log('✅ Parsed data:', data);
+        return data;
+      } catch (parseError) {
+        console.error('❌ Failed to parse JSON. Raw response:', responseText);
+        return {
+          success: false,
+          message: 'Invalid response from server'
+        };
+      }
+      
+    } catch (error: any) {
+      console.error('TaskService.getRotationStatus error:', error);
       return {
         success: false,
-        message: 'Invalid response from server'
+        message: error.message || 'Failed to get rotation status'
       };
     }
-    
-  } catch (error: any) {
-    console.error('TaskService.getRotationStatus error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to get rotation status'
-    };
   }
 }
-} 

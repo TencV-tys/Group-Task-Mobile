@@ -1,6 +1,6 @@
-// services/AssignmentService.ts - COMPLETE UPDATED WITH SECURESTORE
+// services/AssignmentService.ts - UPDATED with TokenUtils
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 import { NotificationService } from './NotificationService';
 
 const API_URL = `${API_BASE_URL}/api/assignments`;
@@ -214,147 +214,121 @@ export interface TodayAssignment {
 
 export class AssignmentService {
   
-  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
-  private static async getAuthToken(): Promise<string | null> {
+  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
+
+  // ========== COMPLETE ASSIGNMENT ==========
+  static async completeAssignment(
+    assignmentId: string, 
+    data: CompleteAssignmentParams
+  ): Promise<CompleteAssignmentResponse> {
     try {
-      const token = await SecureStore.getItemAsync('userToken');
-      console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
-      return token;
-    } catch (error) {
-      console.error('Error getting auth token:', error);
-      return null;
-    }
-  }
-
-  // ========== GET HEADERS WITH TOKEN ==========
-  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
-    const token = await this.getAuthToken();
-    const headers: HeadersInit = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ Added Authorization header');
-    } else {
-      console.warn('⚠️ No auth token available - request may fail');
-    }
-    
-    if (withJsonContent) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
-  }
-// ========== COMPLETE ASSIGNMENT ==========
-static async completeAssignment(
-  assignmentId: string, 
-  data: CompleteAssignmentParams
-): Promise<CompleteAssignmentResponse> {
-  try {
-    console.log('AssignmentService: Completing assignment', assignmentId, data);
-    
-    const token = await this.getAuthToken();
-    
-    if (data.photoUri) { 
-      // Create FormData for multipart upload
-      const formData = new FormData();
+      console.log('AssignmentService: Completing assignment', assignmentId, data);
       
-      // Add notes to formData if present
-      if (data.notes) {
-        formData.append('notes', data.notes);
-      }
+      // ✅ Use TokenUtils.getAccessToken() for token
+      const token = await TokenUtils.getAccessToken();
       
-      // Add the photo file - use 'photo' field name to match backend
-      const filename = data.photoUri.split('/').pop() || 'photo.jpg';
-      formData.append('photo', { // Changed back to 'photo'
-        uri: data.photoUri,
-        name: filename,
-        type: 'image/jpeg',
-      } as any); 
+      if (data.photoUri) { 
+        // Create FormData for multipart upload
+        const formData = new FormData();
         
-      // Prepare headers - DON'T set Content-Type, let browser set it with boundary
-      const headers: HeadersInit = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      
-      console.log('📤 Sending multipart form data with photo (field name: "photo")');
-      
-      const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
-        method: 'POST',
-        headers,
-        body: formData,
-      });
+        // Add notes to formData if present
+        if (data.notes) {
+          formData.append('notes', data.notes);
+        }
+        
+        // Add the photo file - use 'photo' field name to match backend
+        const filename = data.photoUri.split('/').pop() || 'photo.jpg';
+        formData.append('photo', {
+          uri: data.photoUri,
+          name: filename,
+          type: 'image/jpeg',
+        } as any); 
+          
+        // Prepare headers - DON'T set Content-Type, let browser set it with boundary
+        const headers: HeadersInit = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
+        console.log('📤 Sending multipart form data with photo (field name: "photo")');
+        
+        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+          method: 'POST',
+          headers,
+          body: formData,
+        });
 
-      // Try to parse response
-      let result;
-      const responseText = await response.text();
-      try {
-        result = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse response as JSON:', responseText);
-        throw new Error('Invalid server response');
-      }
-      
-      if (!response.ok) {
-        throw new Error(result.message || `Failed: ${response.status}`);
-      }
-      
-      if (result.success) {
-        await NotificationService.getUnreadCount();
-      }
-      
-      return result;
-      
-    } else {
-      // No photo - send as JSON
-      const headers = await this.getHeaders(true); // with JSON content type
-      
-      console.log('📤 Sending JSON data without photo');
-      
-      const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ notes: data.notes }),
-      });
+        // Try to parse response
+        let result;
+        const responseText = await response.text();
+        try {
+          result = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Failed to parse response as JSON:', responseText);
+          throw new Error('Invalid server response');
+        }
+        
+        if (!response.ok) {
+          throw new Error(result.message || `Failed: ${response.status}`);
+        }
+        
+        if (result.success) {
+          await NotificationService.getUnreadCount();
+        }
+        
+        return result;
+        
+      } else {
+        // No photo - send as JSON
+        // ✅ Use TokenUtils.getAuthHeaders()
+        const headers = await TokenUtils.getAuthHeaders(true); // with JSON content type
+        
+        console.log('📤 Sending JSON data without photo');
+        
+        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ notes: data.notes }),
+        });
 
-      // Try to parse response
-      let result;
-      const responseText = await response.text();
-      try {
-        result = JSON.parse(responseText);
-      } catch (e) {
-        console.error('Failed to parse response as JSON:', responseText);
-        throw new Error('Invalid server response');
+        // Try to parse response
+        let result;
+        const responseText = await response.text();
+        try {
+          result = JSON.parse(responseText);
+        } catch (e) {
+          console.error('Failed to parse response as JSON:', responseText);
+          throw new Error('Invalid server response');
+        }
+        
+        if (!response.ok) {
+          throw new Error(result.message || `Failed: ${response.status}`);
+        }
+        
+        if (result.success) {
+          await NotificationService.getUnreadCount();
+        }
+        
+        return result;
       }
-      
-      if (!response.ok) {
-        throw new Error(result.message || `Failed: ${response.status}`);
-      }
-      
-      if (result.success) {
-        await NotificationService.getUnreadCount();
-      }
-      
-      return result;
+
+    } catch (error: any) {
+      console.error('AssignmentService.completeAssignment error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to complete assignment',
+      };
     }
-
-  } catch (error: any) {
-    console.error('AssignmentService.completeAssignment error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to complete assignment',
-    };
   }
-}
 
-  
   // ========== VERIFY ASSIGNMENT ==========
   static async verifyAssignment(
     assignmentId: string, 
     data: { verified: boolean; adminNotes?: string; }
   ): Promise<VerifyAssignmentResponse> {
     try {
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${assignmentId}/verify`, {
         method: 'POST',
@@ -383,7 +357,8 @@ static async completeAssignment(
   // ========== GET ASSIGNMENT DETAILS ==========
   static async getAssignmentDetails(assignmentId: string) {
     try {
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${assignmentId}`, {
         method: 'GET',
@@ -419,7 +394,8 @@ static async completeAssignment(
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
 
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -444,7 +420,8 @@ static async completeAssignment(
       let url = `${API_URL}/today`;
       if (groupId) url += `?groupId=${groupId}`;
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -487,7 +464,8 @@ static async completeAssignment(
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
 
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -509,7 +487,8 @@ static async completeAssignment(
   // ========== GET ASSIGNMENT STATISTICS ==========
   static async getAssignmentStats(groupId: string) {
     try {
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/group/${groupId}/stats`, {
         method: 'GET',
@@ -531,7 +510,8 @@ static async completeAssignment(
   // ========== CHECK SUBMISSION TIME ==========
   static async checkSubmissionTime(assignmentId: string): Promise<TimeValidationResponse> {
     try {
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${assignmentId}/check-time`, {
         method: 'GET',
@@ -583,7 +563,8 @@ static async completeAssignment(
 
       console.log('AssignmentService: Getting upcoming assignments', url);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -607,6 +588,125 @@ static async completeAssignment(
       return {
         success: false,
         data: { assignments: [], currentTime: new Date().toISOString(), total: 0 }
+      };
+    }
+  }
+
+  // ========== GET USER NEGLECTED TASKS ==========
+  static async getUserNeglectedTasks(filters?: {
+    groupId?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    try {
+      let url = `${API_URL}/neglected/my`;
+      const params = new URLSearchParams();
+      
+      if (filters?.groupId) params.append('groupId', filters.groupId);
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset) params.append('offset', filters.offset.toString());
+      
+      const queryString = params.toString();
+      if (queryString) url += `?${queryString}`;
+
+      console.log('AssignmentService: Getting user neglected tasks', url);
+      
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('AssignmentService.getUserNeglectedTasks error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load neglected tasks',
+        data: { tasks: [], total: 0, count: 0 }
+      };
+    }
+  }
+
+  // ========== GET GROUP NEGLECTED TASKS (ADMIN ONLY) ==========
+  static async getGroupNeglectedTasks(
+    groupId: string,
+    filters?: {
+      memberId?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ) {
+    try {
+      let url = `${API_URL}/neglected/group/${groupId}`;
+      const params = new URLSearchParams();
+      
+      if (filters?.memberId) params.append('memberId', filters.memberId);
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset) params.append('offset', filters.offset.toString());
+      
+      const queryString = params.toString();
+      if (queryString) url += `?${queryString}`;
+
+      console.log('AssignmentService: Getting group neglected tasks', url);
+      
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('AssignmentService.getGroupNeglectedTasks error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load group neglected tasks',
+        data: { tasks: [], total: 0, count: 0, pointsByUser: {} }
+      };
+    }
+  }
+
+  // ========== GET NEGLECTED TASKS STATISTICS ==========
+  static async getNeglectedStats(groupId: string) {
+    try {
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
+      
+      const response = await fetch(`${API_URL}/neglected/group/${groupId}/stats`, {
+        method: 'GET',
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('AssignmentService.getNeglectedStats error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load neglected stats',
+        data: { total: 0, totalPointsLost: 0, byUser: {} }
       };
     }
   }
@@ -725,127 +825,10 @@ static async completeAssignment(
     }
   }
 
-// Add these methods to AssignmentService class in AssignmentService.ts
-
-// ========== GET USER NEGLECTED TASKS ==========
-static async getUserNeglectedTasks(filters?: {
-  groupId?: string;
-  limit?: number;
-  offset?: number;
-}) {
-  try {
-    let url = `${API_URL}/neglected/my`;
-    const params = new URLSearchParams();
-    
-    if (filters?.groupId) params.append('groupId', filters.groupId);
-    if (filters?.limit) params.append('limit', filters.limit.toString());
-    if (filters?.offset) params.append('offset', filters.offset.toString());
-    
-    const queryString = params.toString();
-    if (queryString) url += `?${queryString}`;
-
-    console.log('AssignmentService: Getting user neglected tasks', url);
-    
-    const headers = await this.getHeaders(false);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed: ${response.status}`);
+  private static formatNeglectedNote(assignment: any): string {
+    if (assignment.notes && assignment.notes.includes('[NEGLECTED]')) {
+      return assignment.notes;
     }
-    
-    const result = await response.json();
-    return result;
-
-  } catch (error: any) {
-    console.error('AssignmentService.getUserNeglectedTasks error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to load neglected tasks',
-      data: { tasks: [], total: 0, count: 0 }
-    };
+    return `[NEGLECTED] Missed submission on ${new Date(assignment.dueDate).toLocaleDateString()}`;
   }
-}
-
-// ========== GET GROUP NEGLECTED TASKS (ADMIN ONLY) ==========
-static async getGroupNeglectedTasks(
-  groupId: string,
-  filters?: {
-    memberId?: string;
-    limit?: number;
-    offset?: number;
-  }
-) {
-  try {
-    let url = `${API_URL}/neglected/group/${groupId}`;
-    const params = new URLSearchParams();
-    
-    if (filters?.memberId) params.append('memberId', filters.memberId);
-    if (filters?.limit) params.append('limit', filters.limit.toString());
-    if (filters?.offset) params.append('offset', filters.offset.toString());
-    
-    const queryString = params.toString();
-    if (queryString) url += `?${queryString}`;
-
-    console.log('AssignmentService: Getting group neglected tasks', url);
-    
-    const headers = await this.getHeaders(false);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    return result;
-
-  } catch (error: any) {
-    console.error('AssignmentService.getGroupNeglectedTasks error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to load group neglected tasks',
-      data: { tasks: [], total: 0, count: 0, pointsByUser: {} }
-    };
-  }
-}
-
-// ========== GET NEGLECTED TASKS STATISTICS ==========
-static async getNeglectedStats(groupId: string) {
-  try {
-    const headers = await this.getHeaders(false);
-    
-    const response = await fetch(`${API_URL}/neglected/group/${groupId}/stats`, {
-      method: 'GET',
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    return result;
-
-  } catch (error: any) {
-    console.error('AssignmentService.getNeglectedStats error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to load neglected stats',
-      data: { total: 0, totalPointsLost: 0, byUser: {} }
-    };
-  }
-}
-private static formatNeglectedNote(assignment: any): string {
-  if (assignment.notes && assignment.notes.includes('[NEGLECTED]')) {
-    return assignment.notes;
-  }
-  return `[NEGLECTED] Missed submission on ${new Date(assignment.dueDate).toLocaleDateString()}`;
-}
 }

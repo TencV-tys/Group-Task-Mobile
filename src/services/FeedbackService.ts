@@ -1,6 +1,6 @@
-// services/FeedbackService.ts - UPDATED WITH SECURESTORE
+// services/FeedbackService.ts - UPDATED with TokenUtils
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 const API_URL = `${API_BASE_URL}/api/feedback`;
 
@@ -54,36 +54,7 @@ class FeedbackServiceClass {
   private lastStats: FeedbackStats | null = null;
   private isPolling = false;
 
-  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
-  private static async getAuthToken(): Promise<string | null> {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      console.log('🔐 Auth token retrieved:', token ? 'Yes' : 'No');
-      return token;
-    } catch (error) {
-      console.error('Error getting auth token:', error);
-      return null;
-    }
-  }
-
-  // ========== GET HEADERS WITH TOKEN ==========
-  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
-    const token = await this.getAuthToken();
-    const headers: HeadersInit = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ Added Authorization header');
-    } else {
-      console.warn('⚠️ No auth token available - request may fail');
-    }
-    
-    if (withJsonContent) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
-  }
+  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
 
   // ========== SUBMIT FEEDBACK ==========
   async submitFeedback(data: FeedbackData): Promise<FeedbackResponse> {
@@ -95,7 +66,8 @@ class FeedbackServiceClass {
         };
       }
 
-      const headers = await FeedbackServiceClass.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/submit`, {
         method: "POST",
@@ -123,7 +95,8 @@ class FeedbackServiceClass {
   // ========== UPDATE FEEDBACK ==========
   async updateFeedback(feedbackId: string, data: Partial<FeedbackData>): Promise<FeedbackResponse> {
     try {
-      const headers = await FeedbackServiceClass.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${feedbackId}`, {
         method: "PUT",
@@ -151,7 +124,8 @@ class FeedbackServiceClass {
   // ========== GET MY FEEDBACK ==========
   async getMyFeedback(page: number = 1, limit: number = 20): Promise<FeedbackResponse> {
     try {
-      const headers = await FeedbackServiceClass.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/my-feedback?page=${page}&limit=${limit}`, {
         method: "GET",
@@ -173,7 +147,8 @@ class FeedbackServiceClass {
   // ========== GET FEEDBACK DETAILS ==========
   async getFeedbackDetails(feedbackId: string): Promise<FeedbackResponse> {
     try {
-      const headers = await FeedbackServiceClass.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${feedbackId}`, {
         method: "GET",
@@ -195,7 +170,8 @@ class FeedbackServiceClass {
   // ========== DELETE FEEDBACK ==========
   async deleteFeedback(feedbackId: string): Promise<FeedbackResponse> {
     try {
-      const headers = await FeedbackServiceClass.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${feedbackId}`, {
         method: "DELETE",
@@ -222,7 +198,8 @@ class FeedbackServiceClass {
   // ========== GET MY FEEDBACK STATS ==========
   async getMyFeedbackStats(): Promise<FeedbackResponse> {
     try {
-      const headers = await FeedbackServiceClass.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/my-stats`, {
         method: "GET",

@@ -1,39 +1,18 @@
+// services/GroupActivityService.ts - UPDATED with TokenUtils
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 const API_URL = `${API_BASE_URL}/api/group-activity`;
 
 export class GroupActivityService {
   
-  private static async getAuthToken(): Promise<string | null> {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      return token;
-    } catch (error) {
-      console.error('GroupActivityService: Error getting auth token:', error);
-      return null;
-    }
-  }  
-
-  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
-    const token = await this.getAuthToken();
-    const headers: HeadersInit = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    if (withJsonContent) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
-  }
+  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
 
   // Get group activity summary (Admin only)
   static async getGroupActivitySummary(groupId: string) {
     try {
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       const response = await fetch(`${API_URL}/${groupId}/summary`, {
         method: 'GET',
         headers,
@@ -63,7 +42,9 @@ export class GroupActivityService {
       if (filters?.offset) params.append('offset', filters.offset.toString());
 
       const url = `${API_URL}/${groupId}/completion-history${params.toString() ? `?${params}` : ''}`;
-      const headers = await this.getHeaders(false);
+      
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       const response = await fetch(url, { method: 'GET', headers });
       return await response.json();
     } catch (error: any) {
@@ -75,7 +56,8 @@ export class GroupActivityService {
   // Get member contribution details
   static async getMemberContributions(groupId: string, memberId: string) {
     try {
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       const response = await fetch(`${API_URL}/${groupId}/members/${memberId}/contributions`, {
         method: 'GET',
         headers,
@@ -101,7 +83,9 @@ export class GroupActivityService {
       if (filters?.week) params.append('week', filters.week.toString());
 
       const url = `${API_URL}/${groupId}/tasks/completion-history${params.toString() ? `?${params}` : ''}`;
-      const headers = await this.getHeaders(false);
+      
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       const response = await fetch(url, { method: 'GET', headers });
       return await response.json();
     } catch (error: any) {
@@ -110,52 +94,53 @@ export class GroupActivityService {
     }
   }
 
-
-  // Add these methods to your existing GroupActivityService class
-
-// ===== NEW: Get admin dashboard data =====
-static async getAdminDashboard(groupId: string) {
-  try {
-    const headers = await this.getHeaders(false);
-    const response = await fetch(`${API_URL}/${groupId}/admin-dashboard`, {
-      method: 'GET',
-      headers,
-    });
-    return await response.json();
-  } catch (error: any) {
-    console.error('GroupActivityService.getAdminDashboard error:', error);
-    return { success: false, message: error.message };
+  // Get admin dashboard data
+  static async getAdminDashboard(groupId: string) {
+    try {
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
+      const response = await fetch(`${API_URL}/${groupId}/admin-dashboard`, {
+        method: 'GET',
+        headers,
+      });
+      return await response.json();
+    } catch (error: any) {
+      console.error('GroupActivityService.getAdminDashboard error:', error);
+      return { success: false, message: error.message };
+    }
   }
-}
 
-// ===== NEW: Get member dashboard data =====
-static async getMemberDashboard(groupId: string) {
-  try {
-    const headers = await this.getHeaders(false);
-    const response = await fetch(`${API_URL}/${groupId}/member-dashboard`, {
-      method: 'GET',
-      headers,
-    });
-    return await response.json();
-  } catch (error: any) {
-    console.error('GroupActivityService.getMemberDashboard error:', error);
-    return { success: false, message: error.message };
+  // Get member dashboard data
+  static async getMemberDashboard(groupId: string) {
+    try {
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
+      const response = await fetch(`${API_URL}/${groupId}/member-dashboard`, {
+        method: 'GET',
+        headers,
+      });
+      return await response.json();
+    } catch (error: any) {
+      console.error('GroupActivityService.getMemberDashboard error:', error);
+      return { success: false, message: error.message };
+    }
   }
-}
 
-// ===== NEW: Get recent activity for dashboard =====
-static async getRecentActivity(groupId: string, limit: number = 10) {
-  try {
-    const params = new URLSearchParams();
-    params.append('limit', limit.toString());
-    
-    const url = `${API_URL}/${groupId}/recent-activity?${params}`;
-    const headers = await this.getHeaders(false);
-    const response = await fetch(url, { method: 'GET', headers });
-    return await response.json();
-  } catch (error: any) {
-    console.error('GroupActivityService.getRecentActivity error:', error);
-    return { success: false, message: error.message };
+  // Get recent activity for dashboard
+  static async getRecentActivity(groupId: string, limit: number = 10) {
+    try {
+      const params = new URLSearchParams();
+      params.append('limit', limit.toString());
+      
+      const url = `${API_URL}/${groupId}/recent-activity?${params}`;
+      
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
+      const response = await fetch(url, { method: 'GET', headers });
+      return await response.json();
+    } catch (error: any) {
+      console.error('GroupActivityService.getRecentActivity error:', error);
+      return { success: false, message: error.message };
+    }
   }
-}
 }

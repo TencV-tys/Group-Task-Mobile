@@ -1,39 +1,36 @@
-// src/hooks/useImageUpload.ts - UPDATED WITH SECURESTORE
+// src/hooks/useImageUpload.ts - UPDATED with TokenUtils
 import { useState, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { UploadService } from '../uploadService/UploadService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 IMPORT TokenUtils
 
 interface UseImageUploadProps {
   onSuccess?: (result: any) => void;
   onError?: (error: any) => void;
-} 
+  onAuthError?: () => void; // Add this for navigation
+}
 
-export const useImageUpload = ({ onSuccess, onError }: UseImageUploadProps = {}) => {
+export const useImageUpload = ({ onSuccess, onError, onAuthError }: UseImageUploadProps = {}) => {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests from SecureStore
+  // ✅ UPDATED: Use TokenUtils for token checking
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 useImageUpload: No auth token available in SecureStore');
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: true,
+      alertTitle: 'Authentication Required',
+      alertMessage: 'Please log in to upload images',
+      onAuthError: () => {
         setAuthError(true);
-        Alert.alert('Authentication Error', 'Please log in again');
-        return false;
+        onAuthError?.();
       }
-      console.log('✅ useImageUpload: Auth token found in SecureStore');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ useImageUpload: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
-  }, []);
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
+  }, [onAuthError]);
 
   // Request permissions 
   const requestPermissions = async (): Promise<boolean> => {

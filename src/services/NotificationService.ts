@@ -1,6 +1,6 @@
-// services/NotificationService.ts - UPDATED WITH SECURESTORE
+// services/NotificationService.ts - UPDATED with TokenUtils
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 const API_URL = `${API_BASE_URL}/api/notifications`;
 
@@ -64,7 +64,7 @@ export const NotificationTypes = {
   // Other
   MENTION: 'MENTION',
   REMINDER: 'REMINDER',
-   DAILY_TASK_REMINDER: 'DAILY_TASK_REMINDER',
+  DAILY_TASK_REMINDER: 'DAILY_TASK_REMINDER',
 } as const;
 
 export type NotificationType = typeof NotificationTypes[keyof typeof NotificationTypes];
@@ -103,41 +103,13 @@ export interface UnreadCountResponse {
 
 export class NotificationService {
   
-  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
-  private static async getAuthToken(): Promise<string | null> {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      console.log('🔐 NotificationService: Auth token retrieved:', token ? 'Yes' : 'No');
-      return token;
-    } catch (error) {
-      console.error('NotificationService: Error getting auth token:', error);
-      return null;
-    }
-  }
-
-  // ========== GET HEADERS WITH TOKEN ==========
-  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
-    const token = await this.getAuthToken();
-    const headers: HeadersInit = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ NotificationService: Added Authorization header');
-    } else {
-      console.warn('⚠️ NotificationService: No auth token available - request may fail');
-    }
-    
-    if (withJsonContent) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
-  }
+  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
 
   // ========== GET NOTIFICATIONS ==========
   static async getNotifications(page: number = 1, limit: number = 20): Promise<NotificationsResponse> {
     try {
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/?page=${page}&limit=${limit}`, {
         method: "GET",
@@ -161,7 +133,8 @@ export class NotificationService {
   // ========== GET UNREAD COUNT ==========
   static async getUnreadCount(): Promise<UnreadCountResponse> {
     try {
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/unread-count`, {
         method: "GET",
@@ -190,7 +163,8 @@ export class NotificationService {
   // ========== MARK NOTIFICATION AS READ ==========
   static async markAsRead(notificationId: string): Promise<{ success: boolean; message?: string }> {
     try {
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${notificationId}/read`, {
         method: "PATCH",
@@ -212,7 +186,8 @@ export class NotificationService {
   // ========== MARK ALL AS READ ==========
   static async markAllAsRead(): Promise<{ success: boolean; message?: string }> {
     try {
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/mark-all-read`, {
         method: "PATCH",
@@ -234,7 +209,8 @@ export class NotificationService {
   // ========== DELETE NOTIFICATION ==========
   static async deleteNotification(notificationId: string): Promise<{ success: boolean; message?: string }> {
     try {
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${notificationId}`, {
         method: "DELETE",

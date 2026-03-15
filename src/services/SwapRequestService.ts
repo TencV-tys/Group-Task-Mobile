@@ -1,6 +1,6 @@
-// services/SwapRequestService.ts - UPDATED WITH SECURESTORE
+// services/SwapRequestService.ts - UPDATED with TokenUtils
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 import { NotificationService } from './NotificationService';
 
 const API_URL = `${API_BASE_URL}/api/swap-requests`;
@@ -101,36 +101,7 @@ export interface SwapRequestResponse {
 
 export class SwapRequestService {
   
-  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
-  private static async getAuthToken(): Promise<string | null> {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      console.log('🔐 SwapRequestService: Auth token retrieved:', token ? 'Yes' : 'No');
-      return token;
-    } catch (error) {
-      console.error('SwapRequestService: Error getting auth token:', error);
-      return null;
-    }
-  }
-
-  // ========== GET HEADERS WITH TOKEN ==========
-  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
-    const token = await this.getAuthToken();
-    const headers: HeadersInit = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ SwapRequestService: Added Authorization header');
-    } else {
-      console.warn('⚠️ SwapRequestService: No auth token available - request may fail');
-    }
-    
-    if (withJsonContent) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
-  }
+  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
 
   // CREATE: Request to swap an assignment
   static async createSwapRequest(data: CreateSwapRequestData): Promise<SwapRequestResponse> {
@@ -145,7 +116,8 @@ export class SwapRequestService {
         };
       }
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       console.log('Request headers:', headers);
       
       const response = await fetch(`${API_URL}/create`, {
@@ -188,7 +160,8 @@ export class SwapRequestService {
         url += `?scope=${scope}`;
       }
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for no JSON content
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -229,7 +202,8 @@ export class SwapRequestService {
 
       console.log('SwapRequestService: Getting my swap requests', url);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -286,7 +260,8 @@ export class SwapRequestService {
 
       console.log('SwapRequestService: Getting pending requests for me', url);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
         method: 'GET',
@@ -332,7 +307,8 @@ export class SwapRequestService {
     try {
       console.log('SwapRequestService: Getting swap request details', requestId);
       
-      const headers = await this.getHeaders(false);
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${requestId}`, {
         method: 'GET',
@@ -372,7 +348,8 @@ export class SwapRequestService {
     try {
       console.log('SwapRequestService: Accepting swap request', requestId);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${requestId}/accept`, {
         method: 'POST',
@@ -407,7 +384,8 @@ export class SwapRequestService {
     try {
       console.log('SwapRequestService: Rejecting swap request', requestId);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${requestId}/reject`, {
         method: 'POST',
@@ -443,7 +421,8 @@ export class SwapRequestService {
     try {
       console.log('SwapRequestService: Cancelling swap request', requestId);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${requestId}/cancel`, {
         method: 'POST',
@@ -473,7 +452,69 @@ export class SwapRequestService {
     }
   }
 
+  // ===== NEW: Get group swap requests (for admin history view) =====
+  static async getGroupSwapRequests(
+    groupId: string,
+    filters?: {
+      status?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ) {
+    try {
+      let url = `${API_URL}/group/${groupId}`;
+      const params = new URLSearchParams();
+      
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset) params.append('offset', filters.offset.toString());
+      
+      const queryString = params.toString();
+      if (queryString) url += `?${queryString}`;
+
+      console.log('SwapRequestService: Getting group swap requests', url);
+      
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load group swap requests: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('SwapRequestService: Get group requests response:', result);
+      
+      if (result.success) {
+        return {
+          success: true,
+          data: {
+            requests: result.data?.requests || result.requests || [],
+            total: result.data?.total || result.total || 0,
+            stats: result.data?.stats || result.stats
+          }
+        };
+      }
+      
+      return result;
+
+    } catch (error: any) {
+      console.error('SwapRequestService.getGroupSwapRequests error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load group swap requests',
+        data: { requests: [], total: 0 }
+      };
+    }
+  }
+
   // ============= HELPER METHODS =============
+  // (These don't need tokens, so they stay the same)
 
   // Get swap description text
   static getSwapDescription(swapRequest: SwapRequest): string {
@@ -540,69 +581,6 @@ export class SwapRequestService {
     }
   }
 
-
-// Add this method to your existing SwapRequestService class
-
-// ===== NEW: Get group swap requests (for admin history view) =====
-static async getGroupSwapRequests(
-  groupId: string,
-  filters?: {
-    status?: string;
-    limit?: number;
-    offset?: number;
-  }
-) {
-  try {
-    let url = `${API_URL}/group/${groupId}`;
-    const params = new URLSearchParams();
-    
-    if (filters?.status) params.append('status', filters.status);
-    if (filters?.limit) params.append('limit', filters.limit.toString());
-    if (filters?.offset) params.append('offset', filters.offset.toString());
-    
-    const queryString = params.toString();
-    if (queryString) url += `?${queryString}`;
-
-    console.log('SwapRequestService: Getting group swap requests', url);
-    
-    const headers = await this.getHeaders(false);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers,
-      credentials: 'include'
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to load group swap requests: ${response.status}`);
-    }
-    
-    const result = await response.json();
-    console.log('SwapRequestService: Get group requests response:', result);
-    
-    if (result.success) {
-      return {
-        success: true,
-        data: {
-          requests: result.data?.requests || result.requests || [],
-          total: result.data?.total || result.total || 0,
-          stats: result.data?.stats || result.stats
-        }
-      };
-    }
-    
-    return result;
-
-  } catch (error: any) {
-    console.error('SwapRequestService.getGroupSwapRequests error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to load group swap requests',
-      data: { requests: [], total: 0 }
-    };
-  }
-}
-
   // Check if user can swap (time constraints)
   static canRequestSwap(dueDate: string): { canSwap: boolean; reason?: string } {
     const now = new Date();
@@ -636,6 +614,4 @@ static async getGroupSwapRequests(
   static formatDay(day: string): string {
     return day.charAt(0) + day.slice(1).toLowerCase();
   }
-
-
 }

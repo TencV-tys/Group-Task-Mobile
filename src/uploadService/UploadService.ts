@@ -1,6 +1,6 @@
-// src/services/UploadService.ts - UPDATED WITH SECURESTORE
+// src/services/UploadService.ts - UPDATED with TokenUtils
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 const API_URL = `${API_BASE_URL}/api/uploads`;
 
@@ -18,43 +18,13 @@ export interface UploadResponse {
 
 export class UploadService {
   
-  // ========== GET AUTH TOKEN FROM SECURESTORE ==========
-  private static async getAuthToken(): Promise<string | null> {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      console.log('🔐 UploadService: Auth token retrieved:', token ? 'Yes' : 'No');
-      return token;
-    } catch (error) {
-      console.error('UploadService: Error getting auth token:', error);
-      return null;
-    }
-  }
-
-  // ========== GET HEADERS WITH TOKEN ==========
-  private static async getHeaders(withJsonContent: boolean = true): Promise<HeadersInit> {
-    const token = await this.getAuthToken();
-    const headers: HeadersInit = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-      console.log('✅ UploadService: Added Authorization header');
-    } else {
-      console.warn('⚠️ UploadService: No auth token available - request may fail');
-    }
-    
-    if (withJsonContent) {
-      headers['Content-Type'] = 'application/json';
-    }
-    
-    return headers;
-  }
-
   // ========== UPLOAD AVATAR FROM FILE ==========
   static async uploadAvatar(fileUri: string): Promise<UploadResponse> {
     try {
       console.log('📤 Uploading avatar from URI:', fileUri);
       
-      const token = await this.getAuthToken();
+      // ✅ Use TokenUtils.getAccessToken()
+      const token = await TokenUtils.getAccessToken();
       const formData = new FormData();
       
       const filename = fileUri.split('/').pop() || 'avatar.jpg';
@@ -123,7 +93,8 @@ export class UploadService {
         processedBase64 = `data:image/jpeg;base64,${base64Image}`;
       }
 
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
 
       const response = await fetch(`${API_URL}/avatar/base64`, {
         method: 'POST',
@@ -150,7 +121,8 @@ export class UploadService {
     try {
       console.log('📤 Uploading task photo for task:', taskId);
       
-      const token = await this.getAuthToken();
+      // ✅ Use TokenUtils.getAccessToken()
+      const token = await TokenUtils.getAccessToken();
       const formData = new FormData();
       
       const filename = fileUri.split('/').pop() || 'task-photo.jpg';
@@ -200,7 +172,8 @@ export class UploadService {
     try {
       console.log('🗑️ Deleting avatar');
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/avatar`, {
         method: 'DELETE',
@@ -231,7 +204,8 @@ export class UploadService {
         processedBase64 = `data:image/jpeg;base64,${base64Image}`;
       }
 
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
 
       const response = await fetch(`${API_URL}/group/${groupId}/avatar/base64`, {
         method: 'POST',
@@ -256,7 +230,8 @@ export class UploadService {
     try {
       console.log('📤 Uploading group avatar for group:', groupId);
       
-      const token = await this.getAuthToken();
+      // ✅ Use TokenUtils.getAccessToken()
+      const token = await TokenUtils.getAccessToken();
       const formData = new FormData();
       
       const filename = fileUri.split('/').pop() || 'group-avatar.jpg';
@@ -304,7 +279,8 @@ export class UploadService {
     try {
       console.log('🗑️ Deleting group avatar for group:', groupId);
       
-      const headers = await this.getHeaders();
+      // ✅ Use TokenUtils.getAuthHeaders()
+      const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/group/${groupId}/avatar`, {
         method: 'DELETE',

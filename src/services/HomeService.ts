@@ -1,6 +1,6 @@
-// services/HomeService.ts - UPDATED WITH SECURESTORE (NO POLLING)
+// services/HomeService.ts - UPDATED with TokenUtils
 import { API_BASE_URL } from '../config/api';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
 
 const API_URL = `${API_BASE_URL}/api/home`;
 
@@ -21,20 +21,8 @@ class HomeServiceClass {
     try {
       console.log("HomeService: Fetching home data from:", `${API_URL}/`);
       
-      // Get token from SecureStore
-      const token = await SecureStore.getItemAsync('userToken');
-      
-      const headers: HeadersInit = {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-        console.log('✅ Added Authorization header');
-      } else {
-        console.warn('⚠️ No auth token available - request may fail');
-      }
+      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/`, {
         method: "GET",

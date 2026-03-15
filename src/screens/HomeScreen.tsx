@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.tsx - COMPLETELY REFACTORED
+// src/screens/HomeScreen.tsx - COMPLETELY FIXED with GroupListener
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -19,11 +19,9 @@ import { useHomeData } from '../homeHook/useHomeHook';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { useNotifications } from '../notificationHook/useNotifications';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
-import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
-import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { RotationBanner } from '../components/RotationBanner';
+import { GroupListener } from '../components/GroupListener'; // 👈 IMPORT THE NEW COMPONENT
 import { homeStyles as styles } from '../styles/home.styles';
 
 export default function HomeScreen({ navigation }: any) {
@@ -84,101 +82,6 @@ export default function HomeScreen({ navigation }: any) {
     ]
   });
 
-  // ===== REAL-TIME TASK EVENTS FOR EACH GROUP =====
-  const groups = homeData?.groups || [];
-  
-  // Set up rotation listeners for each group
-  groups.forEach((group: any) => {
-    const { events: taskEvents, clearRotationCompleted } = useRealtimeTasks(group.id);
-    const { events: assignmentEvents } = useRealtimeAssignments(group.id, currentUserId || '');
-    const { events: swapEvents } = useRealtimeSwapRequests(group.id, currentUserId || '');
-    
-    // Handle rotation completed
-    useEffect(() => {
-      if (taskEvents.rotationCompleted) {
-        console.log(`🔄 Rotation completed for group ${group.name}`, taskEvents.rotationCompleted);
-        
-        // Find MY new tasks
-        const myNewTasks = taskEvents.rotationCompleted.rotatedTasks?.filter(
-          (task: any) => task.newAssignee === currentUserId
-        ) || [];
-        
-        // Store rotation alert for banner
-        setRotationAlerts(prev => ({
-          ...prev,
-          [group.id]: {
-            ...taskEvents.rotationCompleted,
-            groupName: group.name,
-            myTaskCount: myNewTasks.length
-          }
-        }));
-        
-        // Show alert
-        Alert.alert(
-          '🔄 New Week Started!',
-          `${group.name} is now on Week ${taskEvents.rotationCompleted.newWeek}\n\n` +
-          `You have ${myNewTasks.length} new task(s) assigned.`,
-          [
-            {
-              text: 'View Tasks',
-              onPress: () => {
-                navigation.navigate('GroupTasks', {
-                  groupId: group.id,
-                  groupName: group.name,
-                  userRole: group.role || 'MEMBER'
-                });
-                clearRotationCompleted();
-                setRotationAlerts(prev => {
-                  const newAlerts = {...prev};
-                  delete newAlerts[group.id];
-                  return newAlerts;
-                });
-              }
-            },
-            {
-              text: 'Later',
-              onPress: () => {
-                clearRotationCompleted();
-                setRotationAlerts(prev => {
-                  const newAlerts = {...prev};
-                  delete newAlerts[group.id];
-                  return newAlerts;
-                });
-              }
-            }
-          ]
-        );
-        
-        // Refresh home data
-        refreshHomeData();
-      }
-    }, [taskEvents.rotationCompleted]);
-    
-    // Handle task events
-    useEffect(() => {
-      if (taskEvents.taskCreated || taskEvents.taskUpdated || taskEvents.taskDeleted || taskEvents.taskAssigned) {
-        refreshHomeData();
-      }
-    }, [taskEvents.taskCreated, taskEvents.taskUpdated, taskEvents.taskDeleted, taskEvents.taskAssigned]);
-    
-    // Handle assignment events
-    useEffect(() => {
-      if (assignmentEvents.assignmentCompleted || 
-          assignmentEvents.assignmentVerified || 
-          assignmentEvents.assignmentPendingVerification) {
-        refreshHomeData();
-      }
-    }, [assignmentEvents.assignmentCompleted, assignmentEvents.assignmentVerified, assignmentEvents.assignmentPendingVerification]);
-    
-    // Handle swap events
-    useEffect(() => {
-      if (swapEvents.swapCreated || swapEvents.swapResponded) {
-        refreshHomeData();
-        loadPendingForMe();
-      }
-    }, [swapEvents.swapCreated, swapEvents.swapResponded]);
-  });
-
   // Clear new notification
   useEffect(() => {
     if (events.newNotification) {
@@ -228,13 +131,14 @@ export default function HomeScreen({ navigation }: any) {
   const recentActivity = homeData?.recentActivity || [];
   const currentWeekTasks = homeData?.currentWeekTasks || [];
   const overdueTasks = homeData?.overdueTasks || [];
+  const groups = homeData?.groups || [];
 
   // ===== HANDLERS =====
   const handleRefresh = useCallback(() => {
     refreshHomeData();
     loadPendingForMe();
     loadUnreadCount();
-  }, []);
+  }, [refreshHomeData, loadPendingForMe, loadUnreadCount]);
 
   const handleViewGroups = () => {
     navigation.navigate('MyGroups');
@@ -292,6 +196,69 @@ export default function HomeScreen({ navigation }: any) {
       delete newAlerts[groupId];
       return newAlerts;
     });
+  };
+
+  // ===== HANDLE ROTATION FROM GROUP LISTENER =====
+  const handleRotation = useCallback((groupId: string, alert: any) => {
+    setRotationAlerts(prev => ({
+      ...prev,
+      [groupId]: alert
+    }));
+    
+    const group = groups.find((g: any) => g.id === groupId);
+    
+    Alert.alert(
+      '🔄 New Week Started!',
+      `${alert.groupName} is now on Week ${alert.newWeek}\n\n` +
+      `You have ${alert.myTaskCount} new task(s) assigned.`,
+      [
+        {
+          text: 'View Tasks',
+          onPress: () => {
+            navigation.navigate('GroupTasks', {
+              groupId,
+              groupName: alert.groupName,
+              userRole: group?.role || 'MEMBER'
+            });
+            setRotationAlerts(prev => {
+              const newAlerts = {...prev};
+              delete newAlerts[groupId];
+              return newAlerts;
+            });
+          }
+        },
+        {
+          text: 'Later',
+          onPress: () => {
+            setRotationAlerts(prev => {
+              const newAlerts = {...prev};
+              delete newAlerts[groupId];
+              return newAlerts;
+            });
+          }
+        }
+      ]
+    );
+  }, [groups, navigation]);
+
+  // ===== RENDER GROUP LISTENERS =====
+  const renderGroupListeners = () => {
+    if (!groups.length || !currentUserId) return null;
+    
+    return groups.map((group: any) => (
+      <GroupListener
+        key={group.id}
+        group={group}
+        currentUserId={currentUserId}
+        onRotation={handleRotation}
+        onTaskChange={refreshHomeData}
+        onAssignmentChange={refreshHomeData}
+        onSwapChange={() => {
+          refreshHomeData();
+          loadPendingForMe();
+        }}
+      />
+    ));
   };
 
   // ===== RENDER ROTATION BANNERS =====
@@ -357,6 +324,9 @@ export default function HomeScreen({ navigation }: any) {
   // ===== MAIN RENDER =====
   return (
     <ScreenWrapper noBottom={true} style={styles.container}>
+      {/* Group Listeners (invisible components) */}
+      {renderGroupListeners()}
+
       {/* Rotation Banners */}
       {renderRotationBanners()}
 

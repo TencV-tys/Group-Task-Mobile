@@ -64,7 +64,7 @@ export const CreateSwapRequestScreen = () => {
     scope: propScope
   } = route.params;
   
-  const { createSwapRequest, loading } = useSwapRequests();
+  const { createSwapRequest, loading,authError } = useSwapRequests();
   
   const [members, setMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
@@ -83,6 +83,23 @@ export const CreateSwapRequestScreen = () => {
   const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(
     propSelectedTimeSlotId || null
   );
+
+
+useEffect(() => {
+  if (authError) {
+    Alert.alert(
+      'Session Expired',
+      'Please log in again',
+      [{ 
+        text: 'OK', 
+        onPress: () => {
+          // @ts-ignore
+          navigation.navigate('Login');
+        }
+      }]
+    );
+  }
+}, [authError]);
 
   // Get the current day of the week for this assignment
   useEffect(() => {

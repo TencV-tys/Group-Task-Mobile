@@ -1,4 +1,4 @@
-// src/screens/AdminDashboardScreen.tsx - FIXED header and stat cards
+// src/screens/AdminDashboardScreen.tsx - FULLY UPDATED with TokenUtils
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -12,11 +12,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import * as SecureStore from 'expo-secure-store';
 
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { GroupActivityService } from '../services/GroupActivityService';
+import { TokenUtils } from '../utils/tokenUtils';
 import { useRotationStatus } from '../hooks/useRotationStatus';
 import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
@@ -43,15 +43,14 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
   
-  const { status, checkStatus } = useRotationStatus(groupId);
+  const { status, checkStatus, authError: rotationAuthError } = useRotationStatus(groupId);
 
   // ===== GET USER ID ON MOUNT =====
   useEffect(() => {
     const getUserId = async () => {
       try {
-        const userStr = await SecureStore.getItemAsync('user');
-        if (userStr) {
-          const user = JSON.parse(userStr);
+        const user = await TokenUtils.getUser();
+        if (user) {
           setCurrentUserId(user.id);
         }
       } catch (error) {
@@ -64,6 +63,36 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
       isMounted.current = false;
     };
   }, []);
+
+  // ===== TOKEN CHECK USING TOKENUTILS =====
+  const checkToken = useCallback(async (): Promise<boolean> => {
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
+  }, []);
+
+  // ===== AUTH ERROR HANDLER =====
+  useEffect(() => {
+    if (authError || rotationAuthError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, rotationAuthError, navigation]);
 
   // ===== REAL-TIME EVENT LISTENERS =====
   const { events: taskEvents, clearRotationCompleted } = useRealtimeTasks(groupId);
@@ -137,57 +166,37 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
     }, [groupId])
   );
 
-useEffect(() => {
-  if (taskEvents.rotationCompleted) {
-    console.log('🔄 Admin Dashboard: Rotation completed', taskEvents.rotationCompleted);
-    
-    // Show alert
-    Alert.alert(
-      '🔄 Rotation Completed',
-      `Week ${taskEvents.rotationCompleted.newWeek} has started!\n\n` +
-      `${taskEvents.rotationCompleted.rotatedTasks?.length || 0} tasks were rotated.`,
-      [
-        { 
-          text: 'View Schedule', 
-          onPress: () => {
-            navigation.navigate('RotationSchedule', { 
-              groupId, 
-              groupName, 
-              userRole: 'ADMIN' 
-            });
-            clearRotationCompleted();
+  // Handle rotation completed
+  useEffect(() => {
+    if (taskEvents.rotationCompleted) {
+      console.log('🔄 Admin Dashboard: Rotation completed', taskEvents.rotationCompleted);
+      
+      Alert.alert(
+        '🔄 Rotation Completed',
+        `Week ${taskEvents.rotationCompleted.newWeek} has started!\n\n` +
+        `${taskEvents.rotationCompleted.rotatedTasks?.length || 0} tasks were rotated.`,
+        [
+          { 
+            text: 'View Schedule', 
+            onPress: () => {
+              navigation.navigate('RotationSchedule', { 
+                groupId, 
+                groupName, 
+                userRole: 'ADMIN' 
+              });
+              clearRotationCompleted();
+            }
+          },
+          { 
+            text: 'OK',
+            onPress: () => clearRotationCompleted()
           }
-        },
-        { 
-          text: 'OK',
-          onPress: () => clearRotationCompleted()
-        }
-      ]
-    );
-    
-    // Refresh dashboard data
-    refreshDashboardData();
-  }
-}, [taskEvents.rotationCompleted]);
-
-  const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 AdminDashboard: No auth token available');
-        setAuthError(true);
-        setError('Please log in again');
-        return false;
-      }
-      console.log('✅ AdminDashboard: Auth token found');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ AdminDashboard: Error checking token:', error);
-      setAuthError(true);
-      return false;
+        ]
+      );
+      
+      refreshDashboardData();
     }
-  }, []);
+  }, [taskEvents.rotationCompleted]);
 
   // Update rotationStatus when status changes
   useEffect(() => {
@@ -272,25 +281,6 @@ useEffect(() => {
   const handleSettingsPress = () => {
     setShowSettingsModal(true);
   };
-
-  // Handle auth error
-  useEffect(() => {
-    if (authError) {
-      Alert.alert(
-        'Session Expired',
-        'Please log in again',
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              setAuthError(false);
-              navigation.navigate('Login');
-            }
-          }
-        ]
-      );
-    }
-  }, [authError]);
 
   // ===== STAT CARD =====
   const StatCard = ({ 
@@ -648,13 +638,13 @@ useEffect(() => {
             navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
            <StatCard
-    title="Neglected Tasks"
-    value={stats?.neglectedCount || 0}
-    icon="timer-off"
-    color="#fa5252"
-    navigateTo="NeglectedTasks"
-    navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-  />
+            title="Neglected Tasks"
+            value={stats?.neglectedCount || 0}
+            icon="timer-off"
+            color="#fa5252"
+            navigateTo="NeglectedTasks"
+            navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+          />
         </View>
 
         {/* Task Stats - CLICKABLE */}

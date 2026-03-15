@@ -24,7 +24,7 @@ import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function CreateTaskScreen({ navigation, route }: any) {
   const { groupId, groupName } = route.params || {};
-  const { loading, error, success, createTask, reset } = useCreateTask();
+  const { loading, error, success, createTask, reset,authError } = useCreateTask();
   
   // ✅ NEW: Rotation status hook
   const { status, checkStatus, getTaskRecommendation } = useRotationStatus(groupId);
@@ -55,7 +55,15 @@ export default function CreateTaskScreen({ navigation, route }: any) {
       points?: string;
     }>,
   });
-
+useEffect(() => {
+  if (authError) {
+    Alert.alert(
+      'Session Expired',
+      'Please log in again',
+      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+    );
+  }
+}, [authError]);
   // ✅ NEW: Check rotation status on mount
   useEffect(() => {
     if (groupId) {

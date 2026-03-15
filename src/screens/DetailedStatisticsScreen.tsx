@@ -1,4 +1,4 @@
-// src/screens/DetailedStatisticsScreen.tsx - UPDATED with token checking
+// src/screens/DetailedStatisticsScreen.tsx - Just add auth error handler
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -14,8 +14,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
+
 const { width } = Dimensions.get('window');
 
 export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
@@ -25,28 +26,39 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
   const [authError, setAuthError] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'all'>('week');
 
-  // Check token before making requests
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 DetailedStatisticsScreen: No auth token available');
-        setAuthError(true);
-        return false;
-      }
-      console.log('✅ DetailedStatisticsScreen: Auth token found');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ DetailedStatisticsScreen: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   useEffect(() => {
     loadStatistics();
   }, [groupId]);
+
+  // ✅ ADD THIS: Auth error handler
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              setAuthError(false);
+              navigation.navigate('Login');
+            }
+          }
+        ]
+      );
+    }
+  }, [authError, navigation]);
 
   const loadStatistics = async () => {
     // Check token first
@@ -75,25 +87,6 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
       setLoading(false);
     }
   };
-
-  // Show auth error if needed
-  useEffect(() => {
-    if (authError) {
-      Alert.alert(
-        'Session Expired',
-        'Please log in again',
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              setAuthError(false);
-              navigation.navigate('Login');
-            }
-          }
-        ]
-      );
-    }
-  }, [authError, navigation]);
 
   const getCompletionRateColor = (rate: number) => {
     if (rate >= 80) return '#2b8a3e';

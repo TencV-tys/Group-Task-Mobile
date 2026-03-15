@@ -1,5 +1,5 @@
 // src/screens/FeedbackScreen.tsx - COMPLETELY FIXED with proper picker height
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -43,7 +43,19 @@ export default function FeedbackScreen({ navigation }: any) {
   const [category, setCategory] = useState('');
   const [message, setMessage] = useState('');
   
-  const { submitting, submitFeedback } = useFeedback();
+  const { submitting, submitFeedback, authError
+   } = useFeedback();
+
+
+   useEffect(() => {
+  if (authError) {
+    Alert.alert(
+      'Session Expired',
+      'Please log in again',
+      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+    );
+  }
+}, [authError]);
 
   const handleSubmit = async () => {
     if (!message.trim()) {

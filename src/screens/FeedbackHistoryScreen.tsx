@@ -26,8 +26,19 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
     loadFeedback,
     loadStats,
     setFilter,
-    deleteFeedback
+    deleteFeedback,
+    authError
   } = useFeedback();
+
+  useEffect(() => {
+  if (authError) {
+    Alert.alert(
+      'Session Expired',
+      'Please log in again',
+      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+    );
+  }
+}, [authError]);
 
   useEffect(() => {
     loadStats();

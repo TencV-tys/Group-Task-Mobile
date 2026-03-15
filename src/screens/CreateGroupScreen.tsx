@@ -1,5 +1,5 @@
 // src/screens/CreateGroupScreen.tsx - UPDATED with clean, user-friendly UI
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -22,6 +22,18 @@ export default function CreateGroupScreen({ navigation }: any) {
   const [description, setDescription] = useState('');
   
   const { loading, message, success, createGroup, reset } = useCreateGroup();
+
+  const { authError } = useCreateGroup();
+
+useEffect(() => {
+  if (authError) {
+    Alert.alert(
+      'Session Expired',
+      'Please log in again',
+      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+    );
+  }
+}, [authError]);
 
   const handleCreate = async () => {
     if (!groupName.trim()) {

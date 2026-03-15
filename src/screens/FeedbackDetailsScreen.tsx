@@ -54,7 +54,8 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
     loadFeedbackDetails,
     updateFeedback,
     deleteFeedback,
-    clearSelected
+    clearSelected,
+    authError
   } = useFeedback();
 
   useEffect(() => {
@@ -65,6 +66,15 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
     };
   }, [feedbackId]);
 
+  useEffect(() => {
+  if (authError) {
+    Alert.alert(
+      'Session Expired',
+      'Please log in again',
+      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+    );
+  }
+}, [authError]);
   // Initialize edit form when feedback loads
   useEffect(() => {
     if (selectedFeedback) {

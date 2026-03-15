@@ -1,12 +1,10 @@
-// src/screens/CompleteAssignmentScreen.tsx - UPDATED with 25-minute late threshold
-import React, { useState, useEffect } from 'react';
+// src/screens/CompleteAssignmentScreen.tsx - CLEAN with separated concerns
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   TextInput,
   Image,
   Alert,
@@ -16,269 +14,65 @@ import {
   Dimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as ImagePicker from 'expo-image-picker';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { AssignmentService } from '../services/AssignmentService';
+
+import { useCompleteAssignment } from '../hooks/useCompleteAssignment';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { completeAssignmentStyles as styles } from '../styles/completeAssignment.styles';
 
 const { width } = Dimensions.get('window');
 
 export default function CompleteAssignmentScreen({ navigation, route }: any) {
   const { assignmentId, taskTitle, dueDate, timeSlot, onCompleted } = route.params || {};
   
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const [isSubmittable, setIsSubmittable] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [photo, setPhoto] = useState<string | null>(null);
-  const [notes, setNotes] = useState('');
-  const [errors, setErrors] = useState<{ photo?: string; notes?: string }>({});
-  const [timeStatus, setTimeStatus] = useState<'waiting' | 'submission_open' | 'expired' | 'wrong_day'>('waiting');
-  const [isLate, setIsLate] = useState(false);
+  // ===== HOOK - ALL LOGIC IS HERE =====
+  const {
+    // State
+    timeLeft,
+    isSubmittable,
+    submitting,
+    photo,
+    notes,
+    errors,
+    timeStatus,
+    isLate,
+    authError,
+    
+    // Setters
+    setNotes,
+    setPhoto,
+    
+    // Helper functions
+    formatTime,
+    getTimeStatusMessage,
+    
+    // Actions
+    pickImage,
+    takePhoto,
+    submitCompletion,
+    clearAuthError
+  } = useCompleteAssignment(assignmentId, taskTitle, dueDate, timeSlot, onCompleted);
 
+  // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
-    if (timeSlot && dueDate) {
-      startCountdownTimer();
-    }
-  }, [timeSlot, dueDate]);
-
-  const startCountdownTimer = () => {
-    const calculateTimeLeft = () => {
-      const now = new Date();
-      const due = new Date(dueDate);
-      
-      // Check if it's the due date
-      const isToday = now.toDateString() === due.toDateString();
-      
-      if (!isToday) {
-        setTimeStatus('wrong_day');
-        setIsSubmittable(false);
-        setTimeLeft(null);
-        return;
-      }
-      
-      // Parse end time (this is when submission should OPEN)
-      const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
-      
-      // Create end time object for today (submission OPENS at this time)
-      const submissionOpenTime = new Date(now);
-      submissionOpenTime.setHours(endHour, endMinute, 0, 0);
-      
-      // Grace period: 30 minutes after end time
-      const gracePeriodEnd = new Date(submissionOpenTime.getTime() + 30 * 60000);
-      
-      // Late threshold: 25 minutes after end time
-      const lateThreshold = new Date(submissionOpenTime.getTime() + 25 * 60000);
-      
-      // Current time in milliseconds
-      const currentTime = now.getTime();
-      const openTime = submissionOpenTime.getTime();
-      const lateTime = lateThreshold.getTime();
-      const graceEndTime = gracePeriodEnd.getTime();
-      
-      if (currentTime < openTime) {
-        // Before end time - WAITING (cannot submit yet)
-        setTimeStatus('waiting');
-        setIsSubmittable(false);
-        setIsLate(false);
-        const timeUntilOpen = Math.floor((openTime - currentTime) / 1000);
-        setTimeLeft(timeUntilOpen);
-        
-      } else if (currentTime >= openTime && currentTime <= graceEndTime) {
-        // Within submission window (after end time, before grace period ends)
-        setTimeStatus('submission_open');
-        setIsSubmittable(true);
-        
-        // Check if late (submitted after the 25-minute threshold)
-        const late = currentTime > lateTime;
-        setIsLate(late);
-        
-        const timeLeftMs = graceEndTime - currentTime;
-        setTimeLeft(Math.floor(timeLeftMs / 1000));
-        
-      } else {
-        // After grace period - EXPIRED
-        setTimeStatus('expired');
-        setIsSubmittable(false);
-        setIsLate(false);
-        setTimeLeft(0);
-      }
-    };
-    
-    calculateTimeLeft();
-    const timer = setInterval(calculateTimeLeft, 1000);
-    
-    return () => clearInterval(timer);
-  };
-
-  const formatTime = (seconds: number) => {
-    if (seconds >= 3600) {
-      const hours = Math.floor(seconds / 3600);
-      const mins = Math.floor((seconds % 3600) / 60);
-      const secs = seconds % 60;
-      return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    } else {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-  };
-
-  const getTimeStatusMessage = () => {
-    if (timeStatus === 'submission_open' && isLate) {
-      return {
-        title: '⚠️ LATE SUBMISSION',
-        message: 'You are submitting after 5:25 PM. Points will be reduced.',
-        color: '#e67700',
-        icon: 'timer-alert'
-      };
-    }
-    
-    switch (timeStatus) {
-      case 'wrong_day':
-        return {
-          title: 'Wrong Day',
-          message: `This assignment is due on ${new Date(dueDate).toLocaleDateString()}. Please come back then.`,
-          color: '#868e96',
-          icon: 'calendar-clock'
-        };
-      case 'waiting':
-        return {
-          title: 'Opens After Time Slot',
-          message: `Submit after ${timeSlot?.endTime}`,
-          color: '#e67700',
-          icon: 'clock-start'
-        };
-      case 'submission_open':
-        return {
-          title: 'Submission Open',
-          message: 'Submit your completion now (on-time until 5:25 PM)',
-          color: '#2b8a3e',
-          icon: 'check-circle'
-        };
-      case 'expired':
-        return {
-          title: 'Submission Closed',
-          message: 'The 30-minute grace period has ended',
-          color: '#fa5252',
-          icon: 'timer-off'
-        };
-      default:
-        return {
-          title: 'Checking...',
-          message: 'Checking submission status',
-          color: '#868e96',
-          icon: 'clock'
-        };
-    }
-  };
-
-  const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setPhoto(result.assets[0].uri);
-        setErrors(prev => ({ ...prev, photo: undefined }));
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
-    }
-  };
-
-  const takePhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission required', 'Camera permission is required to take photos');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setPhoto(result.assets[0].uri);
-        setErrors(prev => ({ ...prev, photo: undefined }));
-      }
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo');
-    }
-  };
-
-  const validateSubmission = () => {
-    const newErrors: { photo?: string; notes?: string } = {};
-    
-    if (!photo) {
-      newErrors.photo = 'Photo is required as proof of completion';
-    }
-    
-    if (notes.length > 500) {
-      newErrors.notes = 'Notes cannot exceed 500 characters';
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const submitCompletion = async () => {
-    if (!isSubmittable) {
+    if (authError) {
       Alert.alert(
-        'Cannot Submit',
-        timeStatus === 'waiting' ? 
-          `Submission opens at ${timeSlot?.endTime}` :
-          'Submission time has passed. Please contact an administrator if this is an error.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    if (!validateSubmission()) return;
-
-    setSubmitting(true);
-    
-    try {
-      const result = await AssignmentService.completeAssignment(assignmentId, {
-        notes,
-        photoUri: photo || undefined,
-      });
-      
-      if (result.success) {
-        Alert.alert(
-          'Success!',
-          result.isLate 
-            ? 'Assignment submitted late. Points will be reduced. Waiting for admin verification.'
-            : 'Assignment submitted successfully. Waiting for admin verification.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                if (onCompleted) onCompleted();
-                navigation.goBack();
-              }
+        'Session Expired',
+        'Please log in again',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              clearAuthError();
+              navigation.navigate('Login');
             }
-          ]
-        );
-      } else {
-        Alert.alert('Error', result.message || 'Failed to submit assignment');
-      }
-    } catch (error: any) {
-      console.error('Error submitting assignment:', error);
-      Alert.alert('Error', error.message || 'Network error');
-    } finally {
-      setSubmitting(false);
+          }
+        ]
+      );
     }
-  };
+  }, [authError, navigation, clearAuthError]);
 
+  // ===== RENDER TIME INFO =====
   const renderTimeInfo = () => {
     if (!timeSlot) return null;
 
@@ -415,6 +209,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     );
   };
 
+  // ===== RENDER PHOTO SECTION =====
   const renderPhotoSection = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Proof Photo *</Text>
@@ -498,6 +293,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     </View>
   );
 
+  // ===== RENDER NOTES SECTION =====
   const renderNotesSection = () => (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Notes (Optional)</Text>
@@ -516,7 +312,6 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
           value={notes}
           onChangeText={(text) => {
             setNotes(text);
-            if (errors.notes) setErrors(prev => ({ ...prev, notes: undefined }));
           }}
           placeholder="Describe what you did, any issues encountered, or additional details..."
           placeholderTextColor="#adb5bd"
@@ -538,29 +333,33 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     </View>
   );
 
+  // ===== RENDER HEADER =====
+  const renderHeader = () => (
+    <View style={styles.header}>
+      <TouchableOpacity 
+        onPress={() => navigation.goBack()}
+        style={styles.backButton}
+      >
+        <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      </TouchableOpacity>
+      
+      <View style={styles.titleContainer}>
+        <Text style={styles.title} numberOfLines={1}>
+          Complete Assignment
+        </Text>
+      </View>
+      
+      <View style={styles.headerSpacer} />
+    </View>
+  );
+
   return (
     <ScreenWrapper style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()}
-            style={styles.backButton}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
-          </TouchableOpacity>
-          
-          <View style={styles.titleContainer}>
-            <Text style={styles.title} numberOfLines={1}>
-              Complete Assignment
-            </Text>
-          </View>
-          
-          <View style={styles.headerSpacer} />
-        </View>
+        {renderHeader()}
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <LinearGradient
@@ -672,350 +471,3 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     </ScreenWrapper>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa'
-  },
-  keyboardView: {
-    flex: 1
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    minHeight: 60,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    textAlign: 'center'
-  },
-  headerSpacer: {
-    width: 36
-  },
-  content: {
-    flex: 1,
-    padding: 16
-  },
-  card: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  taskInfoSection: {
-    marginBottom: 24
-  },
-  taskTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#212529',
-    marginBottom: 12
-  },
-  taskDetails: {
-    gap: 8
-  },
-  taskDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
-  },
-  taskDetailText: {
-    fontSize: 14,
-    color: '#495057'
-  },
-  timeInfoContainer: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    borderWidth: 1,
-  },
-  timeOpen: {
-    borderColor: '#b2f2bb',
-  },
-  timeWarning: {
-    borderColor: '#ffec99',
-  },
-  timeCritical: {
-    borderColor: '#ffc9c9',
-  },
-  timeWrongDay: {
-    borderColor: '#e9ecef',
-  },
-  timeInfoHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8
-  },
-  timeInfoTitle: {
-    fontSize: 15,
-    fontWeight: '600'
-  },
-  timeWarningText: {
-    color: '#e67700'
-  },
-  timeCriticalText: {
-    color: '#fa5252'
-  },
-  timerText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8
-  },
-  timeInstructions: {
-    fontSize: 13,
-    color: '#495057',
-    textAlign: 'center',
-    marginBottom: 8
-  },
-  timeMessage: {
-    fontSize: 13,
-    color: '#495057',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginVertical: 8
-  },
-  warningMessage: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 8
-  },
-  warningText: {
-    fontSize: 13,
-    color: '#e67700',
-    fontWeight: '500'
-  },
-  scheduleInfo: {
-    fontSize: 12,
-    color: '#868e96',
-    textAlign: 'center',
-    marginTop: 4
-  },
-  timeSlotInfo: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#e9ecef'
-  },
-  timeSlotLabel: {
-    fontSize: 12,
-    color: '#868e96',
-    marginRight: 4
-  },
-  timeSlotValue: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#495057'
-  },
-  submissionWindowInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 8,
-    backgroundColor: '#f8f9fa',
-    padding: 8,
-    borderRadius: 8,
-  },
-  submissionWindowText: {
-    fontSize: 11,
-    color: '#868e96',
-    fontStyle: 'italic'
-  },
-  section: {
-    marginBottom: 24
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 6
-  },
-  sectionDescription: {
-    fontSize: 13,
-    color: '#868e96',
-    marginBottom: 12,
-    lineHeight: 18
-  },
-  photoUploadOptions: {
-    flexDirection: 'row',
-    gap: 12
-  },
-  photoOption: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#b2f2bb',
-  },
-  photoOptionGradient: {
-    padding: 16,
-    alignItems: 'center',
-    gap: 10,
-  },
-  photoOptionText: {
-    fontSize: 13,
-    color: '#2b8a3e',
-    fontWeight: '500',
-    textAlign: 'center'
-  },
-  photoPreviewContainer: {
-    alignItems: 'center'
-  },
-  photoPreview: {
-    width: width - 72,
-    height: (width - 72) * 0.75,
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  photoActions: {
-    flexDirection: 'row',
-    gap: 8,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  photoActionButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    minWidth: 80,
-  },
-  photoActionGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 4,
-  },
-  removeGradient: {
-    borderWidth: 1,
-    borderColor: '#ffc9c9',
-  },
-  photoActionText: {
-    fontSize: 12,
-    color: '#495057',
-    fontWeight: '500'
-  },
-  removeText: {
-    color: '#fa5252'
-  },
-  notesGradient: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  notesInput: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: '#212529',
-    minHeight: 100,
-    textAlignVertical: 'top',
-    backgroundColor: 'transparent',
-  },
-  inputError: {
-    borderColor: '#fa5252',
-  },
-  notesFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8
-  },
-  charCount: {
-    fontSize: 11,
-    color: '#868e96'
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#fa5252',
-    marginTop: 4
-  },
-  submitButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  submitButtonGradient: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  submitButtonDisabled: {
-    opacity: 0.7,
-  },
-  submitButtonWrongDay: {
-    opacity: 0.7,
-  },
-  submitButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white'
-  },
-  submitButtonTextDisabled: {
-    color: '#868e96'
-  },
-  disabledText: {
-    fontSize: 13,
-    color: '#868e96',
-    textAlign: 'center',
-    marginTop: 12,
-    fontStyle: 'italic'
-  },
-  waitingText: {
-    fontSize: 13,
-    color: '#e67700',
-    textAlign: 'center',
-    marginTop: 12,
-    fontStyle: 'italic'
-  },
-  expiredMessage: {
-    fontSize: 13,
-    color: '#fa5252',
-    textAlign: 'center',
-    marginTop: 12,
-    fontStyle: 'italic'
-  }
-});

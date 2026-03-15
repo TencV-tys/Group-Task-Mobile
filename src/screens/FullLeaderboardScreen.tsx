@@ -1,4 +1,4 @@
-// src/screens/FullLeaderboardScreen.tsx - UPDATED with dark gray primary and token checking
+// src/screens/FullLeaderboardScreen.tsx - Updated checkToken with TokenUtils
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
-import * as SecureStore from 'expo-secure-store';
+import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export const FullLeaderboardScreen = ({ navigation, route }: any) => {
@@ -25,30 +25,22 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [authError, setAuthError] = useState(false);
 
-  // Check token before making requests
+  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
-    try {
-      const token = await SecureStore.getItemAsync('userToken');
-      if (!token) {
-        console.warn('🔐 FullLeaderboardScreen: No auth token available');
-        setAuthError(true);
-        return false;
-      }
-      console.log('✅ FullLeaderboardScreen: Auth token found');
-      setAuthError(false);
-      return true;
-    } catch (error) {
-      console.error('❌ FullLeaderboardScreen: Error checking token:', error);
-      setAuthError(true);
-      return false;
-    }
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    setAuthError(!hasToken);
+    return hasToken;
   }, []);
 
   useEffect(() => {
     loadLeaderboardData();
   }, [groupId]);
 
-  // Show auth error if needed
+  // Auth error handler
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -448,4 +440,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     lineHeight: 20,
   },
-}); 
+});

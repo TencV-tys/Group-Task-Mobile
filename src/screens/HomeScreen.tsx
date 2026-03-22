@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.tsx - UPDATED with TokenUtils for user ID
+// src/screens/HomeScreen.tsx - FULLY UPDATED with group creation listener
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -18,7 +18,8 @@ import { useHomeData } from '../homeHook/useHomeHook';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { useNotifications } from '../notificationHook/useNotifications';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { useRealtimeGroup } from '../hooks/useRealtimeGroup';
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { RotationBanner } from '../components/RotationBanner';
 import { GroupListener } from '../components/GroupListener';
@@ -33,11 +34,25 @@ export default function HomeScreen({ navigation }: any) {
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
   const { unreadCount, loadUnreadCount, refreshNotifications } = useNotifications();
 
+  // ===== LISTEN FOR GROUP CREATION EVENTS =====
+  const { events: groupEvents, clearGroupCreated } = useRealtimeGroup('');
+
+  // ===== REFRESH WHEN GROUP IS CREATED =====
+  useEffect(() => {
+    if (groupEvents.groupCreated) {
+      console.log('🆕 Group created detected in HomeScreen, refreshing data...');
+      console.log('   New group:', groupEvents.groupCreated.groupName);
+      console.log('   Group ID:', groupEvents.groupCreated.groupId);
+      refreshHomeData();
+      clearGroupCreated();
+    }
+  }, [groupEvents.groupCreated, refreshHomeData, clearGroupCreated]);
+
   // ===== GET USER ID USING TOKENUTILS =====
   useEffect(() => {
     const getUserId = async () => {
       try {
-        const user = await TokenUtils.getUser(); // 👈 USE TOKENUTILS
+        const user = await TokenUtils.getUser();
         if (user) {
           setCurrentUserId(user.id);
         }
@@ -94,7 +109,7 @@ export default function HomeScreen({ navigation }: any) {
     loadUnreadCount();
   }, []);
 
-  // Handle auth error (already from useHomeData)
+  // Handle auth error
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -134,6 +149,7 @@ export default function HomeScreen({ navigation }: any) {
 
   // ===== HANDLERS =====
   const handleRefresh = useCallback(() => {
+    console.log('🔄 Manual refresh triggered');
     refreshHomeData();
     loadPendingForMe();
     loadUnreadCount();
@@ -172,8 +188,12 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const handleCreateGroup = () => {
+    console.log('➕ Navigating to CreateGroup screen');
     navigation.navigate('CreateGroup', {
-      onGroupCreated: refreshHomeData
+      onGroupCreated: () => {
+        console.log('📢 Callback from CreateGroup: Group created, refreshing...');
+        refreshHomeData();
+      }
     });
   };
 
@@ -319,6 +339,14 @@ export default function HomeScreen({ navigation }: any) {
       </ScreenWrapper>
     );
   }
+
+  // Log current stats for debugging
+  console.log('📊 HomeScreen render - Current stats:', {
+    groupsCount: stats.groupsCount,
+    groupsLength: groups.length,
+    tasksDueThisWeek: stats.tasksDueThisWeek,
+    overdueTasks: stats.overdueTasks
+  });
 
   // ===== MAIN RENDER =====
   return (

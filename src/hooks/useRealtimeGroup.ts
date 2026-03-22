@@ -1,7 +1,7 @@
-// hooks/useRealtimeGroup.ts - UPDATED with TokenUtils
+// hooks/useRealtimeGroup.ts - FIXED to allow empty groupId
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 
 interface RealtimeGroupState {
   memberJoined: any | null;
@@ -9,9 +9,10 @@ interface RealtimeGroupState {
   memberRoleChanged: any | null;
   groupUpdated: any | null;
   rotationCompleted: any | null;
+  groupCreated: any | null;
 }
 
-export function useRealtimeGroup(groupId: string) {
+export function useRealtimeGroup(groupId?: string) {  // 👈 Make groupId optional
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
@@ -20,13 +21,13 @@ export function useRealtimeGroup(groupId: string) {
     memberLeft: null,
     memberRoleChanged: null,
     groupUpdated: null,
-    rotationCompleted: null
+    rotationCompleted: null,
+    groupCreated: null
   });
   
   const { on, off, isConnected } = useSocket();
   const mountedRef = useRef(true);
 
-  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -58,13 +59,18 @@ export function useRealtimeGroup(groupId: string) {
     setEvents(prev => ({ ...prev, rotationCompleted: null }));
   }, []);
 
+  const clearGroupCreated = useCallback(() => {
+    setEvents(prev => ({ ...prev, groupCreated: null }));
+  }, []);
+
   const clearAll = useCallback(() => {
     setEvents({
       memberJoined: null,
       memberLeft: null,
       memberRoleChanged: null,
       groupUpdated: null,
-      rotationCompleted: null
+      rotationCompleted: null,
+      groupCreated: null
     });
   }, []);
 
@@ -75,53 +81,68 @@ export function useRealtimeGroup(groupId: string) {
 
     const setupListeners = async () => {
       const hasToken = await checkToken();
-      if (!hasToken || !groupId || !isConnected) return;
+      // 👈 FIX: Don't block if groupId is empty (for global events)
+      if (!hasToken || !isConnected) return;
+      
+      // Also need groupId for group-specific listeners
+      const hasGroupId = groupId && groupId.trim() !== '';
 
       setLoading(true);
       setError(null);
 
       try {
-        console.log(`🎧 Setting up real-time group listeners for group: ${groupId}`);
+        console.log(`🎧 Setting up real-time group listeners${hasGroupId ? ` for group: ${groupId}` : ' (global)'}`);
 
-        // Member joined
-        on('group:member-joined', (data: any) => {
-          if (data.groupId === groupId && mounted) {
-            console.log('📢 Real-time: Member joined', data);
-            setEvents(prev => ({ ...prev, memberJoined: data }));
+        // 👇 ALWAYS listen for group created (global event)
+        on('group:created', (data: any) => {
+          if (mounted) {
+            console.log('📢 Real-time: Group created', data);
+            setEvents(prev => ({ ...prev, groupCreated: data }));
           }
         });
 
-        // Member left
-        on('group:member-left', (data: any) => {
-          if (data.groupId === groupId && mounted) {
-            console.log('📢 Real-time: Member left', data);
-            setEvents(prev => ({ ...prev, memberLeft: data }));
-          }
-        });
+        // Only listen for group-specific events if we have a groupId
+        if (hasGroupId) {
+          // Member joined
+          on('group:member-joined', (data: any) => {
+            if (data.groupId === groupId && mounted) {
+              console.log('📢 Real-time: Member joined', data);
+              setEvents(prev => ({ ...prev, memberJoined: data }));
+            }
+          });
 
-        // Member role changed
-        on('group:member-role-changed', (data: any) => {
-          if (data.groupId === groupId && mounted) {
-            console.log('📢 Real-time: Member role changed', data);
-            setEvents(prev => ({ ...prev, memberRoleChanged: data }));
-          }
-        });
+          // Member left
+          on('group:member-left', (data: any) => {
+            if (data.groupId === groupId && mounted) {
+              console.log('📢 Real-time: Member left', data);
+              setEvents(prev => ({ ...prev, memberLeft: data }));
+            }
+          });
 
-        // Group updated
-        on('group:updated', (data: any) => {
-          if (data.groupId === groupId && mounted) {
-            console.log('📢 Real-time: Group updated', data);
-            setEvents(prev => ({ ...prev, groupUpdated: data }));
-          }
-        });
+          // Member role changed
+          on('group:member-role-changed', (data: any) => {
+            if (data.groupId === groupId && mounted) {
+              console.log('📢 Real-time: Member role changed', data);
+              setEvents(prev => ({ ...prev, memberRoleChanged: data }));
+            }
+          });
 
-        // Rotation completed
-        on('rotation:completed', (data: any) => {
-          if (data.groupId === groupId && mounted) {
-            console.log('📢 Real-time: Rotation completed', data);
-            setEvents(prev => ({ ...prev, rotationCompleted: data }));
-          }
-        });
+          // Group updated
+          on('group:updated', (data: any) => {
+            if (data.groupId === groupId && mounted) {
+              console.log('📢 Real-time: Group updated', data);
+              setEvents(prev => ({ ...prev, groupUpdated: data }));
+            }
+          });
+
+          // Rotation completed
+          on('rotation:completed', (data: any) => {
+            if (data.groupId === groupId && mounted) {
+              console.log('📢 Real-time: Rotation completed', data);
+              setEvents(prev => ({ ...prev, rotationCompleted: data }));
+            }
+          });
+        }
 
       } catch (err: any) {
         if (mounted) {
@@ -139,6 +160,8 @@ export function useRealtimeGroup(groupId: string) {
     return () => {
       mounted = false;
       mountedRef.current = false;
+      // Clean up all listeners
+      off('group:created');
       off('group:member-joined');
       off('group:member-left');
       off('group:member-role-changed');
@@ -148,19 +171,17 @@ export function useRealtimeGroup(groupId: string) {
   }, [groupId, isConnected, checkToken, on, off]);
 
   return {
-    // State
     loading,
     error,
     authError,
     isConnected,
     events,
-    
-    // Clear functions
     clearMemberJoined,
     clearMemberLeft,
     clearMemberRoleChanged,
     clearGroupUpdated,
     clearRotationCompleted,
+    clearGroupCreated,
     clearAll
   };
 }

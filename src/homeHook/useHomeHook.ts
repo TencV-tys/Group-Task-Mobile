@@ -1,11 +1,12 @@
-// homeHook/useHomeData.ts - UPDATED with TokenUtils
+// homeHook/useHomeData.ts - FIXED to ensure re-renders
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { HomeService, HomeData } from '../services/HomeService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { useRealtimeGroup } from '../hooks/useRealtimeGroup';
 
 export function useHomeData() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -14,103 +15,29 @@ export function useHomeData() {
   const [homeData, setHomeData] = useState<any>(null);
   const [authError, setAuthError] = useState<boolean>(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [userGroups, setUserGroups] = useState<string[]>([]); // Store user's groups
+  const [userGroups, setUserGroups] = useState<string[]>([]);
  
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
 
-  // ===== GET USER ID AND GROUPS ON MOUNT =====
+  // ===== GET USER ID ON MOUNT =====
   useEffect(() => {
     const getUserData = async () => {
-      // ✅ Use TokenUtils.getUser()
       const user = await TokenUtils.getUser();
       if (user) {
         setCurrentUserId(user.id);
-        
-        // Extract user's groups from homeData if available
-        if (homeData?.groups) {
-          const groupIds = homeData.groups.map((g: any) => g.id);
-          setUserGroups(groupIds);
-        }
       }
     };
     getUserData();
-  }, [homeData]);
+  }, []);
 
-  // ===== REAL-TIME EVENT LISTENERS - FIXED PARAMETERS =====
-  // For tasks, we need to listen to all groups - pass empty string to listen globally
-  const { events: taskEvents } = useRealtimeTasks(''); // Pass empty string for global events
-  
-  // For assignments, we need userId
+  // ===== REAL-TIME EVENT LISTENERS =====
+  const { events: taskEvents } = useRealtimeTasks('');
   const { events: assignmentEvents } = useRealtimeAssignments('', currentUserId || '');
-  
-  // For swaps, we need userId
   const { events: swapEvents } = useRealtimeSwapRequests('', currentUserId || '');
+  const { events: groupEvents, clearGroupCreated } = useRealtimeGroup('');
 
-  // Refresh when tasks change
-  useEffect(() => {
-    if (taskEvents.taskCreated || 
-        taskEvents.taskUpdated || 
-        taskEvents.taskDeleted ||
-        taskEvents.taskAssigned) {
-      console.log('🔄 Task event detected, refreshing home data...');
-      refreshHomeData();
-    }
-  }, [
-    taskEvents.taskCreated,
-    taskEvents.taskUpdated, 
-    taskEvents.taskDeleted,
-    taskEvents.taskAssigned
-  ]);
-
-  // Refresh when assignments change
-  useEffect(() => {
-    if (assignmentEvents.assignmentCompleted ||
-        assignmentEvents.assignmentVerified ||
-        assignmentEvents.assignmentPendingVerification) {
-      console.log('✅ Assignment event detected, refreshing home data...');
-      refreshHomeData();
-    }
-  }, [
-    assignmentEvents.assignmentCompleted,
-    assignmentEvents.assignmentVerified,
-    assignmentEvents.assignmentPendingVerification
-  ]);
-
-  // Refresh when swap requests change
-  useEffect(() => {
-    if (swapEvents.swapCreated ||
-        swapEvents.swapResponded) {
-      console.log('🔄 Swap event detected, refreshing home data...');
-      refreshHomeData();
-    }
-  }, [
-    swapEvents.swapCreated,
-    swapEvents.swapResponded
-  ]);
-
-  // Listen for notifications that should trigger refresh
-  useRealtimeNotifications({
-    onNewNotification: (notification) => {
-      // Refresh home data for relevant notifications
-      if ([
-        'TASK_ASSIGNED',
-        'SUBMISSION_VERIFIED',
-        'SUBMISSION_REJECTED',
-        'POINTS_EARNED',
-        'SWAP_ACCEPTED',
-        'SWAP_RESPONDED',
-        'LATE_SUBMISSION',
-        'POINT_DEDUCTION'
-      ].includes(notification.type)) {
-        console.log(`🔔 Notification ${notification.type} received, refreshing home data...`);
-        refreshHomeData();
-      }
-    },
-    showAlerts: true
-  });
-
-  // ✅ UPDATED: Use TokenUtils.checkToken()
+  // ===== CHECK TOKEN =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -124,6 +51,7 @@ export function useHomeData() {
     return hasToken;
   }, []);
 
+  // ===== PROCESS DATA =====
   const processData = useCallback((data: HomeData) => {
     return {
       user: data.user || {
@@ -153,6 +81,7 @@ export function useHomeData() {
     };
   }, []);
 
+  // ===== FETCH HOME DATA =====
   const fetchHomeData = useCallback(async (isRefreshing = false) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -171,20 +100,22 @@ export function useHomeData() {
     try {
       console.log("📥 useHomeData: Fetching home data...");
       const result = await HomeService.getHomeData();
+      
       if (result.success && result.data) {
         const processedData = processData(result.data);
-        setHomeData(processedData);
         
-        // Update user groups for socket subscriptions
+        // ✅ Force a new object reference to trigger re-render
+        setHomeData({ ...processedData });
+        
         if (processedData.groups) {
           const groupIds = processedData.groups.map((g: any) => g.id);
-          setUserGroups(groupIds);
+          setUserGroups([...groupIds]); // Force new array reference
         }
         
         console.log("📊 Home Data Stats:", {
+          groupsCount: processedData.stats.groupsCount,
           tasksDueThisWeek: processedData.stats.tasksDueThisWeek,
           overdueTasks: processedData.stats.overdueTasks,
-          groupsCount: processedData.stats.groupsCount,
           swapRequests: processedData.stats.swapRequests
         });
         
@@ -207,11 +138,88 @@ export function useHomeData() {
     }
   }, [processData, checkToken]);
 
+  // ===== REFRESH FUNCTION =====
   const refreshHomeData = useCallback(() => {
+    console.log('🔄 refreshHomeData called');
     fetchHomeData(true);
   }, [fetchHomeData]);
 
-  // Initial load on mount
+  // ===== LISTEN FOR GROUP CREATION =====
+  useEffect(() => {
+    if (groupEvents.groupCreated) {
+      console.log('🆕 Group created detected in useHomeData, refreshing...');
+      console.log('   New group:', groupEvents.groupCreated.groupName);
+      refreshHomeData();
+      clearGroupCreated();
+    }
+  }, [groupEvents.groupCreated, refreshHomeData, clearGroupCreated]);
+
+  // ===== TASK EVENTS =====
+  useEffect(() => {
+    if (taskEvents.taskCreated || 
+        taskEvents.taskUpdated || 
+        taskEvents.taskDeleted ||
+        taskEvents.taskAssigned) {
+      console.log('🔄 Task event detected, refreshing home data...');
+      refreshHomeData();
+    }
+  }, [
+    taskEvents.taskCreated,
+    taskEvents.taskUpdated, 
+    taskEvents.taskDeleted,
+    taskEvents.taskAssigned,
+    refreshHomeData
+  ]);
+
+  // ===== ASSIGNMENT EVENTS =====
+  useEffect(() => {
+    if (assignmentEvents.assignmentCompleted ||
+        assignmentEvents.assignmentVerified ||
+        assignmentEvents.assignmentPendingVerification) {
+      console.log('✅ Assignment event detected, refreshing home data...');
+      refreshHomeData();
+    }
+  }, [
+    assignmentEvents.assignmentCompleted,
+    assignmentEvents.assignmentVerified,
+    assignmentEvents.assignmentPendingVerification,
+    refreshHomeData
+  ]);
+
+  // ===== SWAP EVENTS =====
+  useEffect(() => {
+    if (swapEvents.swapCreated ||
+        swapEvents.swapResponded) {
+      console.log('🔄 Swap event detected, refreshing home data...');
+      refreshHomeData();
+    }
+  }, [
+    swapEvents.swapCreated,
+    swapEvents.swapResponded,
+    refreshHomeData
+  ]);
+
+  // ===== NOTIFICATIONS =====
+  useRealtimeNotifications({
+    onNewNotification: (notification) => {
+      if ([
+        'TASK_ASSIGNED',
+        'SUBMISSION_VERIFIED',
+        'SUBMISSION_REJECTED',
+        'POINTS_EARNED',
+        'SWAP_ACCEPTED',
+        'SWAP_RESPONDED',
+        'LATE_SUBMISSION',
+        'POINT_DEDUCTION'
+      ].includes(notification.type)) {
+        console.log(`🔔 Notification ${notification.type} received, refreshing home data...`);
+        refreshHomeData();
+      }
+    },
+    showAlerts: true
+  });
+
+  // ===== INITIAL LOAD =====
   useEffect(() => {
     checkToken().then(hasToken => {
       if (hasToken) {

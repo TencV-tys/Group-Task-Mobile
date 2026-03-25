@@ -10,7 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
+  Platform, 
   Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';

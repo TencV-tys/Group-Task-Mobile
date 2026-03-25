@@ -544,5 +544,56 @@ export const assignmentDetailsStyles = StyleSheet.create({
   infoText: {
     fontSize: 13,
     color: '#495057'
-  }
+  },
+adminBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderRadius: 16,
+  gap: 4,
+},
+adminBadgeText: {
+  color: 'white',
+  fontSize: 10,
+  fontWeight: '600',
+},
+adminInfoBanner: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  marginBottom: 16,
+  borderRadius: 12,
+  gap: 10,
+  borderWidth: 1,
+  borderColor: '#b2f2bb',
+},
+adminInfoText: {
+  flex: 1,
+  fontSize: 13,
+  color: '#2b8a3e',
+  lineHeight: 18,
+},
+readOnlyFooterContainer: {
+  padding: 16,
+  backgroundColor: 'white',
+  borderTopWidth: 1,
+  borderTopColor: '#e9ecef',
+},
+readOnlyFooter: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingVertical: 14,
+  borderRadius: 12,
+  gap: 8,
+  borderWidth: 1,
+  borderColor: '#e9ecef',
+},
+readOnlyText: {
+  fontSize: 14,
+  color: '#2b8a3e',
+  fontWeight: '500',
+},
 });

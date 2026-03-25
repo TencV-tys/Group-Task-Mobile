@@ -1124,7 +1124,7 @@ const styles = StyleSheet.create({
     color: '#868e96',
     marginTop: 8,
     marginBottom: 4,
-    paddingHorizontal: 4,
+    paddingHorizontal: 4, 
     fontStyle: 'italic',
   },
 }); 

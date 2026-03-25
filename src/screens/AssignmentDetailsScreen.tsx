@@ -1,4 +1,4 @@
-// src/screens/AssignmentDetailsScreen.tsx - CLEAN with separated concerns
+// src/screens/AssignmentDetailsScreen.tsx - WITH ADMIN READ-ONLY
 import React, { useEffect } from 'react';
 import {
   View,
@@ -19,7 +19,7 @@ import { ScreenWrapper } from '../components/ScreenWrapper';
 import { assignmentDetailsStyles as styles } from '../styles/assignmentDetails.styles';
 
 export default function AssignmentDetailsScreen({ navigation, route }: any) {
-  const { assignmentId, isAdmin, onVerified } = route.params || {};
+  const { assignmentId, isAdmin = false, onVerified } = route.params || {};
   
   // ===== HOOKS - ALL LOGIC IS HERE =====
   const {
@@ -97,16 +97,29 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
         </Text>
       </View>
       
-      <View style={styles.headerSpacer} />
+      {isAdmin && (
+        <LinearGradient
+          colors={['#2b8a3e', '#1e6b2c']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.adminBadge}
+        >
+          <MaterialCommunityIcons name="shield-account" size={12} color="white" />
+          <Text style={styles.adminBadgeText}>Admin View</Text>
+        </LinearGradient>
+      )}
     </View>
   );
 
-  // ===== RENDER COMPLETE BUTTON =====
+  // ===== RENDER COMPLETE BUTTON (HIDDEN FOR ADMIN) =====
   const renderCompleteButton = () => {
+    // ✅ Admin cannot complete assignments
+    if (isAdmin) return null;
+    
     if (!assignment?.completed) {
       const submissionStatusInfo = getSubmissionStatusInfo();
       
-      return (
+      return ( 
         <View style={styles.completeSection}>
           <Text style={styles.sectionTitle}>Complete This Assignment</Text>
           
@@ -274,8 +287,11 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     return null;
   };
 
-  // ===== RENDER SWAP BUTTON =====
+  // ===== RENDER SWAP BUTTON (HIDDEN FOR ADMIN) =====
   const renderSwapButton = () => {
+    // ✅ Admin cannot request swaps
+    if (isAdmin) return null;
+    
     if (!assignment?.completed && assignment) {
       return (
         <View style={styles.swapSection}>
@@ -334,8 +350,9 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     return null;
   };
 
-  // ===== RENDER VERIFICATION CONTROLS =====
+  // ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) =====
   const renderVerificationControls = () => {
+    // ✅ Only admin can verify, and only for completed assignments not yet verified
     if (!isAdmin || !assignment?.completed || assignment.verified !== null) return null;
 
     return (
@@ -408,6 +425,44 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             </LinearGradient>
           </TouchableOpacity>
         </View>
+      </View>
+    );
+  };
+
+  // ===== RENDER ADMIN INFO BANNER =====
+  const renderAdminInfoBanner = () => {
+    if (!isAdmin) return null;
+    
+    return (
+      <LinearGradient
+        colors={['#e7f5ff', '#d0ebff']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.adminInfoBanner}
+      >
+        <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
+        <Text style={styles.adminInfoText}>
+          Admin View Only - You can see all assignment details but cannot complete or request swaps.
+        </Text>
+      </LinearGradient>
+    );
+  };
+
+  // ===== RENDER READ-ONLY FOOTER =====
+  const renderReadOnlyFooter = () => {
+    if (!isAdmin) return null;
+    
+    return (
+      <View style={styles.readOnlyFooterContainer}>
+        <LinearGradient
+          colors={['#f8f9fa', '#e9ecef']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.readOnlyFooter}
+        >
+          <MaterialCommunityIcons name="eye" size={20} color="#2b8a3e" />
+          <Text style={styles.readOnlyText}>Admin View Only - Cannot modify assignments</Text>
+        </LinearGradient>
       </View>
     );
   };
@@ -486,175 +541,183 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     }
 
     return (
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.card}
-        >
-          {/* Header with status */}
-          <View style={styles.headerRow}>
-            <Text style={styles.taskTitle} numberOfLines={2}>
-              {assignment.task?.title || 'Unknown Task'}
-            </Text>
-            <LinearGradient
-              colors={[getStatusColor() + '20', getStatusColor() + '10']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.statusBadge, { borderColor: getStatusColor() }]}
-            >
-              <MaterialCommunityIcons 
-                name={getStatusIcon()} 
-                size={14} 
-                color={getStatusColor()} 
-              />
-              <Text style={[styles.statusText, { color: getStatusColor() }]}>
-                {getStatusText()}
-              </Text>
-            </LinearGradient>
-          </View>
+      <>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <LinearGradient
+            colors={['#ffffff', '#f8f9fa']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.card}
+          >
+            {/* Admin Info Banner */}
+            {renderAdminInfoBanner()}
 
-          {/* User Info */}
-          <View style={styles.userInfo}>
+            {/* Header with status */}
+            <View style={styles.headerRow}>
+              <Text style={styles.taskTitle} numberOfLines={2}>
+                {assignment.task?.title || 'Unknown Task'}
+              </Text>
+              <LinearGradient
+                colors={[getStatusColor() + '20', getStatusColor() + '10']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.statusBadge, { borderColor: getStatusColor() }]}
+              >
+                <MaterialCommunityIcons 
+                  name={getStatusIcon()} 
+                  size={14} 
+                  color={getStatusColor()} 
+                />
+                <Text style={[styles.statusText, { color: getStatusColor() }]}>
+                  {getStatusText()}
+                </Text>
+              </LinearGradient>
+            </View>
+
+            {/* User Info */}
+            <View style={styles.userInfo}>
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.avatar}
+              >
+                {assignment.user?.avatarUrl ? (
+                  <Image source={{ uri: assignment.user.avatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={styles.avatarText}>
+                    {assignment.user?.fullName?.charAt(0) || 'U'}
+                  </Text>
+                )}
+              </LinearGradient>
+              <View style={styles.userDetails}>
+                <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
+                {assignment.completed && assignment.completedAt && (
+                  <Text style={styles.completionDate}>
+                    Completed {new Date(assignment.completedAt).toLocaleDateString()} • {getTimeDifference(assignment.dueDate, assignment.completedAt)}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* Complete Assignment Button */}
+            {renderCompleteButton()}
+
+            {/* Swap Request Button */}
+            {renderSwapButton()}
+
+            {/* Points and Details */}
+            <View style={styles.detailsGrid}>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Points</Text>
+                <LinearGradient
+                  colors={['#fff3bf', '#ffec99']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.pointsBadge}
+                >
+                  <MaterialCommunityIcons name="star" size={14} color="#e67700" />
+                  <Text style={styles.pointsValue}>{assignment.points || 0}</Text>
+                </LinearGradient>
+              </View>
+              
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Due Date</Text>
+                <Text style={styles.detailValue}>
+                  {new Date(assignment.dueDate).toLocaleDateString()}
+                </Text>
+              </View>
+
+              {assignment.timeSlot && (
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Time Slot</Text>
+                  <Text style={styles.detailValue}>
+                    {assignment.timeSlot.startTime} - {assignment.timeSlot.endTime}
+                  </Text>
+                </View>
+              )}
+
+              {assignment.assignmentDay && (
+                <View style={styles.detailItem}>
+                  <Text style={styles.detailLabel}>Day</Text>
+                  <Text style={styles.detailValue}>{assignment.assignmentDay}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Photo Section */}
+            {renderPhotoSection()}
+
+            {/* User Notes */}
+            {assignment.notes && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>User Notes</Text>
+                <LinearGradient
+                  colors={['#e7f5ff', '#d0ebff']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.notesCard}
+                >
+                  <Text style={styles.notesText}>{assignment.notes}</Text>
+                </LinearGradient>
+              </View>
+            )}
+
+            {/* Admin Notes */}
+            {assignment.adminNotes && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Admin Feedback</Text>
+                <LinearGradient
+                  colors={assignment.verified === false ? ['#fff5f5', '#ffe3e3'] : ['#d3f9d8', '#b2f2bb']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[
+                    styles.adminNotesCard,
+                    assignment.verified === false ? styles.rejectedNotes : styles.verifiedNotes
+                  ]}
+                >
+                  <Text style={styles.adminNotesText}>{assignment.adminNotes}</Text>
+                </LinearGradient>
+              </View>
+            )}
+
+            {/* Verification Controls */}
+            {renderVerificationControls()}
+
+            {/* Assignment Info */}
             <LinearGradient
               colors={['#f8f9fa', '#e9ecef']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.avatar}
+              style={styles.infoSection}
             >
-              {assignment.user?.avatarUrl ? (
-                <Image source={{ uri: assignment.user.avatarUrl }} style={styles.avatarImage} />
-              ) : (
-                <Text style={styles.avatarText}>
-                  {assignment.user?.fullName?.charAt(0) || 'U'}
+              <View style={styles.infoRow}>
+                <MaterialCommunityIcons name="calendar-week" size={14} color="#868e96" />
+                <Text style={styles.infoText}>
+                  Rotation Week: {assignment.rotationWeek || 1}
                 </Text>
+              </View>
+              <View style={styles.infoRow}>
+                <MaterialCommunityIcons name="calendar-range" size={14} color="#868e96" />
+                <Text style={styles.infoText}>
+                  Week: {new Date(assignment.weekStart).toLocaleDateString()} - {new Date(assignment.weekEnd).toLocaleDateString()}
+                </Text>
+              </View>
+              {assignment.task?.group && (
+                <View style={styles.infoRow}>
+                  <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
+                  <Text style={styles.infoText}>
+                    Group: {assignment.task.group.name}
+                  </Text>
+                </View>
               )}
             </LinearGradient>
-            <View style={styles.userDetails}>
-              <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
-              {assignment.completed && assignment.completedAt && (
-                <Text style={styles.completionDate}>
-                  Completed {new Date(assignment.completedAt).toLocaleDateString()} • {getTimeDifference(assignment.dueDate, assignment.completedAt)}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          {/* Complete Assignment Button */}
-          {renderCompleteButton()}
-
-          {/* Swap Request Button */}
-          {renderSwapButton()}
-
-          {/* Points and Details */}
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Points</Text>
-              <LinearGradient
-                colors={['#fff3bf', '#ffec99']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.pointsBadge}
-              >
-                <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-                <Text style={styles.pointsValue}>{assignment.points || 0}</Text>
-              </LinearGradient>
-            </View>
-            
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Due Date</Text>
-              <Text style={styles.detailValue}>
-                {new Date(assignment.dueDate).toLocaleDateString()}
-              </Text>
-            </View>
-
-            {assignment.timeSlot && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Time Slot</Text>
-                <Text style={styles.detailValue}>
-                  {assignment.timeSlot.startTime} - {assignment.timeSlot.endTime}
-                </Text>
-              </View>
-            )}
-
-            {assignment.assignmentDay && (
-              <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Day</Text>
-                <Text style={styles.detailValue}>{assignment.assignmentDay}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Photo Section */}
-          {renderPhotoSection()}
-
-          {/* User Notes */}
-          {assignment.notes && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>User Notes</Text>
-              <LinearGradient
-                colors={['#e7f5ff', '#d0ebff']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.notesCard}
-              >
-                <Text style={styles.notesText}>{assignment.notes}</Text>
-              </LinearGradient>
-            </View>
-          )}
-
-          {/* Admin Notes */}
-          {assignment.adminNotes && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Admin Feedback</Text>
-              <LinearGradient
-                colors={assignment.verified === false ? ['#fff5f5', '#ffe3e3'] : ['#d3f9d8', '#b2f2bb']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[
-                  styles.adminNotesCard,
-                  assignment.verified === false ? styles.rejectedNotes : styles.verifiedNotes
-                ]}
-              >
-                <Text style={styles.adminNotesText}>{assignment.adminNotes}</Text>
-              </LinearGradient>
-            </View>
-          )}
-
-          {/* Verification Controls */}
-          {renderVerificationControls()}
-
-          {/* Assignment Info */}
-          <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.infoSection}
-          >
-            <View style={styles.infoRow}>
-              <MaterialCommunityIcons name="calendar-week" size={14} color="#868e96" />
-              <Text style={styles.infoText}>
-                Rotation Week: {assignment.rotationWeek || 1}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <MaterialCommunityIcons name="calendar-range" size={14} color="#868e96" />
-              <Text style={styles.infoText}>
-                Week: {new Date(assignment.weekStart).toLocaleDateString()} - {new Date(assignment.weekEnd).toLocaleDateString()}
-              </Text>
-            </View>
-            {assignment.task?.group && (
-              <View style={styles.infoRow}>
-                <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
-                <Text style={styles.infoText}>
-                  Group: {assignment.task.group.name}
-                </Text>
-              </View>
-            )}
           </LinearGradient>
-        </LinearGradient>
-      </ScrollView>
+        </ScrollView>
+        
+        {/* Read-Only Footer for Admin */}
+        {renderReadOnlyFooter()}
+      </>
     );
   };
 

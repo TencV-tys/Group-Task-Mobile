@@ -1,5 +1,5 @@
-// src/screens/TeamOverviewScreen.tsx - Team overview for admins
-import React, { useState, useEffect, useCallback } from 'react';
+// src/screens/TeamOverviewScreen.tsx - WITH CONSOLE LOGS FOR DEBUGGING
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -27,7 +27,8 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
-  const [members, setMembers] = useState<any[]>([]);
+  const [allMembers, setAllMembers] = useState<any[]>([]);
+  const [adminCount, setAdminCount] = useState(0);
   const [memberStats, setMemberStats] = useState<Record<string, any>>({});
   const [sortBy, setSortBy] = useState<'points' | 'completion' | 'name'>('points');
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
@@ -65,20 +66,43 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
     setLoading(true);
     setError(null);
 
+    console.log('🔍 [TeamOverview] Loading team data for group:', groupId);
+
     try {
       // Get all members
       const membersResult = await GroupMembersService.getGroupMembers(groupId);
+      console.log('📦 [TeamOverview] Members result:', membersResult.success ? 'Success' : 'Failed');
       
       if (membersResult.success) {
         const activeMembers = (membersResult.members || []).filter((m: any) => m.isActive !== false);
-        setMembers(activeMembers);
+        console.log(`👥 [TeamOverview] Total active members: ${activeMembers.length}`);
         
-        // Get stats for each member
+        // Count admins
+        const admins = activeMembers.filter((m: any) => m.role === 'ADMIN' || m.groupRole === 'ADMIN');
+        setAdminCount(admins.length);
+        console.log(`👑 [TeamOverview] Admins: ${admins.length}`);
+        
+        // Filter out admins
+        const regularMembers = activeMembers.filter((m: any) => {
+          if (m.role === 'ADMIN' || m.groupRole === 'ADMIN') {
+            return false;
+          }
+          return true;
+        });
+        
+        console.log(`👥 [TeamOverview] Regular members: ${regularMembers.length}`);
+        
+        setAllMembers(regularMembers);
+        
+        // Get stats for each regular member
         const stats: Record<string, any> = {};
         
+        console.log('📊 [TeamOverview] Fetching stats for each member...');
+        
         await Promise.all(
-          activeMembers.map(async (member: any) => {
+          regularMembers.map(async (member: any) => {
             try {
+              console.log(`  📈 Fetching stats for: ${member.fullName} (${member.userId})`);
               const tasksResult = await AssignmentService.getUserAssignments(member.userId, {
                 limit: 100
               });
@@ -106,23 +130,30 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
                   earnedPoints,
                   completionRate
                 };
+                
+                console.log(`    ✅ ${member.fullName}: Points=${earnedPoints}, Completion=${completionRate}%, Tasks=${assignments.length}`);
+              } else {
+                console.log(`    ❌ Failed to get stats for ${member.fullName}`);
               }
             } catch (err) {
-              console.error(`Error loading stats for member ${member.userId}:`, err);
+              console.error(`    ❌ Error loading stats for member ${member.userId}:`, err);
             }
           })
         );
         
         setMemberStats(stats);
+        console.log('✅ [TeamOverview] Stats loaded:', Object.keys(stats).length, 'members have stats');
       } else {
         setError(membersResult.message || 'Failed to load team data');
+        console.log('❌ [TeamOverview] Failed to load members:', membersResult.message);
       }
     } catch (err: any) {
-      console.error('Error loading team data:', err);
+      console.error('❌ [TeamOverview] Error loading team data:', err);
       setError(err.message || 'Failed to load team data');
     } finally {
       setLoading(false);
       setRefreshing(false);
+      console.log('✅ [TeamOverview] Loading complete');
     }
   };
 
@@ -135,8 +166,9 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
     setExpandedMember(expandedMember === memberId ? null : memberId);
   };
 
+  // ===== SORTED MEMBERS WITH CONSOLE LOGS =====
   const getSortedMembers = () => {
-    const membersWithStats = members.map(member => ({
+    const membersWithStats = allMembers.map(member => ({
       ...member,
       stats: memberStats[member.userId] || {
         totalTasks: 0,
@@ -150,18 +182,43 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
       }
     }));
 
-    return membersWithStats.sort((a, b) => {
+    console.log(`🔄 [TeamOverview] Sorting ${membersWithStats.length} members by: ${sortBy}`);
+    
+    const sorted = [...membersWithStats].sort((a, b) => {
       if (sortBy === 'points') {
-        return (b.stats.earnedPoints || 0) - (a.stats.earnedPoints || 0);
+        const aPoints = a.stats.earnedPoints || 0;
+        const bPoints = b.stats.earnedPoints || 0;
+        console.log(`  Comparing points: ${a.fullName} (${aPoints}) vs ${b.fullName} (${bPoints}) -> ${bPoints - aPoints}`);
+        return bPoints - aPoints;
       }
       if (sortBy === 'completion') {
-        return (b.stats.completionRate || 0) - (a.stats.completionRate || 0);
+        const aComp = a.stats.completionRate || 0;
+        const bComp = b.stats.completionRate || 0;
+        console.log(`  Comparing completion: ${a.fullName} (${aComp}%) vs ${b.fullName} (${bComp}%) -> ${bComp - aComp}`);
+        return bComp - aComp;
       }
-      return (a.fullName || '').localeCompare(b.fullName || '');
+      const aName = a.fullName || '';
+      const bName = b.fullName || '';
+      console.log(`  Comparing names: ${aName} vs ${bName} -> ${aName.localeCompare(bName)}`);
+      return aName.localeCompare(bName);
     });
+    
+    console.log(`📊 [TeamOverview] Sorted order (${sortBy}):`);
+    sorted.forEach((member, idx) => {
+      if (sortBy === 'points') {
+        console.log(`  ${idx + 1}. ${member.fullName} - ${member.stats.earnedPoints} pts`);
+      } else if (sortBy === 'completion') {
+        console.log(`  ${idx + 1}. ${member.fullName} - ${member.stats.completionRate}%`);
+      } else {
+        console.log(`  ${idx + 1}. ${member.fullName}`);
+      }
+    });
+    
+    return sorted;
   };
 
-  const renderMemberCard = ({ item }: { item: any }) => {
+  // ===== RENDER MEMBER CARD =====
+  const renderMemberCard = ({ item, index }: { item: any; index: number }) => {
     const stats = item.stats;
     const isExpanded = expandedMember === item.userId;
     const completionColor = stats.completionRate >= 80 ? '#2b8a3e' : 
@@ -185,10 +242,10 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
                 <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
               ) : (
                 <LinearGradient
-                  colors={item.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
-                  style={[styles.avatarPlaceholder, item.role === 'ADMIN' && styles.adminAvatar]}
+                  colors={['#f8f9fa', '#e9ecef']}
+                  style={styles.avatarPlaceholder}
                 >
-                  <Text style={[styles.avatarText, { color: item.role === 'ADMIN' ? 'white' : '#495057' }]}>
+                  <Text style={styles.avatarText}>
                     {item.fullName?.charAt(0).toUpperCase() || 'U'}
                   </Text>
                 </LinearGradient>
@@ -196,10 +253,17 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
               <View style={styles.memberDetails}>
                 <View style={styles.nameRow}>
                   <Text style={styles.memberName}>{item.fullName}</Text>
-                  {item.role === 'ADMIN' && (
-                    <LinearGradient colors={['#d3f9d8', '#b2f2bb']} style={styles.roleBadge}>
-                      <MaterialCommunityIcons name="crown" size={10} color="#2b8a3e" />
-                      <Text style={styles.roleBadgeText}>Admin</Text>
+                  <Text style={styles.rankNumber}>#{index + 1}</Text>
+                  {item.inRotation === true && (
+                    <LinearGradient colors={['#d3f9d8', '#b2f2bb']} style={styles.rotationBadge}>
+                      <MaterialCommunityIcons name="sync" size={10} color="#2b8a3e" />
+                      <Text style={styles.rotationBadgeText}>In Rotation</Text>
+                    </LinearGradient>
+                  )}
+                  {item.inRotation === false && item.role !== 'ADMIN' && (
+                    <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.inactiveBadge}>
+                      <MaterialCommunityIcons name="pause" size={10} color="#e67700" />
+                      <Text style={styles.inactiveBadgeText}>Not in Rotation</Text>
                     </LinearGradient>
                   )}
                 </View>
@@ -306,58 +370,71 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
     </View>
   );
 
-  const renderSortBar = () => (
-    <View style={styles.sortBar}>
-      <Text style={styles.sortLabel}>Sort by:</Text>
-      <TouchableOpacity
-        style={[styles.sortOption, sortBy === 'points' && styles.sortOptionActive]}
-        onPress={() => setSortBy('points')}
-      >
-        <LinearGradient
-          colors={sortBy === 'points' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.sortOptionGradient}
+  const renderSortBar = () => {
+    console.log(`🎯 [TeamOverview] Sort bar clicked - current sort: ${sortBy}`);
+    
+    return (
+      <View style={styles.sortBar}>
+        <Text style={styles.sortLabel}>Sort by:</Text>
+        <TouchableOpacity
+          style={[styles.sortOption, sortBy === 'points' && styles.sortOptionActive]}
+          onPress={() => {
+            console.log('📊 [TeamOverview] Sorting by POINTS');
+            setSortBy('points');
+          }}
         >
-          <Text style={[styles.sortOptionText, sortBy === 'points' && styles.sortOptionTextActive]}>
-            Points
-          </Text>
-        </LinearGradient>
-      </TouchableOpacity>
-      
-      <TouchableOpacity
-        style={[styles.sortOption, sortBy === 'completion' && styles.sortOptionActive]}
-        onPress={() => setSortBy('completion')}
-      >
-        <LinearGradient
-          colors={sortBy === 'completion' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.sortOptionGradient}
+          <LinearGradient
+            colors={sortBy === 'points' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.sortOptionGradient}
+          >
+            <Text style={[styles.sortOptionText, sortBy === 'points' && styles.sortOptionTextActive]}>
+              Points
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.sortOption, sortBy === 'completion' && styles.sortOptionActive]}
+          onPress={() => {
+            console.log('📊 [TeamOverview] Sorting by COMPLETION');
+            setSortBy('completion');
+          }}
         >
-          <Text style={[styles.sortOptionText, sortBy === 'completion' && styles.sortOptionTextActive]}>
-            Completion
-          </Text>
-        </LinearGradient>
-      </TouchableOpacity>
-      
-      <TouchableOpacity
-        style={[styles.sortOption, sortBy === 'name' && styles.sortOptionActive]}
-        onPress={() => setSortBy('name')}
-      >
-        <LinearGradient
-          colors={sortBy === 'name' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.sortOptionGradient}
+          <LinearGradient
+            colors={sortBy === 'completion' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.sortOptionGradient}
+          >
+            <Text style={[styles.sortOptionText, sortBy === 'completion' && styles.sortOptionTextActive]}>
+              Completion
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.sortOption, sortBy === 'name' && styles.sortOptionActive]}
+          onPress={() => {
+            console.log('📊 [TeamOverview] Sorting by NAME');
+            setSortBy('name');
+          }}
         >
-          <Text style={[styles.sortOptionText, sortBy === 'name' && styles.sortOptionTextActive]}>
-            Name
-          </Text>
-        </LinearGradient>
-      </TouchableOpacity>
-    </View>
-  );
+          <LinearGradient
+            colors={sortBy === 'name' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.sortOptionGradient}
+          >
+            <Text style={[styles.sortOptionText, sortBy === 'name' && styles.sortOptionTextActive]}>
+              Name
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   const renderSummary = () => {
     const sortedMembers = getSortedMembers();
@@ -365,6 +442,8 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
     const avgCompletion = sortedMembers.length > 0
       ? Math.round(sortedMembers.reduce((sum, m) => sum + (m.stats.completionRate || 0), 0) / sortedMembers.length)
       : 0;
+
+    console.log(`📊 [TeamOverview] Summary: ${sortedMembers.length} members, ${totalPoints} total points, ${avgCompletion}% avg completion`);
 
     return (
       <LinearGradient
@@ -389,6 +468,24 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
             <Text style={styles.summaryLabel}>Avg Completion</Text>
           </View>
         </View>
+      </LinearGradient>
+    );
+  };
+
+  const renderAdminNote = () => {
+    if (adminCount === 0) return null;
+    
+    return (
+      <LinearGradient
+        colors={['#e7f5ff', '#d0ebff']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.adminNote}
+      >
+        <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
+        <Text style={styles.adminNoteText}>
+          {adminCount} admin{adminCount > 1 ? 's' : ''} are not shown here. This view shows regular members only.
+        </Text>
       </LinearGradient>
     );
   };
@@ -428,11 +525,12 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
     <ScreenWrapper style={styles.container}>
       {renderHeader()}
       {renderSummary()}
+      {renderAdminNote()}
       {renderSortBar()}
 
       <FlatList
         data={sortedMembers}
-        renderItem={renderMemberCard}
+        renderItem={({ item, index }) => renderMemberCard({ item, index })}
         keyExtractor={(item) => item.userId || item.id}
         refreshControl={
           <RefreshControl
@@ -453,7 +551,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
             </LinearGradient>
             <Text style={styles.emptyTitle}>No Members Found</Text>
             <Text style={styles.emptySubtext}>
-              This group doesn't have any active members yet
+              This group doesn't have any active regular members yet
             </Text>
           </View>
         }

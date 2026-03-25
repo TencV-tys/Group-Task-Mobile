@@ -408,7 +408,7 @@ const loadRequests = useCallback(async (resetPage = true) => {
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl 
-            refreshing={refreshing} 
+            refreshing={refreshing}  
             onRefresh={handleRefresh}
             colors={['#2b8a3e']}
             tintColor="#2b8a3e"

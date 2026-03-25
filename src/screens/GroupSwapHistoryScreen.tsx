@@ -36,7 +36,7 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
   const [page, setPage] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const limit = 20;
-  
+   
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
 
@@ -139,58 +139,74 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
     }
   }, [authError, navigation]);
 
-  const loadRequests = async (resetPage = true) => {
-    const hasToken = await checkToken();
-    if (!hasToken) {
+  // Add this after your state declarations
+useEffect(() => {
+  if (initialLoadDone.current) {
+    console.log(`🎯 Filter changed to: ${activeFilter}, reloading...`);
+    loadRequests(true);
+  }
+}, [activeFilter]);
+
+// Update loadRequests to use the current activeFilter
+const loadRequests = useCallback(async (resetPage = true) => {
+  const hasToken = await checkToken();
+  if (!hasToken) {
+    setLoading(false);
+    setRefreshing(false);
+    return;
+  }
+
+  if (resetPage) {
+    setPage(0);
+    if (!initialLoadDone.current) {
+      setLoading(true);
+    }
+  }
+  setError(null);
+
+  try {
+    // ✅ Use the current activeFilter
+    const statusParam = activeFilter === 'ALL' ? undefined : activeFilter;
+    
+    console.log(`📥 Loading group swap history for group: ${groupId}, filter: ${statusParam || 'ALL'}, page: ${resetPage ? 0 : page}`);
+    
+    const result = await SwapRequestService.getGroupSwapRequests(groupId, {
+      status: statusParam,
+      limit,
+      offset: resetPage ? 0 : page * limit
+    });
+    
+    console.log('🔍 API Response:', JSON.stringify(result, null, 2));
+    
+    if (result.success && isMounted.current) {
+      const newRequests = result.data?.requests || [];
+      const totalCount = result.data?.total || newRequests.length;
+      
+      console.log(`✅ Received ${newRequests.length} requests (filtered by: ${statusParam || 'ALL'})`);
+      console.log(`✅ Request statuses:`, newRequests.map((r: any) => r.status));
+      
+      if (resetPage) {
+        setRequests(newRequests);
+      } else {
+        setRequests(prev => [...prev, ...newRequests]);
+      }
+      setTotal(totalCount);
+      initialLoadDone.current = true;
+    } else if (isMounted.current) {
+      setError(result.message || 'Failed to load swap history');
+    }
+  } catch (err: any) {
+    console.error('❌ Error loading group swap history:', err);
+    if (isMounted.current) {
+      setError(err.message || 'Failed to load swap history');
+    }
+  } finally {
+    if (isMounted.current) {
       setLoading(false);
       setRefreshing(false);
-      return;
     }
-
-    if (resetPage) {
-      setPage(0);
-      if (!initialLoadDone.current) {
-        setLoading(true);
-      }
-    }
-    setError(null);
-
-    try {
-      console.log(`📥 Loading group swap history for group: ${groupId}, filter: ${activeFilter}, page: ${resetPage ? 0 : page}`);
-      
-      const result = await SwapRequestService.getGroupSwapRequests(groupId, {
-        status: activeFilter === 'ALL' ? undefined : activeFilter,
-        limit,
-        offset: resetPage ? 0 : page * limit
-      });
-      
-      if (result.success && isMounted.current) {
-        const newRequests = result.data?.requests || [];
-        const totalCount = result.data?.total || newRequests.length;
-        
-        if (resetPage) {
-          setRequests(newRequests);
-        } else {
-          setRequests(prev => [...prev, ...newRequests]);
-        }
-        setTotal(totalCount);
-        initialLoadDone.current = true;
-        console.log(`✅ Loaded ${newRequests.length} swap requests`);
-      } else if (isMounted.current) {
-        setError(result.message || 'Failed to load swap history');
-      }
-    } catch (err: any) {
-      console.error('❌ Error loading group swap history:', err);
-      if (isMounted.current) {
-        setError(err.message || 'Failed to load swap history');
-      }
-    } finally {
-      if (isMounted.current) {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }
-  };
+  }
+}, [groupId, activeFilter, checkToken, limit]); // ← Add activeFilter to dependencies
 
   const refreshRequests = useCallback(() => {
     setRefreshing(true);

@@ -1,4 +1,4 @@
-// src/screens/PendingSwapRequestsScreen.tsx - UPDATED with TokenUtils
+// src/screens/PendingSwapRequestsScreen.tsx - COMPLETE WITH ADMIN READ-ONLY
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -14,19 +14,20 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export const PendingSwapRequestsScreen = () => {
   const navigation = useNavigation();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
   
   const {
     pendingForMe,
@@ -51,22 +52,26 @@ export const PendingSwapRequestsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // ===== LOAD USER ID USING TOKENUTILS =====
+  // ===== LOAD USER ID AND ROLE =====
   useEffect(() => {
-    const loadUserId = async () => {
+    const loadUser = async () => {
       try {
-        const user = await TokenUtils.getUser(); // 👈 USE TOKENUTILS
+        const user = await TokenUtils.getUser();
         if (user) {
           setCurrentUserId(user.id);
-        } else {
-          console.log('No user found');
+          setUserRole(user.role);
+          console.log(`✅ Loaded user: ${user.fullName}, role: ${user.role}`);
         }
       } catch (error) {
         console.error('Error loading user:', error);
+      } finally {
+        setIsLoadingUser(false);
       }
     };
-    loadUserId();
+    loadUser();
   }, []);
+
+  const isAdmin = userRole === 'ADMIN';
 
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
@@ -90,7 +95,6 @@ export const PendingSwapRequestsScreen = () => {
   // ========== HANDLE REAL-TIME EVENTS ==========
   useEffect(() => {
     if (swapEvents.swapRequested) {
-      // New request for current user
       if (swapEvents.swapRequested.toUserId === currentUserId || !swapEvents.swapRequested.toUserId) {
         Alert.alert(
           '🔄 New Swap Request',
@@ -220,7 +224,6 @@ export const PendingSwapRequestsScreen = () => {
   };
 
   const handleViewDetails = (requestId: string) => {
-    // Use type assertion to bypass the TypeScript error
     (navigation as any).navigate('SwapRequestDetails', { requestId });
   };
 
@@ -239,6 +242,11 @@ export const PendingSwapRequestsScreen = () => {
     const scope = item.scope || 'week';
     const selectedDay = item.selectedDay;
     const selectedTimeSlot = item.selectedTimeSlot;
+    
+    // ✅ Check if this request is for the current user
+    const isTargetUser = item.targetUserId === currentUserId;
+    const isOpenToAnyone = !item.targetUserId;
+    const canActOnRequest = !isAdmin && (isTargetUser || isOpenToAnyone);
 
     return (
       <TouchableOpacity
@@ -371,7 +379,8 @@ export const PendingSwapRequestsScreen = () => {
           )}
         </View>
 
-        {item.status === 'PENDING' && (
+        {/* Action Buttons - Only for non-admin users who are the target */}
+        {item.status === 'PENDING' && canActOnRequest && (
           <View style={styles.actionButtons}>
             <TouchableOpacity
               style={[styles.actionButton, styles.acceptButton]}
@@ -418,9 +427,33 @@ export const PendingSwapRequestsScreen = () => {
             </TouchableOpacity>
           </View>
         )}
+        
+        {/* Admin View Only Badge */}
+        {item.status === 'PENDING' && isAdmin && (
+          <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.adminViewBadge}
+          >
+            <MaterialCommunityIcons name="eye" size={14} color="#2b8a3e" />
+            <Text style={styles.adminViewText}>Admin View Only</Text>
+          </LinearGradient>
+        )}
       </TouchableOpacity>
     );
   };
+
+  if (isLoadingUser) {
+    return (
+      <ScreenWrapper style={styles.container}>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#2b8a3e" />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </ScreenWrapper>
+    );
+  }
 
   if (loading && !refreshing && pendingForMe.length === 0) {
     return (
@@ -463,6 +496,21 @@ export const PendingSwapRequestsScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Admin Info Banner */}
+      {isAdmin && (
+        <LinearGradient
+          colors={['#e7f5ff', '#d0ebff']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.adminInfoBanner}
+        >
+          <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
+          <Text style={styles.adminInfoText}>
+            Admin View - You can see all pending swap requests but cannot accept or reject them.
+          </Text>
+        </LinearGradient>
+      )}
+
       <FlatList
         data={pendingForMe}
         renderItem={renderSwapRequest}
@@ -488,7 +536,9 @@ export const PendingSwapRequestsScreen = () => {
             </LinearGradient>
             <Text style={styles.emptyTitle}>No Pending Requests</Text>
             <Text style={styles.emptyText}>
-              You don't have any swap requests waiting for your response.
+              {isAdmin 
+                ? 'No pending swap requests in this group'
+                : 'You don\'t have any swap requests waiting for your response.'}
             </Text>
           </View>
         }
@@ -497,7 +547,6 @@ export const PendingSwapRequestsScreen = () => {
   );
 };
 
-// Styles remain exactly the same as your original
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -576,6 +625,23 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+  },
+  adminInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 8,
+    gap: 8,
+  },
+  adminInfoText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#2b8a3e',
+    lineHeight: 16,
   },
   listContent: {
     padding: 16,
@@ -787,6 +853,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: '#fa5252',
+  },
+  adminViewBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    marginTop: 12,
+    borderRadius: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  adminViewText: {
+    fontSize: 12,
+    color: '#2b8a3e',
+    fontWeight: '500',
   },
   emptyContainer: {
     flex: 1,

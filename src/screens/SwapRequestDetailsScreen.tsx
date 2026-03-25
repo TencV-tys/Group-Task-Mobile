@@ -1,4 +1,4 @@
-// src/screens/SwapRequestDetailsScreen.tsx - UPDATED with TokenUtils
+// src/screens/SwapRequestDetailsScreen.tsx - COMPLETE WITH ADMIN READ-ONLY
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -18,7 +18,7 @@ import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 type SwapRequestDetailsRouteParams = {
@@ -41,6 +41,7 @@ export const SwapRequestDetailsScreen = () => {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
 
   const {
@@ -52,14 +53,15 @@ export const SwapRequestDetailsScreen = () => {
     clearSwapExpired
   } = useRealtimeSwapRequests('', currentUserId || '');
 
-  // ===== LOAD USER ID USING TOKENUTILS =====
+  // ===== LOAD USER ID AND ROLE USING TOKENUTILS =====
   useEffect(() => {
     const loadCurrentUser = async () => {
       try {
         const user = await TokenUtils.getUser();
         if (user) {
           setCurrentUserId(user.id);
-          console.log('✅ Current user ID:', user.id);
+          setUserRole(user.role);
+          console.log('✅ Current user ID:', user.id, 'Role:', user.role);
         }
       } catch (error) {
         console.error('Error loading user:', error);
@@ -67,6 +69,8 @@ export const SwapRequestDetailsScreen = () => {
     };
     loadCurrentUser();
   }, []);
+
+  const isAdmin = userRole === 'ADMIN';
 
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
@@ -306,10 +310,10 @@ export const SwapRequestDetailsScreen = () => {
   const isTarget = request.targetUserId === currentUserId;
   const isOpenToAnyone = !request.targetUserId;
   
-  // Who can do what:
-  const canAccept = isPending && !isRequester && (isTarget || isOpenToAnyone);
-  const canReject = isPending && !isRequester && (isTarget || isOpenToAnyone);
-  const canCancel = isPending && isRequester;
+  // ✅ Admin can view but cannot act
+  const canAccept = !isAdmin && isPending && !isRequester && (isTarget || isOpenToAnyone);
+  const canReject = !isAdmin && isPending && !isRequester && (isTarget || isOpenToAnyone);
+  const canCancel = !isAdmin && isPending && isRequester;
 
   return (
     <ScreenWrapper style={styles.container}>
@@ -318,10 +322,35 @@ export const SwapRequestDetailsScreen = () => {
           <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Swap Request</Text>
-        <View style={{ width: 40 }} />
+        {isAdmin && (
+          <LinearGradient
+            colors={['#2b8a3e', '#1e6b2c']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.adminBadge}
+          >
+            <MaterialCommunityIcons name="shield-account" size={12} color="white" />
+            <Text style={styles.adminBadgeText}>Admin View</Text>
+          </LinearGradient>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Admin Info Banner */}
+        {isAdmin && (
+          <LinearGradient
+            colors={['#e7f5ff', '#d0ebff']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.adminInfoBanner}
+          >
+            <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
+            <Text style={styles.adminInfoText}>
+              Admin View Only - You can see all swap request details but cannot accept, reject, or cancel.
+            </Text>
+          </LinearGradient>
+        )}
+
         {/* Status Banner */}
         <LinearGradient
           colors={[`${statusColor}10`, `${statusColor}05`]}
@@ -619,8 +648,8 @@ export const SwapRequestDetailsScreen = () => {
         )}
       </ScrollView>
 
-      {/* Action Buttons - Only show if user has permission */}
-      {isPending && (
+      {/* Action Buttons - Only show if user has permission and NOT admin */}
+      {isPending && !isAdmin && (
         <View style={styles.footer}>
           {canAccept && (
             <TouchableOpacity
@@ -695,11 +724,26 @@ export const SwapRequestDetailsScreen = () => {
           )}
         </View>
       )}
+
+      {/* Admin Read-Only Message */}
+      {isPending && isAdmin && (
+        <View style={styles.footer}>
+          <LinearGradient
+            colors={['#f8f9fa', '#e9ecef']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.readOnlyFooter}
+          >
+            <MaterialCommunityIcons name="eye" size={20} color="#2b8a3e" />
+            <Text style={styles.readOnlyText}>Admin View Only - Cannot modify swap requests</Text>
+          </LinearGradient>
+        </View>
+      )}
     </ScreenWrapper>
   );
 }
 
-// Styles remain exactly the same as your original
+// Complete styles with admin-specific additions
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -733,6 +777,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#212529',
+  },
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    gap: 4,
+  },
+  adminBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  adminInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderRadius: 12,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#b2f2bb',
+  },
+  adminInfoText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#2b8a3e',
+    lineHeight: 18,
+  },
+  readOnlyFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  readOnlyText: {
+    fontSize: 14,
+    color: '#2b8a3e',
+    fontWeight: '500',
   },
   centerContainer: {
     flex: 1,

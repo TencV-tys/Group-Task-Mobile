@@ -807,9 +807,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
           </View>
         </LinearGradient>
       </TouchableOpacity>
-    );
+    ); 
   };
-
+ 
   const renderMySubmissionsSection = () => {
     if (currentWeekSubmissions.length === 0) {
       return (

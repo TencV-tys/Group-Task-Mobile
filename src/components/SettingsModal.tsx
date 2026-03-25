@@ -1127,4 +1127,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     fontStyle: 'italic',
   },
-});
+}); 

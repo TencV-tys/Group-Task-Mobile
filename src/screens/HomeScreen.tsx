@@ -1,4 +1,4 @@
-// src/screens/HomeScreen.tsx - FULLY UPDATED with debouncing
+// src/screens/HomeScreen.tsx - REMOVED points card, added better quick actions
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
@@ -30,7 +30,6 @@ export default function HomeScreen({ navigation }: any) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [rotationAlerts, setRotationAlerts] = useState<{[key: string]: any}>({});
   
-  // ===== ADD DEBOUNCE TIMER REF =====
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFetching = useRef(false);
   
@@ -38,7 +37,6 @@ export default function HomeScreen({ navigation }: any) {
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
   const { unreadCount, loadUnreadCount, refreshNotifications } = useNotifications();
 
-  // ===== DEBOUNCED REFRESH FUNCTION =====
   const debouncedRefresh = useCallback(() => {
     if (refreshTimer.current) {
       clearTimeout(refreshTimer.current);
@@ -57,20 +55,16 @@ export default function HomeScreen({ navigation }: any) {
     }, 500);
   }, [refreshHomeData]);
 
-  // ===== LISTEN FOR GROUP CREATION EVENTS (WITH DEBOUNCE) =====
   const { events: groupEvents, clearGroupCreated } = useRealtimeGroup('');
 
   useEffect(() => {
     if (groupEvents.groupCreated) {
       console.log('🆕 Group created detected in HomeScreen, refreshing data...');
-      console.log('   New group:', groupEvents.groupCreated.groupName);
-      console.log('   Group ID:', groupEvents.groupCreated.groupId);
-      debouncedRefresh(); // ← Use debounced version
+      debouncedRefresh();
       clearGroupCreated();
     }
   }, [groupEvents.groupCreated, debouncedRefresh, clearGroupCreated]);
 
-  // ===== GET USER ID USING TOKENUTILS =====
   useEffect(() => {
     const getUserId = async () => {
       try {
@@ -85,12 +79,9 @@ export default function HomeScreen({ navigation }: any) {
     getUserId();
   }, []);
 
-  // ===== REAL-TIME NOTIFICATIONS (WITH DEBOUNCE) =====
   const { events, clearNewNotification } = useRealtimeNotifications({
     onNewNotification: (notification) => {
       console.log('📢 HomeScreen: New notification received', notification);
-      
-      // Use debounced refresh for all notifications
       debouncedRefresh();
       
       if (notification.type?.includes('SWAP')) {
@@ -115,20 +106,17 @@ export default function HomeScreen({ navigation }: any) {
     ]
   });
 
-  // Clear new notification
   useEffect(() => {
     if (events.newNotification) {
       clearNewNotification();
     }
   }, [events.newNotification]);
 
-  // Initial load
   useEffect(() => {
     loadPendingForMe();
     loadUnreadCount();
   }, []);
 
-  // Handle auth error
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -139,15 +127,11 @@ export default function HomeScreen({ navigation }: any) {
     }
   }, [authError, navigation]);
 
-  // Data extraction with defaults
   const user = homeData?.user || {
     fullName: 'User',
     groupsCount: 0,
-    tasksDue: 0,
     email: '',
-    avatarUrl: null,
-    pointsThisWeek: 0,
-    totalPoints: 0
+    avatarUrl: null
   };
 
   const stats = homeData?.stats || {
@@ -157,8 +141,7 @@ export default function HomeScreen({ navigation }: any) {
     completedTasks: 0,
     totalTasks: 0,
     completionRate: 0,
-    swapRequests: 0,
-    pointsThisWeek: 0
+    swapRequests: 0
   };
 
   const recentActivity = homeData?.recentActivity || [];
@@ -166,10 +149,8 @@ export default function HomeScreen({ navigation }: any) {
   const overdueTasks = homeData?.overdueTasks || [];
   const groups = homeData?.groups || [];
 
-  // ===== HANDLERS =====
   const handleRefresh = useCallback(() => {
     console.log('🔄 Manual refresh triggered');
-    // Clear any pending timer and refresh immediately
     if (refreshTimer.current) {
       clearTimeout(refreshTimer.current);
       refreshTimer.current = null;
@@ -212,10 +193,20 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const handleCreateGroup = () => {
-    console.log(' Navigating to CreateGroup screen');
+    console.log('🎯 Navigating to CreateGroup screen');
     navigation.navigate('CreateGroup', {
       onGroupCreated: () => {
         console.log('📢 Callback from CreateGroup: Group created, refreshing...');
+        refreshHomeData();
+      }
+    });
+  };
+
+  const handleJoinGroup = () => {
+    console.log('🎯 Navigating to JoinGroup screen');
+    navigation.navigate('JoinGroup', {
+      onGroupJoined: () => {
+        console.log('📢 Callback from JoinGroup: Group joined, refreshing...');
         refreshHomeData();
       }
     });
@@ -241,7 +232,6 @@ export default function HomeScreen({ navigation }: any) {
     });
   };
 
-  // ===== HANDLE ROTATION FROM GROUP LISTENER =====
   const handleRotation = useCallback((groupId: string, alert: any) => {
     setRotationAlerts(prev => ({
       ...prev,
@@ -284,7 +274,6 @@ export default function HomeScreen({ navigation }: any) {
     );
   }, [groups, navigation]);
 
-  // ===== RENDER GROUP LISTENERS =====
   const renderGroupListeners = () => {
     if (!groups.length || !currentUserId) return null;
     
@@ -294,17 +283,16 @@ export default function HomeScreen({ navigation }: any) {
         group={group}
         currentUserId={currentUserId}
         onRotation={handleRotation}
-        onTaskChange={debouncedRefresh} // ← Use debounced version
-        onAssignmentChange={debouncedRefresh} // ← Use debounced version
+        onTaskChange={debouncedRefresh}
+        onAssignmentChange={debouncedRefresh}
         onSwapChange={() => {
-          debouncedRefresh(); // ← Use debounced version
+          debouncedRefresh();
           loadPendingForMe();
         }}
       />
     ));
   };
 
-  // ===== RENDER ROTATION BANNERS =====
   const renderRotationBanners = () => {
     const alertEntries = Object.entries(rotationAlerts);
     if (alertEntries.length === 0) return null;
@@ -332,7 +320,6 @@ export default function HomeScreen({ navigation }: any) {
     );
   };
 
-  // ===== LOADING STATE =====
   if (loading && !refreshing) {
     return (
       <ScreenWrapper style={styles.container}>
@@ -344,7 +331,6 @@ export default function HomeScreen({ navigation }: any) {
     );
   }
 
-  // ===== ERROR STATE =====
   if (error && !homeData) {
     return (
       <ScreenWrapper style={styles.container}>
@@ -364,7 +350,6 @@ export default function HomeScreen({ navigation }: any) {
     );
   }
 
-  // Log current stats for debugging (only once per render)
   console.log('📊 HomeScreen render - Current stats:', {
     groupsCount: stats.groupsCount,
     groupsLength: groups.length,
@@ -372,16 +357,11 @@ export default function HomeScreen({ navigation }: any) {
     overdueTasks: stats.overdueTasks
   });
 
-  // ===== MAIN RENDER =====
   return (
     <ScreenWrapper noBottom={true} style={styles.container}>
-      {/* Group Listeners (invisible components) */}
       {renderGroupListeners()}
-
-      {/* Rotation Banners */}
       {renderRotationBanners()}
 
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>Dashboard</Text>
@@ -428,23 +408,7 @@ export default function HomeScreen({ navigation }: any) {
           { paddingBottom: 70 + insets.bottom }
         ]}
       >
-        {/* Points Card */}
-        <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.pointsCard}>
-          <View style={styles.pointsCardContent}>
-            <View>
-              <Text style={styles.pointsCardLabel}>Total Points</Text>
-              <Text style={styles.pointsCardValue}>{user.totalPoints || 0}</Text>
-            </View>
-            <View style={styles.pointsCardIcon}>
-              <MaterialCommunityIcons name="trophy" size={32} color="white" />
-            </View>
-          </View>
-          <View style={styles.pointsCardFooter}>
-            <Text style={styles.pointsCardFooterText}>
-              {stats.pointsThisWeek || 0} points this week
-            </Text>
-          </View>
-        </LinearGradient>
+        {/* ✅ REMOVED Points Card - it's useless for multiple groups */}
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
@@ -476,6 +440,48 @@ export default function HomeScreen({ navigation }: any) {
             <Text style={styles.statNumber}>{stats.swapRequests || 0}</Text>
             <Text style={styles.statLabel}>Swap Requests</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Quick Actions Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <View style={styles.quickActionsGrid}>
+            <TouchableOpacity style={styles.quickActionCard} onPress={handleCreateGroup}>
+              <LinearGradient
+                colors={['#2b8a3e', '#1e6b2c']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionGradient}
+              >
+                <MaterialCommunityIcons name="plus-circle" size={24} color="white" />
+                <Text style={styles.quickActionText}>Create Group</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickActionCard} onPress={handleJoinGroup}>
+              <LinearGradient
+                colors={['#495057', '#343a40']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionGradient}
+              >
+                <MaterialCommunityIcons name="account-plus" size={24} color="white" />
+                <Text style={styles.quickActionText}>Join Group</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.quickActionCard} onPress={handleViewSwapRequests}>
+              <LinearGradient
+                colors={['#e67700', '#cc5f00']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.quickActionGradient}
+              >
+                <MaterialCommunityIcons name="swap-horizontal" size={24} color="white" />
+                <Text style={styles.quickActionText}>My Swaps</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Overdue Tasks */}

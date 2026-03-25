@@ -1,4 +1,4 @@
-// src/screens/NotificationsScreen.tsx - COMPLETE with rotation notifications
+// src/screens/NotificationsScreen.tsx - COMPLETE with expired/deleted handling
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -35,7 +35,7 @@ export default function NotificationsScreen({ navigation }: any) {
       console.log('📢 NotificationsScreen: New notification received', notification);
       refreshNotifications();
     },
-    showAlerts: false // Don't show alerts on notifications screen
+    showAlerts: false
   });
 
   useEffect(() => {
@@ -58,9 +58,94 @@ export default function NotificationsScreen({ navigation }: any) {
     }
   };
 
+  // ✅ Comprehensive validation for notification content
+  const isNotificationValid = (type: string, data: any): { valid: boolean; message?: string; type?: string } => {
+    // ===== CHECK FOR DELETED TASKS =====
+    if (data?.taskDeleted === true || data?.isTaskDeleted === true) {
+      return { valid: false, message: 'The associated task has been deleted.', type: 'deleted' };
+    }
+    
+    // ===== CHECK FOR DELETED ASSIGNMENTS =====
+    if (data?.assignmentDeleted === true) {
+      return { valid: false, message: 'The associated assignment has been deleted.', type: 'deleted' };
+    }
+    
+    // ===== CHECK FOR DELETED SWAP REQUESTS =====
+    if (type === NotificationTypes.SWAP_ADMIN_NOTIFICATION ||
+        type === NotificationTypes.SWAP_REQUEST ||
+        type === NotificationTypes.SWAP_ACCEPTED ||
+        type === NotificationTypes.SWAP_REJECTED ||
+        type === NotificationTypes.SWAP_CANCELLED ||
+        type === NotificationTypes.SWAP_COMPLETED) {
+      
+      // If the swap request ID exists but we're getting 404/400 errors, mark as deleted
+      if (data?.swapRequestId && data?.isDeleted === true) {
+        return { valid: false, message: 'This swap request has been deleted.', type: 'deleted' };
+      }
+    }
+    
+    // ===== CHECK FOR EXPIRED SWAP REQUESTS =====
+    if (type === NotificationTypes.SWAP_EXPIRED) {
+      return { valid: false, message: 'This swap request has expired.', type: 'expired' };
+    }
+    
+    // ===== CHECK FOR ALREADY PROCESSED SWAPS =====
+    if (type === NotificationTypes.SWAP_REQUEST) {
+      if (data?.status === 'ACCEPTED') {
+        return { valid: false, message: 'This swap request has already been accepted.', type: 'accepted' };
+      }
+      if (data?.status === 'REJECTED') {
+        return { valid: false, message: 'This swap request has been rejected.', type: 'rejected' };
+      }
+      if (data?.status === 'CANCELLED') {
+        return { valid: false, message: 'This swap request has been cancelled.', type: 'cancelled' };
+      }
+      if (data?.expired === true) {
+        return { valid: false, message: 'This swap request has expired.', type: 'expired' };
+      }
+    }
+    
+    // ===== CHECK FOR DELETED TASKS IN SUBMISSIONS =====
+    if (type === NotificationTypes.SUBMISSION_PENDING || 
+        type === NotificationTypes.SUBMISSION_VERIFIED ||
+        type === NotificationTypes.SUBMISSION_REJECTED) {
+      
+      // Check if the task was deleted
+      if (data?.taskDeleted === true || data?.isTaskDeleted === true) {
+        return { valid: false, message: 'The task for this submission has been deleted.', type: 'deleted' };
+      }
+      
+      // Check if the task ID is invalid
+      if (data?.taskId && data?.taskId === 'null') {
+        return { valid: false, message: 'The associated task has been removed.', type: 'deleted' };
+      }
+    }
+    
+    // ===== CHECK FOR EXPIRED TASKS =====
+    if (type === NotificationTypes.TASK_OVERDUE || type === NotificationTypes.TASK_REMINDER) {
+      if (data?.expired === true) {
+        return { valid: false, message: 'This task has expired.', type: 'expired' };
+      }
+    }
+    
+    return { valid: true };
+  };
+
   const handleNotificationPress = async (notification: any) => {
     if (!notification.read) {
       await markAsRead(notification.id);
+    }
+
+    // ✅ Check if notification content is valid
+    const validation = isNotificationValid(notification.type, notification.data);
+    
+    if (!validation.valid) {
+      Alert.alert(
+        validation.type === 'deleted' ? '🗑️ Content Deleted' : '⏰ Content Unavailable',
+        validation.message || 'This content is no longer available.',
+        [{ text: 'OK' }]
+      );
+      return;
     }
 
     if (notification.data) {
@@ -71,278 +156,209 @@ export default function NotificationsScreen({ navigation }: any) {
   const handleNavigation = (type: string, data: any) => {
     console.log('Navigating with type:', type, 'data:', data);
     
-    if (type === NotificationTypes.SWAP_EXPIRED) {
-      Alert.alert(
-        '⚠️ Request Expired',
-        'This swap request has expired and is no longer available.',
-        [{ text: 'OK' }]
-      );
+    // ===== SWAP REQUEST NOTIFICATIONS =====
+    if (type === NotificationTypes.SWAP_ADMIN_NOTIFICATION ||
+        type === NotificationTypes.SWAP_REQUEST ||
+        type === NotificationTypes.SWAP_ACCEPTED ||
+        type === NotificationTypes.SWAP_REJECTED ||
+        type === NotificationTypes.SWAP_CANCELLED ||
+        type === NotificationTypes.SWAP_COMPLETED) {
+      
+      // ✅ Check if swap request exists before navigating
+      if (data?.swapRequestId) {
+        // Navigate to swap details, but let the screen handle 404 gracefully
+        navigation.navigate('SwapRequestDetails', { 
+          requestId: data.swapRequestId,
+          // Pass a flag that this might be deleted
+          mayBeDeleted: true
+        });
+      } else if (data?.assignmentId && !data?.taskDeleted) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: type === NotificationTypes.SWAP_ADMIN_NOTIFICATION
+        });
+      } else if (data?.groupId) {
+        navigation.navigate('MySwapRequests', { 
+          groupId: data.groupId,
+          groupName: data.groupName
+        });
+      } else {
+        Alert.alert('Content Unavailable', 'This swap request is no longer available.');
+      }
       return;
     }
     
-    switch (type) {
-      // ===== ROTATION NOTIFICATIONS =====
-      case 'ROTATION_COMPLETED':
-        if (data?.groupId) {
-          navigation.navigate('RotationSchedule', { 
-            groupId: data.groupId,
-            groupName: data.groupName || 'Group',
-            userRole: data.userRole || 'MEMBER'
-          });
-        } else {
-          navigation.navigate('MyGroups');
-        }
-        break;
-
-      // ===== POINT DEDUCTION & NEGLECT =====
-      case NotificationTypes.POINT_DEDUCTION:
-      case NotificationTypes.LATE_SUBMISSION:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: false 
-          });
-        } else if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        } else if (data?.groupId) {
-          navigation.navigate('NeglectedTasks', { 
-            groupId: data.groupId,
-            groupName: data.groupName,
-            userRole: 'MEMBER'
-          });
-        }
-        break;
-      
-      case NotificationTypes.NEGLECT_DETECTED:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: true 
-          });
-        } else if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        } else if (data?.groupId) {
-          navigation.navigate('NeglectedTasks', { 
-            groupId: data.groupId,
-            groupName: data.groupName,
-            userRole: data.userRole || 'ADMIN'
-          });
-        }
-        break;
-      
-      // ===== TASK REMINDERS =====
-      case NotificationTypes.TASK_REMINDER:
-      case NotificationTypes.TASK_ACTIVE:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: false 
-          });
-        } else if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        } else if (data?.groupId) {
-          navigation.navigate('TodayAssignments', { 
-            groupId: data.groupId,
-            groupName: data.groupName 
-          });
-        }
-        break;
-      
-      // ===== SUBMISSION NOTIFICATIONS =====
-      case NotificationTypes.SUBMISSION_PENDING:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: true 
-          });
-        } else if (data?.taskId) {
-          navigation.navigate('PendingVerifications', { 
-            groupId: data.groupId,
-            groupName: data.groupName,
-            userRole: 'ADMIN'
-          });
-        }
-        break;
-      
-      case NotificationTypes.SUBMISSION_VERIFIED:
-      case NotificationTypes.SUBMISSION_REJECTED:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: false 
-          });
-        } else if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        }
-        break;
-      
-      case NotificationTypes.SUBMISSION_DECISION:
-        if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: true 
-          });
-        } else if (data?.groupId) {
-          navigation.navigate('TaskCompletionHistory', { 
-            groupId: data.groupId,
-            groupName: data.groupName,
-            userRole: 'ADMIN'
-          });
-        }
-        break;
-      
-      // ===== FEEDBACK NOTIFICATIONS =====
-      case NotificationTypes.FEEDBACK_SUBMITTED:
-      case NotificationTypes.FEEDBACK_STATUS_UPDATE:
-        if (data?.feedbackId) {
-          navigation.navigate('FeedbackDetails', { feedbackId: data.feedbackId });
-        } else {
-          navigation.navigate('Feedback');
-        }
-        break;
-      
-      // ===== TASK NOTIFICATIONS =====
-      case NotificationTypes.TASK_ASSIGNED:
-      case NotificationTypes.TASK_COMPLETED:
-      case NotificationTypes.TASK_OVERDUE:
-      case NotificationTypes.TASK_CREATED:
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        } else if (data?.groupId) {
-          navigation.navigate('GroupTasks', { 
-            groupId: data.groupId,
-            groupName: data.groupName || 'Group',
-            userRole: data.userRole || 'MEMBER'
-          });
-        }
-        break;
-      
-      // ===== GROUP NOTIFICATIONS =====
-      case NotificationTypes.GROUP_INVITE:
-        if (data?.groupId) {
-          navigation.navigate('GroupDetails', { 
-            groupId: data.groupId,
-            inviteCode: data.inviteCode 
-          });
-        }
-        break;
-      
-      case NotificationTypes.GROUP_JOINED:
-      case NotificationTypes.GROUP_CREATED:
-        if (data?.groupId) {
-          navigation.navigate('GroupTasks', { 
-            groupId: data.groupId, 
-            groupName: data.groupName,
-            userRole: data.userRole || 'MEMBER'
-          });
-        }
-        break;
-      
-      case NotificationTypes.NEW_MEMBER:
-        if (data?.groupId) {
-          navigation.navigate('GroupMembers', { 
-            groupId: data.groupId,
-            groupName: data.groupName,
-            userRole: data.userRole || 'ADMIN'
-          });
-        }
-        break;
-      
-      // ===== SWAP REQUEST NOTIFICATIONS =====
-      case NotificationTypes.SWAP_REQUEST:
-      case NotificationTypes.SWAP_ACCEPTED:
-      case NotificationTypes.SWAP_REJECTED:
-      case NotificationTypes.SWAP_CANCELLED:
-      case NotificationTypes.SWAP_COMPLETED:
-      case NotificationTypes.SWAP_ADMIN_NOTIFICATION:
-        if (data?.swapRequestId) {
-          navigation.navigate('SwapRequestDetails', { 
-            requestId: data.swapRequestId 
-          });
-        } else if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: data.userRole === 'ADMIN'
-          });
-        } else if (data?.groupId) {
-          navigation.navigate('MySwapRequests', { 
-            groupId: data.groupId,
-            groupName: data.groupName
-          });
-        }
-        break;
-      
-      // ===== POINTS & REWARDS =====
-      case NotificationTypes.POINTS_EARNED:
-        if (data?.groupId) {
-          navigation.navigate('FullLeaderboard', { 
-            groupId: data.groupId,
-            groupName: data.groupName 
-          });
-        }
-        break;
-      
-      // ===== MENTIONS =====
-      case NotificationTypes.MENTION:
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        } else if (data?.commentId) {
-          navigation.navigate('CommentDetails', { 
-            commentId: data.commentId 
-          });
-        }
-        break;
-      
-      // ===== REMINDERS =====
-      case NotificationTypes.REMINDER:
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        } else if (data?.assignmentId) {
-          navigation.navigate('AssignmentDetails', { 
-            assignmentId: data.assignmentId,
-            isAdmin: false
-          });
-        }
-        break;
-      
-      // ===== DEFAULT FALLBACK =====
-      default:
-        console.log('Unhandled notification type:', type);
-        if (data?.taskId) {
-          navigation.navigate('TaskDetails', { 
-            taskId: data.taskId,
-            groupId: data.groupId 
-          });
-        } else if (data?.groupId) {
-          navigation.navigate('GroupTasks', { 
-            groupId: data.groupId,
-            groupName: data.groupName || 'Group',
-            userRole: data.userRole || 'MEMBER'
-          });
-        } else {
-          navigation.goBack();
-        }
+    // ===== SUBMISSION PENDING (Admin Review) =====
+    if (type === NotificationTypes.SUBMISSION_PENDING) {
+      if (data?.assignmentId && !data?.taskDeleted) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: true 
+        });
+      } else if (data?.groupId) {
+        navigation.navigate('PendingVerifications', { 
+          groupId: data.groupId,
+          groupName: data.groupName,
+          userRole: 'ADMIN'
+        });
+      } else {
+        Alert.alert('Submission Unavailable', 'This submission is no longer available for review.');
+      }
+      return;
+    }
+    
+    // ===== SUBMISSION VERIFIED/REJECTED =====
+    if (type === NotificationTypes.SUBMISSION_VERIFIED || type === NotificationTypes.SUBMISSION_REJECTED) {
+      if (data?.assignmentId && !data?.taskDeleted) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: false 
+        });
+      } else if (data?.taskId && !data?.taskDeleted) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      } else {
+        Alert.alert('Submission Unavailable', 'This submission details are no longer available.');
+      }
+      return;
+    }
+    
+    // ===== TASK REMINDERS =====
+    if (type === NotificationTypes.TASK_REMINDER || type === NotificationTypes.TASK_ACTIVE) {
+      if (data?.assignmentId && !data?.taskDeleted) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: false 
+        });
+      } else if (data?.taskId && !data?.taskDeleted) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      } else if (data?.groupId) {
+        navigation.navigate('TodayAssignments', { 
+          groupId: data.groupId,
+          groupName: data.groupName 
+        });
+      } else {
+        Alert.alert('Task Unavailable', 'This task reminder is no longer available.');
+      }
+      return;
+    }
+    
+    // ===== ROTATION NOTIFICATIONS =====
+    if (type === 'ROTATION_COMPLETED') {
+      if (data?.groupId) {
+        navigation.navigate('RotationSchedule', { 
+          groupId: data.groupId,
+          groupName: data.groupName || 'Group',
+          userRole: data.userRole || 'MEMBER'
+        });
+      } else {
+        navigation.navigate('MyGroups');
+      }
+      return;
+    }
+    
+    // ===== POINT DEDUCTION & NEGLECT =====
+    if (type === NotificationTypes.POINT_DEDUCTION || type === NotificationTypes.LATE_SUBMISSION) {
+      if (data?.assignmentId && !data?.taskDeleted) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: false 
+        });
+      } else if (data?.taskId && !data?.taskDeleted) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      } else if (data?.groupId) {
+        navigation.navigate('NeglectedTasks', { 
+          groupId: data.groupId,
+          groupName: data.groupName,
+          userRole: 'MEMBER'
+        });
+      } else {
+        Alert.alert('Content Unavailable', 'This notification is no longer available.');
+      }
+      return;
+    }
+    
+    if (type === NotificationTypes.NEGLECT_DETECTED) {
+      if (data?.assignmentId && !data?.taskDeleted) {
+        navigation.navigate('AssignmentDetails', { 
+          assignmentId: data.assignmentId,
+          isAdmin: true 
+        });
+      } else if (data?.taskId && !data?.taskDeleted) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      } else if (data?.groupId) {
+        navigation.navigate('NeglectedTasks', { 
+          groupId: data.groupId,
+          groupName: data.groupName,
+          userRole: 'ADMIN'
+        });
+      } else {
+        Alert.alert('Content Unavailable', 'This neglect notification is no longer available.');
+      }
+      return;
+    }
+    
+    // ===== TASK NOTIFICATIONS =====
+    if (type === NotificationTypes.TASK_ASSIGNED ||
+        type === NotificationTypes.TASK_COMPLETED ||
+        type === NotificationTypes.TASK_OVERDUE ||
+        type === NotificationTypes.TASK_CREATED) {
+      if (data?.taskId && !data?.taskDeleted) {
+        navigation.navigate('TaskDetails', { 
+          taskId: data.taskId,
+          groupId: data.groupId 
+        });
+      } else if (data?.groupId) {
+        navigation.navigate('GroupTasks', { 
+          groupId: data.groupId,
+          groupName: data.groupName || 'Group',
+          userRole: data.userRole || 'MEMBER'
+        });
+      } else {
+        Alert.alert('Task Unavailable', 'This task notification is no longer available.');
+      }
+      return;
+    }
+    
+    // ===== POINTS EARNED =====
+    if (type === NotificationTypes.POINTS_EARNED) {
+      if (data?.groupId) {
+        navigation.navigate('FullLeaderboard', { 
+          groupId: data.groupId,
+          groupName: data.groupName 
+        });
+      } else {
+        Alert.alert('Content Unavailable', 'Leaderboard data is not available.');
+      }
+      return;
+    }
+    
+    // ===== DEFAULT FALLBACK =====
+    console.log('Unhandled notification type:', type);
+    if (data?.taskId && !data?.taskDeleted) {
+      navigation.navigate('TaskDetails', { 
+        taskId: data.taskId,
+        groupId: data.groupId 
+      });
+    } else if (data?.groupId) {
+      navigation.navigate('GroupTasks', { 
+        groupId: data.groupId,
+        groupName: data.groupName || 'Group',
+        userRole: data.userRole || 'MEMBER'
+      });
+    } else {
+      Alert.alert('Content Unavailable', 'This notification content is no longer available.');
     }
   };
 
@@ -377,42 +393,30 @@ export default function NotificationsScreen({ navigation }: any) {
     );
   };
 
-  // ===== COMPLETE ICON MAPPING =====
-  const getNotificationIcon = (type: string): string => {
+  const getNotificationIcon = (type: string, isValid: boolean): string => {
+    if (!isValid) return 'alert-circle';
+    
     const icons: Record<string, string> = {
-      // Rotation
       'ROTATION_COMPLETED': 'calendar-sync',
-      
-      // Points & Neglect
       [NotificationTypes.POINT_DEDUCTION]: 'star-remove',
       [NotificationTypes.LATE_SUBMISSION]: 'timer-alert',
       [NotificationTypes.NEGLECT_DETECTED]: 'alert-circle',
-      
-      // Tasks
       [NotificationTypes.TASK_REMINDER]: 'clock-alert',
       [NotificationTypes.TASK_ACTIVE]: 'clock-check',
       [NotificationTypes.TASK_ASSIGNED]: 'clipboard-check',
       [NotificationTypes.TASK_COMPLETED]: 'check-circle',
       [NotificationTypes.TASK_OVERDUE]: 'alert',
       [NotificationTypes.TASK_CREATED]: 'plus-circle',
-      
-      // Submissions
       [NotificationTypes.SUBMISSION_PENDING]: 'clock-check',
       [NotificationTypes.SUBMISSION_VERIFIED]: 'check-circle',
       [NotificationTypes.SUBMISSION_REJECTED]: 'close-circle',
       [NotificationTypes.SUBMISSION_DECISION]: 'message-check',
-      
-      // Feedback
       [NotificationTypes.FEEDBACK_SUBMITTED]: 'message',
       [NotificationTypes.FEEDBACK_STATUS_UPDATE]: 'update',
-      
-      // Groups
       [NotificationTypes.GROUP_INVITE]: 'account-plus',
       [NotificationTypes.GROUP_JOINED]: 'account-group',
       [NotificationTypes.GROUP_CREATED]: 'home',
       [NotificationTypes.NEW_MEMBER]: 'account-plus',
-      
-      // Swaps
       [NotificationTypes.SWAP_REQUEST]: 'swap-horizontal',
       [NotificationTypes.SWAP_ACCEPTED]: 'handshake',
       [NotificationTypes.SWAP_REJECTED]: 'close-circle',
@@ -420,70 +424,46 @@ export default function NotificationsScreen({ navigation }: any) {
       [NotificationTypes.SWAP_COMPLETED]: 'check-circle',
       [NotificationTypes.SWAP_ADMIN_NOTIFICATION]: 'shield-alert',
       [NotificationTypes.SWAP_EXPIRED]: 'timer-off',
-      
-      // Points
       [NotificationTypes.POINTS_EARNED]: 'trophy',
-      
-      // Mentions
       [NotificationTypes.MENTION]: 'at',
-      
-      // General
       [NotificationTypes.REMINDER]: 'bell',
     };
     return icons[type] || 'bell';
   };
 
-  // ===== COMPLETE COLOR MAPPING =====
-  const getNotificationColor = (type: string): string => {
+  const getNotificationColor = (type: string, isValid: boolean): string => {
+    if (!isValid) return '#868e96';
+    
     const colors: Record<string, string> = {
-      // Rotation - Green
       'ROTATION_COMPLETED': '#2b8a3e',
-      
-      // Points & Neglect - Red/Orange
       [NotificationTypes.POINT_DEDUCTION]: '#fa5252',
       [NotificationTypes.LATE_SUBMISSION]: '#e67700',
       [NotificationTypes.NEGLECT_DETECTED]: '#fa5252',
-      
-      // Tasks - Green/Orange
       [NotificationTypes.TASK_REMINDER]: '#e67700',
       [NotificationTypes.TASK_ACTIVE]: '#2b8a3e',
       [NotificationTypes.TASK_ASSIGNED]: '#2b8a3e',
       [NotificationTypes.TASK_COMPLETED]: '#2b8a3e',
       [NotificationTypes.TASK_OVERDUE]: '#fa5252',
       [NotificationTypes.TASK_CREATED]: '#495057',
-      
-      // Submissions - Orange/Green/Red
       [NotificationTypes.SUBMISSION_PENDING]: '#e67700',
       [NotificationTypes.SUBMISSION_VERIFIED]: '#2b8a3e',
       [NotificationTypes.SUBMISSION_REJECTED]: '#fa5252',
       [NotificationTypes.SUBMISSION_DECISION]: '#495057',
-      
-      // Feedback - Orange/Gray
       [NotificationTypes.FEEDBACK_SUBMITTED]: '#e67700',
       [NotificationTypes.FEEDBACK_STATUS_UPDATE]: '#495057',
-      
-      // Groups - Green
       [NotificationTypes.GROUP_INVITE]: '#2b8a3e',
       [NotificationTypes.GROUP_JOINED]: '#2b8a3e',
       [NotificationTypes.GROUP_CREATED]: '#495057',
       [NotificationTypes.NEW_MEMBER]: '#2b8a3e',
-      
-      // Swaps - Various
-      [NotificationTypes.SWAP_REQUEST]: '#4F46E5', // Indigo
+      [NotificationTypes.SWAP_REQUEST]: '#4F46E5',
       [NotificationTypes.SWAP_ACCEPTED]: '#2b8a3e',
       [NotificationTypes.SWAP_REJECTED]: '#fa5252',
       [NotificationTypes.SWAP_CANCELLED]: '#868e96',
       [NotificationTypes.SWAP_COMPLETED]: '#2b8a3e',
       [NotificationTypes.SWAP_ADMIN_NOTIFICATION]: '#495057',
       [NotificationTypes.SWAP_EXPIRED]: '#868e96',
-      
-      // Points - Orange
       [NotificationTypes.POINTS_EARNED]: '#e67700',
-      
-      // Mentions - Gray
       [NotificationTypes.MENTION]: '#495057',
-      
-      // General - Green
       [NotificationTypes.REMINDER]: '#2b8a3e',
     };
     return colors[type] || '#868e96';
@@ -504,79 +484,118 @@ export default function NotificationsScreen({ navigation }: any) {
     return date.toLocaleDateString();
   };
 
+  // ✅ Render notification with expired/deleted indicators
   const renderNotification = ({ item }: { item: any }) => {
-    const iconName = getNotificationIcon(item.type);
-    const iconColor = getNotificationColor(item.type);
+    const validation = isNotificationValid(item.type, item.data);
+    const isValid = validation.valid;
+    const iconName = getNotificationIcon(item.type, isValid);
+    const iconColor = getNotificationColor(item.type, isValid);
+    const isExpiredOrDeleted = !isValid;
     
     return (
       <TouchableOpacity
-        style={[styles.notificationCard, !item.read && styles.unreadCard]}
+        style={[
+          styles.notificationCard,
+          !item.read && styles.unreadCard,
+          isExpiredOrDeleted && styles.expiredCard
+        ]}
         onPress={() => handleNotificationPress(item)}
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={[iconColor, iconColor + 'dd']}
+          colors={isExpiredOrDeleted ? ['#868e96', '#6c757d'] : [iconColor, iconColor + 'dd']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.iconContainer}
         >
-          <MaterialCommunityIcons name={iconName as any} size={18} color="white" />
+          <MaterialCommunityIcons 
+            name={iconName as any} 
+            size={18} 
+            color="white" 
+          />
         </LinearGradient>
         
         <View style={styles.contentContainer}>
           <View style={styles.headerContainer}>
             <Text style={[styles.title, !item.read && styles.unreadTitle]} numberOfLines={1}>
               {item.title}
+              {isExpiredOrDeleted && ' (Unavailable)'}
             </Text>
             <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
           </View>
           
-          <Text style={styles.message} numberOfLines={2}>
+          <Text style={[styles.message, isExpiredOrDeleted && styles.expiredMessage]} numberOfLines={2}>
             {item.message}
+            {isExpiredOrDeleted && ` ⚠️ ${validation.message || 'Content no longer available'}`}
           </Text>
           
-          {/* ===== PREVIEW INFO FOR DIFFERENT NOTIFICATION TYPES ===== */}
-          
-          {/* Rotation Preview */}
-          {item.type === 'ROTATION_COMPLETED' && item.data?.newWeek && (
-            <View style={styles.previewInfo}>
-              <MaterialCommunityIcons name="calendar-sync" size={12} color="#2b8a3e" />
-              <Text style={styles.previewText}>
-                Week {item.data.newWeek} • {item.data.taskCount || 0} new tasks
+          {/* Show badge for expired/deleted content */}
+          {isExpiredOrDeleted && (
+            <View style={[
+              styles.statusBadge,
+              validation.type === 'deleted' ? styles.deletedBadge : styles.expiredBadge
+            ]}>
+              <MaterialCommunityIcons 
+                name={validation.type === 'deleted' ? "delete" : "timer-off"} 
+                size={10} 
+                color={validation.type === 'deleted' ? "#fa5252" : "#e67700"} 
+              />
+              <Text style={[
+                styles.statusBadgeText,
+                validation.type === 'deleted' ? styles.deletedBadgeText : styles.expiredBadgeText
+              ]}>
+                {validation.type === 'deleted' ? 'Deleted' : 'Expired'}
               </Text>
             </View>
           )}
           
-          {/* Point Deduction Preview */}
-          {item.type === NotificationTypes.POINT_DEDUCTION && item.data?.points && (
-            <View style={styles.previewInfo}>
-              <MaterialCommunityIcons name="star-remove" size={12} color="#fa5252" />
-              <Text style={styles.previewText}>Lost {Math.abs(item.data.points)} points</Text>
-            </View>
-          )}
-          
-          {/* Late Submission Preview */}
-          {item.type === NotificationTypes.LATE_SUBMISSION && item.data?.finalPoints && (
-            <View style={styles.previewInfo}>
-              <MaterialCommunityIcons name="timer-alert" size={12} color="#e67700" />
-              <Text style={styles.previewText}>Points: {item.data.finalPoints}</Text>
-            </View>
-          )}
-          
-          {/* Task Assignment Preview */}
-          {item.type === NotificationTypes.TASK_ASSIGNED && item.data?.taskTitle && (
-            <View style={styles.previewInfo}>
-              <MaterialCommunityIcons name="star" size={12} color="#e67700" />
-              <Text style={styles.previewText}>{item.data.taskPoints || 0} pts</Text>
-            </View>
-          )}
-          
-          {/* Swap Request Preview */}
-          {item.type === NotificationTypes.SWAP_REQUEST && item.data?.taskTitle && (
-            <View style={styles.previewInfo}>
-              <MaterialCommunityIcons name="swap-horizontal" size={12} color="#4F46E5" />
-              <Text style={styles.previewText}>Swap: {item.data.taskTitle}</Text>
-            </View>
+          {/* Preview Info - only if not expired/deleted */}
+          {!isExpiredOrDeleted && (
+            <>
+              {item.type === 'ROTATION_COMPLETED' && item.data?.newWeek && (
+                <View style={styles.previewInfo}>
+                  <MaterialCommunityIcons name="calendar-sync" size={12} color="#2b8a3e" />
+                  <Text style={styles.previewText}>
+                    Week {item.data.newWeek} • {item.data.taskCount || 0} new tasks
+                  </Text>
+                </View>
+              )}
+              
+              {item.type === NotificationTypes.POINT_DEDUCTION && item.data?.points && (
+                <View style={styles.previewInfo}>
+                  <MaterialCommunityIcons name="star-remove" size={12} color="#fa5252" />
+                  <Text style={styles.previewText}>Lost {Math.abs(item.data.points)} points</Text>
+                </View>
+              )}
+              
+              {item.type === NotificationTypes.LATE_SUBMISSION && item.data?.finalPoints && (
+                <View style={styles.previewInfo}>
+                  <MaterialCommunityIcons name="timer-alert" size={12} color="#e67700" />
+                  <Text style={styles.previewText}>Points: {item.data.finalPoints}</Text>
+                </View>
+              )}
+              
+              {item.type === NotificationTypes.TASK_ASSIGNED && item.data?.taskTitle && (
+                <View style={styles.previewInfo}>
+                  <MaterialCommunityIcons name="star" size={12} color="#e67700" />
+                  <Text style={styles.previewText}>{item.data.taskPoints || 0} pts</Text>
+                </View>
+              )}
+              
+              {item.type === NotificationTypes.SWAP_REQUEST && item.data?.taskTitle && (
+                <View style={styles.previewInfo}>
+                  <MaterialCommunityIcons name="swap-horizontal" size={12} color="#4F46E5" />
+                  <Text style={styles.previewText}>Swap: {item.data.taskTitle}</Text>
+                </View>
+              )}
+              
+              {item.type === NotificationTypes.SUBMISSION_PENDING && item.data?.taskTitle && (
+                <View style={styles.previewInfo}>
+                  <MaterialCommunityIcons name="clock-check" size={12} color="#e67700" />
+                  <Text style={styles.previewText}>Needs Review: {item.data.taskTitle}</Text>
+                </View>
+              )}
+            </>
           )}
         </View>
 
@@ -588,7 +607,8 @@ export default function NotificationsScreen({ navigation }: any) {
           <MaterialCommunityIcons name="close" size={14} color="#adb5bd" />
         </TouchableOpacity>
 
-        {!item.read && <View style={styles.unreadDot} />}
+        {!item.read && !isExpiredOrDeleted && <View style={styles.unreadDot} />}
+        {isExpiredOrDeleted && <View style={styles.expiredDot} />}
       </TouchableOpacity>
     );
   };
@@ -621,7 +641,6 @@ export default function NotificationsScreen({ navigation }: any) {
 
   return (
     <ScreenWrapper style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()} 
@@ -657,7 +676,6 @@ export default function NotificationsScreen({ navigation }: any) {
         </TouchableOpacity>
       </View>
 
-      {/* Notifications List */}
       <FlatList
         data={notifications}
         renderItem={renderNotification}
@@ -681,6 +699,7 @@ export default function NotificationsScreen({ navigation }: any) {
   );
 }
 
+// ✅ COMPLETE STYLES
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -775,6 +794,12 @@ const styles = StyleSheet.create({
     borderColor: '#2b8a3e',
     borderWidth: 1,
   },
+  expiredCard: {
+    backgroundColor: '#f8f9fa',
+    borderColor: '#ffc9c9',
+    borderWidth: 1,
+    opacity: 0.8,
+  },
   iconContainer: {
     width: 36,
     height: 36,
@@ -812,6 +837,9 @@ const styles = StyleSheet.create({
     color: '#868e96',
     lineHeight: 16,
   },
+  expiredMessage: {
+    color: '#fa5252',
+  },
   previewInfo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -831,6 +859,41 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: '#2b8a3e',
+  },
+  expiredDot: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fa5252',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  deletedBadge: {
+    backgroundColor: '#fff5f5',
+  },
+  expiredBadge: {
+    backgroundColor: '#fff3bf',
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  deletedBadgeText: {
+    color: '#fa5252',
+  },
+  expiredBadgeText: {
+    color: '#e67700',
   },
   deleteButton: {
     padding: 4,

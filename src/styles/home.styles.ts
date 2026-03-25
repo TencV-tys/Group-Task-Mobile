@@ -67,50 +67,8 @@ export const homeStyles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 80,
   },
-  pointsCard: {
-    margin: 16,
-    marginBottom: 8,
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#2b8a3e',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  pointsCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  pointsCardLabel: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
-    marginBottom: 4,
-  },
-  pointsCardValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  pointsCardIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  pointsCardFooter: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.2)',
-  },
-  pointsCardFooterText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-  },
+  // ✅ REMOVED pointsCard styles since it's no longer used
+  
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -185,6 +143,30 @@ export const homeStyles = StyleSheet.create({
   seeAllText: {
     fontSize: 14,
     color: '#2b8a3e',
+    fontWeight: '600',
+  },
+  // ✅ FIXED: Quick Actions Grid - properly sized
+  quickActionsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  quickActionCard: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  quickActionGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    gap: 6,
+  },
+  quickActionText: {
+    color: 'white',
+    fontSize: 12,
     fontWeight: '600',
   },
   overdueList: {

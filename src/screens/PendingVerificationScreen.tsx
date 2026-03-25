@@ -1,4 +1,4 @@
-// src/screens/PendingVerificationsScreen.tsx - UPDATED with TokenUtils
+// src/screens/PendingVerificationsScreen.tsx - UPDATED with deleted task handling
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,12 +11,12 @@ import {
   RefreshControl,
   Alert,
   StatusBar, 
-  Image
+  Image 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../services/AssignmentService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function PendingVerificationsScreen({ navigation, route }: any) {
@@ -31,7 +31,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   
   const isAdmin = userRole === 'ADMIN';
 
-  // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -50,7 +49,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     }
   }, [authError, navigation]);
 
-  // ===== CHECK ADMIN ACCESS =====
   useEffect(() => {
     if (!isAdmin) {
       Alert.alert('Access Denied', 'Only administrators can access this screen');
@@ -62,7 +60,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   }, [groupId, filter]);
 
   const fetchStats = async () => {
-    // Check token first
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
@@ -81,7 +78,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   };
 
   const fetchSubmissions = async (isRefreshing = false) => {
-    // Check token first
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
@@ -126,24 +122,32 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           );
         }
         
-        const processed = assignments.map((assignment: any) => ({
-          ...assignment,
-          id: assignment.id,
-          userName: assignment.user?.fullName || assignment.user?.name || 'Unknown User',
-          userAvatar: assignment.user?.avatarUrl,
-          userId: assignment.user?.id,
-          taskId: assignment.task?.id || assignment.taskId,
-          taskTitle: assignment.task?.title || assignment.taskTitle || 'Unknown Task',
-          taskPoints: assignment.task?.points || assignment.points || 0,
-          submittedAt: assignment.completedAt ? new Date(assignment.completedAt) : null,
-          dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
-          completed: assignment.completed || false,
-          verified: assignment.verified,
-          photoUrl: assignment.photoUrl,
-          notes: assignment.notes,
-          adminNotes: assignment.adminNotes,
-          timeSlot: assignment.timeSlot
-        }));
+        const processed = assignments.map((assignment: any) => {
+          // ✅ Check if task is deleted (taskId is null and taskTitle is from historical)
+          const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
+          const taskTitle = assignment.task?.title || assignment.taskTitle || 'Unknown Task';
+          const isDeletedTask = assignment.isHistorical === true || (isTaskDeleted && assignment.taskTitle);
+          
+          return {
+            ...assignment,
+            id: assignment.id,
+            userName: assignment.user?.fullName || assignment.user?.name || 'Unknown User',
+            userAvatar: assignment.user?.avatarUrl,
+            userId: assignment.user?.id,
+            taskId: assignment.task?.id || assignment.taskId,
+            taskTitle: isDeletedTask ? `🗑️ ${taskTitle} (Deleted)` : taskTitle,
+            taskPoints: assignment.task?.points || assignment.points || 0,
+            submittedAt: assignment.completedAt ? new Date(assignment.completedAt) : null,
+            dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
+            completed: assignment.completed || false,
+            verified: assignment.verified,
+            photoUrl: assignment.photoUrl,
+            notes: assignment.notes,
+            adminNotes: assignment.adminNotes,
+            timeSlot: assignment.timeSlot,
+            isTaskDeleted: isDeletedTask  // ✅ Add flag for deleted tasks
+          };
+        });
         
         setSubmissions(processed);
       } else {
@@ -158,9 +162,19 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     }
   };
 
-  const handleViewSubmission = (assignmentId: string) => {
+  // ✅ UPDATED: Handle click with check for deleted task
+  const handleViewSubmission = (assignment: any) => {
+    if (assignment.isTaskDeleted) {
+      Alert.alert(
+        'Task Deleted',
+        `The task "${assignment.taskTitle.replace('🗑️ ', '').replace(' (Deleted)', '')}" has been deleted and is no longer available for review.\n\nYou can still see the submission details but cannot verify it.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     navigation.navigate('AssignmentDetails', {
-      assignmentId,
+      assignmentId: assignment.id,
       isAdmin: true,
       onVerified: () => {
         fetchSubmissions();
@@ -169,8 +183,17 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     });
   };
 
-  const handleQuickApprove = async (assignmentId: string, taskTitle: string) => {
-    // Check token first
+  // ✅ UPDATED: Quick approve with check for deleted task
+  const handleQuickApprove = async (assignment: any) => {
+    if (assignment.isTaskDeleted) {
+      Alert.alert(
+        'Cannot Approve',
+        `The task "${assignment.taskTitle.replace('🗑️ ', '').replace(' (Deleted)', '')}" has been deleted and cannot be approved.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
@@ -180,7 +203,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
     Alert.alert(
       'Approve Submission',
-      `Are you sure you want to approve "${taskTitle}"?`,
+      `Are you sure you want to approve "${assignment.taskTitle}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -188,14 +211,14 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           style: 'default',
           onPress: async () => {
             try {
-              const result = await AssignmentService.verifyAssignment(assignmentId, {
+              const result = await AssignmentService.verifyAssignment(assignment.id, {
                 verified: true,
                 adminNotes: 'Approved via quick action'
               });
               
               if (result.success) {
                 Alert.alert('Success', 'Submission approved successfully');
-                setSubmissions(prev => prev.filter(item => item.id !== assignmentId));
+                setSubmissions(prev => prev.filter(item => item.id !== assignment.id));
                 fetchStats();
                 fetchSubmissions();
               } else {
@@ -210,8 +233,17 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     );
   };
 
-  const handleQuickReject = async (assignmentId: string, taskTitle: string) => {
-    // Check token first
+  // ✅ UPDATED: Quick reject with check for deleted task
+  const handleQuickReject = async (assignment: any) => {
+    if (assignment.isTaskDeleted) {
+      Alert.alert(
+        'Cannot Reject',
+        `The task "${assignment.taskTitle.replace('🗑️ ', '').replace(' (Deleted)', '')}" has been deleted.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
@@ -221,7 +253,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
     Alert.alert(
       'Reject Submission',
-      `Are you sure you want to reject "${taskTitle}"?`,
+      `Are you sure you want to reject "${assignment.taskTitle}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -229,14 +261,14 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           style: 'destructive',
           onPress: async () => {
             try {
-              const result = await AssignmentService.verifyAssignment(assignmentId, {
+              const result = await AssignmentService.verifyAssignment(assignment.id, {
                 verified: false,
                 adminNotes: 'Rejected via quick action'
               });
               
               if (result.success) {
                 Alert.alert('Success', 'Submission rejected');
-                setSubmissions(prev => prev.filter(item => item.id !== assignmentId));
+                setSubmissions(prev => prev.filter(item => item.id !== assignment.id));
                 fetchStats();
                 fetchSubmissions();
               } else {
@@ -349,15 +381,20 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     </View>
   );
 
+  // ✅ UPDATED: Render submission item with deleted task styling
   const renderSubmissionItem = ({ item }: any) => {
     const isPending = filter === 'pending';
     const isSubmitted = item.completed === true && item.verified === null;
+    const isDeletedTask = item.isTaskDeleted === true;
     
     return (
       <TouchableOpacity
-        style={styles.submissionCard}
-        onPress={() => handleViewSubmission(item.id)}
-        activeOpacity={0.7}
+        style={[
+          styles.submissionCard,
+          isDeletedTask && styles.deletedTaskCard  // ✅ Different style for deleted tasks
+        ]}
+        onPress={() => handleViewSubmission(item)}
+        activeOpacity={isDeletedTask ? 0.8 : 0.7}
       >
         <View style={styles.cardHeader}>
           <View style={styles.userInfo}>
@@ -387,7 +424,19 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
             </View>
           </View>
           
-          {isPending && item.completed === true && item.verified === null && (
+          {isDeletedTask && (
+            <LinearGradient
+              colors={['#f8f9fa', '#e9ecef']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.deletedBadge}
+            >
+              <MaterialCommunityIcons name="delete" size={12} color="#fa5252" />
+              <Text style={styles.deletedBadgeText}>Deleted</Text>
+            </LinearGradient>
+          )}
+          
+          {!isDeletedTask && isPending && item.completed === true && item.verified === null && (
             <LinearGradient
               colors={['#d3f9d8', '#b2f2bb']}
               start={{ x: 0, y: 0 }}
@@ -398,7 +447,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               <Text style={styles.pendingBadgeText}>Pending</Text>
             </LinearGradient>
           )}
-          {filter === 'verified' && (
+          {!isDeletedTask && filter === 'verified' && (
             <LinearGradient
               colors={['#d3f9d8', '#b2f2bb']}
               start={{ x: 0, y: 0 }}
@@ -409,7 +458,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               <Text style={styles.verifiedBadgeText}>Verified</Text>
             </LinearGradient>
           )}
-          {filter === 'rejected' && (
+          {!isDeletedTask && filter === 'rejected' && (
             <LinearGradient
               colors={['#fff5f5', '#ffe3e3']}
               start={{ x: 0, y: 0 }}
@@ -423,13 +472,17 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
         </View>
 
         <LinearGradient
-          colors={['#f8f9fa', '#e9ecef']}
+          colors={isDeletedTask ? ['#f8f9fa', '#e9ecef'] : ['#f8f9fa', '#e9ecef']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.taskInfo}
+          style={[styles.taskInfo, isDeletedTask && styles.deletedTaskInfo]}
         >
-          <MaterialCommunityIcons name="format-list-checks" size={16} color="#495057" />
-          <Text style={styles.taskTitle} numberOfLines={2}>
+          <MaterialCommunityIcons 
+            name={isDeletedTask ? "delete" : "format-list-checks"} 
+            size={16} 
+            color={isDeletedTask ? "#fa5252" : "#495057"} 
+          />
+          <Text style={[styles.taskTitle, isDeletedTask && styles.deletedTaskTitle]} numberOfLines={2}>
             {item.taskTitle}
           </Text>
         </LinearGradient>
@@ -495,13 +548,13 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           ) : null}
         </View>
 
-        {isPending && isSubmitted && (
+        {isPending && isSubmitted && !isDeletedTask && (
           <View style={styles.quickActions}>
             <TouchableOpacity
               style={styles.quickRejectButton}
               onPress={(e) => {
                 e.stopPropagation();
-                handleQuickReject(item.id, item.taskTitle);
+                handleQuickReject(item);
               }}
             >
               <LinearGradient
@@ -519,7 +572,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               style={styles.quickApproveButton}
               onPress={(e) => {
                 e.stopPropagation();
-                handleQuickApprove(item.id, item.taskTitle);
+                handleQuickApprove(item);
               }}
             >
               <LinearGradient
@@ -533,6 +586,20 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               </LinearGradient>
             </TouchableOpacity>
           </View>
+        )}
+
+        {isDeletedTask && (
+          <LinearGradient
+            colors={['#fff5f5', '#ffe3e3']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.deletedWarning}
+          >
+            <MaterialCommunityIcons name="alert-circle" size={14} color="#fa5252" />
+            <Text style={styles.deletedWarningText}>
+              This task has been deleted. Cannot verify this submission.
+            </Text>
+          </LinearGradient>
         )}
 
         {item.adminNotes && (
@@ -668,7 +735,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   );
 }
 
-// Styles remain exactly the same as your original
+// ✅ ADD NEW STYLES
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -866,6 +933,46 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+  },
+  // ✅ NEW STYLES FOR DELETED TASKS
+  deletedTaskCard: {
+    backgroundColor: '#f8f9fa',
+    opacity: 0.8,
+  },
+  deletedTaskInfo: {
+    backgroundColor: '#f8f9fa',
+  },
+  deletedTaskTitle: {
+    color: '#868e96',
+    textDecorationLine: 'line-through',
+  },
+  deletedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  deletedBadgeText: {
+    fontSize: 11,
+    color: '#fa5252',
+    fontWeight: '600',
+  },
+  deletedWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#ffc9c9',
+  },
+  deletedWarningText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#fa5252',
   },
   cardHeader: {
     flexDirection: 'row',

@@ -1,6 +1,6 @@
-// hooks/useAssignmentDetails.ts
+// hooks/useAssignmentDetails.ts - UPDATED with deleted task handling
 import { useState, useEffect, useCallback } from 'react';
-import { Alert,Linking } from 'react-native';
+import { Alert, Linking } from 'react-native';
 import { AssignmentService } from '../services/AssignmentService';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { TokenUtils } from '../utils/tokenUtils';
@@ -26,6 +26,8 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
   } | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
+  const [isTaskDeleted, setIsTaskDeleted] = useState(false);
+  const [deletedTaskTitle, setDeletedTaskTitle] = useState<string>('');
 
   const { hasPendingRequest, getPendingRequestForAssignment } = useSwapRequests();
 
@@ -75,8 +77,22 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, []);
 
-  // Get submission status info
+  // Get submission status info - modified for deleted tasks
   const getSubmissionStatusInfo = useCallback(() => {
+    // ✅ If task is deleted, show disabled state
+    if (isTaskDeleted) {
+      return {
+        label: '🗑️ TASK DELETED',
+        color: '#868e96',
+        bgColor: '#f8f9fa',
+        borderColor: '#e9ecef',
+        icon: 'delete',
+        description: 'The task associated with this assignment has been deleted.',
+        buttonText: 'Not Available',
+        canSubmit: false
+      };
+    }
+    
     if (submissionStatus === 'available' && isLate) {
       return {
         label: '⚠️ LATE SUBMISSION',
@@ -164,26 +180,29 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
           canSubmit: false
         };
     }
-  }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft]);
+  }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft, isTaskDeleted]);
 
-  // Get status helpers
+  // Get status helpers - modified for deleted tasks
   const getStatusColor = useCallback(() => {
+    if (isTaskDeleted) return '#868e96';
     switch (verificationStatus) {
       case 'verified': return '#2b8a3e';
       case 'rejected': return '#fa5252';
       default: return '#e67700';
     }
-  }, [verificationStatus]);
+  }, [verificationStatus, isTaskDeleted]);
 
   const getStatusIcon = useCallback(() => {
+    if (isTaskDeleted) return 'delete';
     switch (verificationStatus) {
       case 'verified': return 'check-circle';
       case 'rejected': return 'close-circle';
       default: return assignment?.completed ? 'clock-check' : 'clock-outline';
     }
-  }, [verificationStatus, assignment]);
+  }, [verificationStatus, assignment, isTaskDeleted]);
 
   const getStatusText = useCallback(() => {
+    if (isTaskDeleted) return 'Task Deleted';
     if (!assignment?.completed) return 'Not Completed';
     
     switch (verificationStatus) {
@@ -191,7 +210,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
       case 'rejected': return 'Rejected';
       default: return 'Pending Verification';
     }
-  }, [assignment, verificationStatus]);
+  }, [assignment, verificationStatus, isTaskDeleted]);
 
   const getTimeDifference = useCallback((dueDate: string, completedAt: string) => {
     const due = new Date(dueDate);
@@ -208,8 +227,15 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, []);
 
-  // Check time validity
+  // Check time validity - modified for deleted tasks
   const checkTimeValidity = useCallback((assignmentData: any) => {
+    // ✅ If task is deleted, disable submission
+    if (isTaskDeleted) {
+      setIsSubmittable(false);
+      setSubmissionStatus('completed');
+      return;
+    }
+    
     if (!assignmentData || assignmentData.completed) {
       setIsSubmittable(false);
       setSubmissionStatus('completed');
@@ -284,10 +310,17 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
       setIsLate(false);
       setPenaltyInfo(null);
     }
-  }, []);
+  }, [isTaskDeleted]);
 
-  // Check time validity with server
+  // Check time validity with server - modified for deleted tasks
   const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
+    // ✅ If task is deleted, don't check with server
+    if (isTaskDeleted) {
+      setIsSubmittable(false);
+      setSubmissionStatus('completed');
+      return;
+    }
+    
     try {
       const result = await AssignmentService.checkSubmissionTime(assignmentData.id);
       
@@ -332,9 +365,9 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     } catch (error) {
       checkTimeValidity(assignmentData);
     }
-  }, [checkTimeValidity]);
+  }, [checkTimeValidity, isTaskDeleted]);
 
-  // Fetch assignment details
+  // Fetch assignment details - UPDATED to handle deleted tasks
   const fetchAssignmentDetails = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -343,25 +376,59 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
       const result = await AssignmentService.getAssignmentDetails(assignmentId);
 
       if (result.success) {
-        setAssignment(result.assignment);
-        setVerificationStatus(
-          result.assignment.verified ? 'verified' : 
-          result.assignment.verified === false ? 'rejected' : 'pending'
-        );
-        setAdminNotes(result.assignment.adminNotes || '');
+        const assignmentData = result.assignment;
         
-        if (!result.assignment.completed) {
-          await checkTimeValidityWithServer(result.assignment);
-        } else {
+        // ✅ Check if task is deleted
+        if (assignmentData.isTaskDeleted || (!assignmentData.task && assignmentData.taskTitle)) {
+          setIsTaskDeleted(true);
+          setDeletedTaskTitle(assignmentData.taskTitle || 'Deleted Task');
+          
+          // Still set the assignment data but with deleted flag
+          setAssignment({
+            ...assignmentData,
+            isTaskDeleted: true,
+            taskTitle: assignmentData.taskTitle || 'Deleted Task'
+          });
+          setVerificationStatus(
+            assignmentData.verified ? 'verified' : 
+            assignmentData.verified === false ? 'rejected' : 'pending'
+          );
+          setAdminNotes(assignmentData.adminNotes || '');
           setSubmissionStatus('completed');
+          setIsSubmittable(false);
+          
+          // Show alert about deleted task
+          Alert.alert(
+            'Task Deleted',
+            `The task "${assignmentData.taskTitle || 'Unknown Task'}" has been deleted.\n\nYou can view the submission details but cannot make changes.`,
+            [{ text: 'OK' }]
+          );
+        } else {
+          setIsTaskDeleted(false);
+          setAssignment(assignmentData);
+          setVerificationStatus(
+            assignmentData.verified ? 'verified' : 
+            assignmentData.verified === false ? 'rejected' : 'pending'
+          );
+          setAdminNotes(assignmentData.adminNotes || '');
+          
+          if (!assignmentData.completed) {
+            await checkTimeValidityWithServer(assignmentData);
+          } else {
+            setSubmissionStatus('completed');
+          }
         }
       } else {
-        if (result.message?.toLowerCase().includes('token') || 
+        // ✅ Handle 400/404 errors gracefully
+        if (result.message?.includes('400') || result.message?.includes('404') || result.message?.includes('deleted')) {
+          setError('This assignment is no longer available (may have been deleted).');
+        } else if (result.message?.toLowerCase().includes('token') || 
             result.message?.toLowerCase().includes('auth') ||
             result.message?.toLowerCase().includes('unauthorized')) {
           setAuthError(true);
+        } else {
+          setError(result.message || 'Failed to load assignment details');
         }
-        setError(result.message || 'Failed to load assignment details');
       }
     } catch (err: any) {
       console.error('Error fetching assignment:', err);
@@ -371,8 +438,17 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, [assignmentId, checkTimeValidityWithServer]);
 
-  // Handle complete assignment
+  // Handle complete assignment - disabled for deleted tasks
   const handleCompleteAssignment = useCallback((navigation: any) => {
+    if (isTaskDeleted) {
+      Alert.alert(
+        'Cannot Submit',
+        'This assignment is for a deleted task. You cannot submit or modify it.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     if (!assignment || !isSubmittable) {
       const statusInfo = getSubmissionStatusInfo();
       Alert.alert(
@@ -418,11 +494,20 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
         }
       });
     }
-  }, [assignment, isSubmittable, isLate, penaltyInfo, getSubmissionStatusInfo, fetchAssignmentDetails, onVerified]);
+  }, [assignment, isSubmittable, isLate, penaltyInfo, getSubmissionStatusInfo, fetchAssignmentDetails, onVerified, isTaskDeleted]);
 
-  // Handle request swap
+  // Handle request swap - disabled for deleted tasks
   const handleRequestSwap = useCallback((navigation: any, preSelectedScope?: 'week' | 'day') => {
     return async () => {
+      if (isTaskDeleted) {
+        Alert.alert(
+          'Cannot Swap',
+          'This assignment is for a deleted task. You cannot request a swap.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
       if (!assignment) return;
       
       try {
@@ -459,10 +544,19 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
         Alert.alert('Error', error.message || 'Failed to check swap availability');
       }
     };
-  }, [assignment]);
+  }, [assignment, isTaskDeleted]);
 
-  // Handle verify
+  // Handle verify - disabled for deleted tasks (admin can't verify deleted task submissions)
   const handleVerify = useCallback(async (verified: boolean) => {
+    if (isTaskDeleted) {
+      Alert.alert(
+        'Cannot Verify',
+        'This assignment is for a deleted task. Verification is disabled.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     if (!assignment) return;
     setVerifying(true);
     
@@ -497,16 +591,16 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
       Alert.alert('Error', error.message || 'Network error');
       setVerifying(false);
     }
-  }, [assignment, assignmentId, adminNotes, fetchAssignmentDetails, onVerified]);
+  }, [assignment, assignmentId, adminNotes, fetchAssignmentDetails, onVerified, isTaskDeleted]);
 
- const handleViewPhoto = useCallback(() => {
-  if (assignment?.photoUrl) {
-    Linking.openURL(assignment.photoUrl).catch(err => {
-      console.error('Error opening photo URL:', err);
-      Alert.alert('Error', 'Could not open image');
-    });
-  }
-}, [assignment]);
+  const handleViewPhoto = useCallback(() => {
+    if (assignment?.photoUrl) {
+      Linking.openURL(assignment.photoUrl).catch(err => {
+        console.error('Error opening photo URL:', err);
+        Alert.alert('Error', 'Could not open image');
+      });
+    }
+  }, [assignment]);
 
   // Handle real-time verification
   useEffect(() => {
@@ -535,17 +629,17 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, [assignmentEvents.assignmentRejected, assignmentId, fetchAssignmentDetails, onVerified, clearAssignmentRejected]);
 
-  // Start countdown timer
+  // Start countdown timer - don't start for deleted tasks
   useEffect(() => {
-    if (assignment && !assignment.completed) {
+    if (assignment && !assignment.completed && !isTaskDeleted) {
       const timer = setInterval(() => {
-        if (assignment && !assignment.completed) {
+        if (assignment && !assignment.completed && !isTaskDeleted) {
           checkTimeValidity(assignment);
         }
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [assignment, checkTimeValidity]);
+  }, [assignment, checkTimeValidity, isTaskDeleted]);
 
   // Initial load
   useEffect(() => {
@@ -568,6 +662,8 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     isLate,
     penaltyInfo,
     authError,
+    isTaskDeleted,        // ✅ NEW
+    deletedTaskTitle,     // ✅ NEW
     
     // Setters
     setAdminNotes,

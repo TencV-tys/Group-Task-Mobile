@@ -144,38 +144,42 @@ export const SwapRequestDetailsScreen = () => {
     }
   }, [swapEvents.swapExpired]);
 
-  const loadRequestDetails = async () => {
-    setLoading(true);
-    try {
-      console.log('📥 Loading swap request details:', requestId);
-      
-      // Check token first
-      const hasToken = await TokenUtils.checkToken({
-        showAlert: false,
-        onAuthError: () => setAuthError(true)
-      });
-      
-      if (!hasToken) {
-        setError('Authentication required. Please log in again.');
-        setLoading(false);
-        return;
-      }
-      
-      const response = await SwapRequestService.getSwapRequestDetails(requestId);
-      console.log('📦 Swap request response:', response);
-      
-      if (response.success) {
-        setRequest(response.data);
+ const loadRequestDetails = async () => {
+  setLoading(true);
+  try {
+    console.log('📥 Loading swap request details:', requestId);
+    
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
+    });
+    
+    if (!hasToken) {
+      setError('Authentication required. Please log in again.');
+      setLoading(false);
+      return;
+    }
+    
+    const response = await SwapRequestService.getSwapRequestDetails(requestId);
+    console.log('📦 Swap request response:', response);
+    
+    if (response.success) {
+      setRequest(response.data);
+    } else {
+      // ✅ Check if this is a deleted/not found error
+      if (response.message?.includes('404') || response.message?.includes('not found') || response.message?.includes('400')) {
+        setError('This swap request is no longer available (may have been deleted or expired).');
       } else {
         setError(response.message || 'Failed to load request details');
       }
-    } catch (err: any) {
-      console.error('❌ Error loading request:', err);
-      setError(err.message || 'Failed to load request details');
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (err: any) {
+    console.error('❌ Error loading request:', err);
+    setError(err.message || 'Failed to load request details');
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleAccept = () => {
     const swapDescription = request?.scope === 'day' 

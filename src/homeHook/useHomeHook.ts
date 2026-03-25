@@ -1,4 +1,4 @@
-// homeHook/useHomeData.ts - FIXED to ensure re-renders
+// homeHook/useHomeData.ts - FIXED to prevent infinite refresh loop
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { HomeService, HomeData } from '../services/HomeService';
 import { TokenUtils } from '../utils/tokenUtils';
@@ -16,9 +16,17 @@ export function useHomeData() {
   const [authError, setAuthError] = useState<boolean>(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userGroups, setUserGroups] = useState<string[]>([]);
- 
+  const [dataVersion, setDataVersion] = useState(0);
+
+  // ✅ Single debounce timer for all refreshes
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isRefreshingRef = useRef(false);
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
+  
+  // ✅ Track event sources to prevent duplicate triggers
+  const lastEventTime = useRef(0);
+  const pendingRefresh = useRef(false);
 
   // ===== GET USER ID ON MOUNT =====
   useEffect(() => {
@@ -81,8 +89,14 @@ export function useHomeData() {
     };
   }, []);
 
-  // ===== FETCH HOME DATA =====
-  const fetchHomeData = useCallback(async (isRefreshing = false) => {
+  // ===== ACTUAL FETCH FUNCTION =====
+  const executeFetch = useCallback(async (isRefreshingParam = false) => {
+    // Prevent concurrent refreshes
+    if (isRefreshingRef.current) {
+      console.log('⚠️ Refresh already in progress, skipping...');
+      return;
+    }
+
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -90,8 +104,9 @@ export function useHomeData() {
       return;
     }
 
-    if (isRefreshing) {
-      setRefreshing(true); 
+    if (isRefreshingParam) {
+      setRefreshing(true);
+      isRefreshingRef.current = true;
     } else if (!initialLoadDone.current) {
       setLoading(true);
     }
@@ -104,19 +119,25 @@ export function useHomeData() {
       if (result.success && result.data) {
         const processedData = processData(result.data);
         
-        // ✅ Force a new object reference to trigger re-render
-        setHomeData({ ...processedData });
+        const newHomeData = {
+          ...processedData,
+          _timestamp: Date.now()
+        };
+        
+        setHomeData(newHomeData);
+        setDataVersion(prev => prev + 1);
         
         if (processedData.groups) {
           const groupIds = processedData.groups.map((g: any) => g.id);
-          setUserGroups([...groupIds]); // Force new array reference
+          setUserGroups([...groupIds]);
         }
         
         console.log("📊 Home Data Stats:", {
           groupsCount: processedData.stats.groupsCount,
           tasksDueThisWeek: processedData.stats.tasksDueThisWeek,
           overdueTasks: processedData.stats.overdueTasks,
-          swapRequests: processedData.stats.swapRequests
+          swapRequests: processedData.stats.swapRequests,
+          version: dataVersion + 1
         });
         
         setError(null);
@@ -135,74 +156,102 @@ export function useHomeData() {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      isRefreshingRef.current = false;
+      pendingRefresh.current = false;
     }
-  }, [processData, checkToken]);
+  }, [processData, checkToken, dataVersion]);
 
-  // ===== REFRESH FUNCTION =====
-  const refreshHomeData = useCallback(() => {
-    console.log('🔄 refreshHomeData called');
-    fetchHomeData(true);
-  }, [fetchHomeData]);
+  // ===== DEBOUNCED REFRESH - SINGLE ENTRY POINT =====
+  const scheduleRefresh = useCallback((immediate = false) => {
+    // Clear any pending timer
+    if (refreshTimer.current) {
+      clearTimeout(refreshTimer.current);
+      refreshTimer.current = null;
+    }
+    
+    // If immediate refresh requested
+    if (immediate) {
+      console.log('🔄 Immediate refresh triggered');
+      executeFetch(true);
+      return;
+    }
+    
+    // Debounce: Wait 500ms before executing
+    refreshTimer.current = setTimeout(() => {
+      console.log('🔄 Debounced refresh executing');
+      executeFetch(true);
+      refreshTimer.current = null;
+    }, 500);
+  }, [executeFetch]);
 
-  // ===== LISTEN FOR GROUP CREATION =====
+  // ===== EVENT HANDLER - Single function for all real-time events =====
+  const handleRealTimeEvent = useCallback((eventName: string) => {
+    const now = Date.now();
+    
+    // Throttle: Ignore events that happen within 100ms of each other
+    if (now - lastEventTime.current < 100) {
+      console.log(`⏳ Throttling event: ${eventName}, skipping...`);
+      return;
+    }
+    
+    lastEventTime.current = now;
+    console.log(`📢 Real-time event: ${eventName}, scheduling refresh...`);
+    
+    // Schedule a debounced refresh
+    scheduleRefresh();
+  }, [scheduleRefresh]);
+
+  // ===== LISTEN FOR ALL REAL-TIME EVENTS =====
   useEffect(() => {
     if (groupEvents.groupCreated) {
-      console.log('🆕 Group created detected in useHomeData, refreshing...');
-      console.log('   New group:', groupEvents.groupCreated.groupName);
-      refreshHomeData();
+      handleRealTimeEvent('groupCreated');
       clearGroupCreated();
     }
-  }, [groupEvents.groupCreated, refreshHomeData, clearGroupCreated]);
+  }, [groupEvents.groupCreated, handleRealTimeEvent, clearGroupCreated]);
 
-  // ===== TASK EVENTS =====
   useEffect(() => {
     if (taskEvents.taskCreated || 
         taskEvents.taskUpdated || 
         taskEvents.taskDeleted ||
         taskEvents.taskAssigned) {
-      console.log('🔄 Task event detected, refreshing home data...');
-      refreshHomeData();
+      handleRealTimeEvent('taskEvent');
     }
   }, [
     taskEvents.taskCreated,
     taskEvents.taskUpdated, 
     taskEvents.taskDeleted,
     taskEvents.taskAssigned,
-    refreshHomeData
+    handleRealTimeEvent
   ]);
 
-  // ===== ASSIGNMENT EVENTS =====
   useEffect(() => {
     if (assignmentEvents.assignmentCompleted ||
         assignmentEvents.assignmentVerified ||
         assignmentEvents.assignmentPendingVerification) {
-      console.log('✅ Assignment event detected, refreshing home data...');
-      refreshHomeData();
+      handleRealTimeEvent('assignmentEvent');
     }
   }, [
     assignmentEvents.assignmentCompleted,
     assignmentEvents.assignmentVerified,
     assignmentEvents.assignmentPendingVerification,
-    refreshHomeData
+    handleRealTimeEvent
   ]);
 
-  // ===== SWAP EVENTS =====
   useEffect(() => {
     if (swapEvents.swapCreated ||
         swapEvents.swapResponded) {
-      console.log('🔄 Swap event detected, refreshing home data...');
-      refreshHomeData();
+      handleRealTimeEvent('swapEvent');
     }
   }, [
     swapEvents.swapCreated,
     swapEvents.swapResponded,
-    refreshHomeData
+    handleRealTimeEvent
   ]);
 
   // ===== NOTIFICATIONS =====
   useRealtimeNotifications({
     onNewNotification: (notification) => {
-      if ([
+      const relevantTypes = [
         'TASK_ASSIGNED',
         'SUBMISSION_VERIFIED',
         'SUBMISSION_REJECTED',
@@ -210,33 +259,51 @@ export function useHomeData() {
         'SWAP_ACCEPTED',
         'SWAP_RESPONDED',
         'LATE_SUBMISSION',
-        'POINT_DEDUCTION'
-      ].includes(notification.type)) {
-        console.log(`🔔 Notification ${notification.type} received, refreshing home data...`);
-        refreshHomeData();
+        'POINT_DEDUCTION',
+        'GROUP_CREATED'
+      ];
+      
+      if (relevantTypes.includes(notification.type)) {
+        handleRealTimeEvent(`notification:${notification.type}`);
       }
     },
     showAlerts: true
   });
 
+  // ===== REFRESH FUNCTION FOR MANUAL REFRESH =====
+  const refreshHomeData = useCallback(() => {
+    console.log('🔄 Manual refresh requested');
+    // Cancel any pending debounce and refresh immediately
+    if (refreshTimer.current) {
+      clearTimeout(refreshTimer.current);
+      refreshTimer.current = null;
+    }
+    executeFetch(true);
+  }, [executeFetch]);
+
   // ===== INITIAL LOAD =====
   useEffect(() => {
     checkToken().then(hasToken => {
-      if (hasToken) {
-        fetchHomeData();
+      if (hasToken && !initialLoadDone.current) {
+        executeFetch();
       }
     });
     
     return () => {
       isMounted.current = false;
+      if (refreshTimer.current) {
+        clearTimeout(refreshTimer.current);
+      }
     };
-  }, [fetchHomeData, checkToken]);
+  }, [executeFetch, checkToken]);
 
   const updateHomeData = useCallback((updates: any) => {
     setHomeData((prev: any) => ({
       ...prev,
-      ...updates
+      ...updates,
+      _timestamp: Date.now()
     }));
+    setDataVersion(prev => prev + 1);
   }, []);
 
   return {
@@ -245,7 +312,8 @@ export function useHomeData() {
     error,
     homeData,
     authError,
-    fetchHomeData,
+    dataVersion,
+    fetchHomeData: executeFetch,
     refreshHomeData,
     updateHomeData
   };

@@ -8,9 +8,9 @@ const API_URL = `${API_BASE_URL}/api/assignments`;
 export interface Assignment {
   id: string;
   taskId: string;
-  userId: string;
+  userId: string; 
   dueDate: string;
-  points: number;
+  points: number; 
   completed: boolean;
   completedAt?: string;
   verified: boolean | null;
@@ -216,55 +216,96 @@ export class AssignmentService {
   
   // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
 
-  // ========== COMPLETE ASSIGNMENT ==========
-  static async completeAssignment(
-    assignmentId: string, 
-    data: CompleteAssignmentParams
-  ): Promise<CompleteAssignmentResponse> {
-    try {
-      console.log('AssignmentService: Completing assignment', assignmentId, data);
+  // services/AssignmentService.ts - UPDATED with better error handling
+
+// ========== COMPLETE ASSIGNMENT ==========
+static async completeAssignment(
+  assignmentId: string, 
+  data: CompleteAssignmentParams
+): Promise<CompleteAssignmentResponse> {
+  try {
+    console.log('AssignmentService: Completing assignment', assignmentId, data);
+    
+    // ✅ Get token
+    const token = await TokenUtils.getAccessToken();
+    
+    if (!token) {
+      return {
+        success: false,
+        message: 'No authentication token found'
+      };
+    }
+    
+    // ✅ Check if we have a valid base URL
+    if (!API_BASE_URL) {
+      console.error('❌ API_BASE_URL is not defined:', API_BASE_URL);
+      return {
+        success: false,
+        message: 'API base URL is not configured'
+      };
+    }
+    
+    const fullUrl = `${API_URL}/${assignmentId}/complete`;
+    console.log('📤 Full URL:', fullUrl);
+    
+    if (data.photoUri) { 
+      // Create FormData for multipart upload
+      const formData = new FormData();
       
-      // ✅ Use TokenUtils.getAccessToken() for token
-      const token = await TokenUtils.getAccessToken();
+      // Add notes to formData if present
+      if (data.notes) {
+        formData.append('notes', data.notes);
+      }
       
-      if (data.photoUri) { 
-        // Create FormData for multipart upload
-        const formData = new FormData();
-        
-        // Add notes to formData if present
-        if (data.notes) {
-          formData.append('notes', data.notes);
-        }
-        
-        // Add the photo file - use 'photo' field name to match backend
-        const filename = data.photoUri.split('/').pop() || 'photo.jpg';
-        formData.append('photo', {
-          uri: data.photoUri,
-          name: filename,
-          type: 'image/jpeg',
-        } as any); 
-          
-        // Prepare headers - DON'T set Content-Type, let browser set it with boundary
-        const headers: HeadersInit = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        
-        console.log('📤 Sending multipart form data with photo (field name: "photo")');
-        
-        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+      // Get the file name and type from URI
+      const uri = data.photoUri;
+      const filename = uri.split('/').pop() || 'photo.jpg';
+      const match = /\.(\w+)$/.exec(filename);
+      const mimeType = match ? `image/${match[1]}` : 'image/jpeg';
+      
+      // Add the photo file
+      formData.append('photo', {
+        uri: uri,
+        name: filename,
+        type: mimeType,
+      } as any);
+      
+      // Prepare headers
+      const headers: HeadersInit = {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      };
+      
+      console.log('📤 Sending multipart form data:');
+      console.log('   URL:', fullUrl);
+      console.log('   Filename:', filename);
+      console.log('   Type:', mimeType);
+      console.log('   URI:', uri);
+      
+      // ✅ Add timeout to fetch
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      try {
+        const response = await fetch(fullUrl, {
           method: 'POST',
           headers,
           body: formData,
+          signal: controller.signal,
         });
-
-        // Try to parse response
-        let result;
+        
+        clearTimeout(timeoutId);
+        
+        console.log('📥 Response status:', response.status);
+        
         const responseText = await response.text();
+        console.log('📥 Response text length:', responseText.length);
+        
+        let result;
         try {
           result = JSON.parse(responseText);
         } catch (e) {
-          console.error('Failed to parse response as JSON:', responseText);
+          console.error('Failed to parse response as JSON:', responseText.substring(0, 500));
           throw new Error('Invalid server response');
         }
         
@@ -278,22 +319,45 @@ export class AssignmentService {
         
         return result;
         
-      } else {
-        // No photo - send as JSON
-        // ✅ Use TokenUtils.getAuthHeaders()
-        const headers = await TokenUtils.getAuthHeaders(true); // with JSON content type
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
         
-        console.log('📤 Sending JSON data without photo');
+        if (fetchError.name === 'AbortError') {
+          console.error('❌ Request timeout after 30 seconds');
+          return {
+            success: false,
+            message: 'Request timeout. Please check your connection and try again.'
+          };
+        }
         
-        const response = await fetch(`${API_URL}/${assignmentId}/complete`, {
+        throw fetchError;
+      }
+      
+    } else {
+      // No photo - send as JSON
+      const headers = await TokenUtils.getAuthHeaders(true);
+      
+      console.log('📤 Sending JSON data without photo');
+      console.log('   URL:', fullUrl);
+      console.log('   Notes:', data.notes);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
+      try {
+        const response = await fetch(fullUrl, {
           method: 'POST',
           headers,
           body: JSON.stringify({ notes: data.notes }),
+          signal: controller.signal,
         });
-
-        // Try to parse response
-        let result;
+        
+        clearTimeout(timeoutId);
+        
+        console.log('📥 Response status:', response.status);
+        
         const responseText = await response.text();
+        let result;
         try {
           result = JSON.parse(responseText);
         } catch (e) {
@@ -310,16 +374,44 @@ export class AssignmentService {
         }
         
         return result;
+        
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId);
+        
+        if (fetchError.name === 'AbortError') {
+          return {
+            success: false,
+            message: 'Request timeout. Please check your connection.'
+          };
+        }
+        
+        throw fetchError;
       }
+    }
 
-    } catch (error: any) {
-      console.error('AssignmentService.completeAssignment error:', error);
+  } catch (error: any) {
+    console.error('AssignmentService.completeAssignment error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+      url: `${API_URL}/${assignmentId}/complete`
+    });
+    
+    // Check for specific error types
+    if (error.message === 'Network request failed') {
       return {
         success: false,
-        message: error.message || 'Failed to complete assignment',
+        message: 'Cannot connect to server. Please check your internet connection and ensure the server is running.'
       };
     }
+    
+    return {
+      success: false,
+      message: error.message || 'Failed to complete assignment',
+    };
   }
+}
 
   // ========== VERIFY ASSIGNMENT ==========
   static async verifyAssignment(

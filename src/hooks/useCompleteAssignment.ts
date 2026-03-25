@@ -39,7 +39,8 @@ export const useCompleteAssignment = (
   // Start countdown timer
   useEffect(() => {
     if (timeSlot && dueDate) {
-      startCountdownTimer();
+      const timer = startCountdownTimer();
+      return () => clearInterval(timer);
     }
   }, [timeSlot, dueDate]);
 
@@ -58,47 +59,50 @@ export const useCompleteAssignment = (
         return;
       }
       
-      // Parse end time (this is when submission should OPEN)
+      // Parse end time (this is when submission OPENS)
       const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
       
-      // Create end time object for today (submission OPENS at this time)
+      // ✅ Submission opens AT end time
       const submissionOpenTime = new Date(now);
       submissionOpenTime.setHours(endHour, endMinute, 0, 0);
       
-      // Grace period: 30 minutes after end time
-      const gracePeriodEnd = new Date(submissionOpenTime.getTime() + 30 * 60000);
+      // ✅ On-time window: 0 to 25 minutes after end time
+      const onTimeEnd = new Date(submissionOpenTime.getTime() + 25 * 60000);
       
-      // Late threshold: 25 minutes after end time
-      const lateThreshold = new Date(submissionOpenTime.getTime() + 25 * 60000);
+      // ✅ Late window: 25 to 30 minutes after end time
+      const lateWindowEnd = new Date(submissionOpenTime.getTime() + 30 * 60000);
       
-      // Current time in milliseconds
       const currentTime = now.getTime();
       const openTime = submissionOpenTime.getTime();
-      const lateTime = lateThreshold.getTime();
-      const graceEndTime = gracePeriodEnd.getTime();
+      const onTimeEndMs = onTimeEnd.getTime();
+      const lateWindowEndMs = lateWindowEnd.getTime();
       
       if (currentTime < openTime) {
-        // Before end time - WAITING (cannot submit yet)
+        // BEFORE submission opens - WAITING
         setTimeStatus('waiting');
         setIsSubmittable(false);
         setIsLate(false);
         const timeUntilOpen = Math.floor((openTime - currentTime) / 1000);
         setTimeLeft(timeUntilOpen);
         
-      } else if (currentTime >= openTime && currentTime <= graceEndTime) {
-        // Within submission window (after end time, before grace period ends)
+      } else if (currentTime >= openTime && currentTime <= onTimeEndMs) {
+        // ✅ ON TIME: First 25 minutes after end time
         setTimeStatus('submission_open');
         setIsSubmittable(true);
+        setIsLate(false);
+        const timeLeftMs = onTimeEndMs - currentTime;
+        setTimeLeft(Math.floor(timeLeftMs / 1000));
         
-        // Check if late (submitted after the 25-minute threshold)
-        const late = currentTime > lateTime;
-        setIsLate(late);
-        
-        const timeLeftMs = graceEndTime - currentTime;
+      } else if (currentTime > onTimeEndMs && currentTime <= lateWindowEndMs) {
+        // ✅ LATE: Next 5 minutes (25-30 minutes after end time)
+        setTimeStatus('submission_open');
+        setIsSubmittable(true);
+        setIsLate(true);
+        const timeLeftMs = lateWindowEndMs - currentTime;
         setTimeLeft(Math.floor(timeLeftMs / 1000));
         
       } else {
-        // After grace period - EXPIRED
+        // After 30 minutes - EXPIRED
         setTimeStatus('expired');
         setIsSubmittable(false);
         setIsLate(false);
@@ -108,8 +112,7 @@ export const useCompleteAssignment = (
     
     calculateTimeLeft();
     const timer = setInterval(calculateTimeLeft, 1000);
-    
-    return () => clearInterval(timer);
+    return timer;
   }, [dueDate, timeSlot]);
 
   // Get time status message
@@ -117,7 +120,7 @@ export const useCompleteAssignment = (
     if (timeStatus === 'submission_open' && isLate) {
       return {
         title: '⚠️ LATE SUBMISSION',
-        message: 'You are submitting after 5:25 PM. Points will be reduced.',
+        message: 'You are submitting after the on-time window. Points will be reduced by 50%.',
         color: '#e67700',
         icon: 'timer-alert'
       };
@@ -133,22 +136,24 @@ export const useCompleteAssignment = (
         };
       case 'waiting':
         return {
-          title: 'Opens After Time Slot',
-          message: `Submit after ${timeSlot?.endTime}`,
+          title: 'Not Open Yet',
+          message: `Submission opens at ${timeSlot?.endTime}.`,
           color: '#e67700',
           icon: 'clock-start'
         };
       case 'submission_open':
         return {
-          title: 'Submission Open',
-          message: 'Submit your completion now (on-time until 5:25 PM)',
-          color: '#2b8a3e',
-          icon: 'check-circle'
+          title: isLate ? '⚠️ LATE WINDOW' : '✅ ON TIME',
+          message: isLate 
+            ? `You have ${formatTime(timeLeft || 0)} to submit (points reduced by 50%)`
+            : `You have ${formatTime(timeLeft || 0)} to submit for full points`,
+          color: isLate ? '#e67700' : '#2b8a3e',
+          icon: isLate ? 'timer-alert' : 'check-circle'
         };
       case 'expired':
         return {
           title: 'Submission Closed',
-          message: 'The 30-minute grace period has ended',
+          message: 'The 30-minute submission window has ended.',
           color: '#fa5252',
           icon: 'timer-off'
         };
@@ -160,7 +165,7 @@ export const useCompleteAssignment = (
           icon: 'clock'
         };
     }
-  }, [timeStatus, isLate, dueDate, timeSlot]);
+  }, [timeStatus, isLate, dueDate, timeSlot, formatTime]);
 
   // Pick image from gallery
   const pickImage = useCallback(async () => {
@@ -237,11 +242,10 @@ export const useCompleteAssignment = (
     }
 
     if (!isSubmittable) {
+      const statusMsg = getTimeStatusMessage();
       Alert.alert(
         'Cannot Submit',
-        timeStatus === 'waiting' ? 
-          `Submission opens at ${timeSlot?.endTime}` :
-          'Submission time has passed. Please contact an administrator if this is an error.',
+        statusMsg.message,
         [{ text: 'OK' }]
       );
       return;
@@ -261,7 +265,7 @@ export const useCompleteAssignment = (
         Alert.alert(
           'Success!',
           result.isLate 
-            ? 'Assignment submitted late. Points will be reduced. Waiting for admin verification.'
+            ? `Assignment submitted late. Points reduced from ${result.originalPoints} to ${result.finalPoints}. Waiting for admin verification.`
             : 'Assignment submitted successfully. Waiting for admin verification.',
           [
             {
@@ -287,7 +291,7 @@ export const useCompleteAssignment = (
     } finally {
       setSubmitting(false);
     }
-  }, [assignmentId, notes, photo, isSubmittable, timeStatus, timeSlot, validateSubmission, onCompleted]);
+  }, [assignmentId, notes, photo, isSubmittable, validateSubmission, getTimeStatusMessage, onCompleted]);
 
   return {
     // State

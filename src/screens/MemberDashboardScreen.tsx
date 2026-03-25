@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
-  Text,
+  Text, 
   ScrollView,
   TouchableOpacity, 
   ActivityIndicator,

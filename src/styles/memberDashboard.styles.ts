@@ -19,6 +19,55 @@ export const memberDashboardStyles = StyleSheet.create({
     borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
+quickSwapButton: {
+  borderRadius: 12,
+  overflow: 'hidden',
+  marginBottom: 8,
+},
+quickSwapGradient: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 16,
+  gap: 12,
+},
+quickSwapTextContainer: {
+  flex: 1,
+},
+quickSwapTitle: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: 'white',
+},
+quickSwapSubtitle: {
+  fontSize: 12,
+  color: 'rgba(255,255,255,0.8)',
+  marginTop: 2,
+},
+swapActionsGrid: {
+  flexDirection: 'row',
+  gap: 12,
+  marginTop: 8,
+},
+swapActionCard: {
+  flex: 1,
+  borderRadius: 12,
+  overflow: 'hidden',
+},
+swapActionGradient: {
+  alignItems: 'center',
+  paddingVertical: 16,
+  paddingHorizontal: 12,
+  gap: 8,
+},
+swapActionTitle: {
+  fontSize: 16,
+  fontWeight: '600',
+  color: '#212529',
+},
+swapActionSubtitle: {
+  fontSize: 12,
+  color: '#868e96',
+},
   backButton: {
     width: 36,
     height: 36,

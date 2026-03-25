@@ -1,4 +1,4 @@
-// components/SettingsModal.tsx - UPDATED with TokenUtils and Team Overview
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View,
@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -57,7 +57,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
   const isAdmin = userRole === 'ADMIN';
 
-  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -68,7 +67,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return hasToken;
   }, []);
 
-  // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError && visible) {
       Alert.alert(
@@ -146,12 +144,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           if (earliestDate) {
             setFirstTaskDate(earliestDate);
             
+            // ✅ Calculate week based on first task creation (not calendar)
             const firstTaskDate = earliestDate as Date;
-            const dayOfWeek = firstTaskDate.getDay();
-            const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+            const weekDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             
             const weekStart = new Date(firstTaskDate);
-            weekStart.setDate(firstTaskDate.getDate() - daysToMonday);
             weekStart.setHours(0, 0, 0, 0);
             
             const weekEnd = new Date(weekStart);
@@ -161,7 +158,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             setWeekStartDate(weekStart);
             setWeekEndDate(weekEnd);
             
-            checkWeekSwapAvailability(weekStart, weekEnd);
+            // ✅ Check week swap availability based on task creation
+            checkWeekSwapAvailability(firstTaskDate);
           }
         }
       }
@@ -175,32 +173,42 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const checkWeekSwapAvailability = (weekStart: Date, weekEnd: Date) => {
+  // ✅ FIXED: Check week swap availability based on FIRST TASK CREATION DATE
+  const checkWeekSwapAvailability = (firstTaskDate: Date) => {
     const now = new Date();
-    const weekStartDay = new Date(weekStart);
-    weekStartDay.setHours(0, 0, 0, 0);
+    const taskCreatedDate = new Date(firstTaskDate);
     
-    const hoursSinceWeekStart = (now.getTime() - weekStartDay.getTime()) / (1000 * 60 * 60);
-    const isWithinFirst24Hours = hoursSinceWeekStart >= 0 && hoursSinceWeekStart <= 24;
+    // Calculate hours since task was created
+    const hoursSinceTaskCreated = (now.getTime() - taskCreatedDate.getTime()) / (1000 * 60 * 60);
+    const isWithinFirst24Hours = hoursSinceTaskCreated >= 0 && hoursSinceTaskCreated <= 24;
     
-    const weekStartDayName = weekStartDay.toLocaleDateString('en-US', { weekday: 'long' });
+    const taskCreatedDayName = taskCreatedDate.toLocaleDateString('en-US', { weekday: 'long' });
+    const taskCreatedDateStr = taskCreatedDate.toLocaleDateString();
+    
+    console.log(`📅 Week swap check:`, {
+      taskCreatedDate: taskCreatedDate.toISOString(),
+      taskCreatedDay: taskCreatedDayName,
+      hoursSinceTaskCreated,
+      now: now.toISOString()
+    });
     
     if (!isWithinFirst24Hours) { 
       setCanSwapWeek(false);
-      if (hoursSinceWeekStart < 0) {
-        setWeekSwapReason(`Week starts on ${weekStartDayName}`);
+      if (hoursSinceTaskCreated < 0) {
+        setWeekSwapReason(`Week starts on ${taskCreatedDayName} (task not created yet)`);
       } else {
-        setWeekSwapReason(`Week swap window closed (week started ${weekStartDayName})`);
-      } 
+        const daysSince = Math.floor(hoursSinceTaskCreated / 24);
+        setWeekSwapReason(`Week swap window closed. Only available within first 24 hours after task was created on ${taskCreatedDayName} (${daysSince} day${daysSince > 1 ? 's' : ''} ago)`);
+      }
     } else {
       setCanSwapWeek(true);
-      const hoursLeft = Math.ceil(24 - hoursSinceWeekStart);
-      const minutesLeft = Math.ceil((24 - hoursSinceWeekStart) * 60);
+      const hoursLeft = Math.ceil(24 - hoursSinceTaskCreated);
+      const minutesLeft = Math.ceil((24 - hoursSinceTaskCreated) * 60);
       
       if (hoursLeft < 1) {
-        setWeekSwapReason(`${minutesLeft} minutes left (week started ${weekStartDayName})`);
+        setWeekSwapReason(`${minutesLeft} minutes left to swap this week (task created ${taskCreatedDayName})`);
       } else {
-        setWeekSwapReason(`${hoursLeft} hour${hoursLeft > 1 ? 's' : ''} left (week started ${weekStartDayName})`);
+        setWeekSwapReason(`${hoursLeft} hour${hoursLeft > 1 ? 's' : ''} left to swap this week (task created ${taskCreatedDayName})`);
       }
     }
   };
@@ -236,31 +244,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       return;
     }
 
-    Alert.alert(
-      'Swap Entire Week',
-      `Swap all ${incompleteAssignments.length} incomplete task(s) for week ${rotationWeek}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Continue',
-          style: 'default',
-          onPress: () => {
-            navigation.navigate('CreateSwapRequest', {
-              assignmentId: firstTask.assignment.id,
-              groupId,
-              taskTitle: firstTask.title,
-              dueDate: firstTask.assignment.dueDate,
-              taskPoints: firstTask.assignment.points,
-              timeSlot: firstTask.assignment.timeSlot?.startTime || 'Scheduled time',
-              executionFrequency: firstTask.executionFrequency,
-              timeSlots: firstTask.timeSlots || [],
-              scope: 'week',
-            });
-            onClose();
-          }
-        }
-      ]
-    );
+    // ✅ Include task creation date in navigation params
+    navigation.navigate('CreateSwapRequest', {
+      assignmentId: firstTask.assignment.id,
+      groupId,
+      taskTitle: firstTask.title,
+      dueDate: firstTask.assignment.dueDate,
+      taskPoints: firstTask.assignment.points,
+      timeSlot: firstTask.assignment.timeSlot?.startTime || 'Scheduled time',
+      executionFrequency: firstTask.executionFrequency,
+      timeSlots: firstTask.timeSlots || [],
+      scope: 'week',
+      taskCreatedAt: firstTask.createdAt || new Date().toISOString() // 👈 Pass task creation date
+    });
+    onClose();
   };
 
   const handleReviewSubmissions = async () => {

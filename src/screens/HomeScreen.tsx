@@ -1,5 +1,5 @@
-// src/screens/HomeScreen.tsx - FULLY UPDATED with group creation listener
-import React, { useEffect, useState, useCallback } from 'react';
+// src/screens/HomeScreen.tsx - FULLY UPDATED with debouncing
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -30,23 +30,45 @@ export default function HomeScreen({ navigation }: any) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [rotationAlerts, setRotationAlerts] = useState<{[key: string]: any}>({});
   
+  // ===== ADD DEBOUNCE TIMER REF =====
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isFetching = useRef(false);
+  
   const { loading, refreshing, error, homeData, refreshHomeData, authError } = useHomeData();
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
   const { unreadCount, loadUnreadCount, refreshNotifications } = useNotifications();
 
-  // ===== LISTEN FOR GROUP CREATION EVENTS =====
+  // ===== DEBOUNCED REFRESH FUNCTION =====
+  const debouncedRefresh = useCallback(() => {
+    if (refreshTimer.current) {
+      clearTimeout(refreshTimer.current);
+    }
+    refreshTimer.current = setTimeout(() => {
+      if (!isFetching.current) {
+        console.log('🔄 Debounced refresh - calling refreshHomeData');
+        refreshHomeData();
+      } else {
+        console.log('🔄 Already fetching, retrying in 1s...');
+        setTimeout(() => {
+          refreshHomeData();
+        }, 1000);
+      }
+      refreshTimer.current = null;
+    }, 500);
+  }, [refreshHomeData]);
+
+  // ===== LISTEN FOR GROUP CREATION EVENTS (WITH DEBOUNCE) =====
   const { events: groupEvents, clearGroupCreated } = useRealtimeGroup('');
 
-  // ===== REFRESH WHEN GROUP IS CREATED =====
   useEffect(() => {
     if (groupEvents.groupCreated) {
       console.log('🆕 Group created detected in HomeScreen, refreshing data...');
       console.log('   New group:', groupEvents.groupCreated.groupName);
       console.log('   Group ID:', groupEvents.groupCreated.groupId);
-      refreshHomeData();
+      debouncedRefresh(); // ← Use debounced version
       clearGroupCreated();
     }
-  }, [groupEvents.groupCreated, refreshHomeData, clearGroupCreated]);
+  }, [groupEvents.groupCreated, debouncedRefresh, clearGroupCreated]);
 
   // ===== GET USER ID USING TOKENUTILS =====
   useEffect(() => {
@@ -63,16 +85,13 @@ export default function HomeScreen({ navigation }: any) {
     getUserId();
   }, []);
 
-  // ===== REAL-TIME NOTIFICATIONS =====
+  // ===== REAL-TIME NOTIFICATIONS (WITH DEBOUNCE) =====
   const { events, clearNewNotification } = useRealtimeNotifications({
     onNewNotification: (notification) => {
       console.log('📢 HomeScreen: New notification received', notification);
       
-      if (notification.type?.includes('TASK') || 
-          notification.type?.includes('ASSIGNMENT') ||
-          notification.type?.includes('SUBMISSION')) {
-        refreshHomeData();
-      }
+      // Use debounced refresh for all notifications
+      debouncedRefresh();
       
       if (notification.type?.includes('SWAP')) {
         loadPendingForMe();
@@ -150,6 +169,11 @@ export default function HomeScreen({ navigation }: any) {
   // ===== HANDLERS =====
   const handleRefresh = useCallback(() => {
     console.log('🔄 Manual refresh triggered');
+    // Clear any pending timer and refresh immediately
+    if (refreshTimer.current) {
+      clearTimeout(refreshTimer.current);
+      refreshTimer.current = null;
+    }
     refreshHomeData();
     loadPendingForMe();
     loadUnreadCount();
@@ -188,7 +212,7 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const handleCreateGroup = () => {
-    console.log('➕ Navigating to CreateGroup screen');
+    console.log(' Navigating to CreateGroup screen');
     navigation.navigate('CreateGroup', {
       onGroupCreated: () => {
         console.log('📢 Callback from CreateGroup: Group created, refreshing...');
@@ -270,10 +294,10 @@ export default function HomeScreen({ navigation }: any) {
         group={group}
         currentUserId={currentUserId}
         onRotation={handleRotation}
-        onTaskChange={refreshHomeData}
-        onAssignmentChange={refreshHomeData}
+        onTaskChange={debouncedRefresh} // ← Use debounced version
+        onAssignmentChange={debouncedRefresh} // ← Use debounced version
         onSwapChange={() => {
-          refreshHomeData();
+          debouncedRefresh(); // ← Use debounced version
           loadPendingForMe();
         }}
       />
@@ -340,7 +364,7 @@ export default function HomeScreen({ navigation }: any) {
     );
   }
 
-  // Log current stats for debugging
+  // Log current stats for debugging (only once per render)
   console.log('📊 HomeScreen render - Current stats:', {
     groupsCount: stats.groupsCount,
     groupsLength: groups.length,

@@ -1,5 +1,5 @@
-// src/screens/TaskAssignmentScreen.tsx - UPDATED with TokenUtils
-import React, { useState, useEffect } from 'react';
+// src/screens/TaskAssignmentScreen.tsx - UPDATED with admin filter
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTaskAssignment } from '../taskHook/useTaskAssignment';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function TaskAssignmentScreen({ navigation, route }: any) {
@@ -31,12 +30,20 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     groupInfo,
     loadData,
     reassignTask,
-    authError // 👈 Make sure this is returned from the hook
+    authError
   } = useTaskAssignment(groupId);
 
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [showAssigneeModal, setShowAssigneeModal] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
+
+  // ===== FILTER MEMBERS: Only those in rotation (exclude admins) =====
+  const membersInRotation = useMemo(() => {
+    return members.filter(member => 
+      member.inRotation === true && 
+      member.role !== 'ADMIN'
+    );
+  }, [members]);
 
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
@@ -122,7 +129,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   };
 
   const renderTask = ({ item }: any) => {
-    const currentAssignee = members.find(m => m.userId === item.currentAssignee);
+    const currentAssignee = membersInRotation.find(m => m.userId === item.currentAssignee);
     const isRecurring = item.isRecurring;
     const hasTimeSlots = item.timeSlots && item.timeSlots.length > 0;
 
@@ -307,7 +314,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
               style={styles.headerStat}
             >
               <MaterialCommunityIcons name="account-group" size={12} color="#495057" />
-              <Text style={styles.headerStatText}>{members.length} members</Text>
+              <Text style={styles.headerStatText}>{membersInRotation.length} members in rotation</Text>
             </LinearGradient>
           </View>
         </View>
@@ -414,12 +421,13 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 </Text>
               </LinearGradient>
 
-              {/* Available Members Section */}
+              {/* Available Members Section - ONLY members in rotation */}
               <Text style={styles.sectionHeader}>Available Members</Text>
               
               {(() => {
                 const assignedMemberIds = getAssignedMembersForWeek();
-                const availableMembers = members.filter(member => 
+                // ✅ FIX: Only show members in rotation (exclude admins)
+                const availableMembers = membersInRotation.filter(member => 
                   !assignedMemberIds.has(member.userId)
                 );
                 
@@ -428,10 +436,10 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                     <View style={styles.emptyMembers}>
                       <MaterialCommunityIcons name="account-group" size={48} color="#dee2e6" />
                       <Text style={styles.emptyMembersText}>
-                        No available members
+                        No available members in rotation
                       </Text>
                       <Text style={styles.emptyMembersSubtext}>
-                        All members are already assigned to tasks this week
+                        All members are already assigned or there are no members in rotation
                       </Text>
                     </View>
                   );
@@ -457,7 +465,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                     >
                       <View style={styles.memberInfo}>
                         <LinearGradient
-                          colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                          colors={['#f8f9fa', '#e9ecef']}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                           style={[
@@ -467,7 +475,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                         >
                           <Text style={[
                             styles.memberInitial,
-                            { color: member.role === 'ADMIN' ? 'white' : '#495057' }
+                            { color: '#495057' }
                           ]}>
                             {member.fullName?.charAt(0) || '?'}
                           </Text>
@@ -481,11 +489,8 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                             {isCurrentAssignee && ' (Current)'}
                           </Text>
                           <View style={styles.memberMeta}>
-                            <Text style={[
-                              styles.memberRole,
-                              member.role === 'ADMIN' && styles.adminRoleText
-                            ]}>
-                              {member.role === 'ADMIN' ? 'Admin' : 'Member'}
+                            <Text style={styles.memberRole}>
+                              Member
                             </Text>
                             {member.rotationOrder && (
                               <LinearGradient
@@ -520,10 +525,10 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 });
               })()}
 
-              {/* Already Assigned Members Section */}
+              {/* Already Assigned Members Section - Only members in rotation */}
               {(() => {
                 const assignedMemberIds = getAssignedMembersForWeek();
-                const assignedMembers = members.filter(member => 
+                const assignedMembers = membersInRotation.filter(member => 
                   assignedMemberIds.has(member.userId) && 
                   selectedTask?.currentAssignee !== member.userId
                 );
@@ -560,7 +565,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                               </Text>
                               <View style={styles.memberMeta}>
                                 <Text style={[styles.memberRole, styles.disabledText]}>
-                                  {member.role === 'ADMIN' ? 'Admin' : 'Member'}
+                                  Member
                                 </Text>
                                 {assignedTask && (
                                   <Text style={[styles.memberOrder, styles.disabledText]}>
@@ -607,7 +612,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   );
 }
 
-// Styles remain exactly the same as your original
+// Styles remain the same as your original
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
@@ -901,7 +906,6 @@ const styles = StyleSheet.create({
     color: '#adb5bd',
     textAlign: 'center'
   },
-  // Modal Styles
   modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',

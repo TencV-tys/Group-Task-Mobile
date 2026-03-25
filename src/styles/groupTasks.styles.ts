@@ -837,4 +837,28 @@ export const styles = StyleSheet.create({
     color: '#e67700',
     lineHeight: 18,
   },
+  progressContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: '#e9ecef',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#2b8a3e',
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 11,
+    color: '#868e96',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  
 });

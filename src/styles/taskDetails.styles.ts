@@ -1039,4 +1039,82 @@ export const taskDetailsStyles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 2,
   },
+progressContainer: {
+  marginBottom: 16,
+  paddingHorizontal: 4,
+},
+progressBar: {
+  height: 6,
+  backgroundColor: '#e9ecef',
+  borderRadius: 3,
+  overflow: 'hidden',
+  marginBottom: 4,
+},
+progressFill: {
+  height: '100%',
+  backgroundColor: '#2b8a3e',
+  borderRadius: 3,
+},
+progressText: {
+  fontSize: 11,
+  color: '#868e96',
+  textAlign: 'center',
+},
+timeSlotItem: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  paddingVertical: 12,
+  paddingHorizontal: 16,
+  borderBottomWidth: 1,
+  borderBottomColor: '#e9ecef',
+},
+completedTimeSlotItem: {
+  backgroundColor: '#f8f9fa',
+},
+submittableTimeSlotItem: {
+  backgroundColor: '#fff9e6',
+},
+timeSlotIconContainer: {
+  width: 32,
+  marginRight: 12,
+},
+timeSlotInfo: {
+  flex: 1,
+},
+timeSlotTitle: {
+  fontSize: 14,
+  fontWeight: '500',
+  color: '#212529',
+  marginBottom: 2,
+},
+timeSlotPoints: {
+  fontSize: 12,
+  color: '#868e96',
+},
+completedBadgeText: {
+  fontSize: 11,
+  color: '#2b8a3e',
+  fontWeight: '500',
+},
+availableBadge: {
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 12,
+},
+availableBadgeText: {
+  fontSize: 11,
+  color: '#e67700',
+  fontWeight: '500',
+},
+pendingBadge: {
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 12,
+},
+pendingBadgeText: {
+  fontSize: 11,
+  color: '#868e96',
+  fontWeight: '500',
+},
 });

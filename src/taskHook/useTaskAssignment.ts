@@ -1,8 +1,8 @@
-// src/hooks/useTaskAssignment.ts - UPDATED with TokenUtils
-import { useState, useEffect, useCallback } from 'react';
+// src/hooks/useTaskAssignment.ts - ADD filtered members
+import { useState, useEffect, useCallback, useMemo } from 'react'; // ← Add useMemo
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 
 export const useTaskAssignment = (groupId: string) => { 
   const [loading, setLoading] = useState(true);
@@ -13,7 +13,21 @@ export const useTaskAssignment = (groupId: string) => {
   const [groupInfo, setGroupInfo] = useState<any>(null);
   const [authError, setAuthError] = useState(false);
 
-  // ✅ UPDATED: Use TokenUtils.checkToken()
+  // ✅ Filter members - only those in rotation (not admins)
+  const membersInRotation = useMemo(() => {
+    return members.filter(member => 
+      member.inRotation === true && 
+      member.role !== 'ADMIN'
+    );
+  }, [members]);
+
+  // ✅ Filter members that can be assigned (available + in rotation)
+  const getAssignableMembers = useCallback((assignedMemberIds: Set<string>) => {
+    return membersInRotation.filter(member => 
+      !assignedMemberIds.has(member.userId)
+    );
+  }, [membersInRotation]);
+
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -28,7 +42,6 @@ export const useTaskAssignment = (groupId: string) => {
   }, []);
 
   const loadData = useCallback(async (isRefreshing = false) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -47,7 +60,6 @@ export const useTaskAssignment = (groupId: string) => {
     try {
       console.log(`📥 useTaskAssignment: Loading data for group ${groupId}`);
       
-      // Load tasks
       const tasksResult = await TaskService.getGroupTasks(groupId);
       if (tasksResult.success) {
         setTasks(tasksResult.tasks || []);
@@ -60,21 +72,19 @@ export const useTaskAssignment = (groupId: string) => {
         }
       }
 
-      // Load members
       const membersResult = await GroupMembersService.getGroupMembers(groupId);
       if (membersResult.success) {
         setMembers(membersResult.members || []);
         console.log(`✅ useTaskAssignment: Loaded ${membersResult.members?.length || 0} members`);
+        console.log(`   Members in rotation: ${membersResult.members?.filter((m: any) => m.inRotation).length || 0}`);
       } else if (membersResult.message?.toLowerCase().includes('token') || 
                  membersResult.message?.toLowerCase().includes('auth')) {
         setAuthError(true);
       }
 
-      // Load group info
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
         setGroupInfo(groupResult.group);
-        console.log(`✅ useTaskAssignment: Loaded group info for ${groupId}`);
       } else if (groupResult.message?.toLowerCase().includes('token') || 
                  groupResult.message?.toLowerCase().includes('auth')) {
         setAuthError(true);
@@ -104,7 +114,6 @@ export const useTaskAssignment = (groupId: string) => {
       const result = await TaskService.reassignTask(taskId, targetUserId);
       
       if (result.success) {
-        // Refresh tasks after successful reassignment
         await loadData(true);
       }
       
@@ -130,10 +139,12 @@ export const useTaskAssignment = (groupId: string) => {
     error,
     tasks,
     members,
+    membersInRotation,        // ← ADD THIS - filtered members in rotation
     groupInfo,
     authError,
     loadData,
     reassignTask,
+    getAssignableMembers,     // ← ADD THIS - helper to get available members
     setTasks
   };
 };

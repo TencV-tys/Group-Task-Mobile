@@ -1,6 +1,5 @@
-
-// src/screens/GroupTasksScreen.tsx - UPDATED with TokenUtils
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+// src/screens/GroupTasksScreen.tsx - COMPLETE FIXED VERSION
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
 
 import { TaskService } from '../services/TaskService';
+import { GroupMembersService } from '../services/GroupMemberService';
 import { SettingsModal } from '../components/SettingsModal';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useRotationStatus } from '../hooks/useRotationStatus';
@@ -25,7 +25,7 @@ import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { styles } from '../styles/groupTasks.styles';
 
 type TabType = 'all' | 'my';
@@ -52,6 +52,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const initialLoadDone = useRef(false);
   const isAdmin = userRole === 'ADMIN';
 
+  // ===== ALL STATE HOOKS FIRST =====
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,20 +63,21 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  
   const [todayAssignments, setTodayAssignments] = useState<any[]>([]);
   const [showTodaySection, setShowTodaySection] = useState(false);
   const [nextActiveTime, setNextActiveTime] = useState<string | null>(null);
-
   const [taskCreationDays, setTaskCreationDays] = useState<Map<string, number>>(new Map());
   const [baselineCreationDay, setBaselineCreationDay] = useState('');
   const [hasMixedCreationDays, setHasMixedCreationDays] = useState(false);
   const [tasksNeeded, setTasksNeeded] = useState(0);
+  const [membersInRotation, setMembersInRotation] = useState<any[]>([]);
 
+  // ===== CUSTOM HOOKS =====
   const { status: rotationStatus, checkStatus } = useRotationStatus(groupId);
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
   const { isConnected } = useRealtimeNotifications({ showAlerts: false });
 
+  // ===== REALTIME HOOKS =====
   const {
     events: taskEvents,
     clearTaskCreated,
@@ -96,115 +98,95 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     clearSwapCreated
   } = useRealtimeSwapRequests(groupId, currentUserId || '');
 
-  // ===== UPDATED: Use TokenUtils.checkToken() =====
+ // ===== useMemo HOOKS (TOP LEVEL) =====
+
+// ===== useMemo HOOKS (TOP LEVEL) =====
+const groupedMyTasks = useMemo(() => {
+  if (selectedTab !== 'my') return [];
+  
+  const taskMap = new Map();
+  myTasks.forEach((item: any) => {
+    const taskId = item.id;
+    if (!taskMap.has(taskId)) {
+      // Try to find original task, but if not found, use data from assignment
+      const originalTask = tasks.find(t => t.id === taskId);
+      
+      // ✅ Check if this is a deleted task (no original task found)
+      const isDeletedTask = !originalTask && item.assignment?.isHistorical === true;
+      
+      taskMap.set(taskId, {
+        id: taskId,
+        // Use original task data if available, otherwise use from assignment
+        title: originalTask?.title 
+          || item.title 
+          || item.taskTitle 
+          || (isDeletedTask ? '🗑️ Deleted Task' : 'Unknown Task'),
+        description: originalTask?.description || item.description,
+        points: originalTask?.points || item.points || item.assignment?.points || 0,
+        executionFrequency: originalTask?.executionFrequency || item.executionFrequency,
+        timeFormat: originalTask?.timeFormat || item.timeFormat,
+        timeSlots: originalTask?.timeSlots || item.timeSlots || [],
+        selectedDays: originalTask?.selectedDays || item.selectedDays,
+        dayOfWeek: originalTask?.dayOfWeek || item.dayOfWeek,
+        isRecurring: originalTask?.isRecurring ?? item.isRecurring ?? true,
+        category: originalTask?.category || item.category,
+        rotationOrder: originalTask?.rotationOrder || item.rotationOrder,
+        currentAssignee: originalTask?.currentAssignee || item.currentAssignee,
+        lastAssignedAt: originalTask?.lastAssignedAt || item.lastAssignedAt,
+        createdAt: originalTask?.createdAt || item.createdAt || new Date(),
+        creator: originalTask?.creator || item.creator,
+        userAssignment: item.assignment,
+        assignmentsCount: 0,
+        completedCount: 0,
+        totalPoints: 0,
+        earnedPoints: 0,
+        isFullyCompleted: false,
+        hasAnyCompleted: false,
+        isDeleted: isDeletedTask  // ✅ Add flag for deleted tasks
+      });
+    }
+    
+    const taskData = taskMap.get(taskId);
+    taskData.assignmentsCount++;
+    
+    const isCompleted = item.assignment?.completed === true;
+    
+    if (isCompleted) {
+      taskData.completedCount++;
+      taskData.earnedPoints += item.assignment?.points || 0;
+      taskData.hasAnyCompleted = true;
+    }
+    taskData.totalPoints += item.assignment?.points || 0;
+  });
+  
+  // Calculate isFullyCompleted after processing all
+  const result = Array.from(taskMap.values()).map(task => ({
+    ...task,
+    isFullyCompleted: task.assignmentsCount > 0 && task.completedCount === task.assignmentsCount
+  }));
+  
+  console.log('📊 Grouped myTasks:', result.map(t => ({
+    title: t.title,
+    assignmentsCount: t.assignmentsCount,
+    completedCount: t.completedCount,
+    isFullyCompleted: t.isFullyCompleted,
+    earnedPoints: t.earnedPoints,
+    totalPoints: t.totalPoints,
+    isDeleted: t.isDeleted
+  })));
+  
+  return result;
+}, [selectedTab, myTasks, tasks]);
+
+  // ===== useCallback HOOKS =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
-    
     setAuthError(!hasToken);
     return hasToken;
   }, []);
-
-  // ===== AUTH ERROR HANDLER =====
-  useEffect(() => {
-    if (authError) {
-      Alert.alert('Session Expired', 'Please log in again', [
-        { text: 'OK', onPress: () => navigation.navigate('Login') }
-      ]);
-    }
-  }, [authError, navigation]);
-
-  useEffect(() => {
-    const getCurrentUser = async () => {
-      try {
-        const userStr = await SecureStore.getItemAsync('user');
-        if (userStr) {
-          const user = JSON.parse(userStr);
-          setCurrentUserId(user.id);
-        }
-      } catch (error) {
-        console.error('Error getting user:', error);
-      } finally {
-        setLoadingUser(false);
-      }
-    };
-    getCurrentUser();
-    return () => { isMounted.current = false; };
-  }, []);
-
-  useEffect(() => {
-    if (taskEvents.taskCreated) {
-      Alert.alert('📢 New Task', `Task "${taskEvents.taskCreated.title}" created`);
-      refreshTasks();
-      clearTaskCreated();
-    }
-  }, [taskEvents.taskCreated]);
-
-  useEffect(() => {
-    if (taskEvents.taskUpdated) {
-      refreshTasks();
-      clearTaskUpdated();
-    }
-  }, [taskEvents.taskUpdated]);
-
-  useEffect(() => {
-    if (taskEvents.taskDeleted) {
-      Alert.alert('🗑️ Task Deleted', `Task "${taskEvents.taskDeleted.taskTitle}" deleted`);
-      refreshTasks();
-      clearTaskDeleted();
-    }
-  }, [taskEvents.taskDeleted]);
-
-  useEffect(() => {
-    if (taskEvents.taskAssigned) {
-      if (taskEvents.taskAssigned.assignedTo === currentUserId) {
-        Alert.alert('📋 New Assignment', `You've been assigned: "${taskEvents.taskAssigned.taskTitle}"`);
-      }
-      refreshTasks();
-      clearTaskAssigned();
-    }
-  }, [taskEvents.taskAssigned]);
-
-  useEffect(() => {
-    if (assignmentEvents.assignmentCompleted) {
-      refreshTasks();
-      clearAssignmentCompleted();
-    }
-  }, [assignmentEvents.assignmentCompleted]);
-
-  useEffect(() => {
-    if (assignmentEvents.assignmentVerified) {
-      refreshTasks();
-      clearAssignmentVerified();
-    }
-  }, [assignmentEvents.assignmentVerified]);
-
-  useEffect(() => {
-    if (swapEvents.swapCreated) {
-      refreshTasks();
-      clearSwapCreated();
-    }
-  }, [swapEvents.swapCreated]);
-
-  useEffect(() => {
-    if (groupId && userRole === 'ADMIN') checkStatus();
-  }, [groupId, tasks.length]);
-
-  useEffect(() => {
-    if (groupId && !loadingUser && !initialLoadDone.current) {
-      fetchTasks();
-      loadPendingForMe(groupId);
-    }
-  }, [groupId, loadingUser]);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      if (groupId && !loadingUser) refreshTasks();
-    });
-    return unsubscribe;
-  }, [navigation, groupId, loadingUser]);
 
   const getTaskUrgency = useCallback((task: any): UrgencyLevel => {
     if (!task.userAssignment?.timeSlot || !task.userAssignment?.dueDate) return 'none';
@@ -315,10 +297,13 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     setTaskCreationDays(dayCounts);
     setBaselineCreationDay(mostCommonDay);
     setHasMixedCreationDays(dayCounts.size > 1);
-    if (rotationStatus?.totalMembers) {
-      setTasksNeeded(Math.max(0, rotationStatus.totalMembers - taskList.length));
-    }
-  }, [rotationStatus?.totalMembers]);
+    
+    const membersInRotationCount = rotationStatus?.membersInRotation ?? 0;
+    const tasksNeededCount = Math.max(0, membersInRotationCount - taskList.length);
+    setTasksNeeded(tasksNeededCount);
+    
+    console.log(`📊 analyzeTaskCreationDays: tasks=${taskList.length}, membersInRotation=${membersInRotationCount}, tasksNeeded=${tasksNeededCount}`);
+  }, [rotationStatus?.membersInRotation]);
 
   const findTodayAssignments = useCallback((tasks: any[]) => {
     const today = new Date().toDateString();
@@ -330,26 +315,45 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   }, [getTaskUrgency]);
 
   const calculateNextActiveTime = useCallback((tasks: any[]): string | null => {
-  const now = new Date();
-  let nextTime: Date | null = null;
+    const now = new Date();
+    let nextTime: Date | null = null;
 
-  tasks.forEach(task => {
-    if (task.userAssignment?.timeSlot) {
-      const [hours, minutes] = task.userAssignment.timeSlot.startTime.split(':').map(Number);
-      const startTime = new Date();
-      startTime.setHours(hours, minutes, 0, 0);
-      if (startTime > now && (!nextTime || startTime < nextTime)) {
-        nextTime = startTime;
+    tasks.forEach(task => {
+      if (task.userAssignment?.timeSlot) {
+        const [hours, minutes] = task.userAssignment.timeSlot.startTime.split(':').map(Number);
+        const startTime = new Date();
+        startTime.setHours(hours, minutes, 0, 0);
+        if (startTime > now && (!nextTime || startTime < nextTime)) {
+          nextTime = startTime;
+        }
       }
+    });
+
+    return nextTime ? 
+      `${(nextTime as Date).getHours().toString().padStart(2, '0')}:${(nextTime as Date).getMinutes().toString().padStart(2, '0')}` : 
+      null;
+  }, []);
+
+  // ===== FETCH MEMBERS FUNCTION =====
+  const fetchMembers = useCallback(async () => {
+    const hasToken = await checkToken();
+    if (!hasToken) return;
+    
+    try {
+      const membersResult = await GroupMembersService.getGroupMembers(groupId);
+      if (membersResult.success) {
+        const members = membersResult.members || [];
+        const inRotation = members.filter((m: any) => m.inRotation === true);
+        setMembersInRotation(inRotation);
+        console.log(`✅ Loaded ${inRotation.length} members in rotation`);
+      }
+    } catch (err) {
+      console.error('Error fetching members:', err);
     }
-  });
+  }, [groupId, checkToken]);
 
-  return nextTime ? 
-    `${(nextTime as Date).getHours().toString().padStart(2, '0')}:${(nextTime as Date).getMinutes().toString().padStart(2, '0')}` : 
-    null;
-}, []);
-
-  const fetchTasks = async (isRefreshing = false) => {
+  // ===== FETCH TASKS FUNCTION =====
+  const fetchTasks = useCallback(async (isRefreshing = false) => {
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -404,10 +408,111 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         setRefreshing(false);
       }
     }
-  };
+  }, [groupId, checkToken, analyzeTaskCreationDays, validateTaskTime, getTaskUrgency, findTodayAssignments, calculateNextActiveTime]);
 
-  const refreshTasks = useCallback(() => fetchTasks(true), []);
+  const refreshTasks = useCallback(() => fetchTasks(true), [fetchTasks]);
 
+  // ===== useEffect HOOKS =====
+  useEffect(() => {
+    if (authError) {
+      Alert.alert('Session Expired', 'Please log in again', [
+        { text: 'OK', onPress: () => navigation.navigate('Login') }
+      ]);
+    }
+  }, [authError, navigation]);
+
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      try {
+        const userStr = await SecureStore.getItemAsync('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          setCurrentUserId(user.id);
+        }
+      } catch (error) {
+        console.error('Error getting user:', error);
+      } finally {
+        setLoadingUser(false);
+      }
+    };
+    getCurrentUser();
+    return () => { isMounted.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (taskEvents.taskCreated) {
+      Alert.alert('📢 New Task', `Task "${taskEvents.taskCreated.title}" created`);
+      refreshTasks();
+      clearTaskCreated();
+    }
+  }, [taskEvents.taskCreated, refreshTasks, clearTaskCreated]);
+
+  useEffect(() => {
+    if (taskEvents.taskUpdated) {
+      refreshTasks();
+      clearTaskUpdated();
+    }
+  }, [taskEvents.taskUpdated, refreshTasks, clearTaskUpdated]);
+
+  useEffect(() => {
+    if (taskEvents.taskDeleted) {
+      Alert.alert('🗑️ Task Deleted', `Task "${taskEvents.taskDeleted.taskTitle}" deleted`);
+      refreshTasks();
+      clearTaskDeleted();
+    }
+  }, [taskEvents.taskDeleted, refreshTasks, clearTaskDeleted]);
+
+  useEffect(() => {
+    if (taskEvents.taskAssigned) {
+      if (taskEvents.taskAssigned.assignedTo === currentUserId) {
+        Alert.alert('📋 New Assignment', `You've been assigned: "${taskEvents.taskAssigned.taskTitle}"`);
+      }
+      refreshTasks();
+      clearTaskAssigned();
+    }
+  }, [taskEvents.taskAssigned, refreshTasks, clearTaskAssigned, currentUserId]);
+
+  useEffect(() => {
+    if (assignmentEvents.assignmentCompleted) {
+      refreshTasks();
+      clearAssignmentCompleted();
+    }
+  }, [assignmentEvents.assignmentCompleted, refreshTasks, clearAssignmentCompleted]);
+
+  useEffect(() => {
+    if (assignmentEvents.assignmentVerified) {
+      refreshTasks();
+      clearAssignmentVerified();
+    }
+  }, [assignmentEvents.assignmentVerified, refreshTasks, clearAssignmentVerified]);
+
+  useEffect(() => {
+    if (swapEvents.swapCreated) {
+      refreshTasks();
+      clearSwapCreated();
+    }
+  }, [swapEvents.swapCreated, refreshTasks, clearSwapCreated]);
+
+  useEffect(() => {
+    if (groupId && userRole === 'ADMIN') checkStatus();
+  }, [groupId, tasks.length, checkStatus, userRole]);
+
+  useEffect(() => {
+    if (groupId && !loadingUser && !initialLoadDone.current) {
+      fetchTasks();
+      fetchMembers();
+      loadPendingForMe(groupId);
+    }
+  }, [groupId, loadingUser, fetchTasks, fetchMembers, loadPendingForMe]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (groupId && !loadingUser) refreshTasks();
+    });
+    return unsubscribe;
+  }, [navigation, groupId, loadingUser, refreshTasks]);
+
+  // ===== HANDLER FUNCTIONS =====
   const handleViewRotationSchedule = () => {
     navigation.navigate('RotationSchedule', { groupId, groupName, userRole });
   };
@@ -505,6 +610,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       navigation.navigate('MemberDashboard', { groupId, groupName, userRole });
     }
   };
+
+  // ===== RENDER FUNCTIONS =====
   const renderAssignmentInfo = (task: any) => {
     const hasAssignment = task.userAssignment || task.assignments?.length > 0;
     if (!hasAssignment) {
@@ -528,23 +635,35 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         assigneeName = 'You';
         isCompleted = currentAssignment?.completed || false;
       }
-    } else {
-      if (task.assignments?.length > 0) {
-        currentAssignment = task.assignments.find((a: any) => a.userId === task.currentAssignee) || task.assignments[0];
-        if (currentAssignment) {
-          assigneeName = currentAssignment.user?.fullName || 'Unknown';
-          isAssignedToMe = currentAssignment.userId === currentUserId;
-          isCompleted = currentAssignment.completed || false;
+    } else { 
+      const currentWeekAssignment = task.assignments?.find((a: any) => {
+        const isCurrentWeek = a.rotationWeek === rotationStatus?.currentWeek;
+        const isAssigned = a.userId === task.currentAssignee;
+        return isCurrentWeek && isAssigned;
+      }) || task.assignments?.[0];
+       
+      if (currentWeekAssignment) {
+        currentAssignment = currentWeekAssignment;
+        assigneeName = currentWeekAssignment.user?.fullName || 'Unknown';
+        isAssignedToMe = currentWeekAssignment.userId === currentUserId;
+        isCompleted = currentWeekAssignment.completed || false;
+      } else if (task.currentAssignee) {
+        const assignedMember = membersInRotation.find(m => m.userId === task.currentAssignee);
+        if (assignedMember) {
+          assigneeName = assignedMember.fullName;
+          isAssignedToMe = assignedMember.userId === currentUserId;
         }
-      } else if (task.userAssignment) {
-        currentAssignment = task.userAssignment;
-        assigneeName = task.userAssignment.user?.fullName || 'Unknown';
-        isAssignedToMe = task.userAssignment.userId === currentUserId;
-        isCompleted = task.userAssignment.completed || false;
       }
     }
     
-    if (!currentAssignment) return null;
+    if (!currentAssignment && !task.currentAssignee) {
+      return (
+        <View style={styles.unassignedInfo}>
+          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
+          <Text style={styles.unassignedText}>Not assigned</Text>
+        </View>
+      );
+    }
 
     const getIcon = () => {
       if (isCompleted) return "check-circle";
@@ -579,6 +698,10 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
     const isTodayBaseline = today === baselineCreationDay;
+    const membersInRotationCount = rotationStatus?.membersInRotation ?? 0;
+    const hasPerfectCount = tasks.length === membersInRotationCount;
+    const needsTasks = tasks.length < membersInRotationCount;
+    const tasksNeededCount = Math.max(0, membersInRotationCount - tasks.length);
     
     return (
       <LinearGradient
@@ -622,11 +745,20 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             </Text>
           </View>
 
-          {tasksNeeded > 0 && (
+          {needsTasks && (
             <View style={styles.tasksNeededBadge}>
               <MaterialCommunityIcons name="alert" size={14} color="#e67700" />
               <Text style={styles.tasksNeededText}>
-                Need {tasksNeeded} more task{tasksNeeded > 1 ? 's' : ''} for perfect rotation
+                Need {tasksNeededCount} more task{tasksNeededCount > 1 ? 's' : ''} for perfect rotation ({tasks.length}/{membersInRotationCount})
+              </Text>
+            </View>
+          )}
+
+          {hasPerfectCount && membersInRotationCount > 0 && (
+            <View style={[styles.tasksNeededBadge, { backgroundColor: '#d3f9d8' }]}>
+              <MaterialCommunityIcons name="check-circle" size={14} color="#2b8a3e" />
+              <Text style={[styles.tasksNeededText, { color: '#2b8a3e' }]}>
+                Perfect! {tasks.length} task{tasks.length > 1 ? 's' : ''} for {membersInRotationCount} member{membersInRotationCount > 1 ? 's' : ''} in rotation
               </Text>
             </View>
           )}
@@ -640,14 +772,12 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
         <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
       </TouchableOpacity>
-      
       <View style={styles.titleContainer}>
         <Text style={styles.title} numberOfLines={1}>{groupName || 'Tasks'}</Text>
         <View style={styles.connectionStatus}>
           <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#2b8a3e' : '#fa5252' }]} />
           <Text style={styles.connectionText}>{isConnected ? 'Live' : 'Offline'}</Text>
         </View>
-        
         {isAdmin && rotationStatus && !rotationStatus.hasEnoughTasks && rotationStatus.totalTasks > 0 && (
           <TouchableOpacity style={styles.rotationWarningBadge} onPress={handleViewRotationSchedule}>
             <MaterialCommunityIcons name="alert" size={14} color="#e67700" />
@@ -657,7 +787,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           </TouchableOpacity>
         )}
       </View>
-      
       <View style={styles.headerRight}>
         {!isAdmin && (
           <TouchableOpacity style={styles.swapButton} onPress={handleNavigateToSwapRequests}>
@@ -669,7 +798,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             )}
           </TouchableOpacity>
         )}
-        
         <TouchableOpacity style={styles.settingsButton} onPress={() => setShowSettingsModal(true)}>
           <MaterialCommunityIcons name="cog" size={22} color="#2b8a3e" />
         </TouchableOpacity>
@@ -692,11 +820,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       >
         <View style={styles.todaySectionHeader}>
           <View style={styles.todaySectionTitleContainer}>
-            <MaterialCommunityIcons 
-              name={hasUrgent ? "timer-alert" : "clock-alert"} 
-              size={20} 
-              color={hasUrgent ? "#fa5252" : "#e67700"} 
-            />
+            <MaterialCommunityIcons name={hasUrgent ? "timer-alert" : "clock-alert"} size={20} color={hasUrgent ? "#fa5252" : "#e67700"} />
             <Text style={[styles.todaySectionTitle, { color: hasUrgent ? "#fa5252" : "#e67700" }]}>
               {hasUrgent ? 'URGENT - Due Soon' : 'Due Today'}
             </Text>
@@ -799,12 +923,28 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
   const renderTask = ({ item }: any) => {
     const isMyTasksView = selectedTab === 'my';
-    const isCompleted = item.assignment?.completed || item.userAssignment?.completed;
-    const urgencyLevel = item.urgencyLevel || 'none';
+    
+    // ✅ Determine if task is fully completed
+    let isFullyCompleted = false;
+    let completionPercentage = 0;
+    let completedCount = 0;
+    let totalCount = 0;
+    
+    if (isMyTasksView && item.assignmentsCount && item.assignmentsCount > 1) {
+      // Multi-slot task
+      totalCount = item.assignmentsCount;
+      completedCount = item.completedCount || 0;
+      isFullyCompleted = completedCount === totalCount;
+      completionPercentage = (completedCount / totalCount) * 100;
+    } else {
+      // Single assignment task
+      isFullyCompleted = item.assignment?.completed || item.userAssignment?.completed || false;
+    }
+    
     const validation = validateTaskTime(item);
     
     const getGradientColors = (): [string, string] => {
-      if (isCompleted) return ['#f8f9fa', '#e9ecef'];
+      if (isFullyCompleted) return ['#f8f9fa', '#e9ecef'];
       if (isMyTasksView && validation.isSubmittableNow) {
         return validation.willBePenalized ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb'];
       }
@@ -821,21 +961,32 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             { text: 'View Details', onPress: () => handleViewTaskDetails(item.id) },
             { text: 'Cancel', style: 'cancel' }
           ]);
-        })}
+        })()}
       >
         <LinearGradient colors={getGradientColors()} style={styles.taskCard}>
           <View style={styles.taskHeader}>
-            <LinearGradient colors={isCompleted ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']} style={styles.taskIcon}>
-              <MaterialCommunityIcons name={isCompleted ? "check" : "format-list-checks"} size={20} color={isCompleted ? "white" : "#495057"} />
+            <LinearGradient 
+              colors={isFullyCompleted ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']} 
+              style={styles.taskIcon}
+            >
+              <MaterialCommunityIcons 
+                name={isFullyCompleted ? "check" : "format-list-checks"} 
+                size={20} 
+                color={isFullyCompleted ? "white" : "#495057"} 
+              />
             </LinearGradient>
             <View style={styles.taskInfo}>
-              <Text style={[styles.taskTitle, isCompleted && styles.completedTaskTitle]} numberOfLines={2}>
+              <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
                 {item.title}
               </Text>
               <View style={styles.taskMeta}>
                 <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.pointsBadge}>
                   <MaterialCommunityIcons name="star" size={12} color="#e67700" />
-                  <Text style={styles.taskPoints}>{item.points} pts</Text>
+                  <Text style={styles.taskPoints}>
+                    {isMyTasksView && item.assignmentsCount > 1 
+                      ? `${item.earnedPoints}/${item.totalPoints} pts` 
+                      : `${item.points} pts`}
+                  </Text>
                 </LinearGradient>
               </View>
             </View>
@@ -843,7 +994,19 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           
           {renderAssignmentInfo(item)}
           
-          {isMyTasksView && !isCompleted && validation.isSubmittableNow && (
+          {/* ✅ Show progress bar ONLY for multi-slot tasks that are NOT fully completed */}
+          {isMyTasksView && item.assignmentsCount && item.assignmentsCount > 1 && !isFullyCompleted && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+              </View>
+              <Text style={styles.progressText}>
+                {item.completedCount}/{item.assignmentsCount} slots completed • {item.earnedPoints}/{item.totalPoints} pts
+              </Text>
+            </View>
+          )}
+          
+          {isMyTasksView && !isFullyCompleted && validation.isSubmittableNow && (
             <TouchableOpacity onPress={() => handleCompleteNow(item)}>
               <LinearGradient colors={validation.willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']} style={styles.completeNowButton}>
                 <View style={styles.completeNowContent}>
@@ -867,138 +1030,92 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     );
   };
 
-  const renderContent = () => {
-    const currentTasks = selectedTab === 'my' ? myTasks : tasks;
-    const showEmpty = !loading && currentTasks.length === 0;
-    
+const renderContent = () => {
+  // ✅ Filter out deleted tasks for BOTH admin and member views
+  let currentTasks = [];
+  
+  if (selectedTab === 'my') {
+    // For 'my' tab, filter out deleted tasks
+    currentTasks = groupedMyTasks.filter((task: any) => task.isDeleted !== true);
+  } else {
+    // For 'all' tab, filter out deleted tasks
+    currentTasks = tasks.filter((task: any) => task.isDeleted !== true);
+  }
+  
+  const showEmpty = !loading && currentTasks.length === 0;
+  
+  return (
+    <FlatList
+      data={currentTasks}
+      renderItem={renderTask}
+      keyExtractor={item => item.id}
+      ListHeaderComponent={
+        <>
+          {renderCreationDayBanner()}
+          {renderTodaySection()}
+        </>
+      }
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refreshTasks} colors={['#2b8a3e']} />
+      }
+      ListEmptyComponent={showEmpty ? (
+        <View style={styles.emptyContainer}>
+          <MaterialCommunityIcons name={selectedTab === 'my' ? "clipboard-text" : "clipboard-list"} size={64} color="#dee2e6" />
+          <Text style={styles.emptyText}>
+            {selectedTab === 'my' ? 'No tasks assigned to you' : 'No tasks yet'}
+          </Text>
+          {isAdmin && selectedTab === 'all' && (
+            <TouchableOpacity style={styles.emptyButton} onPress={handleCreateTask}>
+              <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.emptyButtonGradient}>
+                <Text style={styles.emptyButtonText}>Create First Task</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
+      ) : null}
+      contentContainerStyle={[styles.listContainer, { paddingBottom: 70 + insets.bottom }]}
+    />
+  );
+};
+  // ===== BOTTOM TABS =====
+  const renderBottomTabs = () => {
     return (
-      <FlatList
-        data={currentTasks}
-        renderItem={renderTask}
-        keyExtractor={item => item.id}
-        ListHeaderComponent={
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa']}
+        style={[styles.bottomTab, { height: 70 + insets.bottom, paddingBottom: insets.bottom }]}
+      >
+        {isAdmin ? (
           <>
-            {renderCreationDayBanner()}
-            {renderTodaySection()}
+            <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="view-dashboard" size={24} color="#8e8e93" />
+              <Text style={styles.tabText}>Dashboard</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('all')} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="format-list-bulleted" size={24} color={selectedTab === 'all' ? '#2b8a3e' : '#8e8e93'} />
+              <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>All Tasks</Text>
+            </TouchableOpacity>
           </>
-        }
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refreshTasks} colors={['#2b8a3e']} />
-        }
-        ListEmptyComponent={showEmpty ? (
-          <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons name={selectedTab === 'my' ? "clipboard-text" : "clipboard-list"} size={64} color="#dee2e6" />
-            <Text style={styles.emptyText}>
-              {selectedTab === 'my' ? 'No tasks assigned to you' : 'No tasks yet'}
-            </Text>
-            {isAdmin && selectedTab === 'all' && (
-              <TouchableOpacity style={styles.emptyButton} onPress={handleCreateTask}>
-                <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.emptyButtonGradient}>
-                  <Text style={styles.emptyButtonText}>Create First Task</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : null}
-        contentContainerStyle={[styles.listContainer, { paddingBottom: 70 + insets.bottom }]}
-      />
+        ) : (
+          <>
+            <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('all')} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="format-list-bulleted" size={24} color={selectedTab === 'all' ? '#2b8a3e' : '#8e8e93'} />
+              <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>All Tasks</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('my')} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="clipboard-check" size={24} color={selectedTab === 'my' ? '#2b8a3e' : '#8e8e93'} />
+              <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>My Tasks</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="view-dashboard" size={24} color="#8e8e93" />
+              <Text style={styles.tabText}>Dashboard</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </LinearGradient>
     );
   };
 
-  
- // ===== BOTTOM TABS - ROLE BASED (FIXED) =====
-const renderBottomTabs = () => {
-  return (
-    <LinearGradient
-      colors={['#ffffff', '#f8f9fa']}
-      style={[styles.bottomTab, { height: 70 + insets.bottom, paddingBottom: insets.bottom }]}
-    >
-      {isAdmin ? (
-        // ADMIN: Dashboard (left) | All Tasks (right)
-        <>
-          <TouchableOpacity 
-            style={styles.tabButton}
-            onPress={handleDashboardPress}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons 
-              name="view-dashboard" 
-              size={24} 
-              color="#8e8e93" // Always gray since it's navigation, not a tab
-            />
-            <Text style={styles.tabText}>
-              Dashboard
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.tabButton}
-            onPress={() => setSelectedTab('all')}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons 
-              name="format-list-bulleted" 
-              size={24} 
-              color={selectedTab === 'all' ? '#2b8a3e' : '#8e8e93'} 
-            />
-            <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>
-              All Tasks
-            </Text>
-          </TouchableOpacity>
-        </>
-      ) : (
-        // MEMBER: All Tasks | My Tasks | Dashboard
-        <>
-          <TouchableOpacity 
-            style={styles.tabButton}
-            onPress={() => setSelectedTab('all')}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons 
-              name="format-list-bulleted" 
-              size={24} 
-              color={selectedTab === 'all' ? '#2b8a3e' : '#8e8e93'} 
-            />
-            <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>
-              All Tasks
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.tabButton}
-            onPress={() => setSelectedTab('my')}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons 
-              name="clipboard-check" 
-              size={24} 
-              color={selectedTab === 'my' ? '#2b8a3e' : '#8e8e93'} 
-            />
-            <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>
-              My Tasks
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.tabButton}
-            onPress={handleDashboardPress}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons 
-              name="view-dashboard" 
-              size={24} 
-              color="#8e8e93" // Always gray since it's navigation
-            />
-            <Text style={styles.tabText}>
-              Dashboard
-            </Text>
-          </TouchableOpacity>
-        </>
-      )}
-    </LinearGradient>
-  );
-};
-
+  // ===== LOADING STATES =====
   if (loadingUser) {
     return (
       <ScreenWrapper style={styles.container}>
@@ -1037,6 +1154,7 @@ const renderBottomTabs = () => {
     );
   }
 
+  // ===== MAIN RENDER =====
   return (
     <ScreenWrapper noBottom={true} style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -1048,7 +1166,7 @@ const renderBottomTabs = () => {
             colors={
               !rotationStatus.hasEnoughTasks 
                 ? ['#fff3bf', '#ffec99']
-                : rotationStatus.totalTasks === rotationStatus.totalMembers
+                : rotationStatus.totalTasks === rotationStatus.membersInRotation
                   ? ['#d3f9d8', '#b2f2bb']
                   : ['#e7f5ff', '#d0ebff']
             }
@@ -1058,7 +1176,7 @@ const renderBottomTabs = () => {
               name={
                 !rotationStatus.hasEnoughTasks 
                   ? "alert" 
-                  : rotationStatus.totalTasks === rotationStatus.totalMembers
+                  : rotationStatus.totalTasks === rotationStatus.membersInRotation
                     ? "check-circle"
                     : "information"
               } 
@@ -1066,7 +1184,7 @@ const renderBottomTabs = () => {
               color={
                 !rotationStatus.hasEnoughTasks 
                   ? "#e67700" 
-                  : rotationStatus.totalTasks === rotationStatus.totalMembers
+                  : rotationStatus.totalTasks === rotationStatus.membersInRotation
                     ? "#2b8a3e"
                     : "#2b8a3e"
               } 
@@ -1075,24 +1193,24 @@ const renderBottomTabs = () => {
               <Text style={[
                 styles.rotationBannerTitle,
                 !rotationStatus.hasEnoughTasks && styles.warningTitle,
-                rotationStatus.totalTasks === rotationStatus.totalMembers && styles.successTitle,
+                rotationStatus.totalTasks === rotationStatus.membersInRotation && styles.successTitle,
               ]}>
                 {!rotationStatus.hasEnoughTasks 
                   ? '⚠️ Rotation Warning' 
-                  : rotationStatus.totalTasks === rotationStatus.totalMembers
+                  : rotationStatus.totalTasks === rotationStatus.membersInRotation
                     ? '✅ Perfect Rotation'
                     : '⚠️ Rotation Imbalance'}
               </Text>
               <Text style={[
                 styles.rotationBannerMessage,
                 !rotationStatus.hasEnoughTasks && styles.warningMessage,
-                rotationStatus.totalTasks === rotationStatus.totalMembers && styles.successMessage,
+                rotationStatus.totalTasks === rotationStatus.membersInRotation && styles.successMessage,
               ]}>
                 {!rotationStatus.hasEnoughTasks 
-                  ? `You have ${rotationStatus.totalMembers} members but only ${rotationStatus.totalTasks} recurring tasks. Need ${rotationStatus.tasksNeeded} more task${rotationStatus.tasksNeeded > 1 ? 's' : ''} for perfect rotation.`
-                  : rotationStatus.totalTasks === rotationStatus.totalMembers
-                    ? `Perfect! ${rotationStatus.totalTasks} tasks for ${rotationStatus.totalMembers} members - one task each.`
-                    : `You have ${rotationStatus.totalTasks} tasks for ${rotationStatus.totalMembers} members.`}
+                  ? `You have ${rotationStatus.membersInRotation} members in rotation but only ${rotationStatus.totalTasks} recurring tasks. Need ${rotationStatus.tasksNeeded} more task${rotationStatus.tasksNeeded > 1 ? 's' : ''} for perfect rotation.`
+                  : rotationStatus.totalTasks === rotationStatus.membersInRotation
+                    ? `Perfect! ${rotationStatus.totalTasks} tasks for ${rotationStatus.membersInRotation} members in rotation - one task each.`
+                    : `You have ${rotationStatus.totalTasks} tasks for ${rotationStatus.membersInRotation} members in rotation.`}
               </Text>
             </View>
             <MaterialCommunityIcons name="chevron-right" size={20} color="#2b8a3e" />

@@ -1,11 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react'; // ✅ ADDED useEffect
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Alert,
   ActivityIndicator,
@@ -16,27 +15,38 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCreateTask } from '../taskHook/useCreateTask';
-import { useRotationStatus } from '../hooks/useRotationStatus'; // ✅ ADDED new hook
+import { useRotationStatus } from '../hooks/useRotationStatus';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TimeSlotModal } from '../components/TimeSlotModal';
 import { DAY_OF_WEEK_OPTIONS, formatTimeDisplay } from '../utils/timeUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
+// Helper function to convert time to minutes
+const convertTimeToMinutes = (time: string): number => {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + (minutes || 0);
+};
+
+// Helper to format time for display
+const formatTimeForDisplay = (time: string): string => {
+  const [hours, minutes] = time.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHour = hours % 12 || 12;
+  return `${displayHour}:${minutes.toString().padStart(2, '0')} ${period}`;
+};
+
 export default function CreateTaskScreen({ navigation, route }: any) {
   const { groupId, groupName } = route.params || {};
-  const { loading, error, success, createTask, reset,authError } = useCreateTask();
-  
-  // ✅ NEW: Rotation status hook
+  const { loading, error, success, createTask, reset, authError } = useCreateTask();
   const { status, checkStatus, getTaskRecommendation } = useRotationStatus(groupId);
   
   const scrollViewRef = useRef<ScrollView>(null);
   const [showTimeSlotModal, setShowTimeSlotModal] = useState(false);
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
-  const [editingSlot, setEditingSlot] = useState<{
-    startTime: string;
-    endTime: string;
-    label?: string;
-    points?: string;
+  const [editingSlot, setEditingSlot] = useState<any>(null);
+  const [modalInitialTime, setModalInitialTime] = useState<{
+    startTime: { hour: string; minute: string; period: string };
+    endTime: { hour: string; minute: string; period: string };
   } | null>(null);
 
   const [form, setForm] = useState({
@@ -49,27 +59,102 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     isRecurring: true,
     category: '',
     timeSlots: [] as Array<{ 
+      id?: string;
       startTime: string; 
       endTime: string; 
       label?: string;
       points?: string;
     }>,
   });
-useEffect(() => {
-  if (authError) {
-    Alert.alert(
-      'Session Expired',
-      'Please log in again',
-      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-    );
-  }
-}, [authError]);
-  // ✅ NEW: Check rotation status on mount
+
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+      );
+    }
+  }, [authError]);
+
   useEffect(() => {
     if (groupId) {
       checkStatus();
     }
   }, [groupId]);
+
+  // ✅ Calculate points
+  const totalPoints = parseInt(form.points, 10);
+  const usedPoints = form.timeSlots.reduce((sum, slot) => {
+    return sum + (parseInt(slot.points || '0', 10));
+  }, 0);
+  const remainingPoints = totalPoints - usedPoints;
+  const canAddMoreSlots = remainingPoints > 0 && form.timeSlots.length < 10;
+
+  // ✅ Auto-detect next available start time based on existing slots
+  const getNextAvailableStartTime = (): { hour: string; minute: string; period: string } => {
+    if (form.timeSlots.length === 0) {
+      return { hour: '8', minute: '00', period: 'AM' };
+    }
+    
+    // Sort slots by start time
+    const sortedSlots = [...form.timeSlots].sort((a, b) => {
+      const timeA = convertTimeToMinutes(a.startTime);
+      const timeB = convertTimeToMinutes(b.startTime);
+      return timeA - timeB;
+    });
+    
+    const lastSlot = sortedSlots[sortedSlots.length - 1];
+    const lastEndTime = lastSlot.endTime;
+    
+    let [hour, minute] = lastEndTime.split(':').map(Number);
+    let period = hour >= 12 ? 'PM' : 'AM';
+    
+    // Add 30 minutes
+    minute += 30;
+    if (minute >= 60) {
+      minute -= 60;
+      hour += 1;
+    }
+    
+    // Handle hour rollover
+    if (hour >= 24) {
+      hour = 0;
+      period = 'AM';
+    }
+    
+    const displayHour = hour % 12 || 12;
+    
+    // Update period if crossing noon/midnight
+    if (hour === 12 && minute === 0) {
+      period = period === 'AM' ? 'PM' : 'AM';
+    } else if (hour > 12) {
+      period = 'PM';
+    }
+    
+    return {
+      hour: displayHour.toString(),
+      minute: minute.toString().padStart(2, '0'),
+      period
+    };
+  };
+
+  // ✅ Calculate end time from start time (add 1 hour)
+  const getEndTimeFromStart = (start: { hour: string; minute: string; period: string }) => {
+    let hour = parseInt(start.hour, 10);
+    let minute = start.minute;
+    let period = start.period;
+    
+    if (start.period === 'AM' && start.hour === '11') {
+      return { hour: '12', minute, period: 'PM' };
+    } else if (start.period === 'PM' && start.hour === '11') {
+      return { hour: '12', minute, period: 'AM' };
+    } else if (start.hour === '12') {
+      return { hour: '1', minute, period };
+    } else {
+      return { hour: (hour + 1).toString(), minute, period };
+    }
+  };
 
   const handleSubmit = async () => {
     Keyboard.dismiss();
@@ -96,22 +181,8 @@ useEffect(() => {
       return;
     }
 
-    let totalTimeSlotPoints = 0;
-    if (form.timeSlots.length > 0) {
-      for (const slot of form.timeSlots) {
-        const slotPoints = parseInt(slot.points || '0', 10);
-        if (slotPoints > 10) {
-          Alert.alert('Error', `Time slot "${slot.label || 'Untitled'}" has ${slotPoints} points. Maximum is 10 points per time slot.`);
-          return;
-        }
-        if (!isNaN(slotPoints) && slotPoints > 0) {
-          totalTimeSlotPoints += slotPoints;
-        }
-      }
-    }
-
-    if (totalTimeSlotPoints > points) {
-      Alert.alert('Error', `Time slots points (${totalTimeSlotPoints}) exceed total task points (${points}). Please adjust the points.`);
+    if (usedPoints > points) {
+      Alert.alert('Error', `Time slots points (${usedPoints}) exceed total task points (${points}). Please adjust the points.`);
       return;
     }
 
@@ -175,13 +246,13 @@ useEffect(() => {
               if (route.params?.onTaskCreated) {
                 route.params.onTaskCreated(result.task);
               }
-            navigation.navigate('GroupTasks', {
-  groupId: groupId,
-  groupName: groupName,
-  userRole: 'ADMIN', // or pass the actual userRole if you have it
-  switchToAllTasks: true,
-  refreshTasks: true
- });
+              navigation.navigate('GroupTasks', {
+                groupId: groupId,
+                groupName: groupName,
+                userRole: 'ADMIN',
+                switchToAllTasks: true,
+                refreshTasks: true
+              });
             }
           }
         ]
@@ -224,7 +295,26 @@ useEffect(() => {
     }
   };
 
+  // ✅ Enhanced handleAddTimeSlot with auto-detection
   const handleAddTimeSlot = () => {
+    if (!canAddMoreSlots) {
+      Alert.alert(
+        'Cannot Add More Slots',
+        `You have used ${usedPoints} out of ${totalPoints} points. Remaining: ${remainingPoints} points.\n\nAdjust total points or remove existing slots.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    // Auto-detect next start time
+    const nextStartTime = getNextAvailableStartTime();
+    const nextEndTime = getEndTimeFromStart(nextStartTime);
+    
+    setModalInitialTime({
+      startTime: nextStartTime,
+      endTime: nextEndTime
+    });
+    
     setEditingSlot(null);
     setEditingSlotIndex(null);
     setShowTimeSlotModal(true);
@@ -234,6 +324,7 @@ useEffect(() => {
     const slot = form.timeSlots[index];
     setEditingSlot(slot);
     setEditingSlotIndex(index);
+    setModalInitialTime(null);
     setShowTimeSlotModal(true);
   };
 
@@ -262,27 +353,29 @@ useEffect(() => {
     label?: string;
     points?: string;
   }) => {
+    // Sort slots by start time after adding/updating
+    let updatedSlots: any[];
+    
     if (editingSlotIndex !== null) {
-      const updatedSlots = [...form.timeSlots];
+      updatedSlots = [...form.timeSlots];
       updatedSlots[editingSlotIndex] = slot;
-      setForm(prev => ({ ...prev, timeSlots: updatedSlots }));
     } else {
-      setForm(prev => ({
-        ...prev,
-        timeSlots: [...prev.timeSlots, slot]
-      }));
+      updatedSlots = [...form.timeSlots, slot];
     }
+    
+    // Sort by start time
+    updatedSlots.sort((a, b) => {
+      const timeA = convertTimeToMinutes(a.startTime);
+      const timeB = convertTimeToMinutes(b.startTime);
+      return timeA - timeB;
+    });
+    
+    setForm(prev => ({ ...prev, timeSlots: updatedSlots }));
     
     setEditingSlot(null);
     setEditingSlotIndex(null);
+    setModalInitialTime(null);
     setShowTimeSlotModal(false);
-  };
-
-  const calculateTimeSlotPoints = () => {
-    return form.timeSlots.reduce((total, slot) => {
-      const points = parseInt(slot.points || '0', 10);
-      return total + (isNaN(points) ? 0 : points);
-    }, 0);
   };
 
   const hasTimeSlotExceedingLimit = () => {
@@ -292,10 +385,6 @@ useEffect(() => {
     });
   };
 
-  const totalTimeSlotPoints = calculateTimeSlotPoints();
-  const remainingPoints = parseInt(form.points, 10) - totalTimeSlotPoints;
-  const isPointsValid = remainingPoints >= 0;
-  
   const isPointsWithinLimit = () => {
     const points = parseInt(form.points, 10);
     return !isNaN(points) && points >= 1 && points <= 10;
@@ -308,7 +397,7 @@ useEffect(() => {
     return (
       !form.title.trim() ||
       isPointsInvalid ||
-      !isPointsValid ||
+      usedPoints > totalPoints ||
       hasTimeSlotExceedingLimit() ||
       (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
       (form.executionFrequency === 'WEEKLY' && form.selectedDays.length === 0 && !form.dayOfWeek) ||
@@ -316,7 +405,6 @@ useEffect(() => {
     );
   };
 
-  // ✅ NEW: Get recommendation for display
   const recommendation = getTaskRecommendation();
 
   return (
@@ -365,7 +453,6 @@ useEffect(() => {
               </LinearGradient>
             )}
 
-            {/* ✅ NEW: Rotation Status Warning - Only shows when needed */}
             {status && !status.hasEnoughTasks && status.totalTasks > 0 && (
               <LinearGradient
                 colors={['#fff3bf', '#ffec99']}
@@ -385,7 +472,6 @@ useEffect(() => {
               </LinearGradient>
             )}
 
-            {/* ✅ NEW: Info when no tasks yet */}
             {status && status.totalTasks === 0 && (
               <LinearGradient
                 colors={['#e7f5ff', '#d0ebff']}
@@ -511,42 +597,38 @@ useEffect(() => {
                 )}
               </View>
 
-              {/* Points Summary */}
-              <View style={styles.pointsSummary}>
-                <View style={styles.pointsSummaryRow}>
-                  <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-                  <Text style={styles.pointsSummaryText}>
-                    Total: <Text style={styles.pointsHighlight}>{form.points}</Text>
-                  </Text>
-                </View>
-                <View style={styles.pointsSummaryRow}>
-                  <MaterialCommunityIcons name="clock-outline" size={14} color="#495057" />
-                  <Text style={styles.pointsSummaryText}>
-                    Assigned to slots: <Text style={styles.pointsHighlight}>{totalTimeSlotPoints}</Text>
-                  </Text>
-                </View>
-                <View style={styles.pointsSummaryRow}>
-                  <MaterialCommunityIcons name="star-outline" size={14} color="#495057" />
+              {/* Points Usage Indicator */}
+              <View style={styles.pointsUsageContainer}>
+                <LinearGradient
+                  colors={remainingPoints > 0 ? ['#d3f9d8', '#b2f2bb'] : ['#fff5f5', '#ffe3e3']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.pointsUsageBar}
+                >
+                  <View 
+                    style={[
+                      styles.pointsUsageFill,
+                      { width: `${Math.min(100, (usedPoints / totalPoints) * 100)}%` }
+                    ]} 
+                  />
+                </LinearGradient>
+                <View style={styles.pointsUsageInfo}>
                   <Text style={[
-                    styles.pointsSummaryText,
-                    !isPointsValid && styles.errorText
+                    styles.pointsUsageText,
+                    remainingPoints === 0 && styles.pointsUsageFull
                   ]}>
-                    Remaining: <Text style={[
-                      styles.pointsHighlight,
-                      !isPointsValid && styles.errorText
-                    ]}>
-                      {remainingPoints}
-                    </Text>
+                    {usedPoints}/{totalPoints} points used
                   </Text>
-                </View>
-                {hasTimeSlotExceedingLimit() && (
-                  <View style={styles.warningRow}>
-                    <MaterialCommunityIcons name="alert-circle" size={14} color="#fa5252" />
-                    <Text style={styles.errorText}>
-                      Some slots exceed 10 points
+                  {remainingPoints > 0 ? (
+                    <Text style={styles.pointsRemainingText}>
+                      {remainingPoints} point{remainingPoints !== 1 ? 's' : ''} remaining
                     </Text>
-                  </View>
-                )}
+                  ) : (
+                    <Text style={styles.pointsFullText}>
+                      All points allocated ✓
+                    </Text>
+                  )}
+                </View>
               </View>
 
               {/* Category Input */}
@@ -630,22 +712,34 @@ useEffect(() => {
                       Time Slots {form.executionFrequency === 'DAILY' ? '*' : ''}
                     </Text>
                     <Text style={styles.timeSlotsSubtitle}>
-                      Max 10 points per slot
+                      Max 10 points per slot • {remainingPoints} points left
                     </Text>
                   </View>
                   <TouchableOpacity
-                    style={styles.addTimeSlotButton}
+                    style={[
+                      styles.addTimeSlotButton,
+                      (!canAddMoreSlots || loading) && styles.addTimeSlotDisabled
+                    ]}
                     onPress={handleAddTimeSlot}
-                    disabled={loading}
+                    disabled={!canAddMoreSlots || loading}
                   >
                     <LinearGradient
-                      colors={['#2b8a3e', '#1e6b2c']}
+                      colors={canAddMoreSlots ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.addTimeSlotGradient}
                     >
-                      <MaterialCommunityIcons name="plus" size={16} color="white" />
-                      <Text style={styles.addTimeSlotText}>Add</Text>
+                      <MaterialCommunityIcons 
+                        name="plus" 
+                        size={16} 
+                        color={canAddMoreSlots ? "white" : "#868e96"} 
+                      />
+                      <Text style={[
+                        styles.addTimeSlotText,
+                        !canAddMoreSlots && styles.addTimeSlotTextDisabled
+                      ]}>
+                        Add
+                      </Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
@@ -680,7 +774,7 @@ useEffect(() => {
                           <View style={styles.timeSlotInfo}>
                             <View style={styles.timeSlotHeader}>
                               <Text style={styles.timeSlotTime}>
-                                {formatTimeDisplay(slot.startTime)} - {formatTimeDisplay(slot.endTime)}
+                                {formatTimeForDisplay(slot.startTime)} - {formatTimeForDisplay(slot.endTime)}
                               </Text>
                               {slot.points && slotPoints > 0 && (
                                 <LinearGradient
@@ -722,6 +816,21 @@ useEffect(() => {
                       );
                     })}
                   </View>
+                )}
+                
+                {/* Warning when can't add more slots */}
+                {!canAddMoreSlots && totalPoints > 0 && form.timeSlots.length > 0 && (
+                  <LinearGradient
+                    colors={['#fff5f5', '#ffe3e3']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.limitWarning}
+                  >
+                    <MaterialCommunityIcons name="alert-circle" size={16} color="#fa5252" />
+                    <Text style={styles.limitWarningText}>
+                      All {totalPoints} points have been allocated. Adjust total points or remove slots to add more.
+                    </Text>
+                  </LinearGradient>
                 )}
               </View>
 
@@ -884,11 +993,15 @@ useEffect(() => {
 
       <TimeSlotModal
         visible={showTimeSlotModal}
-        onClose={() => setShowTimeSlotModal(false)}
+        onClose={() => {
+          setShowTimeSlotModal(false);
+          setModalInitialTime(null);
+        }}
         onSave={handleSaveTimeSlot}
         editingSlot={editingSlot}
-        totalTaskPoints={parseInt(form.points, 10)}
-        usedPoints={totalTimeSlotPoints}
+        initialTime={modalInitialTime}
+        totalTaskPoints={totalPoints}
+        usedPoints={usedPoints}
         maxPointsPerSlot={10}
       />
     </ScreenWrapper>
@@ -968,7 +1081,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginLeft: 24,
   },
-  // ✅ NEW: Warning styles
   warningContainer: {
     borderRadius: 12,
     padding: 16,
@@ -1086,33 +1198,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  pointsSummary: {
-    backgroundColor: '#f8f9fa',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
+  pointsUsageContainer: {
     marginBottom: 20,
-    gap: 6,
   },
-  pointsSummaryRow: {
+  pointsUsageBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: '#e9ecef',
+    marginBottom: 8,
+  },
+  pointsUsageFill: {
+    height: '100%',
+    backgroundColor: '#2b8a3e',
+    borderRadius: 4,
+  },
+  pointsUsageInfo: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
   },
-  pointsSummaryText: {
-    fontSize: 13,
+  pointsUsageText: {
+    fontSize: 12,
     color: '#495057',
   },
-  pointsHighlight: {
-    fontWeight: '600',
+  pointsUsageFull: {
     color: '#2b8a3e',
+    fontWeight: '600',
   },
-  warningRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
+  pointsRemainingText: {
+    fontSize: 12,
+    color: '#2b8a3e',
+    fontWeight: '500',
+  },
+  pointsFullText: {
+    fontSize: 12,
+    color: '#2b8a3e',
+    fontWeight: '600',
   },
   frequencyContainer: {
     flexDirection: 'row',
@@ -1159,6 +1281,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
+  addTimeSlotDisabled: {
+    opacity: 0.6,
+  },
   addTimeSlotGradient: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1170,6 +1295,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     color: 'white'
+  },
+  addTimeSlotTextDisabled: {
+    color: '#868e96'
   },
   emptyTimeSlots: {
     alignItems: 'center',
@@ -1252,6 +1380,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e9ecef',
+  },
+  limitWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#ffc9c9',
+  },
+  limitWarningText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#fa5252',
   },
   daysContainer: {
     flexDirection: 'row',
@@ -1388,28 +1531,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pointsInputContainer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 8,
-},
-pointsInputGradient: {
-  flex: 1,
-  borderRadius: 8,
-  borderWidth: 1,
-  borderColor: '#e9ecef',
-},
-pointsInput: {
-  paddingHorizontal: 12,
-  paddingVertical: 12,
-  fontSize: 16,
-  fontWeight: '600',
-  color: '#212529',
-  backgroundColor: 'transparent',
-  textAlign: 'center'
-},
-pointsLabel: {
-  fontSize: 14,
-  color: '#495057',
-  width: 50,
-},
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pointsInputGradient: {
+    flex: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  pointsInput: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#212529',
+    backgroundColor: 'transparent',
+    textAlign: 'center'
+  },
+  pointsLabel: {
+    fontSize: 14,
+    color: '#495057',
+    width: 50,
+  },
 });

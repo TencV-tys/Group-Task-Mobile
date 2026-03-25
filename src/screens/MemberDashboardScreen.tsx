@@ -4,7 +4,7 @@ import {
   View,
   Text,
   ScrollView,
-  TouchableOpacity,
+  TouchableOpacity, 
   ActivityIndicator,
   RefreshControl,
   Alert,

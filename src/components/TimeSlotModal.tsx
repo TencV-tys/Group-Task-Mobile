@@ -1,4 +1,4 @@
-// src/components/TimeSlotModal.tsx - COMPLETE WITH AUTO END TIME AND LABEL OPTIONS
+// src/components/TimeSlotModal.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -22,7 +22,6 @@ import {
   PERIOD_OPTIONS
 } from '../utils/timeUtils';
 
-// 👈 Predefined label options
 const LABEL_OPTIONS = [
   { value: 'Morning', icon: 'weather-sunset-up', color: '#fab005' },
   { value: 'Lunch', icon: 'food', color: '#e67700' },
@@ -42,6 +41,10 @@ interface TimeSlotModalProps {
   onClose: () => void;
   onSave: (slot: TimeSlot) => void;
   editingSlot: TimeSlot | null;
+  initialTime?: {
+    startTime: { hour: string; minute: string; period: string };
+    endTime: { hour: string; minute: string; period: string };
+  } | null;
   totalTaskPoints: number;
   usedPoints: number;
   maxPointsPerSlot?: number;
@@ -51,7 +54,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   visible,
   onClose,
   onSave,
-  editingSlot, 
+  editingSlot,
+  initialTime,
   totalTaskPoints,
   usedPoints,
   maxPointsPerSlot = 10
@@ -70,43 +74,39 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   });
   
   const [label, setLabel] = useState('');
-  const [customLabel, setCustomLabel] = useState(''); // 👈 For "Other" option
+  const [customLabel, setCustomLabel] = useState('');
   const [points, setPoints] = useState('');
   const [error, setError] = useState<string>('');
+  const [isManualEndTimeChange, setIsManualEndTimeChange] = useState(false);
 
-  // Helper function to calculate end time from start time
+  // Helper function to calculate end time from start time (add 1 hour)
   const getDefaultEndTime = (startHour: string, startMinute: string, startPeriod: string) => {
     let hour = parseInt(startHour, 10);
     const minute = startMinute;
     let period = startPeriod;
     
-    // Add 1 hour
     hour += 1;
     
-    // Handle hour rollover and period changes
+    // Handle 12-hour rollover
     if (hour === 12) {
-      // 11 AM + 1 = 12 PM, 11 PM + 1 = 12 AM
       return {
         hour: '12',
         minute,
         period: period === 'AM' ? 'PM' : 'AM'
       };
     } else if (hour === 13) {
-      // 12 PM + 1 = 1 PM, 12 AM + 1 = 1 AM
       return {
         hour: '1',
         minute,
-        period: period // stays the same
+        period: period
       };
     } else if (hour > 12) {
-      // 1 PM + 1 = 2 PM (keep same period)
       return {
         hour: (hour - 12).toString(),
         minute,
         period: period
       };
     } else {
-      // Regular hours (1-11)
       return {
         hour: hour.toString(),
         minute,
@@ -115,22 +115,34 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     }
   };
 
-  // Update end time when start time changes (but not when editing)
+  // ✅ FIXED: Auto-update end time when start time changes (for new slots only)
   useEffect(() => {
-    if (!editingSlot && currentStep === 'time') {
+    // Only auto-update if:
+    // 1. Not editing an existing slot
+    // 2. User hasn't manually changed the end time
+    // 3. We're in the time step
+    if (!editingSlot && !isManualEndTimeChange && currentStep === 'time') {
       const newEndTime = getDefaultEndTime(startTime.hour, startTime.minute, startTime.period);
       setEndTime(newEndTime);
     }
-  }, [startTime, editingSlot, currentStep]);
+  }, [startTime, editingSlot, currentStep, isManualEndTimeChange]);
 
+  // Reset manual flag when modal opens or when switching to time step
+  useEffect(() => {
+    if (currentStep === 'time') {
+      setIsManualEndTimeChange(false);
+    }
+  }, [currentStep]);
+
+  // Initialize modal based on context
   useEffect(() => {
     if (editingSlot) {
       const start12 = convertTo12Hour(editingSlot.startTime);
       const end12 = convertTo12Hour(editingSlot.endTime);
       setStartTime(start12);
       setEndTime(end12);
+      setIsManualEndTimeChange(true); // Editing existing slot, don't auto-update
       
-      // Handle label - check if it's one of the predefined options
       if (editingSlot.label) {
         const predefinedLabel = LABEL_OPTIONS.find(opt => opt.value === editingSlot.label);
         if (predefinedLabel) {
@@ -146,16 +158,26 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
       }
       
       setPoints(editingSlot.points || '');
+    } else if (initialTime) {
+      // Use auto-detected initial time from CreateTaskScreen
+      setStartTime(initialTime.startTime);
+      setEndTime(initialTime.endTime);
+      setIsManualEndTimeChange(false);
+      setLabel('');
+      setCustomLabel('');
+      setPoints('');
     } else {
+      // First slot - default 8:00 AM to 9:00 AM
       setStartTime({ hour: '8', minute: '00', period: 'AM' });
       setEndTime({ hour: '9', minute: '00', period: 'AM' });
+      setIsManualEndTimeChange(false);
       setLabel('');
       setCustomLabel('');
       setPoints('');
     }
     setError('');
     setCurrentStep('time');
-  }, [editingSlot, visible]);
+  }, [editingSlot, initialTime, visible]);
 
   const handleTimeNext = () => {
     const start24 = convertTo24Hour(startTime.hour, startTime.minute, startTime.period);
@@ -199,7 +221,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
       return;
     }
 
-    // Determine final label value
     let finalLabel = '';
     if (label === 'Other') {
       finalLabel = customLabel.trim();
@@ -223,7 +244,12 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     return newTotalPoints > totalTaskPoints;
   };
 
-  // ===== RENDER LABEL OPTIONS =====
+  // Handle manual end time change
+  const handleEndTimeChange = (newEndTime: { hour: string; minute: string; period: string }) => {
+    setIsManualEndTimeChange(true);
+    setEndTime(newEndTime);
+  };
+
   const renderLabelOptions = () => (
     <View style={styles.labelOptionsContainer}>
       <Text style={styles.inputLabel}>
@@ -264,7 +290,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
         ))}
       </View>
 
-      {/* Custom label input for "Other" */}
       {label === 'Other' && (
         <View style={styles.customLabelContainer}>
           <Text style={styles.customLabelHint}>Enter custom label:</Text>
@@ -291,7 +316,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   const renderTimePicker = (
     time: { hour: string; minute: string; period: string },
     setTime: (time: { hour: string; minute: string; period: string }) => void,
-    title: string
+    title: string,
+    isStartTime: boolean = true
   ) => (
     <View style={styles.timePickerContainer}>
       <Text style={styles.timePickerTitle}>{title}</Text>
@@ -307,7 +333,15 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                   styles.numberButton,
                   time.hour === hour && styles.numberButtonActive
                 ]}
-                onPress={() => setTime({ ...time, hour })}
+                onPress={() => {
+                  setTime({ ...time, hour });
+                  // If this is start time and not editing, auto-update end time
+                  if (isStartTime && !editingSlot && currentStep === 'time') {
+                    const newEndTime = getDefaultEndTime(hour, time.minute, time.period);
+                    setEndTime(newEndTime);
+                    setIsManualEndTimeChange(false);
+                  }
+                }}
               >
                 <LinearGradient
                   colors={time.hour === hour ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
@@ -338,7 +372,15 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                   styles.minuteButton,
                   time.minute === minute && styles.numberButtonActive
                 ]}
-                onPress={() => setTime({ ...time, minute })}
+                onPress={() => {
+                  setTime({ ...time, minute });
+                  // If this is start time and not editing, auto-update end time
+                  if (isStartTime && !editingSlot && currentStep === 'time') {
+                    const newEndTime = getDefaultEndTime(time.hour, minute, time.period);
+                    setEndTime(newEndTime);
+                    setIsManualEndTimeChange(false);
+                  }
+                }}
               >
                 <LinearGradient
                   colors={time.minute === minute ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
@@ -368,7 +410,15 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                   styles.periodButton,
                   time.period === period && styles.periodButtonActive
                 ]}
-                onPress={() => setTime({ ...time, period })}
+                onPress={() => {
+                  setTime({ ...time, period });
+                  // If this is start time and not editing, auto-update end time
+                  if (isStartTime && !editingSlot && currentStep === 'time') {
+                    const newEndTime = getDefaultEndTime(time.hour, time.minute, period);
+                    setEndTime(newEndTime);
+                    setIsManualEndTimeChange(false);
+                  }
+                }}
               >
                 <LinearGradient
                   colors={time.period === period ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
@@ -407,8 +457,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
       </View>
       
       <View style={styles.timePickersContainer}>
-        {renderTimePicker(startTime, setStartTime, 'Start Time')}
-        {renderTimePicker(endTime, setEndTime, 'End Time')}
+        {renderTimePicker(startTime, setStartTime, 'Start Time', true)}
+        {renderTimePicker(endTime, handleEndTimeChange, 'End Time', false)}
       </View>
       
       <Text style={styles.autoUpdateNote}>
@@ -433,7 +483,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
           <Text style={styles.stepText}>Step 2 of 2: Add Details</Text>
         </View>
         
-        {/* Time Summary */}
         <LinearGradient
           colors={['#f8f9fa', '#e9ecef']}
           start={{ x: 0, y: 0 }}
@@ -452,10 +501,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
           </Text>
         </LinearGradient>
         
-        {/* Label Input with Options */}
         {renderLabelOptions()}
         
-        {/* Points Input */}
         <View style={styles.inputGroup}>
           <View style={styles.pointsHeader}>
             <Text style={styles.inputLabel}>
@@ -501,7 +548,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
             <Text style={styles.pointsLabel}>pts</Text>
           </View>
           
-          {/* Quick Select Buttons */}
           <Text style={styles.quickSelectLabel}>Quick select:</Text>
           <View style={styles.pointsGrid}>
             {Array.from({ length: maxPointsPerSlot + 1 }, (_, i) => i).map((num) => {
@@ -545,7 +591,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
             })}
           </View>
           
-          {/* Points Summary */}
           <View style={styles.pointsSummary}>
             <View style={styles.pointsSummaryRow}>
               <MaterialCommunityIcons name="star" size={14} color="#e67700" />
@@ -591,7 +636,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
             </View>
           </View>
           
-          {/* Warning if exceeding total */}
           {wouldExceed && pointsNum > 0 && (
             <LinearGradient
               colors={['#fff5f5', '#ffe3e3']}
@@ -627,7 +671,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.modalContent}>
-            {/* Header */}
             <View style={styles.modalHeader}>
               <TouchableOpacity
                 onPress={() => {
@@ -653,7 +696,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
               <View style={styles.headerSpacer} />
             </View>
 
-            {/* Body */}
             <ScrollView 
               style={styles.modalBody} 
               showsVerticalScrollIndicator={true}
@@ -669,7 +711,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
               ) : null}
             </ScrollView>
 
-            {/* Footer with BUTTONS */}
             <View style={styles.modalFooter}>
               {currentStep === 'time' ? (
                 <TouchableOpacity
@@ -743,8 +784,7 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   );
 };
 
-// At the bottom, replace the styles section with this:
-
+// Styles remain the same as your existing styles...
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
@@ -1229,7 +1269,6 @@ const styles = StyleSheet.create({
   saveButtonDisabled: {
     opacity: 0.7,
   },
-  // 👇 Add the new label option styles directly inside styles
   labelOptionsContainer: {
     marginBottom: 20,
   },
@@ -1278,4 +1317,3 @@ const styles = StyleSheet.create({
 });
 
 export default TimeSlotModal;
-

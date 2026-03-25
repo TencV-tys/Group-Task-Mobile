@@ -208,68 +208,101 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  const processTaskData = (taskData: any) => {
-    if (taskData.timeSlots && taskData.timeSlots.length > 0) {
-      taskData.timeSlots.sort((a: any, b: any) => {
-        const timeA = convertTimeToMinutes(a.startTime);
-        const timeB = convertTimeToMinutes(b.startTime);
-        return timeA - timeB;
-      });
-    }
+  // In processTaskData function, add proper typing
+
+const processTaskData = (taskData: any) => {
+  // ✅ FIX: Sort time slots by start time (earliest first) with proper typing
+  if (taskData.timeSlots && taskData.timeSlots.length > 0) {
+    console.log('📅 Before sorting time slots:', taskData.timeSlots.map((s: any) => s.startTime));
     
-    if (taskData.selectedDays && taskData.selectedDays.length > 0) {
-      const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      taskData.selectedDays.sort((a: string, b: string) => 
-        dayOrder.indexOf(a) - dayOrder.indexOf(b)
-      );
-    }
+    taskData.timeSlots.sort((a: any, b: any) => {
+      const timeA = convertTimeToMinutes(a.startTime);
+      const timeB = convertTimeToMinutes(b.startTime);
+      return timeA - timeB;
+    });
     
-    if (taskData.assignments && taskData.assignments.length > 0) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+    console.log('📅 After sorting time slots:', taskData.timeSlots.map((s: any) => s.startTime));
+  }
+  
+  // Sort selected days with proper typing
+  if (taskData.selectedDays && taskData.selectedDays.length > 0) {
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    taskData.selectedDays.sort((a: string, b: string) => 
+      dayOrder.indexOf(a) - dayOrder.indexOf(b)
+    );
+  }
+  
+  // Sort assignments with proper typing
+  if (taskData.assignments && taskData.assignments.length > 0) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    taskData.assignments.sort((a: any, b: any) => {
+      const dateA = new Date(a.dueDate);
+      const dateB = new Date(b.dueDate);
       
-      taskData.assignments.sort((a: any, b: any) => {
-        const dateA = new Date(a.dueDate);
-        const dateB = new Date(b.dueDate);
-        
-        const dayA = new Date(dateA);
-        dayA.setHours(0, 0, 0, 0);
-        
-        const dayB = new Date(dateB);
-        dayB.setHours(0, 0, 0, 0);
-        
-        const isAToday = dayA.getTime() === today.getTime();
-        const isBToday = dayB.getTime() === today.getTime();
-        
-        if (isAToday && !isBToday) return -1;
-        if (!isAToday && isBToday) return 1;
-        
-        if (isAToday && isBToday) {
-          return dateA.getTime() - dateB.getTime();
-        }
-        
-        const isAFuture = dayA.getTime() >= today.getTime();
-        const isBFuture = dayB.getTime() >= today.getTime();
-        
-        if (isAFuture && !isBFuture) return -1;
-        if (!isAFuture && isBFuture) return 1;
-        
-        if (isAFuture && isBFuture) {
-          return dateA.getTime() - dateB.getTime();
-        }
-        
-        return dateB.getTime() - dateA.getTime();
-      });
-    }
+      const dayA = new Date(dateA);
+      dayA.setHours(0, 0, 0, 0);
+      
+      const dayB = new Date(dateB);
+      dayB.setHours(0, 0, 0, 0);
+      
+      const isAToday = dayA.getTime() === today.getTime();
+      const isBToday = dayB.getTime() === today.getTime();
+      
+      if (isAToday && !isBToday) return -1;
+      if (!isAToday && isBToday) return 1;
+      
+      if (isAToday && isBToday) {
+        const timeA = dateA.getHours() * 60 + dateA.getMinutes();
+        const timeB = dateB.getHours() * 60 + dateB.getMinutes();
+        return timeA - timeB;
+      }
+      
+      const isAFuture = dayA.getTime() >= today.getTime();
+      const isBFuture = dayB.getTime() >= today.getTime();
+      
+      if (isAFuture && !isBFuture) return -1;
+      if (!isAFuture && isBFuture) return 1;
+      
+      if (isAFuture && isBFuture) {
+        return dateA.getTime() - dateB.getTime();
+      }
+      
+      return dateB.getTime() - dateA.getTime();
+    });
+  }
+  
+  return taskData;
+};
+
+const convertTimeToMinutes = (time: string) => {
+  if (!time) return 0;
+  
+  // Handle 12-hour format (e.g., "9:00 AM" or "9:00PM")
+  const timeLower = time.toLowerCase();
+  let hours = 0;
+  let minutes = 0;
+  
+  if (timeLower.includes('am') || timeLower.includes('pm')) {
+    // 12-hour format
+    const isPM = timeLower.includes('pm');
+    const timeWithoutSuffix = time.replace(/[ap]m/gi, '').trim();
+    const [hourStr, minuteStr] = timeWithoutSuffix.split(':');
+    hours = parseInt(hourStr || '0', 10);
+    minutes = parseInt(minuteStr || '0', 10);
     
-    return taskData;
-  };
-
-  const convertTimeToMinutes = (time: string) => {
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes;
-  };
-
+    if (isPM && hours !== 12) hours += 12;
+    if (!isPM && hours === 12) hours = 0;
+  } else {
+    // 24-hour format
+    const [hourStr, minuteStr] = time.split(':');
+    hours = parseInt(hourStr || '0', 10);
+    minutes = parseInt(minuteStr || '0', 10);
+  }
+  
+  return hours * 60 + minutes;
+};
   const checkTimeValidity = (taskData: any) => {
     if (!taskData?.userAssignment || taskData.userAssignment.completed) {
       setIsSubmittable(false);
@@ -837,7 +870,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
     });
 
-    return (
+    return ( 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>My Submissions This Week</Text>
         {sortedSubmissions.map((submission: any, index: number) => {

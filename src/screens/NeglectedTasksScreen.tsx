@@ -1,4 +1,4 @@
-// src/screens/NeglectedTasksScreen.tsx - UPDATED with TokenUtils
+// src/screens/NeglectedTasksScreen.tsx - WITH DEBUG CONSOLE LOGS
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -14,12 +14,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { AssignmentService } from '../services/AssignmentService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export const NeglectedTasksScreen = ({ navigation, route }: any) => {
   const { groupId, groupName, userRole } = route.params;
   const isAdmin = userRole === 'ADMIN';
+  
+  console.log('🔍 [NeglectedTasks] Screen initialized');
+  console.log(`   groupId: ${groupId}`);
+  console.log(`   groupName: ${groupName}`);
+  console.log(`   userRole: ${userRole}`);
+  console.log(`   isAdmin: ${isAdmin}`);
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -31,20 +37,21 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
 
-  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
+    console.log('🔑 [NeglectedTasks] Checking token...');
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
     
+    console.log(`   Token valid: ${hasToken}`);
     setAuthError(!hasToken);
     return hasToken;
   }, []);
 
-  // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
+      console.log('❌ [NeglectedTasks] Auth error detected');
       Alert.alert(
         'Session Expired',
         'Please log in again',
@@ -53,7 +60,6 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
             text: 'OK', 
             onPress: () => {
               setAuthError(false);
-              // @ts-ignore - navigation type issue
               navigation.navigate('Login');
             }
           }
@@ -63,168 +69,245 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
   }, [authError, navigation]);
 
   useEffect(() => {
+    console.log('🧹 [NeglectedTasks] Cleanup setup');
     return () => {
+      console.log('🧹 [NeglectedTasks] Component unmounting');
       isMounted.current = false;
     };
   }, []);
 
   const loadNeglectedTasks = useCallback(async (refresh = false) => {
-    const hasToken = await checkToken();
-    if (!hasToken) {
+  console.log(`📥 [NeglectedTasks] loadNeglectedTasks called, refresh: ${refresh}`);
+  
+  const hasToken = await checkToken();
+  if (!hasToken) {
+    console.log('❌ [NeglectedTasks] No token, aborting load');
+    setLoading(false);
+    setRefreshing(false);
+    return;
+  }
+
+  if (refresh) {
+    setRefreshing(true);
+    console.log('🔄 [NeglectedTasks] Refreshing mode');
+  } else {
+    setLoading(true);
+    console.log('⏳ [NeglectedTasks] Loading mode');
+  }
+  setError(null);
+
+  try {
+    let result;
+    if (isAdmin) {
+      console.log(`👑 [NeglectedTasks] Fetching GROUP neglected tasks for group: ${groupId}`);
+      result = await AssignmentService.getGroupNeglectedTasks(groupId);
+      console.log('📦 [NeglectedTasks] Group API response:', JSON.stringify(result, null, 2));
+      
+      if (result.success && isMounted.current) {
+        console.log(`✅ [NeglectedTasks] Group API success`);
+        console.log(`   Tasks count: ${result.data.tasks?.length || 0}`);
+        console.log(`   Total: ${result.data.total || 0}`);
+        console.log(`   Points by user:`, result.data.pointsByUser);
+        
+        setNeglectedTasks(result.data.tasks || []);
+        setStats({
+          total: result.data.total || 0,
+          pointsByUser: result.data.pointsByUser || {}
+        });
+      } else if (isMounted.current) {
+        console.log(`❌ [NeglectedTasks] Group API failed: ${result.message}`);
+        setError(result.message || 'Failed to load neglected tasks');
+      }
+    } else {
+      console.log(`👤 [NeglectedTasks] Fetching USER neglected tasks for group: ${groupId}`);
+      result = await AssignmentService.getUserNeglectedTasks({ groupId });
+      console.log('📦 [NeglectedTasks] User API response:', JSON.stringify(result, null, 2));
+      
+      if (result.success && isMounted.current) {
+        console.log(`✅ [NeglectedTasks] User API success`);
+        console.log(`   Tasks count: ${result.data.tasks?.length || 0}`);
+        console.log(`   Total from data.total: ${result.data.total || 0}`);
+        console.log(`   Summary:`, result.data.summary);
+        
+        setNeglectedTasks(result.data.tasks || []);
+        
+        // ✅ FIX: Get total from summary.total or data.total
+        const totalCount = result.data.summary?.total || result.data.total || 0;
+        
+        setStats({ 
+          total: totalCount,  // 👈 This will now be 2
+          summary: result.data.summary,
+          pointsByUser: result.data.pointsByUser || {}
+        });
+        
+        console.log(`   ✅ Set stats.total to: ${totalCount}`);
+      } else if (isMounted.current) {
+        console.log(`❌ [NeglectedTasks] User API failed: ${result.message}`);
+        setError(result.message || 'Failed to load neglected tasks');
+      }
+    }
+  } catch (err: any) {
+    console.error('❌ [NeglectedTasks] Exception caught:', err);
+    if (isMounted.current) {
+      setError(err.message || 'Failed to load neglected tasks');
+    }
+  } finally {
+    if (isMounted.current) {
+      console.log(`✅ [NeglectedTasks] Load complete, tasks count: ${neglectedTasks.length}`);
       setLoading(false);
       setRefreshing(false);
-      return;
+      initialLoadDone.current = true;
     }
-
-    if (refresh) setRefreshing(true);
-    else setLoading(true);
-    setError(null);
-
-    try {
-      let result;
-      if (isAdmin) {
-        result = await AssignmentService.getGroupNeglectedTasks(groupId);
-        if (result.success && isMounted.current) {
-          setNeglectedTasks(result.data.tasks || []);
-          setStats({
-            total: result.data.total || 0,
-            pointsByUser: result.data.pointsByUser || {}
-          });
-        } else if (isMounted.current) {
-          setError(result.message || 'Failed to load neglected tasks');
-        }
-      } else {
-        result = await AssignmentService.getUserNeglectedTasks({ groupId });
-        if (result.success && isMounted.current) {
-          setNeglectedTasks(result.data.tasks || []);
-          setStats({ total: result.data.total || 0 });
-        } else if (isMounted.current) {
-          setError(result.message || 'Failed to load neglected tasks');
-        }
-      }
-    } catch (err: any) {
-      if (isMounted.current) {
-        setError(err.message || 'Failed to load neglected tasks');
-      }
-    } finally {
-      if (isMounted.current) {
-        setLoading(false);
-        setRefreshing(false);
-        initialLoadDone.current = true;
-      }
-    }
-  }, [groupId, isAdmin, checkToken]);
+  }
+}, [groupId, isAdmin, checkToken]);
 
   useEffect(() => {
+    console.log(`🎬 [NeglectedTasks] Initial load triggered, initialLoadDone: ${initialLoadDone.current}`);
     if (!initialLoadDone.current) {
       loadNeglectedTasks();
     }
   }, []);
 
-  const renderTaskItem = ({ item }: any) => (
-    <TouchableOpacity
-      style={styles.taskCard}
-      onPress={() => navigation.navigate('TaskDetails', { taskId: item.taskId })}
-      activeOpacity={0.7}
-    >
-      <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
-        style={styles.taskCardGradient}
+  // Log whenever neglectedTasks changes
+  useEffect(() => {
+    console.log(`🔄 [NeglectedTasks] neglectedTasks updated: ${neglectedTasks.length} tasks`);
+    if (neglectedTasks.length > 0) {
+      console.log('   Tasks:', neglectedTasks.map(t => ({ id: t.id, title: t.taskTitle, points: t.points })));
+    }
+  }, [neglectedTasks]);
+
+  // Log whenever stats changes
+  useEffect(() => {
+    console.log(`📊 [NeglectedTasks] stats updated:`, stats);
+  }, [stats]);
+
+  const renderTaskItem = ({ item, index }: any) => {
+    console.log(`🎨 [NeglectedTasks] Rendering task ${index}: ${item.taskTitle}`);
+    return (
+      <TouchableOpacity
+        style={styles.taskCard}
+        onPress={() => {
+          console.log(`👆 [NeglectedTasks] Task pressed: ${item.taskId}`);
+          navigation.navigate('TaskDetails', { taskId: item.taskId });
+        }}
+        activeOpacity={0.7}
       >
-        <View style={styles.taskHeader}>
-          <View style={styles.taskTitleContainer}>
-            <MaterialCommunityIcons name="timer-off" size={20} color="#fa5252" />
-            <Text style={styles.taskTitle} numberOfLines={1}>
-              {item.taskTitle}
-            </Text>
-          </View>
-          <Text style={styles.pointsLost}>-{item.points} pts</Text>
-        </View>
-
-        {isAdmin && item.user && (
-          <View style={styles.userInfo}>
-            <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.userAvatar}>
-              <Text style={styles.userAvatarText}>
-                {item.user.fullName?.charAt(0) || 'U'}
-              </Text>
-            </LinearGradient>
-            <Text style={styles.userName}>{item.user.fullName}</Text>
-          </View>
-        )}
-
-        <View style={styles.taskDetails}>
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="calendar" size={14} color="#868e96" />
-            <Text style={styles.detailText}>
-              Due: {new Date(item.dueDate).toLocaleDateString()}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="clock-alert" size={14} color="#fa5252" />
-            <Text style={styles.detailText}>
-              Missed: {item.expiredAt ? new Date(item.expiredAt).toLocaleDateString() : 'N/A'}
-            </Text>
-          </View>
-          {item.timeSlot && (
-            <View style={styles.detailRow}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color="#868e96" />
-              <Text style={styles.detailText}>
-                {item.timeSlot.startTime} - {item.timeSlot.endTime}
-                {item.timeSlot.label && ` (${item.timeSlot.label})`}
+        <LinearGradient
+          colors={['#ffffff', '#f8f9fa']}
+          style={styles.taskCardGradient}
+        >
+          <View style={styles.taskHeader}>
+            <View style={styles.taskTitleContainer}>
+              <MaterialCommunityIcons name="timer-off" size={20} color="#fa5252" />
+              <Text style={styles.taskTitle} numberOfLines={1}>
+                {item.taskTitle}
               </Text>
             </View>
-          )}
-        </View>
-
-        {item.notes && item.notes.includes('[NEGLECTED]') && (
-          <LinearGradient
-            colors={['#fff5f5', '#ffe3e3']}
-            style={styles.notesContainer}
-          >
-            <MaterialCommunityIcons name="alert-circle" size={14} color="#fa5252" />
-            <Text style={styles.notesText} numberOfLines={2}>
-              {item.notes}
-            </Text>
-          </LinearGradient>
-        )}
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-
-  const renderHeader = () => {
-    if (!stats) return null;
-
-    return (
-      <LinearGradient
-        colors={['#fff5f5', '#ffe3e3']}
-        style={styles.statsHeader}
-      >
-        <View style={styles.statsRow}>
-          <MaterialCommunityIcons name="timer-off" size={24} color="#fa5252" />
-          <Text style={styles.statsTitle}>
-            {stats.total} Neglected Task{stats.total !== 1 ? 's' : ''}
-          </Text>
-        </View>
-        
-        {isAdmin && stats.pointsByUser && Object.keys(stats.pointsByUser).length > 0 && (
-          <View style={styles.pointsBreakdown}>
-            <Text style={styles.pointsBreakdownTitle}>Points Lost:</Text>
-            {Object.entries(stats.pointsByUser).map(([userId, points]) => {
-              const user = neglectedTasks.find(t => t.user?.id === userId)?.user;
-              if (!user) return null;
-              return (
-                <Text key={userId} style={styles.pointsBreakdownText}>
-                  • {user.fullName}: {String(points)} pts
-                </Text>
-              );
-            })}
+            <Text style={styles.pointsLost}>-{item.points} pts</Text>
           </View>
-        )}
-      </LinearGradient>
+
+          {isAdmin && item.user && (
+            <View style={styles.userInfo}>
+              <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.userAvatar}>
+                <Text style={styles.userAvatarText}>
+                  {item.user.fullName?.charAt(0) || 'U'}
+                </Text>
+              </LinearGradient>
+              <Text style={styles.userName}>{item.user.fullName}</Text>
+            </View>
+          )}
+
+          <View style={styles.taskDetails}>
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="calendar" size={14} color="#868e96" />
+              <Text style={styles.detailText}>
+                Due: {new Date(item.dueDate).toLocaleDateString()}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="clock-alert" size={14} color="#fa5252" />
+              <Text style={styles.detailText}>
+                Missed: {item.expiredAt ? new Date(item.expiredAt).toLocaleDateString() : 'N/A'}
+              </Text>
+            </View>
+            {item.timeSlot && (
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="clock-outline" size={14} color="#868e96" />
+                <Text style={styles.detailText}>
+                  {item.timeSlot.startTime} - {item.timeSlot.endTime}
+                  {item.timeSlot.label && ` (${item.timeSlot.label})`}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {item.notes && item.notes.includes('[NEGLECTED]') && (
+            <LinearGradient
+              colors={['#fff5f5', '#ffe3e3']}
+              style={styles.notesContainer}
+            >
+              <MaterialCommunityIcons name="alert-circle" size={14} color="#fa5252" />
+              <Text style={styles.notesText} numberOfLines={2}>
+                {item.notes}
+              </Text>
+            </LinearGradient>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
     );
   };
 
+  const renderHeader = () => {
+  console.log(`📋 [NeglectedTasks] Rendering header, stats:`, stats);
+  if (!stats) return null;
+
+  // ✅ Get the correct total (handle both admin and member structures)
+  const totalCount = stats.total || stats.summary?.total || 0;
+ // ✅ FIXED: With type assertion
+const totalPointsLost = stats.summary?.totalPointsLost || 
+  (Object.values(stats.pointsByUser || {}) as number[]).reduce((a, b) => a + b, 0) || 0;
+  return (
+    <LinearGradient
+      colors={['#fff5f5', '#ffe3e3']}
+      style={styles.statsHeader}
+    >
+      <View style={styles.statsRow}>
+        <MaterialCommunityIcons name="timer-off" size={24} color="#fa5252" />
+        <Text style={styles.statsTitle}>
+          {totalCount} Neglected Task{totalCount !== 1 ? 's' : ''}
+        </Text>
+      </View>
+      
+      {/* Show points lost */}
+      {totalPointsLost > 0 && (
+        <View style={styles.pointsBreakdown}>
+          <Text style={styles.pointsBreakdownTitle}>
+            Total Points Lost: {totalPointsLost}
+          </Text>
+        </View>
+      )}
+      
+      {/* Admin view - show per user breakdown */}
+      {isAdmin && stats.pointsByUser && Object.keys(stats.pointsByUser).length > 0 && (
+        <View style={styles.pointsBreakdown}>
+          <Text style={styles.pointsBreakdownTitle}>Points Lost by User:</Text>
+          {Object.entries(stats.pointsByUser).map(([userId, points]) => {
+            const user = neglectedTasks.find(t => t.user?.id === userId)?.user;
+            if (!user) return null;
+            return (
+              <Text key={userId} style={styles.pointsBreakdownText}>
+                • {user.fullName}: {String(points)} pts
+              </Text>
+            );
+          })}
+        </View>
+      )}
+    </LinearGradient>
+  );
+};
+
   if (loading && !refreshing) {
+    console.log('⏳ [NeglectedTasks] Showing loading state');
     return (
       <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
@@ -243,6 +326,7 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
   }
 
   if (error && !refreshing) {
+    console.log(`❌ [NeglectedTasks] Showing error state: ${error}`);
     return (
       <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
@@ -270,6 +354,7 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
     );
   }
 
+  console.log(`✅ [NeglectedTasks] Rendering main view with ${neglectedTasks.length} tasks`);
   return (
     <ScreenWrapper style={styles.container}>
       <View style={styles.header}>
@@ -317,7 +402,7 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
   );
 };
 
-// Styles remain exactly the same
+// Styles remain the same
 const styles = StyleSheet.create({
   container: {
     flex: 1,

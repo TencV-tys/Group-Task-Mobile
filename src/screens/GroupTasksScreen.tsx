@@ -749,7 +749,7 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
   console.log(`   Has perfect count? ${hasPerfectCount} (tasks: ${tasks.length}, members: ${membersInRotationCount})`);
   console.log(`   Needs tasks? ${needsTasks}`);
   console.log(`   Tasks needed count: ${tasksNeededCount}`);
-  
+   
 
     return (
       <LinearGradient
@@ -969,114 +969,170 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
     );
   };
 
-  const renderTask = ({ item }: any) => {
-    const isMyTasksView = selectedTab === 'my';
-    
-    // ✅ Determine if task is fully completed
-    let isFullyCompleted = false;
-    let completionPercentage = 0;
-    let completedCount = 0;
-    let totalCount = 0;
-    
-    if (isMyTasksView && item.assignmentsCount && item.assignmentsCount > 1) {
+const renderTask = ({ item }: any) => {
+  const isMyTasksView = selectedTab === 'my';
+  
+  // ✅ Determine task completion status based on view
+  let isFullyCompleted = false;
+  let completionPercentage = 0;
+  let completedCount = 0;
+  let totalCount = 0;
+  let earnedPoints = 0;
+  let totalPoints = 0;
+  
+  if (isMyTasksView) {
+    // MY TASKS VIEW: Show user's personal progress
+    if (item.assignmentsCount && item.assignmentsCount > 1) {
       // Multi-slot task
       totalCount = item.assignmentsCount;
       completedCount = item.completedCount || 0;
       isFullyCompleted = completedCount === totalCount;
       completionPercentage = (completedCount / totalCount) * 100;
+      earnedPoints = item.earnedPoints || 0;
+      totalPoints = item.totalPoints || 0;
     } else {
       // Single assignment task
       isFullyCompleted = item.assignment?.completed || item.userAssignment?.completed || false;
+      completionPercentage = isFullyCompleted ? 100 : 0;
+      completedCount = isFullyCompleted ? 1 : 0;
+      totalCount = 1;
+      earnedPoints = isFullyCompleted ? (item.points || 0) : 0;
+      totalPoints = item.points || 0;
     }
-    
-    const validation = validateTaskTime(item);
-    
-    const getGradientColors = (): [string, string] => {
-      if (isFullyCompleted) return ['#f8f9fa', '#e9ecef'];
-      if (isMyTasksView && validation.isSubmittableNow) {
-        return validation.willBePenalized ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb'];
-      }
-      return ['#ffffff', '#f8f9fa'];
-    };
-
-    return (
-      <TouchableOpacity
-        onPress={() => handleViewTaskDetails(item.id)}
-        onLongPress={() => !isMyTasksView && isAdmin && (() => {
-          Alert.alert('Task Options', `"${item.title}"`, [
-            { text: 'Edit', onPress: () => handleEditTask(item) },
-            { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item.id, item.title) },
-            { text: 'View Details', onPress: () => handleViewTaskDetails(item.id) },
-            { text: 'Cancel', style: 'cancel' }
-          ]);
-        })()}
-      >
-        <LinearGradient colors={getGradientColors()} style={styles.taskCard}>
-          <View style={styles.taskHeader}>
-            <LinearGradient 
-              colors={isFullyCompleted ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']} 
-              style={styles.taskIcon}
-            >
-              <MaterialCommunityIcons 
-                name={isFullyCompleted ? "check" : "format-list-checks"} 
-                size={20} 
-                color={isFullyCompleted ? "white" : "#495057"} 
-              />
-            </LinearGradient>
-            <View style={styles.taskInfo}>
-              <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
-                {item.title}
-              </Text>
-              <View style={styles.taskMeta}>
-                <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.pointsBadge}>
-                  <MaterialCommunityIcons name="star" size={12} color="#e67700" />
-                  <Text style={styles.taskPoints}>
-                    {isMyTasksView && item.assignmentsCount > 1 
-                      ? `${item.earnedPoints}/${item.totalPoints} pts` 
-                      : `${item.points} pts`}
-                  </Text>
-                </LinearGradient>
-              </View>
-            </View>
-          </View>
-          
-          {renderAssignmentInfo(item)}
-          
-          {/* ✅ Show progress bar ONLY for multi-slot tasks that are NOT fully completed */}
-          {isMyTasksView && item.assignmentsCount && item.assignmentsCount > 1 && !isFullyCompleted && (
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
-              </View>
-              <Text style={styles.progressText}>
-                {item.completedCount}/{item.assignmentsCount} slots completed • {item.earnedPoints}/{item.totalPoints} pts
-              </Text>
-            </View>
-          )}
-          
-          {isMyTasksView && !isFullyCompleted && validation.isSubmittableNow && (
-            <TouchableOpacity onPress={() => handleCompleteNow(item)}>
-              <LinearGradient colors={validation.willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']} style={styles.completeNowButton}>
-                <View style={styles.completeNowContent}>
-                  <MaterialCommunityIcons name={validation.willBePenalized ? "timer-alert" : "check-circle"} size={20} color="white" />
-                  <Text style={styles.completeNowText}>
-                    {validation.willBePenalized ? 'Submit Late' : 'Complete Now'}
-                  </Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-          
-          <View style={styles.taskFooter}>
-            <Text style={styles.taskCreator}>
-              <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
-            </Text>
-            <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-          </View>
-        </LinearGradient>
-      </TouchableOpacity>
-    );
+  } else {
+    // ALL TASKS VIEW (ADMIN): Show overall task completion across ALL members
+    if (item.assignments && item.assignments.length > 0) {
+      // Get all assignments for this task
+      const allAssignments = item.assignments;
+      totalCount = allAssignments.length;
+      
+      // Count completed assignments
+      const completedAssignments = allAssignments.filter((a: any) => a.completed === true);
+      completedCount = completedAssignments.length;
+      isFullyCompleted = completedCount === totalCount;
+      completionPercentage = (completedCount / totalCount) * 100;
+      
+      // Calculate total points earned across all members
+      earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+      totalPoints = allAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+    } else {
+      // No assignments yet
+      totalCount = 0;
+      completedCount = 0;
+      isFullyCompleted = false;
+      completionPercentage = 0;
+      earnedPoints = 0;
+      totalPoints = 0;
+    }
+  }
+  
+  const validation = validateTaskTime(item);
+  
+  const getGradientColors = (): [string, string] => {
+    if (isFullyCompleted) return ['#f8f9fa', '#e9ecef'];
+    if (isMyTasksView && validation.isSubmittableNow) {
+      return validation.willBePenalized ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb'];
+    }
+    return ['#ffffff', '#f8f9fa'];
   };
+
+  return (
+    <TouchableOpacity
+      onPress={() => handleViewTaskDetails(item.id)}
+      onLongPress={() => !isMyTasksView && isAdmin && (() => {
+        Alert.alert('Task Options', `"${item.title}"`, [
+          { text: 'Edit', onPress: () => handleEditTask(item) },
+          { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item.id, item.title) },
+          { text: 'View Details', onPress: () => handleViewTaskDetails(item.id) },
+          { text: 'Cancel', style: 'cancel' }
+        ]);
+      })()}
+    >
+      <LinearGradient colors={getGradientColors()} style={styles.taskCard}>
+        <View style={styles.taskHeader}>
+          <LinearGradient 
+            colors={isFullyCompleted ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']} 
+            style={styles.taskIcon}
+          >
+            <MaterialCommunityIcons 
+              name={isFullyCompleted ? "check" : "format-list-checks"} 
+              size={20} 
+              color={isFullyCompleted ? "white" : "#495057"} 
+            />
+          </LinearGradient>
+          <View style={styles.taskInfo}>
+            <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <View style={styles.taskMeta}>
+              <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.pointsBadge}>
+                <MaterialCommunityIcons name="star" size={12} color="#e67700" />
+                <Text style={styles.taskPoints}>
+                  {isMyTasksView 
+                    ? (item.assignmentsCount > 1 
+                        ? `${earnedPoints}/${totalPoints} pts` 
+                        : `${item.points} pts`)
+                    : `${earnedPoints}/${totalPoints} pts (${completedCount}/${totalCount} completed)`
+                  }
+                </Text>
+              </LinearGradient>
+            </View>
+          </View>
+        </View>
+        
+        {renderAssignmentInfo(item)}
+        
+        {/* ✅ Progress Bar - Show for BOTH views when there are multiple assignments */}
+        {((isMyTasksView && item.assignmentsCount && item.assignmentsCount > 1 && !isFullyCompleted) ||
+          (!isMyTasksView && totalCount > 1 && !isFullyCompleted)) && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+            </View>
+            <Text style={styles.progressText}>
+              {isMyTasksView 
+                ? `${completedCount}/${totalCount} slots completed • ${earnedPoints}/${totalPoints} pts`
+                : `${completedCount}/${totalCount} assignments completed • ${earnedPoints}/${totalPoints} total points`
+              }
+            </Text>
+          </View>
+        )}
+        
+        {/* ✅ Show progress bar for single assignment but not fully completed in ADMIN view */}
+        {!isMyTasksView && totalCount === 1 && !isFullyCompleted && totalCount > 0 && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+            </View>
+            <Text style={styles.progressText}>
+              {completedCount === 0 ? 'Not completed yet' : 'Completed'}
+            </Text>
+          </View>
+        )}
+        
+        {isMyTasksView && !isFullyCompleted && validation.isSubmittableNow && (
+          <TouchableOpacity onPress={() => handleCompleteNow(item)}>
+            <LinearGradient colors={validation.willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']} style={styles.completeNowButton}>
+              <View style={styles.completeNowContent}>
+                <MaterialCommunityIcons name={validation.willBePenalized ? "timer-alert" : "check-circle"} size={20} color="white" />
+                <Text style={styles.completeNowText}>
+                  {validation.willBePenalized ? 'Submit Late' : 'Complete Now'}
+                </Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+        
+        <View style={styles.taskFooter}>
+          <Text style={styles.taskCreator}>
+            <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
+          </Text>
+          <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+};
 
 const renderContent = () => {
   // ✅ Filter out deleted tasks for BOTH admin and member views

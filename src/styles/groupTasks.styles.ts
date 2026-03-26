@@ -78,6 +78,12 @@ export const styles = StyleSheet.create({
     width: 80,
     justifyContent: 'flex-end'
   },
+  detailRow: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 6,
+  marginBottom: 4,
+},
   swapButton: {
     position: 'relative',
     padding: 8,

@@ -1,6 +1,7 @@
-// services/SwapRequestService.ts - UPDATED with TokenUtils
+// services/SwapRequestService.ts - COMPLETE WITH checkUserHasAssignmentOnDay
+
 import { API_BASE_URL } from '../config/api';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 import { NotificationService } from './NotificationService';
 
 const API_URL = `${API_BASE_URL}/api/swap-requests`;
@@ -101,14 +102,11 @@ export interface SwapRequestResponse {
 
 export class SwapRequestService {
   
-  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
-
   // CREATE: Request to swap an assignment
   static async createSwapRequest(data: CreateSwapRequestData): Promise<SwapRequestResponse> {
     try {
       console.log('SwapRequestService: Creating swap request', data);
       
-      // Validate day scope
       if (data.scope === 'day' && !data.selectedDay) {
         return {
           success: false,
@@ -116,9 +114,7 @@ export class SwapRequestService {
         };
       }
       
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
-      console.log('Request headers:', headers);
       
       const response = await fetch(`${API_URL}/create`, {
         method: 'POST',
@@ -127,8 +123,6 @@ export class SwapRequestService {
         credentials: 'include'
       });
 
-      console.log('Response status:', response.status);
-      
       const result = await response.json();
       console.log('SwapRequestService: Create response', result);
       
@@ -136,7 +130,6 @@ export class SwapRequestService {
         throw new Error(result.message || `Failed to create swap request: ${response.status}`);
       }
       
-      // After successful creation, refresh notifications
       if (result.success) {
         await NotificationService.getUnreadCount();
       }
@@ -153,14 +146,16 @@ export class SwapRequestService {
   }
 
   // CHECK: Check if assignment can be swapped
-  static async checkCanSwap(assignmentId: string, scope?: 'week' | 'day') {
+  static async checkCanSwap(assignmentId: string, scope?: 'week' | 'day', selectedDay?: string) {
     try {
       let url = `${API_URL}/check/${assignmentId}`;
-      if (scope) {
-        url += `?scope=${scope}`;
-      }
+      const params = new URLSearchParams();
+      if (scope) params.append('scope', scope);
+      if (selectedDay && scope === 'day') params.append('selectedDay', selectedDay);
       
-      // ✅ Use TokenUtils.getAuthHeaders() with false for no JSON content
+      const queryString = params.toString();
+      if (queryString) url += `?${queryString}`;
+      
       const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
@@ -186,6 +181,44 @@ export class SwapRequestService {
     }
   }
 
+  // ✅ NEW: Check if a user has an assignment on a specific day
+  static async checkUserHasAssignmentOnDay(
+    userId: string,
+    groupId: string,
+    day: string,
+    week: number
+  ): Promise<{ hasAssignment: boolean; assignment?: any }> {
+    try {
+      console.log(`🔍 Checking if user ${userId} has assignment on ${day} (week ${week})`);
+      
+      const headers = await TokenUtils.getAuthHeaders(false);
+      
+      const url = `${API_URL}/check-user-assignment?targetUserId=${encodeURIComponent(userId)}&groupId=${encodeURIComponent(groupId)}&day=${encodeURIComponent(day)}&week=${week}`;
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to check user assignment: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('SwapRequestService: checkUserHasAssignmentOnDay response:', result);
+      
+      return {
+        hasAssignment: result.hasAssignment || false,
+        assignment: result.assignment || null
+      };
+
+    } catch (error: any) {
+      console.error('SwapRequestService.checkUserHasAssignmentOnDay error:', error);
+      return { hasAssignment: false };
+    }
+  }
+
   // GET: Get my swap requests
   static async getMySwapRequests(filters?: SwapRequestFilters) {
     try {
@@ -200,9 +233,6 @@ export class SwapRequestService {
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
 
-      console.log('SwapRequestService: Getting my swap requests', url);
-      
-      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
       const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
@@ -216,11 +246,8 @@ export class SwapRequestService {
       }
       
       const result = await response.json();
-      console.log('SwapRequestService: Get my requests response:', result);
       
-      // Handle different response structures
       if (result.success) {
-        // Check if data is directly in result or in result.data
         const requests = result.data?.requests || result.requests || [];
         const total = result.data?.total || result.total || requests.length;
         
@@ -258,9 +285,6 @@ export class SwapRequestService {
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
 
-      console.log('SwapRequestService: Getting pending requests for me', url);
-      
-      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
       const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
@@ -274,9 +298,7 @@ export class SwapRequestService {
       }
       
       const result = await response.json();
-      console.log('SwapRequestService: Get pending for me response:', result);
       
-      // Handle different response structures
       if (result.success) {
         const requests = result.data?.requests || result.requests || [];
         const total = result.data?.total || result.total || requests.length;
@@ -305,9 +327,6 @@ export class SwapRequestService {
   // GET: Get swap request details by ID
   static async getSwapRequestDetails(requestId: string): Promise<{ success: boolean; message: string; data?: any }> {
     try {
-      console.log('SwapRequestService: Getting swap request details', requestId);
-      
-      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
       const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(`${API_URL}/${requestId}`, {
@@ -321,9 +340,7 @@ export class SwapRequestService {
       }
       
       const result = await response.json();
-      console.log('SwapRequestService: Get details response:', result);
       
-      // Handle different response structures
       if (result.success) {
         return {
           success: true,
@@ -346,9 +363,6 @@ export class SwapRequestService {
   // ACCEPT: Accept a swap request
   static async acceptSwapRequest(requestId: string): Promise<SwapRequestResponse> {
     try {
-      console.log('SwapRequestService: Accepting swap request', requestId);
-      
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${requestId}/accept`, {
@@ -358,7 +372,6 @@ export class SwapRequestService {
       });
 
       const result = await response.json();
-      console.log('SwapRequestService: Accept response', result);
       
       if (!response.ok) {
         throw new Error(result.message || `Failed to accept swap request: ${response.status}`);
@@ -382,9 +395,6 @@ export class SwapRequestService {
   // REJECT: Reject a swap request
   static async rejectSwapRequest(requestId: string, reason?: string): Promise<SwapRequestResponse> {
     try {
-      console.log('SwapRequestService: Rejecting swap request', requestId);
-      
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${requestId}/reject`, {
@@ -395,7 +405,6 @@ export class SwapRequestService {
       });
 
       const result = await response.json();
-      console.log('SwapRequestService: Reject response', result);
       
       if (!response.ok) {
         throw new Error(result.message || `Failed to reject swap request: ${response.status}`);
@@ -419,9 +428,6 @@ export class SwapRequestService {
   // CANCEL: Cancel a swap request
   static async cancelSwapRequest(requestId: string): Promise<SwapRequestResponse> {
     try {
-      console.log('SwapRequestService: Cancelling swap request', requestId);
-      
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${requestId}/cancel`, {
@@ -431,7 +437,6 @@ export class SwapRequestService {
       });
 
       const result = await response.json();
-      console.log('SwapRequestService: Cancel response', result);
       
       if (!response.ok) {
         throw new Error(result.message || `Failed to cancel swap request: ${response.status}`);
@@ -452,7 +457,7 @@ export class SwapRequestService {
     }
   }
 
-  // ===== NEW: Get group swap requests (for admin history view) =====
+  // GET: Get group swap requests (for admin history view)
   static async getGroupSwapRequests(
     groupId: string,
     filters?: {
@@ -472,9 +477,6 @@ export class SwapRequestService {
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
 
-      console.log('SwapRequestService: Getting group swap requests', url);
-      
-      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
       const headers = await TokenUtils.getAuthHeaders(false);
       
       const response = await fetch(url, {
@@ -488,7 +490,6 @@ export class SwapRequestService {
       }
       
       const result = await response.json();
-      console.log('SwapRequestService: Get group requests response:', result);
       
       if (result.success) {
         return {
@@ -514,9 +515,7 @@ export class SwapRequestService {
   }
 
   // ============= HELPER METHODS =============
-  // (These don't need tokens, so they stay the same)
 
-  // Get swap description text
   static getSwapDescription(swapRequest: SwapRequest): string {
     if (swapRequest.scope === 'day') {
       if (swapRequest.selectedTimeSlotId && swapRequest.selectedTimeSlot) {
@@ -527,61 +526,39 @@ export class SwapRequestService {
     return 'entire week';
   }
 
-  // Get status color
   static getStatusColor(status: string): string {
     switch (status) {
-      case 'PENDING':
-        return '#F59E0B';
-      case 'ACCEPTED':
-        return '#10B981';
-      case 'REJECTED':
-        return '#EF4444';
-      case 'CANCELLED':
-        return '#6B7280';
-      case 'EXPIRED':
-        return '#9CA3AF';
-      default:
-        return '#6B7280';
+      case 'PENDING': return '#F59E0B';
+      case 'ACCEPTED': return '#10B981';
+      case 'REJECTED': return '#EF4444';
+      case 'CANCELLED': return '#6B7280';
+      case 'EXPIRED': return '#9CA3AF';
+      default: return '#6B7280';
     }
   }
 
-  // Get status label
   static getStatusLabel(status: string): string {
     switch (status) {
-      case 'PENDING':
-        return 'Pending';
-      case 'ACCEPTED':
-        return 'Accepted';
-      case 'REJECTED':
-        return 'Rejected';
-      case 'CANCELLED':
-        return 'Cancelled';
-      case 'EXPIRED':
-        return 'Expired';
-      default:
-        return status;
+      case 'PENDING': return 'Pending';
+      case 'ACCEPTED': return 'Accepted';
+      case 'REJECTED': return 'Rejected';
+      case 'CANCELLED': return 'Cancelled';
+      case 'EXPIRED': return 'Expired';
+      default: return status;
     }
   }
 
-  // Get status icon
   static getStatusIcon(status: string): string {
     switch (status) {
-      case 'PENDING':
-        return 'time-outline';
-      case 'ACCEPTED':
-        return 'checkmark-circle';
-      case 'REJECTED':
-        return 'close-circle';
-      case 'CANCELLED':
-        return 'ban';
-      case 'EXPIRED':
-        return 'alert-circle';
-      default:
-        return 'help-circle';
+      case 'PENDING': return 'time-outline';
+      case 'ACCEPTED': return 'checkmark-circle';
+      case 'REJECTED': return 'close-circle';
+      case 'CANCELLED': return 'ban';
+      case 'EXPIRED': return 'alert-circle';
+      default: return 'help-circle';
     }
   }
 
-  // Check if user can swap (time constraints)
   static canRequestSwap(dueDate: string): { canSwap: boolean; reason?: string } {
     const now = new Date();
     const due = new Date(dueDate);
@@ -603,14 +580,12 @@ export class SwapRequestService {
     return { canSwap: true };
   }
 
-  // Get day from due date
   static getDayFromDueDate(dueDate: string): string {
     const date = new Date(dueDate);
     const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
     return days[date.getDay()];
   }
 
-  // Format day for display
   static formatDay(day: string): string {
     return day.charAt(0) + day.slice(1).toLowerCase();
   }

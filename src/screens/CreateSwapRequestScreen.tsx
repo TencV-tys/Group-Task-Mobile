@@ -1,5 +1,6 @@
-// src/screens/CreateSwapRequestScreen.tsx - UPDATED with dark gray primary color
-import React, { useState, useEffect } from 'react';
+// src/screens/CreateSwapRequestScreen.tsx - COMPLETE FIXED VERSION
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,11 +16,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { GroupMembersService } from '../services/GroupMemberService';
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 type CreateSwapRequestRouteParams = {
@@ -47,7 +48,7 @@ const DAYS_OF_WEEK = [
 ];
 
 export const CreateSwapRequestScreen = () => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: CreateSwapRequestRouteParams }, 'params'>>();
   const { 
     assignmentId, 
@@ -64,9 +65,10 @@ export const CreateSwapRequestScreen = () => {
     scope: propScope
   } = route.params;
   
-  const { createSwapRequest, loading,authError } = useSwapRequests();
+  const { createSwapRequest, loading, authError } = useSwapRequests();
   
   const [members, setMembers] = useState<any[]>([]);
+  const [allMembers, setAllMembers] = useState<any[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
   const [reason, setReason] = useState('');
   const [targetUserId, setTargetUserId] = useState<string | undefined>(undefined);
@@ -75,6 +77,7 @@ export const CreateSwapRequestScreen = () => {
   const [canSwap, setCanSwap] = useState<{ canSwap: boolean; reason?: string }>({ canSwap: true });
   const [checking, setChecking] = useState(true);
   const [existingRequest, setExistingRequest] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   
   const [swapScope, setSwapScope] = useState<'week' | 'day'>(propScope || 'day');
   const [selectedDay, setSelectedDay] = useState<string | null>(
@@ -83,23 +86,34 @@ export const CreateSwapRequestScreen = () => {
   const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(
     propSelectedTimeSlotId || null
   );
+  const [currentWeek, setCurrentWeek] = useState<number>(1);
+  const [eligibleCount, setEligibleCount] = useState<number>(0);
 
+  // Get current user ID
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const user = await TokenUtils.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+    };
+    getCurrentUser();
+  }, []);
 
-useEffect(() => {
-  if (authError) {
-    Alert.alert(
-      'Session Expired',
-      'Please log in again',
-      [{ 
-        text: 'OK', 
-        onPress: () => {
-          // @ts-ignore
-          navigation.navigate('Login');
-        }
-      }]
-    );
-  }
-}, [authError]);
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [{ 
+          text: 'OK', 
+          onPress: () => {
+            navigation.navigate('Login');
+          }
+        }]
+      );
+    }
+  }, [authError, navigation]);
 
   // Get the current day of the week for this assignment
   useEffect(() => {
@@ -109,21 +123,42 @@ useEffect(() => {
       const dayFromDate = dayNames[date.getDay()];
       setSelectedDay(dayFromDate);
     }
-  }, [dueDate]);
+  }, [dueDate, selectedDay]);
+
+  // Load group and get current week
+  useEffect(() => {
+    loadCurrentWeek();
+  }, [groupId]);
 
   // Load group members
   useEffect(() => {
-    loadGroupMembers();
+    loadAllMembers();
   }, [groupId]);
+
+  // Filter members when scope or selected day changes
+  useEffect(() => {
+    filterEligibleMembers();
+  }, [allMembers, swapScope, selectedDay, currentWeek]);
 
   // Check swap availability when scope changes
   useEffect(() => {
     if (assignmentId) {
       checkSwapAvailability();
-    } 
-  }, [assignmentId, swapScope]);
+    }
+  }, [assignmentId, swapScope, selectedDay]);
 
-  const loadGroupMembers = async () => {
+  const loadCurrentWeek = async () => {
+    try {
+      const result = await GroupMembersService.getGroupInfo(groupId);
+      if (result.success && result.group) {
+        setCurrentWeek(result.group.currentRotationWeek || 1);
+      }
+    } catch (error) {
+      console.error('Error loading current week:', error);
+    }
+  };
+
+  const loadAllMembers = async () => {
     setLoadingMembers(true);
     try {
       console.log('📥 Loading members for group:', groupId);
@@ -131,7 +166,7 @@ useEffect(() => {
       
       if (result.success) {
         const activeMembers = (result.members || []).filter((m: any) => m.isActive !== false);
-        setMembers(activeMembers);
+        setAllMembers(activeMembers);
         console.log(`✅ Loaded ${activeMembers.length} active members`);
       } else {
         console.error('Failed to load members:', result.message);
@@ -143,10 +178,83 @@ useEffect(() => {
     }
   };
 
+  // Check if a member has an assignment on a specific day
+  const checkMemberHasAssignmentOnDay = async (
+    memberId: string, 
+    day: string, 
+    week: number
+  ): Promise<boolean> => {
+    try {
+      const result = await SwapRequestService.checkUserHasAssignmentOnDay(
+        memberId,
+        groupId,
+        day,
+        week 
+      );
+      return result.hasAssignment || false;
+    } catch (error) {
+      console.error('Error checking assignment:', error);
+      return false;
+    }
+  };
+
+ // Filter eligible members based on swap scope
+const filterEligibleMembers = async () => {
+  if (allMembers.length === 0) return;
+  
+  setLoadingMembers(true);
+  
+  // Define nonAdminMembers outside the try-catch so it's accessible in catch
+  const nonAdminMembers = allMembers.filter(m => 
+    m.userId !== currentUserId && 
+    m.role !== 'ADMIN' &&
+    m.inRotation === true
+  );
+  
+  try {
+    let eligible: any[] = [];
+    
+    if (swapScope === 'day' && selectedDay) {
+      // For DAY swaps: only members who have NO task that day
+      console.log(`🔍 Filtering for DAY swap on ${selectedDay}`);
+      
+      for (const member of nonAdminMembers) {
+        const hasAssignment = await checkMemberHasAssignmentOnDay(
+          member.userId || member.id,
+          selectedDay,
+          currentWeek
+        );
+        
+        if (!hasAssignment) {
+          eligible.push(member);
+        }
+      }
+      
+      setEligibleCount(eligible.length);
+      console.log(`✅ Found ${eligible.length} eligible members for day swap on ${selectedDay}`);
+    } else {
+      // For WEEK swaps: all members in rotation (excluding admins)
+      eligible = nonAdminMembers;
+      setEligibleCount(eligible.length);
+      console.log(`✅ Found ${eligible.length} members for week swap`);
+    }
+    
+    setMembers(eligible);
+    
+  } catch (error) {
+    console.error('Error filtering members:', error);
+    // Now nonAdminMembers is accessible here
+    setMembers(nonAdminMembers);
+    setEligibleCount(nonAdminMembers.length);
+  } finally {
+    setLoadingMembers(false);
+  }
+};
+
   const checkSwapAvailability = async () => {
     setChecking(true);
     try {
-      const result = await SwapRequestService.checkCanSwap(assignmentId, swapScope);
+      const result = await SwapRequestService.checkCanSwap(assignmentId, swapScope, selectedDay || undefined);
       console.log('📦 Check swap result:', result);
       
       if (result.success) {
@@ -158,9 +266,18 @@ useEffect(() => {
         if (result.existingRequestId) {
           setExistingRequest({ id: result.existingRequestId });
         }
+      } else {
+        setCanSwap({
+          canSwap: false,
+          reason: result.message || 'Unable to check swap availability'
+        });
       }
     } catch (error) {
       console.error('Failed to check swap availability:', error);
+      setCanSwap({
+        canSwap: false,
+        reason: 'Network error. Please try again.'
+      });
     } finally {
       setChecking(false);
     }
@@ -193,6 +310,16 @@ useEffect(() => {
     if (swapScope === 'day') {
       if (!selectedDay) {
         Alert.alert('Error', 'Cannot determine which day to swap. Please try again.');
+        return;
+      }
+      
+      // Check if there are any eligible members (only for "Anyone" option)
+      if (!targetUserId && members.length === 0) {
+        Alert.alert(
+          'No Eligible Members',
+          `No members are available to accept a day swap on ${selectedDay}. All members already have tasks that day.`,
+          [{ text: 'OK' }]
+        );
         return;
       }
     }
@@ -229,7 +356,6 @@ useEffect(() => {
                   if (existingRequest?.id) {
                     navigation.goBack();
                     setTimeout(() => {
-                      // @ts-ignore
                       navigation.navigate('SwapRequestDetails', { requestId: existingRequest.id });
                     }, 100);
                   } else {
@@ -251,8 +377,49 @@ useEffect(() => {
 
   const getSelectedMemberName = () => {
     if (!targetUserId) return 'Anyone can accept';
-    const member = members.find(m => m.userId === targetUserId || m.id === targetUserId);
+    const member = allMembers.find(m => m.userId === targetUserId || m.id === targetUserId);
     return member?.fullName || 'Selected user';
+  };
+
+  const renderEligibleMessage = () => {
+    if (swapScope === 'day' && selectedDay) {
+      if (eligibleCount === 0 && !targetUserId) {
+        return (
+          <LinearGradient
+            colors={['#fff5f5', '#ffe3e3']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.warningCard}
+          >
+            <MaterialCommunityIcons name="alert-circle" size={24} color="#fa5252" />
+            <View style={styles.warningContent}>
+              <Text style={styles.warningTitle}>No Eligible Members</Text>
+              <Text style={styles.warningText}>
+                All members already have tasks on {selectedDay}. No one can accept this day swap.
+              </Text>
+            </View>
+          </LinearGradient>
+        );
+      } else if (eligibleCount > 0 && !targetUserId) {
+        return (
+          <LinearGradient
+            colors={['#d3f9d8', '#b2f2bb']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.infoSuccessCard}
+          >
+            <MaterialCommunityIcons name="check-circle" size={24} color="#2b8a3e" />
+            <View style={styles.warningContent}>
+              <Text style={styles.successTitle}>{eligibleCount} Member{eligibleCount !== 1 ? 's' : ''} Available</Text>
+              <Text style={styles.successText}>
+                {eligibleCount} member{eligibleCount !== 1 ? 's are' : ' is'} available to accept this day swap.
+              </Text>
+            </View>
+          </LinearGradient>
+        );
+      }
+    }
+    return null;
   };
 
   if (checking || loadingMembers) {
@@ -289,8 +456,10 @@ useEffect(() => {
             style={styles.viewRequestButton}
             onPress={() => {
               if (existingRequest?.id) {
-                // @ts-ignore
-                navigation.navigate('SwapRequestDetails', { requestId: existingRequest.id });
+                navigation.goBack();
+                setTimeout(() => {
+                  navigation.navigate('SwapRequestDetails', { requestId: existingRequest.id });
+                }, 100);
               }
             }}
           >
@@ -374,7 +543,7 @@ useEffect(() => {
               >
                 <MaterialCommunityIcons name="calendar-today" size={14} color="#495057" />
                 <Text style={styles.assignmentDayText}>
-                  This assignment is for: <Text style={styles.assignmentDayBold}>{selectedDay}</Text>
+                  Swapping: <Text style={styles.assignmentDayBold}>{selectedDay}</Text>
                 </Text>
               </LinearGradient>
             )}
@@ -448,6 +617,9 @@ useEffect(() => {
                 </View>
               </LinearGradient>
 
+              {/* Show eligible members message for DAY swaps */}
+              {renderEligibleMessage()}
+
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Swap With</Text>
                 <TouchableOpacity
@@ -472,32 +644,39 @@ useEffect(() => {
 
                 {showMemberSelector && (
                   <View style={styles.memberList}>
-                    <TouchableOpacity
-                      style={styles.memberItem}
-                      onPress={() => {
-                        setTargetUserId(undefined);
-                        setShowMemberSelector(false);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.memberInfo}>
-                        <LinearGradient
-                          colors={['#f8f9fa', '#e9ecef']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={[styles.avatar, styles.anyoneAvatar]}
-                        >
-                          <MaterialCommunityIcons name="account-group" size={18} color="#495057" />
-                        </LinearGradient>
-                        <View>
-                          <Text style={styles.memberName}>Anyone can accept</Text>
-                          <Text style={styles.memberRole}>Any group member</Text>
+                    {/* Anyone option - only show if there are eligible members */}
+                    {eligibleCount > 0 && (
+                      <TouchableOpacity
+                        style={styles.memberItem}
+                        onPress={() => {
+                          setTargetUserId(undefined);
+                          setShowMemberSelector(false);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.memberInfo}>
+                          <LinearGradient
+                            colors={['#f8f9fa', '#e9ecef']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={[styles.avatar, styles.anyoneAvatar]}
+                          >
+                            <MaterialCommunityIcons name="account-group" size={18} color="#495057" />
+                          </LinearGradient>
+                          <View>
+                            <Text style={styles.memberName}>Anyone can accept</Text>
+                            <Text style={styles.memberRole}>
+                              {swapScope === 'day' 
+                                ? `${eligibleCount} eligible member${eligibleCount !== 1 ? 's' : ''}`
+                                : `${members.length} member${members.length !== 1 ? 's' : ''}`}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                      {!targetUserId && (
-                        <MaterialCommunityIcons name="check-circle" size={20} color="#2b8a3e" />
-                      )}
-                    </TouchableOpacity>
+                        {!targetUserId && (
+                          <MaterialCommunityIcons name="check-circle" size={20} color="#2b8a3e" />
+                        )}
+                      </TouchableOpacity>
+                    )}
                     
                     {members.length > 0 ? (
                       members.map(member => (
@@ -512,7 +691,7 @@ useEffect(() => {
                         >
                           <View style={styles.memberInfo}>
                             <LinearGradient
-                              colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                              colors={['#f8f9fa', '#e9ecef']}
                               start={{ x: 0, y: 0 }}
                               end={{ x: 1, y: 1 }}
                               style={styles.avatar}
@@ -523,10 +702,7 @@ useEffect(() => {
                                   style={styles.avatarImage} 
                                 />
                               ) : (
-                                <Text style={[
-                                  styles.avatarText,
-                                  { color: member.role === 'ADMIN' ? 'white' : '#495057' }
-                                ]}>
+                                <Text style={styles.avatarText}>
                                   {member.fullName?.charAt(0).toUpperCase() || '?'}
                                 </Text>
                               )}
@@ -534,7 +710,7 @@ useEffect(() => {
                             <View>
                               <Text style={styles.memberName}>{member.fullName || 'Unknown'}</Text>
                               <Text style={styles.memberRole}>
-                                {member.role === 'ADMIN' ? 'Admin' : 'Member'}
+                                Member • {member.inRotation ? 'In Rotation' : 'Not in Rotation'}
                               </Text>
                             </View>
                           </View>
@@ -545,7 +721,12 @@ useEffect(() => {
                       ))
                     ) : (
                       <View style={styles.noMembersContainer}>
-                        <Text style={styles.noMembersText}>No active members found</Text>
+                        <MaterialCommunityIcons name="account-off" size={32} color="#adb5bd" />
+                        <Text style={styles.noMembersText}>
+                          {swapScope === 'day' && selectedDay
+                            ? `No members available on ${selectedDay}`
+                            : 'No active members found'}
+                        </Text>
                       </View>
                     )}
                   </View>
@@ -616,7 +797,7 @@ useEffect(() => {
                 <Text style={styles.infoText}>
                   {swapScope === 'week' 
                     ? 'This will swap ALL your tasks for the current week.'
-                    : `You're swapping the assignment for ${selectedDay || 'this day'}.`}
+                    : `This will transfer your ${selectedDay} task to the accepting member. Only members without a task on ${selectedDay} can accept.`}
                 </Text>
               </LinearGradient>
             </>
@@ -626,13 +807,21 @@ useEffect(() => {
         {canSwap.canSwap && (
           <View style={styles.footer}>
             <TouchableOpacity
-              style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+              style={[
+                styles.submitButton, 
+                loading && styles.submitButtonDisabled,
+                (swapScope === 'day' && eligibleCount === 0 && !targetUserId) && styles.submitButtonDisabled
+              ]}
               onPress={handleSubmit}
-              disabled={loading}
+              disabled={loading || (swapScope === 'day' && eligibleCount === 0 && !targetUserId)}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={loading ? ['#f8f9fa', '#e9ecef'] : ['#2b8a3e', '#1e6b2c']}
+                colors={
+                  loading || (swapScope === 'day' && eligibleCount === 0 && !targetUserId) 
+                    ? ['#f8f9fa', '#e9ecef'] 
+                    : ['#2b8a3e', '#1e6b2c']
+                }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.submitButtonGradient}
@@ -653,6 +842,11 @@ useEffect(() => {
                 )}
               </LinearGradient>
             </TouchableOpacity>
+            {swapScope === 'day' && eligibleCount === 0 && !targetUserId && (
+              <Text style={styles.disabledHint}>
+                ⓘ No members available to accept this day swap
+              </Text>
+            )}
           </View>
         )}
       </KeyboardAvoidingView>
@@ -864,20 +1058,43 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   warningTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fa5252',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   warningText: {
     fontSize: 13,
-    color: '#fa5252',
+    color: '#c92a2a',
+    lineHeight: 18,
   },
-  infoBanner: {
-    flexDirection: 'row',
+  infoSuccessCard: {
     borderRadius: 12,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#b2f2bb',
+  },
+  successTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2b8a3e',
+    marginBottom: 4,
+  },
+  successText: {
+    fontSize: 13,
+    color: '#1e6b2c',
+    lineHeight: 18,
+  },
+  infoBanner: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     gap: 12,
     borderWidth: 1,
     borderColor: '#e9ecef',
@@ -886,14 +1103,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   infoBannerTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
-    marginBottom: 2,
+    color: '#212529',
+    marginBottom: 4,
   },
   infoBannerText: {
     fontSize: 13,
-    color: '#868e96',
+    color: '#495057',
     lineHeight: 18,
   },
   section: {
@@ -902,18 +1119,17 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
+    color: '#495057',
     marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
   selectorButton: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
@@ -923,8 +1139,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   selectorText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#212529',
+    fontWeight: '500',
   },
   memberList: {
     marginTop: 8,
@@ -932,14 +1149,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e9ecef',
-    padding: 8,
+    overflow: 'hidden',
   },
   memberItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
-    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f5',
   },
   memberInfo: {
     flexDirection: 'row',
@@ -952,38 +1171,39 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   anyoneAvatar: {
-    borderColor: '#e9ecef',
+    backgroundColor: '#e9ecef',
   },
   avatarImage: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   avatarText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#495057',
   },
   memberName: {
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '600',
     color: '#212529',
     marginBottom: 2,
   },
   memberRole: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#868e96',
   },
   noMembersContainer: {
-    padding: 20,
     alignItems: 'center',
+    paddingVertical: 32,
+    gap: 12,
   },
   noMembersText: {
     fontSize: 14,
-    color: '#868e96',
+    color: '#adb5bd',
+    textAlign: 'center',
   },
   expiryOptions: {
     flexDirection: 'row',
@@ -993,16 +1213,10 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   expiryOptionGradient: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
     alignItems: 'center',
-  },
-  expiryOptionActive: {
-    borderColor: '#495057',
   },
   expiryOptionText: {
     fontSize: 13,
@@ -1012,35 +1226,45 @@ const styles = StyleSheet.create({
   expiryOptionTextActive: {
     color: 'white',
   },
+  expiryOptionActive: {
+    borderWidth: 1,
+    borderColor: '#495057',
+  },
   reasonInputGradient: {
     borderRadius: 12,
+    padding: 2,
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
   reasonInput: {
-    padding: 16,
-    fontSize: 15,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
     color: '#212529',
     minHeight: 100,
-    backgroundColor: 'transparent',
+    textAlignVertical: 'top',
   },
   infoNote: {
     flexDirection: 'row',
-    borderRadius: 12,
-    padding: 16,
+    alignItems: 'center',
     gap: 12,
-    marginTop: 8,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
   infoText: {
     flex: 1,
-    fontSize: 13,
-    color: '#495057',
+    fontSize: 12,
+    color: '#868e96',
     lineHeight: 18,
   },
   footer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: 'white',
     borderTopWidth: 1,
     borderTopColor: '#e9ecef',
@@ -1049,19 +1273,27 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  submitButtonDisabled: {
+    opacity: 0.6,
+  },
   submitButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
     gap: 8,
-  },
-  submitButtonDisabled: {
-    opacity: 0.7,
+    paddingVertical: 14,
   },
   submitButtonText: {
-    color: 'white',
     fontSize: 15,
     fontWeight: '600',
+    color: 'white',
+  },
+  disabledHint: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#fa5252',
+    marginTop: 8,
   },
 });
+
+export default CreateSwapRequestScreen;

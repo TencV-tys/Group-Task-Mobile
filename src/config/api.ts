@@ -31,4 +31,4 @@ export const getBackendIP = (): string => {
 export const API_BASE_URL = `http://${getBackendIP()}:5000`;
 
 // Log it for debugging
-console.log('🌐 Backend URL:', API_BASE_URL);
+console.log('🌐 Backend URL:', API_BASE_URL); 

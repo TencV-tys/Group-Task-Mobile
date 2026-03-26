@@ -1,7 +1,7 @@
 // src/styles/assignmentDetails.styles.ts
 import { StyleSheet, Dimensions } from 'react-native';
 
-const { width } = Dimensions.get('window');
+const { width,height } = Dimensions.get('window');
 
 export const assignmentDetailsStyles = StyleSheet.create({
   container: {
@@ -553,6 +553,37 @@ adminBadge: {
   borderRadius: 16,
   gap: 4,
 },
+modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: width,
+    height: height,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  modalImage: {
+    width: width - 40,
+    height: height - 100,
+    borderRadius: 8,
+  },
 adminBadgeText: {
   color: 'white',
   fontSize: 10,

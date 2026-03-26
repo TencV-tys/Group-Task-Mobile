@@ -28,7 +28,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   // ===== HOOK - ALL LOGIC IS HERE =====
   const {
     // State
-    timeLeft,
+    timeLeft, 
     isSubmittable,
     submitting,
     photo,

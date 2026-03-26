@@ -1,4 +1,5 @@
-// src/screens/AssignmentDetailsScreen.tsx - WITH ADMIN READ-ONLY
+// src/screens/AssignmentDetailsScreen.tsx - WITH PHOTO MODAL
+
 import React, { useEffect } from 'react';
 import {
   View,
@@ -6,17 +7,22 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  TextInput, 
-  ActivityIndicator,
+  TextInput,   
+  ActivityIndicator, 
   Alert,
-  StatusBar
+  StatusBar,
+  Modal,
+  Dimensions
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { LinearGradient } from 'expo-linear-gradient'; 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useAssignmentDetails } from '../hooks/useAssignmentDetails';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { assignmentDetailsStyles as styles } from '../styles/assignmentDetails.styles';
+import { getFullImageUrl } from '../utils/imageUrl';
+
+const { width, height } = Dimensions.get('window');
 
 export default function AssignmentDetailsScreen({ navigation, route }: any) {
   const { assignmentId, isAdmin = false, onVerified } = route.params || {};
@@ -45,6 +51,10 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     hasPendingRequest,
     pendingRequest,
     
+    // Photo modal
+    photoModalVisible,
+    selectedPhotoUrl,
+    
     // Helper functions
     getStatusColor,
     getStatusIcon,
@@ -58,6 +68,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     handleRequestSwap,
     handleVerify,
     handleViewPhoto,
+    closePhotoModal,
     clearAuthError
   } = useAssignmentDetails(assignmentId, isAdmin, onVerified);
 
@@ -111,185 +122,216 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     </View>
   );
 
+  // ===== RENDER PHOTO MODAL =====
+  const renderPhotoModal = () => (
+    <Modal
+      visible={photoModalVisible}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={closePhotoModal}
+    >
+      <TouchableOpacity
+        style={styles.modalOverlay}
+        activeOpacity={1}
+        onPress={closePhotoModal}
+      >
+        <View style={styles.modalContent}>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={closePhotoModal}
+          >
+            <MaterialCommunityIcons name="close" size={24} color="white" />
+          </TouchableOpacity>
+          {selectedPhotoUrl && (
+            <Image
+              source={{ uri: selectedPhotoUrl }}
+              style={styles.modalImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
   // ===== RENDER COMPLETE BUTTON (HIDDEN FOR ADMIN) =====
   const renderCompleteButton = () => {
-    // ✅ Admin cannot complete assignments
     if (isAdmin) return null;
     
-    if (!assignment?.completed) {
-      const submissionStatusInfo = getSubmissionStatusInfo();
-      
-      return ( 
-        <View style={styles.completeSection}>
-          <Text style={styles.sectionTitle}>Complete This Assignment</Text>
-          
-          <LinearGradient
-            colors={[submissionStatusInfo.bgColor, submissionStatusInfo.bgColor]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.submissionStatusCard, { borderColor: submissionStatusInfo.borderColor }]}
-          >
-            <View style={styles.submissionStatusHeader}>
-              <View style={[styles.statusIconContainer, { backgroundColor: submissionStatusInfo.color + '20' }]}>
-                <MaterialCommunityIcons 
-                  name={submissionStatusInfo.icon as any} 
-                  size={22} 
-                  color={submissionStatusInfo.color} 
-                />
-              </View>
-              <View style={styles.statusTextContainer}>
-                <Text style={[styles.submissionStatusLabel, { color: submissionStatusInfo.color }]}>
-                  {submissionStatusInfo.label}
-                </Text>
-                <Text style={[styles.submissionStatusDescription, { color: submissionStatusInfo.color }]}>
-                  {submissionStatusInfo.description}
-                </Text>
-              </View>
+    if (assignment?.completed) {
+      return null;
+    }
+    
+    const submissionStatusInfo = getSubmissionStatusInfo();
+    
+    return ( 
+      <View style={styles.completeSection}>
+        <Text style={styles.sectionTitle}>Complete This Assignment</Text>
+        
+        <LinearGradient
+          colors={[submissionStatusInfo.bgColor, submissionStatusInfo.bgColor]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.submissionStatusCard, { borderColor: submissionStatusInfo.borderColor }]}
+        >
+          <View style={styles.submissionStatusHeader}>
+            <View style={[styles.statusIconContainer, { backgroundColor: submissionStatusInfo.color + '20' }]}>
+              <MaterialCommunityIcons 
+                name={submissionStatusInfo.icon as any} 
+                size={22} 
+                color={submissionStatusInfo.color} 
+              />
             </View>
-            
-            {assignment?.timeSlot && submissionStatus === 'available' && (
-              <View style={styles.timeWindowInfo}>
-                <Text style={styles.timeWindowText}>
-                  Submit within time window for full points
+            <View style={styles.statusTextContainer}>
+              <Text style={[styles.submissionStatusLabel, { color: submissionStatusInfo.color }]}>
+                {submissionStatusInfo.label}
+              </Text>
+              <Text style={[styles.submissionStatusDescription, { color: submissionStatusInfo.color }]}>
+                {submissionStatusInfo.description}
+              </Text>
+            </View>
+          </View>
+          
+          {assignment?.timeSlot && submissionStatus === 'available' && (
+            <View style={styles.timeWindowInfo}>
+              <Text style={styles.timeWindowText}>
+                Submit within time window for full points
+              </Text>
+            </View>
+          )}
+          
+          {isLate && penaltyInfo && (
+            <LinearGradient
+              colors={['#fff3bf', '#ffec99']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.penaltyInfo}
+            >
+              <MaterialCommunityIcons name="alert" size={16} color="#e67700" />
+              <Text style={styles.penaltyText}>
+                Points: {penaltyInfo.finalPoints} / {penaltyInfo.originalPoints} 
+                (Penalty: -{penaltyInfo.penaltyAmount})
+              </Text>
+            </LinearGradient>
+          )}
+          
+          {submissionStatus === 'available' && timeLeft !== null && (
+            <View style={styles.timerContainer}>
+              <LinearGradient
+                colors={timeLeft < 300 ? ['#ffc9c9', '#ffb3b3'] : isLate ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[
+                  styles.timerBadge, 
+                  timeLeft < 300 && styles.urgentTimerBadge,
+                  isLate && styles.lateTimerBadge
+                ]}
+              >
+                <MaterialCommunityIcons 
+                  name={timeLeft < 300 ? "timer-alert" : isLate ? "timer-alert" : "timer"} 
+                  size={16} 
+                  color={timeLeft < 300 ? "#fa5252" : isLate ? "#e67700" : "#2b8a3e"} 
+                />
+                <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : isLate ? "#e67700" : "#2b8a3e" }]}>
+                  {formatTimeLeft(timeLeft)} remaining
                 </Text>
-              </View>
-            )}
-            
-            {isLate && penaltyInfo && (
+              </LinearGradient>
+              {timeLeft < 300 && (
+                <Text style={styles.urgentMessage}>Hurry! Grace period ending soon.</Text>
+              )}
+            </View>
+          )}
+          
+          {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
+            <View style={styles.waitingContainer}>
               <LinearGradient
                 colors={['#fff3bf', '#ffec99']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.penaltyInfo}
+                style={styles.waitingBadge}
               >
-                <MaterialCommunityIcons name="alert" size={16} color="#e67700" />
-                <Text style={styles.penaltyText}>
-                  Points: {penaltyInfo.finalPoints} / {penaltyInfo.originalPoints} 
-                  (Penalty: -{penaltyInfo.penaltyAmount})
+                <MaterialCommunityIcons name="clock-start" size={16} color="#e67700" />
+                <Text style={styles.waitingText}>
+                  Opens in {formatTimeLeft(timeLeft)}
                 </Text>
               </LinearGradient>
-            )}
-            
-            {submissionStatus === 'available' && timeLeft !== null && (
-              <View style={styles.timerContainer}>
-                <LinearGradient
-                  colors={timeLeft < 300 ? ['#ffc9c9', '#ffb3b3'] : isLate ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[
-                    styles.timerBadge, 
-                    timeLeft < 300 && styles.urgentTimerBadge,
-                    isLate && styles.lateTimerBadge
-                  ]}
-                >
-                  <MaterialCommunityIcons 
-                    name={timeLeft < 300 ? "timer-alert" : isLate ? "timer-alert" : "timer"} 
-                    size={16} 
-                    color={timeLeft < 300 ? "#fa5252" : isLate ? "#e67700" : "#2b8a3e"} 
-                  />
-                  <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : isLate ? "#e67700" : "#2b8a3e" }]}>
-                    {formatTimeLeft(timeLeft)} remaining
-                  </Text>
-                </LinearGradient>
-                {timeLeft < 300 && (
-                  <Text style={styles.urgentMessage}>Hurry! Grace period ending soon.</Text>
-                )}
-              </View>
-            )}
-            
-            {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
-              <View style={styles.waitingContainer}>
-                <LinearGradient
-                  colors={['#fff3bf', '#ffec99']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.waitingBadge}
-                >
-                  <MaterialCommunityIcons name="clock-start" size={16} color="#e67700" />
-                  <Text style={styles.waitingText}>
-                    Opens in {formatTimeLeft(timeLeft)}
-                  </Text>
-                </LinearGradient>
-              </View>
-            )}
-          </LinearGradient>
-          
-          {submissionStatusInfo.canSubmit ? (
-            <TouchableOpacity
-              style={[
-                styles.completeButton,
-                isLate && styles.lateButton
-              ]}
-              onPress={() => handleCompleteAssignment(navigation)}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={isLate ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.completeButtonGradient}
-              >
-                <View style={styles.completeButtonContent}>
-                  <MaterialCommunityIcons 
-                    name={isLate ? "timer-alert" : "check-circle"} 
-                    size={20} 
-                    color="white" 
-                  />
-                  <Text style={styles.completeButtonText}>{submissionStatusInfo.buttonText}</Text>
-                </View>
-                {timeLeft && timeLeft < 600 && (
-                  <View style={styles.completeButtonFooter}>
-                    <MaterialCommunityIcons name="alert" size={14} color="white" />
-                    <Text style={styles.completeButtonSubtext}>
-                      {timeLeft < 300 ? 'Urgent! ' : ''}{formatTimeLeft(timeLeft)} left
-                    </Text>
-                  </View>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.disabledButtonContainer}>
-              <TouchableOpacity
-                style={styles.disabledButton}
-                disabled={true}
-                onPress={() => {
-                  Alert.alert(
-                    submissionStatusInfo.label,
-                    submissionStatusInfo.description,
-                    [{ text: 'OK' }]
-                  );
-                }}
-              >
-                <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.disabledButtonGradient}
-                >
-                  <MaterialCommunityIcons 
-                    name={submissionStatusInfo.icon as any} 
-                    size={20} 
-                    color="#868e96" 
-                  />
-                  <Text style={styles.disabledButtonText}>
-                    {submissionStatusInfo.buttonText}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
-              <Text style={styles.disabledButtonHint}>
-                ⓘ {submissionStatusInfo.description}
-              </Text>
             </View>
           )}
-        </View>
-      );
-    }
-    return null;
+        </LinearGradient>
+        
+        {submissionStatusInfo.canSubmit ? (
+          <TouchableOpacity
+            style={[
+              styles.completeButton,
+              isLate && styles.lateButton
+            ]}
+            onPress={() => handleCompleteAssignment(navigation)}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={isLate ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.completeButtonGradient}
+            >
+              <View style={styles.completeButtonContent}>
+                <MaterialCommunityIcons 
+                  name={isLate ? "timer-alert" : "check-circle"} 
+                  size={20} 
+                  color="white" 
+                />
+                <Text style={styles.completeButtonText}>{submissionStatusInfo.buttonText}</Text>
+              </View>
+              {timeLeft && timeLeft < 600 && (
+                <View style={styles.completeButtonFooter}>
+                  <MaterialCommunityIcons name="alert" size={14} color="white" />
+                  <Text style={styles.completeButtonSubtext}>
+                    {timeLeft < 300 ? 'Urgent! ' : ''}{formatTimeLeft(timeLeft)} left
+                  </Text>
+                </View>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.disabledButtonContainer}>
+            <TouchableOpacity
+              style={styles.disabledButton}
+              disabled={true}
+              onPress={() => {
+                Alert.alert(
+                  submissionStatusInfo.label,
+                  submissionStatusInfo.description,
+                  [{ text: 'OK' }]
+                );
+              }}
+            >
+              <LinearGradient
+                colors={['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.disabledButtonGradient}
+              >
+                <MaterialCommunityIcons 
+                  name={submissionStatusInfo.icon as any} 
+                  size={20} 
+                  color="#868e96" 
+                />
+                <Text style={styles.disabledButtonText}>
+                  {submissionStatusInfo.buttonText}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <Text style={styles.disabledButtonHint}>
+              ⓘ {submissionStatusInfo.description}
+            </Text>
+          </View>
+        )}
+      </View>
+    );
   };
 
   // ===== RENDER SWAP BUTTON (HIDDEN FOR ADMIN) =====
   const renderSwapButton = () => {
-    // ✅ Admin cannot request swaps
     if (isAdmin) return null;
     
     if (!assignment?.completed && assignment) {
@@ -352,7 +394,6 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
   // ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) =====
   const renderVerificationControls = () => {
-    // ✅ Only admin can verify, and only for completed assignments not yet verified
     if (!isAdmin || !assignment?.completed || assignment.verified !== null) return null;
 
     return (
@@ -467,37 +508,50 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     );
   };
 
+ 
   // ===== RENDER PHOTO SECTION =====
-  const renderPhotoSection = () => {
-    if (!assignment?.photoUrl) return null;
+const renderPhotoSection = () => { 
+  if (!assignment?.photoUrl) return null;
 
-    return (
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Proof Photo</Text>
-        <TouchableOpacity
-          style={styles.photoContainer}
-          onPress={handleViewPhoto}
-          activeOpacity={0.7}
+  // ✅ Build full URL for the preview image
+  const fullImageUrl = getFullImageUrl(assignment?.photoUrl);
+
+  if (!fullImageUrl) return null;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Proof Photo</Text>
+      <TouchableOpacity
+        style={styles.photoContainer}
+        onPress={handleViewPhoto}
+        activeOpacity={0.7}
+      >
+        <Image
+          source={{ uri: fullImageUrl }}
+          style={styles.photo}
+          resizeMode="cover"
+          onError={(e) => {
+            console.error('Image preview error:', e.nativeEvent.error);
+            console.log('Failed URL:', fullImageUrl);
+          }}
+          onLoad={() => {
+            console.log('Image preview loaded:', fullImageUrl);
+          }}
+        />
+        <LinearGradient
+          colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.photoOverlay}
         >
-          <Image
-            source={{ uri: assignment.photoUrl }}
-            style={styles.photo}
-            resizeMode="cover"
-          />
-          <LinearGradient
-            colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.photoOverlay}
-          >
-            <MaterialCommunityIcons name="magnify" size={28} color="white" />
-            <Text style={styles.viewPhotoText}>Tap to view full image</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
+          <MaterialCommunityIcons name="magnify" size={28} color="white" />
+          <Text style={styles.viewPhotoText}>Tap to view full image</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View> 
+  );
+};
+ 
   // ===== RENDER CONTENT =====
   const renderContent = () => {
     if (loading) {
@@ -726,6 +780,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       {renderHeader()}
       {renderContent()}
+      {renderPhotoModal()}
     </ScreenWrapper>
   );
 }

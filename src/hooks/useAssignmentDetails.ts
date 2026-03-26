@@ -1,12 +1,14 @@
-// hooks/useAssignmentDetails.ts - COMPLETE FIXED VERSION
+// hooks/useAssignmentDetails.ts - COMPLETE WITH PHOTO MODAL
+
 import { useState, useEffect, useCallback } from 'react';
-import { Alert, Linking } from 'react-native';
+import { Alert } from 'react-native';
 import { AssignmentService } from '../services/AssignmentService';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { useRealtimeAssignments } from './useRealtimeAssignments';
 import { useRealtimeNotifications } from './useRealtimeNotifications';
+import { getFullImageUrl } from '../utils/imageUrl';
 
 export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onVerified?: () => void) => {
   const [loading, setLoading] = useState(true);
@@ -28,6 +30,10 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
   const [authError, setAuthError] = useState(false);
   const [isTaskDeleted, setIsTaskDeleted] = useState(false);
   const [deletedTaskTitle, setDeletedTaskTitle] = useState<string>('');
+  
+  // Photo modal state
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string | null>(null);
 
   const { hasPendingRequest, getPendingRequestForAssignment } = useSwapRequests();
 
@@ -225,9 +231,8 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, []);
 
-  // ✅ ADD THIS MISSING FUNCTION - Check time validity
+  // Check time validity
   const checkTimeValidity = useCallback((assignmentData: any) => {
-    // If task is deleted, disable submission
     if (isTaskDeleted) {
       setIsSubmittable(false);
       setSubmissionStatus('completed');
@@ -244,9 +249,6 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     const assignmentDate = new Date(assignmentData.dueDate);
     const today = now.toDateString();
     const assignmentDay = assignmentDate.toDateString();
-    
-    // Only log when status changes (optional)
-    // console.log(`⏰ [checkTimeValidity] Checking time validity...`);
     
     if (today !== assignmentDay) {
       setIsSubmittable(false);
@@ -314,7 +316,6 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
 
   // Check time validity with server
   const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
-    // If task is deleted, don't check with server
     if (isTaskDeleted) {
       setIsSubmittable(false);
       setSubmissionStatus('completed');
@@ -370,16 +371,17 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
 
   // Fetch assignment details
   const fetchAssignmentDetails = useCallback(async () => {
+      console.log('🔄 [fetchAssignmentDetails] START loading');
     setLoading(true);
     setError(null);
 
     try {
       const result = await AssignmentService.getAssignmentDetails(assignmentId);
-
+          console.log('📦 [fetchAssignmentDetails] API response received');
       if (result.success) {
+          console.log('✅ [fetchAssignmentDetails] Success, setting data');
         const assignmentData = result.assignment;
         
-        // Check if task is deleted
         if (assignmentData.isTaskDeleted || (!assignmentData.task && assignmentData.taskTitle)) {
           setIsTaskDeleted(true);
           setDeletedTaskTitle(assignmentData.taskTitle || 'Deleted Task');
@@ -432,12 +434,13 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
       console.error('Error fetching assignment:', err);
       setError(err.message || 'Network error');
     } finally {
+       console.log('🏁 [fetchAssignmentDetails] END loading');
       setLoading(false);
     }
   }, [assignmentId, checkTimeValidityWithServer]);
 
-  // Handle complete assignment
-  const handleCompleteAssignment = useCallback((navigation: any) => {
+  // Handle complete assignment with refresh
+  const handleCompleteAssignment = useCallback((navigation: any, onComplete?: () => void) => {
     if (isTaskDeleted) {
       Alert.alert(
         'Cannot Submit',
@@ -457,30 +460,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
       return;
     }
     
-    if (isLate && penaltyInfo) {
-      Alert.alert(
-        'Late Submission',
-        `You are submitting late.\n\nYou will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}.\n\nDo you want to continue?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Submit Anyway', 
-            onPress: () => {
-              navigation.navigate('CompleteAssignment', {
-                assignmentId: assignment.id,
-                taskTitle: assignment.task?.title || 'Unknown Task',
-                dueDate: assignment.dueDate,
-                timeSlot: assignment.timeSlot,
-                onCompleted: () => {
-                  fetchAssignmentDetails();
-                  if (onVerified) onVerified?.();
-                }
-              });
-            }
-          }
-        ]
-      );
-    } else {
+    const navigateToComplete = () => {
       navigation.navigate('CompleteAssignment', {
         assignmentId: assignment.id,
         taskTitle: assignment.task?.title || 'Unknown Task',
@@ -489,8 +469,22 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
         onCompleted: () => {
           fetchAssignmentDetails();
           if (onVerified) onVerified?.();
+          if (onComplete) onComplete();
         }
       });
+    };
+    
+    if (isLate && penaltyInfo) {
+      Alert.alert(
+        'Late Submission',
+        `You are submitting late.\n\nYou will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}.\n\nDo you want to continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Submit Anyway', onPress: navigateToComplete }
+        ]
+      );
+    } else {
+      navigateToComplete();
     }
   }, [assignment, isSubmittable, isLate, penaltyInfo, getSubmissionStatusInfo, fetchAssignmentDetails, onVerified, isTaskDeleted]);
 
@@ -591,14 +585,27 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, [assignment, assignmentId, adminNotes, fetchAssignmentDetails, onVerified, isTaskDeleted]);
 
+  // Handle view photo - SHOW MODAL
   const handleViewPhoto = useCallback(() => {
     if (assignment?.photoUrl) {
-      Linking.openURL(assignment.photoUrl).catch(err => {
-        console.error('Error opening photo URL:', err);
-        Alert.alert('Error', 'Could not open image');
-      });
+      const fullUrl = getFullImageUrl(assignment.photoUrl);
+      
+      if (fullUrl) {
+        console.log('📸 Showing photo modal:', fullUrl);
+        setSelectedPhotoUrl(fullUrl);
+        setPhotoModalVisible(true);
+      } else {
+        console.error('Invalid photo URL:', assignment.photoUrl);
+        Alert.alert('Error', 'Could not load image. Invalid URL.');
+      }
     }
   }, [assignment]);
+
+  // Close photo modal
+  const closePhotoModal = useCallback(() => {
+    setPhotoModalVisible(false);
+    setSelectedPhotoUrl(null);
+  }, []);
 
   // Handle real-time verification
   useEffect(() => {
@@ -663,6 +670,11 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     isTaskDeleted,
     deletedTaskTitle,
     
+    // Photo modal state
+    photoModalVisible,
+    selectedPhotoUrl,
+    closePhotoModal,  // ✅ Added this
+    
     // Setters
     setAdminNotes,
     
@@ -676,11 +688,11 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     getStatusText,
     getTimeDifference,
     getSubmissionStatusInfo,
-    formatTimeLeft,
-    
+    formatTimeLeft, 
+     
     // Actions
     fetchAssignmentDetails,
-    handleCompleteAssignment,
+    handleCompleteAssignment, 
     handleRequestSwap,
     handleVerify,
     handleViewPhoto,

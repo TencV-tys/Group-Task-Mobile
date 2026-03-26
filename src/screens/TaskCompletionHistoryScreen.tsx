@@ -1,4 +1,5 @@
-// src/screens/TaskCompletionHistoryScreen.tsx - UPDATED with TokenUtils
+// src/screens/TaskCompletionHistoryScreen.tsx - WITH DETAILED CONSOLE LOGS
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -12,13 +13,13 @@ import {
   StatusBar,
   TextInput,
   Image,
-  Alert
+  Alert 
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GroupActivityService } from '../services/GroupActivityService';
 import { TaskService } from '../services/TaskService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function TaskCompletionHistoryScreen({ navigation, route }: any) {
@@ -34,13 +35,16 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   const [searchQuery, setSearchQuery] = useState('');
   const [authError, setAuthError] = useState(false);
 
-  // ===== UPDATED: Use TokenUtils.checkToken() =====
+  console.log('📱 [TaskCompletionHistory] Screen mounted with params:', { groupId, groupName, userRole });
+
+  // ===== CHECK TOKEN =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
     
+    console.log('🔐 [TaskCompletionHistory] Token check result:', hasToken);
     setAuthError(!hasToken);
     return hasToken;
   }, []);
@@ -48,6 +52,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
+      console.log('⚠️ [TaskCompletionHistory] Auth error detected');
       Alert.alert(
         'Session Expired',
         'Please log in again',
@@ -65,37 +70,48 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   }, [authError, navigation]);
 
   useEffect(() => {
+    console.log('🔄 [TaskCompletionHistory] Initial useEffect triggered');
     const initialize = async () => {
       const hasToken = await checkToken();
       if (hasToken) {
+        console.log('✅ Token valid, fetching tasks and history...');
         await fetchTasks();
         await fetchHistory();
+      } else {
+        console.log('❌ Token invalid, skipping fetch');
       }
     };
     initialize();
   }, [groupId]);
 
   useEffect(() => {
+    console.log('🔄 [TaskCompletionHistory] Filter changed:', { selectedTaskId, selectedWeek });
     if (selectedTaskId !== null || selectedWeek !== null) {
       fetchHistory();
     }
   }, [selectedTaskId, selectedWeek]);
 
   const fetchTasks = async () => {
+    console.log('📥 [TaskCompletionHistory] Fetching tasks for group:', groupId);
     try {
       const result = await TaskService.getGroupTasks(groupId);
       if (result.success) {
         setTasks(result.tasks || []);
+        console.log(`✅ [TaskCompletionHistory] Loaded ${result.tasks?.length || 0} tasks`);
+      } else {
+        console.log('❌ [TaskCompletionHistory] Failed to load tasks:', result.message);
       }
     } catch (err) {
-      console.error('Error fetching tasks:', err);
+      console.error('❌ [TaskCompletionHistory] Error fetching tasks:', err);
     }
   };
 
   const fetchHistory = async (isRefreshing = false) => {
-    // Check token first
+    console.log('📥 [TaskCompletionHistory] fetchHistory called', { isRefreshing, selectedTaskId, selectedWeek });
+    
     const hasToken = await checkToken();
     if (!hasToken) {
+      console.log('❌ [TaskCompletionHistory] No valid token, stopping fetch');
       setLoading(false);
       setRefreshing(false);
       return;
@@ -110,14 +126,33 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     setAuthError(false);
 
     try {
+      console.log('📡 [TaskCompletionHistory] Calling GroupActivityService.getTaskCompletionHistory...');
       const result = await GroupActivityService.getTaskCompletionHistory(groupId, {
         taskId: selectedTaskId || undefined,
         week: selectedWeek || undefined
       });
       
+      console.log('📦 [TaskCompletionHistory] API Response:', {
+        success: result.success,
+        hasData: !!result.data,
+        tasksCount: result.data?.tasks?.length || 0
+      });
+      
       if (result.success) {
         setHistoryData(result.data);
+        console.log(`✅ [TaskCompletionHistory] Loaded ${result.data?.tasks?.length || 0} task groups`);
+        
+        // Log first few completions for debugging
+        if (result.data?.tasks && result.data.tasks.length > 0) {
+          result.data.tasks.forEach((taskGroup: any, idx: number) => {
+            console.log(`   Task Group ${idx + 1}: ${taskGroup.taskTitle} - ${taskGroup.completions.length} completions`);
+            taskGroup.completions.forEach((completion: any, cidx: number) => {
+              console.log(`      Completion ${cidx + 1}: assignmentId=${completion.assignmentId}, user=${completion.userName}, points=${completion.points}, verified=${completion.verified}`);
+            });
+          });
+        }
       } else {
+        console.log('❌ [TaskCompletionHistory] API returned error:', result.message);
         setError(result.message || 'Failed to load completion history');
         if (result.message?.toLowerCase().includes('token') || 
             result.message?.toLowerCase().includes('auth')) {
@@ -125,11 +160,12 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
         }
       }
     } catch (err: any) {
-      console.error('Error fetching history:', err);
+      console.error('❌ [TaskCompletionHistory] Error fetching history:', err);
       setError(err.message || 'Network error');
     } finally {
       setLoading(false);
       setRefreshing(false);
+      console.log('🏁 [TaskCompletionHistory] fetchHistory completed');
     }
   };
 
@@ -150,28 +186,24 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     task.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Helper function for status badge gradient
   const getVerifiedGradient = (verified: boolean | null): [string, string] => {
-    if (verified === true) return ['#d3f9d8', '#b2f2bb']; // Light green
-    if (verified === false) return ['#fff5f5', '#ffe3e3']; // Light red
-    return ['#fff3bf', '#ffec99']; // Light orange for pending
+    if (verified === true) return ['#d3f9d8', '#b2f2bb'];
+    if (verified === false) return ['#fff5f5', '#ffe3e3'];
+    return ['#fff3bf', '#ffec99'];
   };
 
-  // Helper function for status icon color
   const getVerifiedIconColor = (verified: boolean | null): string => {
     if (verified === true) return '#2b8a3e';
     if (verified === false) return '#fa5252';
     return '#e67700';
   };
 
-  // Helper function for status icon name
   const getVerifiedIcon = (verified: boolean | null): string => {
     if (verified === true) return 'check-circle';
     if (verified === false) return 'close-circle';
     return 'clock-outline';
   };
 
-  // Helper function for status text
   const getVerifiedText = (verified: boolean | null): string => {
     if (verified === true) return 'Verified';
     if (verified === false) return 'Rejected';
@@ -380,10 +412,23 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
         {taskGroup.completions.map((completion: any, index: number) => (
           <TouchableOpacity
             key={index}
-            onPress={() => navigation.navigate('AssignmentDetails', {
-              assignmentId: completion.assignmentId,
-              isAdmin: userRole === 'ADMIN'
-            })}
+            onPress={() => {
+              console.log('👆 [TaskCompletionHistory] Navigating to AssignmentDetails:', {
+                assignmentId: completion.assignmentId,
+                taskTitle: taskGroup.taskTitle,
+                userName: completion.userName,
+                points: completion.points,
+                verified: completion.verified
+              });
+              navigation.navigate('AssignmentDetails', {
+                assignmentId: completion.assignmentId,
+                isAdmin: userRole === 'ADMIN',
+                onVerified: () => {
+                  console.log('🔄 [TaskCompletionHistory] Refresh triggered after verification');
+                  fetchHistory(true);
+                }
+              });
+            }}
             activeOpacity={0.7}
           >
             <LinearGradient
@@ -493,6 +538,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   };
 
   if (loading && !refreshing) {
+    console.log('⏳ [TaskCompletionHistory] Showing loading indicator');
     return (
       <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -504,6 +550,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   }
 
   if (authError) {
+    console.log('⚠️ [TaskCompletionHistory] Showing auth error screen');
     return (
       <ScreenWrapper style={styles.container}>
         <View style={styles.errorContainer}>
@@ -528,6 +575,8 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     );
   }
 
+  console.log(`🎨 [TaskCompletionHistory] Rendering main view with ${historyData?.tasks?.length || 0} task groups`);
+  
   return (
     <ScreenWrapper style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />

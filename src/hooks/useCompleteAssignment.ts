@@ -293,100 +293,120 @@ export const useCompleteAssignment = (
     return Object.keys(newErrors).length === 0;
   }, [photo, notes]);
 
-  // Submit completion
-  const submitCompletion = useCallback(async () => {
-    console.log('🚀 [useCompleteAssignment] submitCompletion called');
-    console.log('   isSubmittable:', isSubmittable);
-    console.log('   timeStatus:', timeStatus);
-    console.log('   isLate:', isLate);
-    console.log('   hasPhoto:', !!photo);
-    console.log('   notes length:', notes.length);
+
+// hooks/useCompleteAssignment.ts - ADD MORE DETAILED LOGS
+
+const submitCompletion = useCallback(async () => {
+  console.log('\n🚀🚀🚀 [SUBMIT COMPLETION] START 🚀🚀🚀');
+  console.log('   isSubmittable:', isSubmittable);
+  console.log('   timeStatus:', timeStatus);
+  console.log('   isLate:', isLate);
+  console.log('   hasPhoto:', !!photo);
+  console.log('   photo URI:', photo);
+  console.log('   notes length:', notes.length);
+  console.log('   notes content:', notes);
+  
+  // Check token first
+  const hasToken = await TokenUtils.checkToken({
+    showAlert: false,
+    onAuthError: () => setAuthError(true)
+  });
+  
+  if (!hasToken) {
+    console.log('❌ [SUBMIT] No valid token');
+    Alert.alert('Authentication Error', 'Please log in again');
+    return;
+  }
+
+  if (!isSubmittable) {
+    const statusMsg = getTimeStatusMessage();
+    console.log('❌ [SUBMIT] Not submittable:', statusMsg.message);
+    Alert.alert(
+      'Cannot Submit',
+      statusMsg.message,
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+
+  if (!validateSubmission()) {
+    console.log('❌ [SUBMIT] Validation failed');
+    return;
+  }
+
+  setSubmitting(true);
+  
+  try {
+    console.log('📤 [SUBMIT] Calling AssignmentService.completeAssignment...');
+    console.log('   Assignment ID:', assignmentId);
+    console.log('   Photo URI exists:', !!photo);
+    console.log('   Photo URI:', photo);
     
-    // Check token first
-    const hasToken = await TokenUtils.checkToken({
-      showAlert: false,
-      onAuthError: () => setAuthError(true)
+    const result = await AssignmentService.completeAssignment(assignmentId, {
+      notes: notes.trim(),
+      photoUri: photo || undefined,
     });
     
-    if (!hasToken) {
-      Alert.alert('Authentication Error', 'Please log in again');
-      return;
-    }
-
-    if (!isSubmittable) {
-      const statusMsg = getTimeStatusMessage();
-      Alert.alert(
-        'Cannot Submit',
-        statusMsg.message,
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    if (!validateSubmission()) return;
-
-    setSubmitting(true);
+    console.log('📥 [SUBMIT] Result from server:', JSON.stringify(result, null, 2));
     
-    try {
-      console.log('📤 [useCompleteAssignment] Calling AssignmentService.completeAssignment');
+    if (result.success) {
+      console.log('✅ [SUBMIT] Submission successful!');
+      console.log('   isLate:', result.isLate);
+      console.log('   originalPoints:', result.originalPoints);
+      console.log('   finalPoints:', result.finalPoints);
+      console.log('   assignment:', result.assignment);
       
-      const result = await AssignmentService.completeAssignment(assignmentId, {
-        notes: notes.trim(),
-        photoUri: photo || undefined,
-      });
-      
-      console.log('📥 [useCompleteAssignment] Result:', result);
-      
-      if (result.success) {
-        console.log('✅ [useCompleteAssignment] Submission successful!');
-        Alert.alert(
-          'Success!',
-          result.isLate 
-            ? `Assignment submitted late. Points reduced from ${result.originalPoints} to ${result.finalPoints}. Waiting for admin verification.`
-            : 'Assignment submitted successfully. Waiting for admin verification.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                if (onCompleted) onCompleted();
-                // Clear form after submission
-                setPhoto(null);
-                setNotes('');
-              }
+      Alert.alert(
+        'Success!',
+        result.isLate 
+          ? `Assignment submitted late. Points reduced from ${result.originalPoints} to ${result.finalPoints}. Waiting for admin verification.`
+          : 'Assignment submitted successfully. Waiting for admin verification.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              if (onCompleted) onCompleted();
+              setPhoto(null);
+              setNotes('');
             }
-          ]
+          }
+        ]
+      );
+    } else {
+      console.log('❌ [SUBMIT] Submission failed:', result.message);
+      console.log('   Validation data:', result.validation);
+      
+      // Check if error is about time validation
+      if (result.message?.toLowerCase().includes('late') || 
+          result.message?.toLowerCase().includes('time') ||
+          result.message?.toLowerCase().includes('window')) {
+        Alert.alert(
+          'Submission Time Error',
+          result.message + '\n\nPlease check the time window requirements.',
+          [{ text: 'OK' }]
         );
+      } else if (result.message?.toLowerCase().includes('token') || 
+                 result.message?.toLowerCase().includes('auth') ||
+                 result.message?.toLowerCase().includes('unauthorized')) {
+        setAuthError(true);
+        Alert.alert('Session Expired', 'Please log in again');
       } else {
-        console.log('❌ [useCompleteAssignment] Submission failed:', result.message);
-        
-        // Check if error is about time validation
-        if (result.message?.toLowerCase().includes('late') || 
-            result.message?.toLowerCase().includes('time') ||
-            result.message?.toLowerCase().includes('window')) {
-          Alert.alert(
-            'Submission Time Error',
-            result.message + '\n\nPlease check the time window requirements.',
-            [{ text: 'OK' }]
-          );
-        } else if (result.message?.toLowerCase().includes('token') || 
-                   result.message?.toLowerCase().includes('auth') ||
-                   result.message?.toLowerCase().includes('unauthorized')) {
-          setAuthError(true);
-          Alert.alert('Session Expired', 'Please log in again');
-        } else {
-          Alert.alert('Error', result.message || 'Failed to submit assignment');
-        }
+        Alert.alert('Error', result.message || 'Failed to submit assignment');
       }
-    } catch (error: any) {
-      console.error('❌ [useCompleteAssignment] Error submitting assignment:', error);
-      Alert.alert('Error', error.message || 'Network error. Please check your connection.');
-    } finally {
-      setSubmitting(false);
     }
-  }, [assignmentId, notes, photo, isSubmittable, validateSubmission, getTimeStatusMessage, onCompleted]);
+  } catch (error: any) {
+    console.error('❌❌❌ [SUBMIT] Error submitting assignment:', error);
+    console.error('   Error message:', error.message);
+    console.error('   Error stack:', error.stack);
+    Alert.alert('Error', error.message || 'Network error. Please check your connection.');
+  } finally { 
+    setSubmitting(false);
+    console.log('🏁 [SUBMIT] Submission flow completed');
+  }
+}, [assignmentId, notes, photo, isSubmittable, validateSubmission, getTimeStatusMessage, onCompleted]);
 
-  return {
-    // State
+  return { 
+    // State 
     timeLeft,
     isSubmittable,
     submitting,
@@ -399,7 +419,7 @@ export const useCompleteAssignment = (
      
     // Setters
     setPhoto,
-    setNotes,
+    setNotes, 
     setErrors,
     
     // Helper functions

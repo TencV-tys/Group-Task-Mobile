@@ -18,11 +18,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AssignmentService, TodayAssignment } from '../services/AssignmentService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-
+ 
 export default function TodayAssignmentsScreen({ navigation, route }: any) {
   const { groupId, groupName } = route.params || {};
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false); 
   const [assignments, setAssignments] = useState<TodayAssignment[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
@@ -48,7 +48,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
       Alert.alert(
         'Session Expired',
         'Please log in again',
-        [
+        [ 
           { 
             text: 'OK', 
             onPress: () => {

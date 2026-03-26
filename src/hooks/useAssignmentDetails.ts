@@ -433,7 +433,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     } catch (err: any) {
       console.error('Error fetching assignment:', err);
       setError(err.message || 'Network error');
-    } finally {
+    } finally { 
        console.log('🏁 [fetchAssignmentDetails] END loading');
       setLoading(false);
     }

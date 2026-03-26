@@ -1,5 +1,6 @@
-// src/screens/MemberContributionsScreen.tsx - COMPLETE FIXED VERSION
-import React, { useState, useEffect, useCallback } from 'react';
+// src/screens/MemberContributionsScreen.tsx - FIXED SCROLLING & CLICKABLE WEEKS
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,13 +12,21 @@ import {
   RefreshControl,
   StatusBar,
   Alert,
-  Image
+  Image,
+  LayoutAnimation,
+  UIManager,
+  Platform
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GroupActivityService } from '../services/GroupActivityService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+
+// Enable LayoutAnimation for Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 export default function MemberContributionsScreen({ navigation, route }: any) {
   const { groupId, groupName, memberId, userRole } = route.params || {};
@@ -27,6 +36,7 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
   const [error, setError] = useState<string | null>(null);
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [authError, setAuthError] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Debug: Log the params
   useEffect(() => {
@@ -74,7 +84,6 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
   }, [groupId, memberId]);
 
   const fetchData = async (isRefreshing = false) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -121,10 +130,10 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
 
   // Helper function for status badge gradient
   const getStatusGradient = (assignment: any): [string, string] => {
-    if (!assignment.completed) return ['#f1f3f5', '#e9ecef']; // Light gray
-    if (assignment.verified === true) return ['#d3f9d8', '#b2f2bb']; // Light green
-    if (assignment.verified === false) return ['#fff5f5', '#ffe3e3']; // Light red
-    return ['#fff3bf', '#ffec99']; // Light orange for pending
+    if (!assignment.completed) return ['#f1f3f5', '#e9ecef'];
+    if (assignment.verified === true) return ['#d3f9d8', '#b2f2bb'];
+    if (assignment.verified === false) return ['#fff5f5', '#ffe3e3'];
+    return ['#fff3bf', '#ffec99'];
   };
 
   // Helper function for status icon color
@@ -157,6 +166,12 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     if (assignment.verified === true) return '#2b8a3e';
     if (assignment.verified === false) return '#fa5252';
     return '#e67700';
+  };
+
+  // Handle week press with animation
+  const handleWeekPress = (weekNumber: number) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setSelectedWeek(selectedWeek === weekNumber ? null : weekNumber);
   };
 
   // ===== Profile Card (centered like Profile Screen) =====
@@ -254,7 +269,7 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         <Text style={styles.statsTitle}>Overall Statistics</Text>
         
         <View style={styles.statsGrid}>
-          <View style={styles.statBox}>
+          <TouchableOpacity style={styles.statBox} activeOpacity={0.7} onPress={() => {}}>
             <LinearGradient
               colors={['#f8f9fa', '#e9ecef']}
               start={{ x: 0, y: 0 }}
@@ -264,9 +279,9 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
               <Text style={styles.statNumber}>{summary.totalAssignments || 0}</Text>
             </LinearGradient>
             <Text style={styles.statLabel}>Total Tasks</Text>
-          </View>
+          </TouchableOpacity>
           
-          <View style={styles.statBox}>
+          <TouchableOpacity style={styles.statBox} activeOpacity={0.7} onPress={() => {}}>
             <LinearGradient
               colors={['#d3f9d8', '#b2f2bb']}
               start={{ x: 0, y: 0 }}
@@ -276,9 +291,9 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
               <Text style={styles.statNumber}>{summary.completedAssignments || 0}</Text>
             </LinearGradient>
             <Text style={styles.statLabel}>Completed</Text>
-          </View>
+          </TouchableOpacity>
           
-          <View style={styles.statBox}>
+          <TouchableOpacity style={styles.statBox} activeOpacity={0.7} onPress={() => {}}>
             <LinearGradient
               colors={['#fff3bf', '#ffec99']}
               start={{ x: 0, y: 0 }}
@@ -288,9 +303,9 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
               <Text style={styles.statNumber}>{Math.round(summary.completionRate || 0)}%</Text>
             </LinearGradient>
             <Text style={styles.statLabel}>Completion</Text>
-          </View>
+          </TouchableOpacity>
           
-          <View style={styles.statBox}>
+          <TouchableOpacity style={styles.statBox} activeOpacity={0.7} onPress={() => {}}>
             <LinearGradient
               colors={['#ffec99', '#ffe066']}
               start={{ x: 0, y: 0 }}
@@ -300,7 +315,7 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
               <Text style={styles.statNumber}>{summary.earnedPoints || 0}</Text>
             </LinearGradient>
             <Text style={styles.statLabel}>Points</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </LinearGradient>
     );
@@ -319,7 +334,8 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
       >
         <TouchableOpacity
           style={styles.weekHeader}
-          onPress={() => setSelectedWeek(isExpanded ? null : week.week)}
+          onPress={() => handleWeekPress(week.week)}
+          activeOpacity={0.7}
         >
           <View style={styles.weekTitleContainer}>
             <LinearGradient
@@ -359,10 +375,14 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
                   styles.assignmentItem,
                   index === week.assignments.length - 1 && styles.lastItem
                 ]}
-                onPress={() => navigation.navigate('AssignmentDetails', {
-                  assignmentId: assignment.id,
-                  isAdmin: userRole === 'ADMIN'
-                })}
+                onPress={() => {
+                  console.log('👆 Navigating to AssignmentDetails:', assignment.id);
+                  navigation.navigate('AssignmentDetails', {
+                    assignmentId: assignment.id,
+                    isAdmin: userRole === 'ADMIN'
+                  });
+                }}
+                activeOpacity={0.7}
               >
                 <View style={styles.assignmentInfo}>
                   <Text style={styles.assignmentTitle}>{assignment.taskTitle}</Text>
@@ -417,6 +437,7 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
                     </Text>
                   )}
                 </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color="#ced4da" />
               </TouchableOpacity>
             ))}
           </View>
@@ -497,7 +518,11 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
       {renderHeader()}
 
       <ScrollView
+        ref={scrollViewRef}
         style={styles.content}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={true}
+        nestedScrollEnabled={true}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
@@ -550,6 +575,9 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
                 <Text style={styles.noWeeksText}>No weekly data available</Text>
               )}
             </View>
+            
+            {/* Extra padding at bottom for better scrolling */}
+            <View style={styles.bottomPadding} />
           </>
         )}
       </ScrollView>
@@ -606,7 +634,10 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16
+  },
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 40,
   },
   errorContainer: {
     alignItems: 'center',
@@ -805,7 +836,7 @@ const styles = StyleSheet.create({
   },
   weekCard: {
     borderRadius: 12,
-    marginBottom: 8,
+    marginBottom: 12,
     overflow: 'hidden',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -825,19 +856,21 @@ const styles = StyleSheet.create({
   weekTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8
+    gap: 8,
+    flex: 1,
   },
   weekIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center'
   },
   weekTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#212529'
+    color: '#212529',
+    flex: 1,
   },
   weekStats: {
     flexDirection: 'row',
@@ -857,12 +890,17 @@ const styles = StyleSheet.create({
     color: '#868e96'
   },
   weekDetails: {
-    padding: 16,
+    padding: 12,
+    paddingTop: 8,
     borderTopWidth: 1,
     borderTopColor: '#e9ecef'
   },
   assignmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: 12,
+    paddingHorizontal: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef'
   },
@@ -870,7 +908,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0
   },
   assignmentInfo: {
-    flex: 1
+    flex: 1,
+    marginRight: 12
   },
   assignmentTitle: {
     fontSize: 15,
@@ -930,5 +969,8 @@ const styles = StyleSheet.create({
     color: '#868e96',
     fontStyle: 'italic',
     marginTop: 4
+  },
+  bottomPadding: {
+    height: 20
   }
 });

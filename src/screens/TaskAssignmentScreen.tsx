@@ -1,4 +1,5 @@
-// src/screens/TaskAssignmentScreen.tsx - UPDATED with admin filter
+// src/screens/TaskAssignmentScreen.tsx - WITH DISABLED CHANGE BUTTON FOR ASSIGNED MEMBERS
+
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
@@ -45,6 +46,9 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     );
   }, [members]);
 
+  console.log('📊 [TaskAssignment] Members in rotation:', membersInRotation.length);
+  console.log('📊 [TaskAssignment] Total members:', members.length);
+
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
@@ -82,6 +86,11 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     });
     
     return assignedMemberIds;
+  };
+
+  // Check if a task is assigned to a member (has any assignment for current week)
+  const isTaskAssigned = (task: any) => {
+    return task.currentAssignee !== null && task.currentAssignee !== undefined;
   };
 
   const handleOpenAssigneeModal = (task: any) => {
@@ -128,12 +137,26 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     );
   };
 
-  const renderTask = ({ item }: any) => {
-    const currentAssignee = membersInRotation.find(m => m.userId === item.currentAssignee);
-    const isRecurring = item.isRecurring;
-    const hasTimeSlots = item.timeSlots && item.timeSlots.length > 0;
+  // src/screens/TaskAssignmentScreen.tsx - UPDATED with navigation to TaskDetails
 
-    return (
+const renderTask = ({ item }: any) => {
+  const currentAssignee = membersInRotation.find(m => m.userId === item.currentAssignee);
+  const isRecurring = item.isRecurring;
+  const hasTimeSlots = item.timeSlots && item.timeSlots.length > 0;
+  const taskAssigned = isTaskAssigned(item);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => {
+        console.log('👆 Navigating to TaskDetails:', item.id);
+        navigation.navigate('TaskDetails', {
+          taskId: item.id,
+          groupId: groupId,
+          userRole: userRole
+        });
+      }}
+    >
       <LinearGradient
         colors={['#ffffff', '#f8f9fa']}
         start={{ x: 0, y: 0 }}
@@ -198,18 +221,12 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
             {currentAssignee ? (
               <View style={styles.currentAssignee}>
                 <LinearGradient
-                  colors={currentAssignee.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                  colors={['#f8f9fa', '#e9ecef']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[
-                    styles.assigneeAvatar,
-                    currentAssignee.role === 'ADMIN' && styles.adminAvatar
-                  ]}
+                  style={styles.assigneeAvatar}
                 >
-                  <Text style={[
-                    styles.assigneeInitial,
-                    { color: currentAssignee.role === 'ADMIN' ? 'white' : '#495057' }
-                  ]}>
+                  <Text style={styles.assigneeInitial}>
                     {currentAssignee.fullName?.charAt(0) || '?'}
                   </Text>
                 </LinearGradient>
@@ -218,12 +235,6 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                     {currentAssignee.fullName}
                   </Text>
                   <View style={styles.assigneeMeta}>
-                    {currentAssignee.role === 'ADMIN' && (
-                      <View style={styles.adminIndicator}>
-                        <MaterialCommunityIcons name="crown" size={10} color="#2b8a3e" />
-                        <Text style={styles.adminText}>Admin</Text>
-                      </View>
-                    )}
                     {currentAssignee.rotationOrder && (
                       <LinearGradient
                         colors={['#f8f9fa', '#e9ecef']}
@@ -248,26 +259,40 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
             
             {userRole === 'ADMIN' && (
               <TouchableOpacity
-                style={styles.changeButton}
-                onPress={() => handleOpenAssigneeModal(item)}
-                activeOpacity={0.8}
+                style={[
+                  styles.changeButton,
+                  taskAssigned && styles.changeButtonDisabled
+                ]}
+                onPress={() => !taskAssigned && handleOpenAssigneeModal(item)}
+                activeOpacity={taskAssigned ? 0.5 : 0.8}
+                disabled={taskAssigned}
               >
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}
+                  colors={taskAssigned ? ['#e9ecef', '#dee2e6'] : ['#2b8a3e', '#1e6b2c']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.changeButtonGradient}
                 >
-                  <MaterialCommunityIcons name="account-switch" size={14} color="white" />
-                  <Text style={styles.changeButtonText}>Change</Text>
+                  <MaterialCommunityIcons 
+                    name={taskAssigned ? "check" : "account-switch"} 
+                    size={14} 
+                    color={taskAssigned ? "#868e96" : "white"} 
+                  />
+                  <Text style={[
+                    styles.changeButtonText,
+                    taskAssigned && styles.changeButtonTextDisabled
+                  ]}>
+                    {taskAssigned ? "Assigned" : "Change"}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             )}
           </View>
         </View>
       </LinearGradient>
-    );
-  };
+    </TouchableOpacity>
+  );
+};
 
   if (loading && !refreshing) {
     return (
@@ -426,7 +451,6 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
               
               {(() => {
                 const assignedMemberIds = getAssignedMembersForWeek();
-                // ✅ FIX: Only show members in rotation (exclude admins)
                 const availableMembers = membersInRotation.filter(member => 
                   !assignedMemberIds.has(member.userId)
                 );
@@ -473,10 +497,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                             isCurrentAssignee && styles.currentAssigneeAvatar
                           ]}
                         >
-                          <Text style={[
-                            styles.memberInitial,
-                            { color: '#495057' }
-                          ]}>
+                          <Text style={styles.memberInitial}>
                             {member.fullName?.charAt(0) || '?'}
                           </Text>
                         </LinearGradient>
@@ -612,7 +633,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   );
 }
 
-// Styles remain the same as your original
+// Updated styles
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
@@ -822,12 +843,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e9ecef'
   },
-  adminAvatar: {
-    borderColor: '#2b8a3e'
-  },
   assigneeInitial: {
     fontWeight: 'bold',
-    fontSize: 14
+    fontSize: 14,
+    color: '#495057'
   },
   assigneeInfo: {
     flex: 1
@@ -842,16 +861,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8
-  },
-  adminIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2
-  },
-  adminText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#2b8a3e'
   },
   rotationBadge: {
     paddingHorizontal: 6,
@@ -876,7 +885,11 @@ const styles = StyleSheet.create({
   },
   changeButton: {
     borderRadius: 8,
-    overflow: 'hidden'
+    overflow: 'hidden',
+    marginLeft: 8,
+  },
+  changeButtonDisabled: {
+    opacity: 0.6,
   },
   changeButtonGradient: {
     flexDirection: 'row',
@@ -889,6 +902,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: '600',
     fontSize: 12
+  },
+  changeButtonTextDisabled: {
+    color: '#868e96'
   },
   emptyContainer: {
     alignItems: 'center',
@@ -1044,7 +1060,8 @@ const styles = StyleSheet.create({
   },
   memberInitial: {
     fontWeight: 'bold',
-    fontSize: 16
+    fontSize: 16,
+    color: '#495057'
   },
   disabledInitial: {
     color: '#adb5bd'
@@ -1073,10 +1090,6 @@ const styles = StyleSheet.create({
   memberRole: {
     fontSize: 12,
     color: '#868e96'
-  },
-  adminRoleText: {
-    color: '#2b8a3e',
-    fontWeight: '600'
   },
   memberOrderBadge: {
     paddingHorizontal: 6,

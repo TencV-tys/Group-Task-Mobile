@@ -610,7 +610,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
           </>
         )}
       </ScrollView>
-    </ScreenWrapper>
+    </ScreenWrapper> 
   );
 }
 

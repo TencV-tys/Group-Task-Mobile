@@ -1,4 +1,5 @@
-// src/screens/MemberDashboardScreen.tsx - UPDATED with TokenUtils
+// src/screens/MemberDashboardScreen.tsx - COMPLETE FIXED VERSION
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -12,7 +13,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import * as SecureStore from 'expo-secure-store';
 
 import { TaskService } from '../services/TaskService';
 import { GroupActivityService } from '../services/GroupActivityService';
@@ -21,10 +21,11 @@ import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
-import { SettingsModal } from '../components/SettingsModal';
+import { TokenUtils } from '../utils/tokenUtils';
+import { SettingsModal } from '../components/SettingsModal'; 
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { memberDashboardStyles as styles } from '../styles/memberDashboard.styles';
+import { API_BASE_URL } from '../config/api';
 
 export const MemberDashboardScreen = ({ navigation, route }: any) => {
   const { groupId, groupName } = route.params;
@@ -40,21 +41,35 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   
+  // State for my swap requests count
+  const [mySwapRequestsCount, setMySwapRequestsCount] = useState(0);
+  const [loadingSwaps, setLoadingSwaps] = useState(false);
+  
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
   
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
 
+  console.log('🏠 [MemberDashboard] Component mounted with params:', { groupId, groupName });
+  console.log('🏠 [MemberDashboard] Current userId:', currentUserId);
+  console.log('🏠 [MemberDashboard] Current mySwapRequestsCount:', mySwapRequestsCount);
+
   // ===== GET USER ID USING TOKENUTILS =====
   useEffect(() => {
     const getUserId = async () => {
       try {
-        const user = await TokenUtils.getUser(); // 👈 USE TOKENUTILS
+        const user = await TokenUtils.getUser();
         if (user) {
           setCurrentUserId(user.id);
+          console.log('👤 [MemberDashboard] Current user ID set:', user.id);
+          
+          // Fetch swap count immediately after userId is set
+          await fetchMySwapRequestsCount();
+        } else {
+          console.log('⚠️ [MemberDashboard] No user found');
         }
       } catch (error) {
-        console.error('Error getting user ID:', error);
+        console.error('❌ [MemberDashboard] Error getting user ID:', error);
       }
     };
     getUserId();
@@ -64,6 +79,65 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     };
   }, []);
 
+  // ===== FETCH MY SWAP REQUESTS COUNT =====
+  const fetchMySwapRequestsCount = useCallback(async () => {
+    console.log('🔍 [MemberDashboard] fetchMySwapRequestsCount called');
+    console.log('🔍 [MemberDashboard] currentUserId:', currentUserId);
+    
+    if (!currentUserId) {
+      console.log('⚠️ [MemberDashboard] No currentUserId, skipping fetch');
+      return;
+    }
+    
+    setLoadingSwaps(true);
+    try {
+      console.log('📡 [MemberDashboard] Fetching swap requests from:', `${API_BASE_URL}/api/swap-requests/my-requests?limit=100`);
+      
+      const headers = await TokenUtils.getAuthHeaders(false);
+      const response = await fetch(`${API_BASE_URL}/api/swap-requests/my-requests?limit=100`, {
+        headers
+      });
+      
+      const data = await response.json();
+      console.log('📊 [MemberDashboard] My swap requests API response:', JSON.stringify(data, null, 2));
+      
+      if (data.success && data.data?.requests) {
+        // Count pending swaps created by the user
+        const pendingCount = data.data.requests.filter(
+          (req: any) => req.status === 'PENDING'
+        ).length;
+        
+        console.log(`📊 [MemberDashboard] Total requests: ${data.data.requests.length}`);
+        console.log(`📊 [MemberDashboard] Pending requests: ${pendingCount}`);
+        
+        // Log each request's status
+        data.data.requests.forEach((req: any, index: number) => {
+          console.log(`   Request ${index + 1}:`, {
+            id: req.id,
+            status: req.status,
+            assignmentId: req.assignmentId
+          });
+        });
+        
+        setMySwapRequestsCount(pendingCount);
+        console.log(`✅ [MemberDashboard] Set mySwapRequestsCount to: ${pendingCount}`);
+      } else {
+        console.log('⚠️ [MemberDashboard] No swap requests found or API error');
+        setMySwapRequestsCount(0);
+      }
+    } catch (error) {
+      console.error('❌ [MemberDashboard] Error fetching my swap requests:', error);
+      setMySwapRequestsCount(0);
+    } finally {
+      setLoadingSwaps(false);
+    }
+  }, [currentUserId]);
+
+  // ===== LOG STATE CHANGES =====
+  useEffect(() => {
+    console.log('🔄 [MemberDashboard] mySwapRequestsCount changed to:', mySwapRequestsCount);
+  }, [mySwapRequestsCount]);
+
   // ===== REAL-TIME EVENT LISTENERS =====
   const { events: taskEvents, clearRotationCompleted } = useRealtimeTasks(groupId);
   const { events: assignmentEvents } = useRealtimeAssignments(groupId, currentUserId || '');
@@ -72,7 +146,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   // ===== ROTATION COMPLETED HANDLER =====
   useEffect(() => {
     if (taskEvents.rotationCompleted) {
-      console.log('🔄 Member Dashboard: Rotation completed', taskEvents.rotationCompleted);
+      console.log('🔄 [MemberDashboard] Rotation completed', taskEvents.rotationCompleted);
       
       const myNewTasks = taskEvents.rotationCompleted.rotatedTasks?.filter(
         (task: any) => task.newAssignee === currentUserId
@@ -112,7 +186,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         taskEvents.taskUpdated || 
         taskEvents.taskDeleted ||
         taskEvents.taskAssigned) {
-      console.log('🔄 Task event detected, refreshing member dashboard...');
+      console.log('🔄 [MemberDashboard] Task event detected, refreshing...');
       refreshDashboardData();
     }
   }, [
@@ -127,7 +201,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     if (assignmentEvents.assignmentCompleted ||
         assignmentEvents.assignmentVerified ||
         assignmentEvents.assignmentPendingVerification) {
-      console.log('✅ Assignment event detected, refreshing member dashboard...');
+      console.log('✅ [MemberDashboard] Assignment event detected, refreshing...');
       refreshDashboardData();
     }
   }, [
@@ -140,8 +214,9 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   useEffect(() => {
     if (swapEvents.swapCreated ||
         swapEvents.swapResponded) {
-      console.log('🔄 Swap event detected, refreshing member dashboard...');
+      console.log('🔄 [MemberDashboard] Swap event detected, refreshing...');
       refreshDashboardData();
+      fetchMySwapRequestsCount();
     }
   }, [
     swapEvents.swapCreated,
@@ -161,8 +236,12 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         'LATE_SUBMISSION',
         'POINT_DEDUCTION'
       ].includes(notification.type)) {
-        console.log(`🔔 Member notification ${notification.type} received, refreshing...`);
+        console.log(`🔔 [MemberDashboard] Notification ${notification.type} received, refreshing...`);
         refreshDashboardData();
+        
+        if (notification.type === 'SWAP_ACCEPTED' || notification.type === 'SWAP_RESPONDED') {
+          fetchMySwapRequestsCount();
+        }
       }
     },
     showAlerts: true
@@ -170,13 +249,21 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
   useFocusEffect(
     useCallback(() => {
+      console.log('🎯 [MemberDashboard] Screen focused');
+      console.log('🎯 [MemberDashboard] Current userId on focus:', currentUserId);
+      console.log('🎯 [MemberDashboard] Current swap count on focus:', mySwapRequestsCount);
+      
       if (!initialLoadDone.current) {
         loadDashboardData();
       }
-    }, [groupId])
+      
+      // Always refresh swap count when screen is focused
+      if (currentUserId) {
+        fetchMySwapRequestsCount();
+      }
+    }, [groupId, currentUserId])
   );
 
-  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -187,7 +274,6 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     return hasToken;
   }, []);
 
-  // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -207,6 +293,8 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   }, [authError, navigation]);
 
   const loadDashboardData = async (isRefreshing = false) => {
+    console.log('📥 [MemberDashboard] loadDashboardData called', { isRefreshing });
+    
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -222,9 +310,16 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     setError(null);
 
     try {
-      console.log('📥 Loading member dashboard data for group:', groupId);
+      console.log('📥 [MemberDashboard] Loading member dashboard data for group:', groupId);
 
       const dashboardResult = await GroupActivityService.getMemberDashboard(groupId);
+      
+      console.log('📊 [MemberDashboard] Dashboard result:', {
+        success: dashboardResult.success,
+        hasData: !!dashboardResult.data,
+        tasksDueToday: dashboardResult.data?.tasks?.dueToday?.length || 0,
+        upcomingTasks: dashboardResult.data?.tasks?.upcoming?.length || 0
+      });
       
       if (dashboardResult.success && isMounted.current) {
         setDashboardData(dashboardResult.data);
@@ -240,13 +335,49 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         ];
         setMyTasks(allTasks);
         
+        // Log due today tasks
+        const dueTodayTasks = dashboardResult.data.tasks?.dueToday || [];
+        console.log(`📅 [MemberDashboard] Due today tasks count: ${dueTodayTasks.length}`);
+        if (dueTodayTasks.length > 0) {
+          dueTodayTasks.forEach((task: any, index: number) => {
+            console.log(`   Task ${index + 1}:`, {
+              id: task.id,
+              title: task.title,
+              dueDate: task.dueDate,
+              isDueToday: task.isDueToday
+            });
+          });
+        } else {
+          console.log('📅 [MemberDashboard] No tasks due today from dashboard API');
+        }
+        
         initialLoadDone.current = true;
       } else {
-        console.log('Falling back to individual API calls...');
+        console.log('⚠️ [MemberDashboard] Falling back to individual API calls...');
         
         const tasksResult = await TaskService.getMyTasks(groupId);
+        console.log('📊 [MemberDashboard] getMyTasks result:', {
+          success: tasksResult.success,
+          tasksCount: tasksResult.tasks?.length || 0
+        });
+        
         if (tasksResult.success && isMounted.current) {
           setMyTasks(tasksResult.tasks || []);
+          
+          // Calculate due today tasks from myTasks
+          const today = new Date();
+          const startOfDay = new Date(today);
+          startOfDay.setHours(0, 0, 0, 0);
+          const endOfDay = new Date(today);
+          endOfDay.setHours(23, 59, 59, 999);
+          
+          const dueTodayFromTasks = tasksResult.tasks?.filter((t: any) => {
+            if (t.assignment?.completed) return false;
+            const dueDate = new Date(t.assignment?.dueDate);
+            return dueDate >= startOfDay && dueDate <= endOfDay;
+          }) || [];
+          
+          console.log(`📅 [MemberDashboard] Calculated due today from tasks: ${dueTodayFromTasks.length}`);
           
           const thisWeek = tasksResult.tasks
             ?.filter((t: any) => {
@@ -269,21 +400,28 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
       }
 
       await loadPendingForMe(groupId);
+      
+      // Fetch swap count after dashboard loads
+      if (currentUserId) {
+        await fetchMySwapRequestsCount();
+      }
 
     } catch (err: any) {
-      console.error('❌ Error loading member dashboard:', err);
+      console.error('❌ [MemberDashboard] Error loading dashboard:', err);
       if (isMounted.current) {
         setError(err.message || 'Failed to load dashboard data');
       }
     } finally {
-      if (isMounted.current) {
+      if (isMounted.current) { 
         setLoading(false);
         setRefreshing(false);
+        console.log('🏁 [MemberDashboard] loadDashboardData completed');
       }
     }
   };
 
   const refreshDashboardData = useCallback(() => {
+    console.log('🔄 [MemberDashboard] refreshDashboardData called');
     loadDashboardData(true);
   }, []);
 
@@ -295,7 +433,32 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     setShowSettingsModal(true);
   };
 
-  // ===== CLICKABLE STAT CARD =====
+  // Calculate tasks due today for display
+  const pendingTasks = dashboardData?.tasks?.upcoming || myTasks.filter(t => !t.assignment?.completed);
+  const completedTasks = dashboardData?.stats?.completedTasks || myTasks.filter(t => t.assignment?.completed).length;
+  
+  // Calculate tasks due today
+  let tasksDueToday: any[] = [];
+  if (dashboardData?.tasks?.dueToday) {
+    tasksDueToday = dashboardData.tasks.dueToday;
+    console.log(`📅 [MemberDashboard] Using dashboard due today: ${tasksDueToday.length}`);
+  } else {
+    const today = new Date();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(today);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    tasksDueToday = myTasks.filter(t => {
+      if (t.assignment?.completed) return false;
+      const dueDate = new Date(t.assignment?.dueDate);
+      return dueDate >= startOfDay && dueDate <= endOfDay;
+    });
+    console.log(`📅 [MemberDashboard] Calculated due today: ${tasksDueToday.length}`);
+  }
+  
+  console.log(`📊 [MemberDashboard] Final Stats - Pending: ${pendingTasks.length}, Completed: ${completedTasks}, Due Today: ${tasksDueToday.length}, My Swaps: ${mySwapRequestsCount}`);
+
   const StatCard = ({ 
     title, 
     value, 
@@ -307,6 +470,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     navigationParams
   }: any) => {
     const handlePress = () => {
+      console.log(`👆 [MemberDashboard] StatCard pressed: ${title}, value: ${value}`);
       if (onPress) {
         onPress();
       } else if (navigateTo) {
@@ -355,10 +519,13 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
     return (
       <TouchableOpacity
-        onPress={() => navigation.navigate('AssignmentDetails', {
-          assignmentId: task.id || task.assignment?.id,
-          isAdmin: false
-        })}
+        onPress={() => {
+          console.log(`👆 [MemberDashboard] Task pressed: ${task.title || task.taskTitle}`);
+          navigation.navigate('AssignmentDetails', {
+            assignmentId: task.id || task.assignment?.id,
+            isAdmin: false
+          });
+        }}
         activeOpacity={0.7}
       >
         <LinearGradient
@@ -479,10 +646,6 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     );
   }
 
-  const pendingTasks = dashboardData?.tasks?.upcoming || myTasks.filter(t => !t.assignment?.completed);
-  const completedTasks = dashboardData?.stats?.completedTasks || myTasks.filter(t => t.assignment?.completed).length;
-  const tasksDueToday = dashboardData?.tasks?.dueToday || myTasks.filter(t => t.assignment?.isDueToday && !t.assignment?.completed);
-
   return (
     <ScreenWrapper style={styles.container}>
       <View style={styles.header}>
@@ -583,8 +746,8 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             navigationParams={{ groupId, groupName }}
           />
           <StatCard
-            title="Swap Requests"
-            value={totalPendingForMe || 0}
+            title="My Swaps"
+            value={mySwapRequestsCount}
             icon="swap-horizontal"
             color="#2b8a3e"
             navigateTo="MySwapRequests"

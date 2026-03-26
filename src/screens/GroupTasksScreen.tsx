@@ -275,35 +275,63 @@ const groupedMyTasks = useMemo(() => {
     return result;
   }, []);
 
-  const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
-    if (!taskList.length) return;
-    
-    const dayCounts = new Map<string, number>();
-    let maxCount = 0;
-    let mostCommonDay = '';
-    
-    taskList.forEach(task => {
-      if (task.createdAt) {
-        const dayName = new Date(task.createdAt).toLocaleDateString('en-US', { weekday: 'long' });
-        const count = (dayCounts.get(dayName) || 0) + 1;
-        dayCounts.set(dayName, count);
-        if (count > maxCount) {
-          maxCount = count;
-          mostCommonDay = dayName;
-        }
+ // In GroupTasksScreen.tsx - Update analyzeTaskCreationDays
+
+const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
+  console.log('🔍🔍🔍 [analyzeTaskCreationDays] START 🔍🔍🔍');
+  console.log(`📊 Total tasks to analyze: ${taskList.length}`);
+  
+  if (!taskList.length) {
+    console.log('⚠️ No tasks to analyze');
+    return;
+  }
+  
+  const dayCounts = new Map<string, number>();
+  let maxCount = 0;
+  let mostCommonDay = '';
+  
+  // Log each task's creation date
+  taskList.forEach((task, index) => {
+    if (task.createdAt) {
+      const creationDate = new Date(task.createdAt);
+      const dayName = creationDate.toLocaleDateString('en-US', { weekday: 'long' });
+      const fullDate = creationDate.toLocaleDateString();
+      
+      console.log(`   Task ${index + 1}: "${task.title}" - Created on ${dayName}, ${fullDate}`);
+      
+      const count = (dayCounts.get(dayName) || 0) + 1;
+      dayCounts.set(dayName, count);
+      if (count > maxCount) {
+        maxCount = count;
+        mostCommonDay = dayName;
       }
-    });
-    
-    setTaskCreationDays(dayCounts);
-    setBaselineCreationDay(mostCommonDay);
-    setHasMixedCreationDays(dayCounts.size > 1);
-    
-    const membersInRotationCount = rotationStatus?.membersInRotation ?? 0;
-    const tasksNeededCount = Math.max(0, membersInRotationCount - taskList.length);
-    setTasksNeeded(tasksNeededCount);
-    
-    console.log(`📊 analyzeTaskCreationDays: tasks=${taskList.length}, membersInRotation=${membersInRotationCount}, tasksNeeded=${tasksNeededCount}`);
-  }, [rotationStatus?.membersInRotation]);
+    } else {
+      console.log(`   Task ${index + 1}: "${task.title}" - No createdAt date`);
+    }
+  });
+  
+  console.log(`📊 Day counts:`);
+  dayCounts.forEach((count, day) => {
+    console.log(`   ${day}: ${count} task${count > 1 ? 's' : ''}`);
+  });
+  
+  console.log(`🏆 Most common creation day: ${mostCommonDay} (${maxCount} tasks)`);
+  console.log(`📅 Has mixed creation days? ${dayCounts.size > 1}`);
+  
+  setTaskCreationDays(dayCounts);
+  setBaselineCreationDay(mostCommonDay);
+  setHasMixedCreationDays(dayCounts.size > 1);
+  
+  const membersInRotationCount = rotationStatus?.membersInRotation ?? 0;
+  const tasksNeededCount = Math.max(0, membersInRotationCount - taskList.length);
+  setTasksNeeded(tasksNeededCount);
+  
+  console.log(`👥 Members in rotation: ${membersInRotationCount}`);
+  console.log(`📝 Tasks needed for perfect rotation: ${tasksNeededCount}`);
+  console.log(`📊 Final stats: tasks=${taskList.length}, membersInRotation=${membersInRotationCount}, tasksNeeded=${tasksNeededCount}`);
+  console.log('🔍🔍🔍 [analyzeTaskCreationDays] END 🔍🔍🔍');
+  
+}, [rotationStatus?.membersInRotation]);
 
   const findTodayAssignments = useCallback((tasks: any[]) => {
     const today = new Date().toDateString();
@@ -694,8 +722,19 @@ const groupedMyTasks = useMemo(() => {
   };
 
   const renderCreationDayBanner = () => {
-    if (!isAdmin || selectedTab !== 'all' || !tasks.length) return null;
-    
+     console.log('🎨 [renderCreationDayBanner] Rendering banner');
+  console.log(`   isAdmin: ${isAdmin}`);
+  console.log(`   selectedTab: ${selectedTab}`);
+  console.log(`   tasks.length: ${tasks.length}`);
+  console.log(`   hasMixedCreationDays: ${hasMixedCreationDays}`);
+  console.log(`   baselineCreationDay: ${baselineCreationDay}`);
+  console.log(`   taskCreationDays:`, Array.from(taskCreationDays.entries()));
+  
+     if (!isAdmin || selectedTab !== 'all' || !tasks.length) {
+    console.log('   ⏭️ Skipping banner - conditions not met');
+    return null;
+  } 
+
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
     const isTodayBaseline = today === baselineCreationDay;
     const membersInRotationCount = rotationStatus?.membersInRotation ?? 0;
@@ -703,6 +742,15 @@ const groupedMyTasks = useMemo(() => {
     const needsTasks = tasks.length < membersInRotationCount;
     const tasksNeededCount = Math.max(0, membersInRotationCount - tasks.length);
     
+
+ console.log(`   Today: ${today}`);
+  console.log(`   Is today the baseline? ${isTodayBaseline} (baseline: ${baselineCreationDay})`);
+  console.log(`   Members in rotation: ${membersInRotationCount}`);
+  console.log(`   Has perfect count? ${hasPerfectCount} (tasks: ${tasks.length}, members: ${membersInRotationCount})`);
+  console.log(`   Needs tasks? ${needsTasks}`);
+  console.log(`   Tasks needed count: ${tasksNeededCount}`);
+  
+
     return (
       <LinearGradient
         colors={!hasMixedCreationDays ? ['#d3f9d8', '#b2f2bb'] : ['#fff3bf', '#ffec99']}

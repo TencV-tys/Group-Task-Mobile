@@ -1,7 +1,9 @@
-// hooks/useCompleteAssignment.ts
+// hooks/useCompleteAssignment.ts - FIXED photo info handling
+
 import { useState, useEffect, useCallback } from 'react';
 import { Alert, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { AssignmentService } from '../services/AssignmentService';
 import { TokenUtils } from '../utils/tokenUtils';
 
@@ -21,6 +23,13 @@ export const useCompleteAssignment = (
   const [timeStatus, setTimeStatus] = useState<'waiting' | 'submission_open' | 'expired' | 'wrong_day'>('waiting');
   const [isLate, setIsLate] = useState(false);
   const [authError, setAuthError] = useState(false);
+
+  console.log('🎯 [useCompleteAssignment] Initialized with:', {
+    assignmentId,
+    taskTitle,
+    dueDate,
+    timeSlot: timeSlot ? `${timeSlot.startTime}-${timeSlot.endTime}` : 'none'
+  });
 
   // Format time
   const formatTime = useCallback((seconds: number) => {
@@ -52,6 +61,13 @@ export const useCompleteAssignment = (
       // Check if it's the due date
       const isToday = now.toDateString() === due.toDateString();
       
+      console.log('⏰ [useCompleteAssignment] Time check:', {
+        now: now.toLocaleString(),
+        dueDate: due.toLocaleString(),
+        isToday,
+        timeSlot: timeSlot ? `${timeSlot.startTime}-${timeSlot.endTime}` : 'none'
+      });
+      
       if (!isToday) {
         setTimeStatus('wrong_day');
         setIsSubmittable(false);
@@ -77,29 +93,39 @@ export const useCompleteAssignment = (
       const onTimeEndMs = onTimeEnd.getTime();
       const lateWindowEndMs = lateWindowEnd.getTime();
       
+      console.log('⏰ [useCompleteAssignment] Time windows:', {
+        submissionOpen: submissionOpenTime.toLocaleTimeString(),
+        onTimeEnd: onTimeEnd.toLocaleTimeString(),
+        lateWindowEnd: lateWindowEnd.toLocaleTimeString(),
+        currentTime: now.toLocaleTimeString()
+      });
+      
       if (currentTime < openTime) {
         // BEFORE submission opens - WAITING
+        const timeUntilOpen = Math.floor((openTime - currentTime) / 1000);
         setTimeStatus('waiting');
         setIsSubmittable(false);
         setIsLate(false);
-        const timeUntilOpen = Math.floor((openTime - currentTime) / 1000);
         setTimeLeft(timeUntilOpen);
+        console.log('⏰ [useCompleteAssignment] Status: waiting, opens in', timeUntilOpen, 'seconds');
         
       } else if (currentTime >= openTime && currentTime <= onTimeEndMs) {
         // ✅ ON TIME: First 25 minutes after end time
+        const timeLeftMs = onTimeEndMs - currentTime;
         setTimeStatus('submission_open');
         setIsSubmittable(true);
         setIsLate(false);
-        const timeLeftMs = onTimeEndMs - currentTime;
         setTimeLeft(Math.floor(timeLeftMs / 1000));
+        console.log('✅ [useCompleteAssignment] Status: on-time, time left:', Math.floor(timeLeftMs / 1000), 'seconds');
         
       } else if (currentTime > onTimeEndMs && currentTime <= lateWindowEndMs) {
         // ✅ LATE: Next 5 minutes (25-30 minutes after end time)
+        const timeLeftMs = lateWindowEndMs - currentTime;
         setTimeStatus('submission_open');
         setIsSubmittable(true);
         setIsLate(true);
-        const timeLeftMs = lateWindowEndMs - currentTime;
         setTimeLeft(Math.floor(timeLeftMs / 1000));
+        console.log('⚠️ [useCompleteAssignment] Status: late, time left:', Math.floor(timeLeftMs / 1000), 'seconds');
         
       } else {
         // After 30 minutes - EXPIRED
@@ -107,6 +133,7 @@ export const useCompleteAssignment = (
         setIsSubmittable(false);
         setIsLate(false);
         setTimeLeft(0);
+        console.log('❌ [useCompleteAssignment] Status: expired');
       }
     };
     
@@ -175,14 +202,33 @@ export const useCompleteAssignment = (
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        base64: false,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setPhoto(result.assets[0].uri);
+        const uri = result.assets[0].uri;
+        setPhoto(uri);
+        
+        // ✅ FIXED: Check if file exists and get size safely
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(uri);
+          if (fileInfo.exists) {
+            console.log('📸 [useCompleteAssignment] Photo selected:', {
+              uri: uri.substring(0, 100) + '...',
+              size: 'size' in fileInfo ? fileInfo.size : 'unknown',
+              exists: fileInfo.exists
+            });
+          } else {
+            console.log('📸 [useCompleteAssignment] Photo selected but file not found:', uri);
+          }
+        } catch (infoError) {
+          console.log('📸 [useCompleteAssignment] Could not get file info:', infoError);
+        }
+        
         setErrors(prev => ({ ...prev, photo: undefined }));
       }
     } catch (error) {
-      console.error('Error picking image:', error);
+      console.error('❌ [useCompleteAssignment] Error picking image:', error);
       Alert.alert('Error', 'Failed to pick image');
     }
   }, []);
@@ -200,14 +246,33 @@ export const useCompleteAssignment = (
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
+        base64: false,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setPhoto(result.assets[0].uri);
+        const uri = result.assets[0].uri;
+        setPhoto(uri);
+        
+        // ✅ FIXED: Check if file exists and get size safely
+        try {
+          const fileInfo = await FileSystem.getInfoAsync(uri);
+          if (fileInfo.exists) {
+            console.log('📸 [useCompleteAssignment] Photo taken:', {
+              uri: uri.substring(0, 100) + '...',
+              size: 'size' in fileInfo ? fileInfo.size : 'unknown',
+              exists: fileInfo.exists
+            });
+          } else {
+            console.log('📸 [useCompleteAssignment] Photo taken but file not found:', uri);
+          }
+        } catch (infoError) {
+          console.log('📸 [useCompleteAssignment] Could not get file info:', infoError);
+        }
+        
         setErrors(prev => ({ ...prev, photo: undefined }));
       }
     } catch (error) {
-      console.error('Error taking photo:', error);
+      console.error('❌ [useCompleteAssignment] Error taking photo:', error);
       Alert.alert('Error', 'Failed to take photo');
     }
   }, []);
@@ -230,6 +295,13 @@ export const useCompleteAssignment = (
 
   // Submit completion
   const submitCompletion = useCallback(async () => {
+    console.log('🚀 [useCompleteAssignment] submitCompletion called');
+    console.log('   isSubmittable:', isSubmittable);
+    console.log('   timeStatus:', timeStatus);
+    console.log('   isLate:', isLate);
+    console.log('   hasPhoto:', !!photo);
+    console.log('   notes length:', notes.length);
+    
     // Check token first
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -256,12 +328,17 @@ export const useCompleteAssignment = (
     setSubmitting(true);
     
     try {
+      console.log('📤 [useCompleteAssignment] Calling AssignmentService.completeAssignment');
+      
       const result = await AssignmentService.completeAssignment(assignmentId, {
-        notes,
+        notes: notes.trim(),
         photoUri: photo || undefined,
       });
       
+      console.log('📥 [useCompleteAssignment] Result:', result);
+      
       if (result.success) {
+        console.log('✅ [useCompleteAssignment] Submission successful!');
         Alert.alert(
           'Success!',
           result.isLate 
@@ -272,22 +349,37 @@ export const useCompleteAssignment = (
               text: 'OK',
               onPress: () => {
                 if (onCompleted) onCompleted();
+                // Clear form after submission
+                setPhoto(null);
+                setNotes('');
               }
             }
           ]
         );
       } else {
-        // Check if error is auth-related
-        if (result.message?.toLowerCase().includes('token') || 
-            result.message?.toLowerCase().includes('auth') ||
-            result.message?.toLowerCase().includes('unauthorized')) {
+        console.log('❌ [useCompleteAssignment] Submission failed:', result.message);
+        
+        // Check if error is about time validation
+        if (result.message?.toLowerCase().includes('late') || 
+            result.message?.toLowerCase().includes('time') ||
+            result.message?.toLowerCase().includes('window')) {
+          Alert.alert(
+            'Submission Time Error',
+            result.message + '\n\nPlease check the time window requirements.',
+            [{ text: 'OK' }]
+          );
+        } else if (result.message?.toLowerCase().includes('token') || 
+                   result.message?.toLowerCase().includes('auth') ||
+                   result.message?.toLowerCase().includes('unauthorized')) {
           setAuthError(true);
+          Alert.alert('Session Expired', 'Please log in again');
+        } else {
+          Alert.alert('Error', result.message || 'Failed to submit assignment');
         }
-        Alert.alert('Error', result.message || 'Failed to submit assignment');
       }
     } catch (error: any) {
-      console.error('Error submitting assignment:', error);
-      Alert.alert('Error', error.message || 'Network error');
+      console.error('❌ [useCompleteAssignment] Error submitting assignment:', error);
+      Alert.alert('Error', error.message || 'Network error. Please check your connection.');
     } finally {
       setSubmitting(false);
     }
@@ -304,7 +396,7 @@ export const useCompleteAssignment = (
     timeStatus,
     isLate,
     authError,
-    
+     
     // Setters
     setPhoto,
     setNotes,

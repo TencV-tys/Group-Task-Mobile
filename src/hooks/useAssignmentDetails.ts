@@ -1,4 +1,4 @@
-// hooks/useAssignmentDetails.ts - UPDATED with deleted task handling
+// hooks/useAssignmentDetails.ts - COMPLETE FIXED VERSION
 import { useState, useEffect, useCallback } from 'react';
 import { Alert, Linking } from 'react-native';
 import { AssignmentService } from '../services/AssignmentService';
@@ -77,9 +77,8 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, []);
 
-  // Get submission status info - modified for deleted tasks
+  // Get submission status info
   const getSubmissionStatusInfo = useCallback(() => {
-    // ✅ If task is deleted, show disabled state
     if (isTaskDeleted) {
       return {
         label: '🗑️ TASK DELETED',
@@ -182,7 +181,6 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft, isTaskDeleted]);
 
-  // Get status helpers - modified for deleted tasks
   const getStatusColor = useCallback(() => {
     if (isTaskDeleted) return '#868e96';
     switch (verificationStatus) {
@@ -227,9 +225,9 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, []);
 
-  // Check time validity - modified for deleted tasks
+  // ✅ ADD THIS MISSING FUNCTION - Check time validity
   const checkTimeValidity = useCallback((assignmentData: any) => {
-    // ✅ If task is deleted, disable submission
+    // If task is deleted, disable submission
     if (isTaskDeleted) {
       setIsSubmittable(false);
       setSubmissionStatus('completed');
@@ -246,6 +244,9 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     const assignmentDate = new Date(assignmentData.dueDate);
     const today = now.toDateString();
     const assignmentDay = assignmentDate.toDateString();
+    
+    // Only log when status changes (optional)
+    // console.log(`⏰ [checkTimeValidity] Checking time validity...`);
     
     if (today !== assignmentDay) {
       setIsSubmittable(false);
@@ -276,10 +277,9 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
         setTimeLeft(timeUntilEnd);
       }
       else if (currentTime >= endTimeMs && currentTime <= graceEndMs) {
+        const isLateSubmission = currentTime > lateThresholdMs;
         setIsSubmittable(true);
         setSubmissionStatus('available');
-        
-        const isLateSubmission = currentTime > lateThresholdMs;
         setIsLate(isLateSubmission);
         
         if (isLateSubmission && assignmentData.points) {
@@ -312,9 +312,9 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, [isTaskDeleted]);
 
-  // Check time validity with server - modified for deleted tasks
+  // Check time validity with server
   const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
-    // ✅ If task is deleted, don't check with server
+    // If task is deleted, don't check with server
     if (isTaskDeleted) {
       setIsSubmittable(false);
       setSubmissionStatus('completed');
@@ -363,11 +363,12 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
         checkTimeValidity(assignmentData);
       }
     } catch (error) {
+      console.error(`❌ Server check failed, falling back to local:`, error);
       checkTimeValidity(assignmentData);
     }
   }, [checkTimeValidity, isTaskDeleted]);
 
-  // Fetch assignment details - UPDATED to handle deleted tasks
+  // Fetch assignment details
   const fetchAssignmentDetails = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -378,12 +379,11 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
       if (result.success) {
         const assignmentData = result.assignment;
         
-        // ✅ Check if task is deleted
+        // Check if task is deleted
         if (assignmentData.isTaskDeleted || (!assignmentData.task && assignmentData.taskTitle)) {
           setIsTaskDeleted(true);
           setDeletedTaskTitle(assignmentData.taskTitle || 'Deleted Task');
           
-          // Still set the assignment data but with deleted flag
           setAssignment({
             ...assignmentData,
             isTaskDeleted: true,
@@ -397,7 +397,6 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
           setSubmissionStatus('completed');
           setIsSubmittable(false);
           
-          // Show alert about deleted task
           Alert.alert(
             'Task Deleted',
             `The task "${assignmentData.taskTitle || 'Unknown Task'}" has been deleted.\n\nYou can view the submission details but cannot make changes.`,
@@ -419,7 +418,6 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
           }
         }
       } else {
-        // ✅ Handle 400/404 errors gracefully
         if (result.message?.includes('400') || result.message?.includes('404') || result.message?.includes('deleted')) {
           setError('This assignment is no longer available (may have been deleted).');
         } else if (result.message?.toLowerCase().includes('token') || 
@@ -438,7 +436,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, [assignmentId, checkTimeValidityWithServer]);
 
-  // Handle complete assignment - disabled for deleted tasks
+  // Handle complete assignment
   const handleCompleteAssignment = useCallback((navigation: any) => {
     if (isTaskDeleted) {
       Alert.alert(
@@ -496,7 +494,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, [assignment, isSubmittable, isLate, penaltyInfo, getSubmissionStatusInfo, fetchAssignmentDetails, onVerified, isTaskDeleted]);
 
-  // Handle request swap - disabled for deleted tasks
+  // Handle request swap
   const handleRequestSwap = useCallback((navigation: any, preSelectedScope?: 'week' | 'day') => {
     return async () => {
       if (isTaskDeleted) {
@@ -546,7 +544,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     };
   }, [assignment, isTaskDeleted]);
 
-  // Handle verify - disabled for deleted tasks (admin can't verify deleted task submissions)
+  // Handle verify
   const handleVerify = useCallback(async (verified: boolean) => {
     if (isTaskDeleted) {
       Alert.alert(
@@ -629,7 +627,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, [assignmentEvents.assignmentRejected, assignmentId, fetchAssignmentDetails, onVerified, clearAssignmentRejected]);
 
-  // Start countdown timer - don't start for deleted tasks
+  // Start countdown timer
   useEffect(() => {
     if (assignment && !assignment.completed && !isTaskDeleted) {
       const timer = setInterval(() => {
@@ -662,8 +660,8 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     isLate,
     penaltyInfo,
     authError,
-    isTaskDeleted,        // ✅ NEW
-    deletedTaskTitle,     // ✅ NEW
+    isTaskDeleted,
+    deletedTaskTitle,
     
     // Setters
     setAdminNotes,

@@ -1,4 +1,5 @@
-// src/screens/TodayAssignmentsScreen.tsx - UPDATED with consistent design
+// src/screens/TodayAssignmentsScreen.tsx - ADDED detailed console logs
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -15,7 +16,7 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AssignmentService, TodayAssignment } from '../services/AssignmentService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
 export default function TodayAssignmentsScreen({ navigation, route }: any) {
@@ -26,13 +27,16 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
 
-  // ===== UPDATED: Use TokenUtils.checkToken() =====
+  console.log('📱 [TodayAssignments] Screen mounted with params:', { groupId, groupName });
+
+  // ===== CHECK TOKEN =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
     
+    console.log('🔐 [TodayAssignments] Token check result:', hasToken);
     setAuthError(!hasToken);
     return hasToken;
   }, []);
@@ -40,6 +44,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
+      console.log('⚠️ [TodayAssignments] Auth error detected');
       Alert.alert(
         'Session Expired',
         'Please log in again',
@@ -57,13 +62,20 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   }, [authError, navigation]);
 
   useEffect(() => {
+    console.log('🔄 [TodayAssignments] useEffect triggered, fetching assignments...');
     fetchTodayAssignments();
   }, [groupId]);
 
   const fetchTodayAssignments = async (isRefreshing = false) => {
+    console.log('📥 [TodayAssignments] fetchTodayAssignments called', { 
+      isRefreshing, 
+      groupId 
+    });
+    
     // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
+      console.log('❌ [TodayAssignments] No valid token, stopping fetch');
       setLoading(false);
       setRefreshing(false);
       return;
@@ -78,11 +90,36 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
     setAuthError(false);
 
     try {
+      console.log('📡 [TodayAssignments] Calling AssignmentService.getTodayAssignments...');
       const result = await AssignmentService.getTodayAssignments(groupId);
       
+      console.log('📦 [TodayAssignments] API Response:', JSON.stringify(result, null, 2));
+      
       if (result.success) {
-        setAssignments(result.data?.assignments || []);
+        const assignmentsData = result.data?.assignments || [];
+        console.log(`✅ [TodayAssignments] Successfully loaded ${assignmentsData.length} assignments`);
+        
+        // Log each assignment for debugging
+        if (assignmentsData.length > 0) {
+          assignmentsData.forEach((assignment: TodayAssignment, index: number) => {
+            console.log(`📋 [TodayAssignments] Assignment ${index + 1}:`, {
+              id: assignment.id,
+              title: assignment.taskTitle,
+              dueDate: assignment.dueDate,
+              canSubmit: assignment.canSubmit,
+              timeLeft: assignment.timeLeft,
+              willBePenalized: assignment.willBePenalized,
+              groupName: assignment.group?.name
+            });
+          });
+        } else {
+          console.log('📭 [TodayAssignments] No assignments due today');
+          console.log('🔍 [TodayAssignments] Check if there are any assignments in the system');
+        }
+        
+        setAssignments(assignmentsData);
       } else {
+        console.error('❌ [TodayAssignments] API returned error:', result.message);
         setError(result.message || 'Failed to load today\'s assignments');
         if (result.message?.toLowerCase().includes('token') || 
             result.message?.toLowerCase().includes('auth')) {
@@ -90,19 +127,27 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
         }
       }
     } catch (err: any) {
-      console.error('Error fetching today\'s assignments:', err);
+      console.error('❌ [TodayAssignments] Error fetching today\'s assignments:', err);
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        groupId
+      });
       setError(err.message || 'Network error');
     } finally {
       setLoading(false);
       setRefreshing(false);
+      console.log('🏁 [TodayAssignments] fetch completed');
     }
   };
 
   const handleViewAssignment = (assignmentId: string) => {
+    console.log('👆 [TodayAssignments] Viewing assignment:', assignmentId);
     navigation.navigate('AssignmentDetails', {
       assignmentId,
       isAdmin: false,
       onVerified: () => {
+        console.log('🔄 [TodayAssignments] Assignment verified, refreshing...');
         fetchTodayAssignments(true);
       }
     });
@@ -122,7 +167,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
     }
   };
 
-  // Get gradient colors based on status - CONSISTENT DESIGN
+  // Get gradient colors based on status
   const getGradientColors = (item: TodayAssignment): [string, string] => {
     const isUrgent = item.timeLeft && item.timeLeft < 300;
     const isLate = item.willBePenalized;
@@ -139,7 +184,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
     return ['#ffffff', '#f8f9fa']; // Default white/light gray gradient
   };
 
-  // Get status badge colors - CONSISTENT DESIGN
+  // Get status badge colors
   const getStatusBadgeColors = (item: TodayAssignment): [string, string] => {
     const isLate = item.willBePenalized;
     if (isLate) return ['#fff3bf', '#ffec99']; // Orange for late
@@ -177,7 +222,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
               <Text style={styles.taskTitle} numberOfLines={2}>
                 {item.taskTitle}
               </Text>
-              <Text style={styles.groupName}>{item.group.name}</Text>
+              <Text style={styles.groupName}>{item.group?.name || 'Unknown Group'}</Text>
             </View>
             
             <LinearGradient
@@ -294,6 +339,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   );
 
   if (loading && !refreshing) {
+    console.log('⏳ [TodayAssignments] Showing loading indicator');
     return (
       <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -305,6 +351,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   }
 
   if (authError) {
+    console.log('⚠️ [TodayAssignments] Showing auth error screen');
     return (
       <ScreenWrapper style={styles.container}>
         <View style={styles.errorContainer}>
@@ -328,6 +375,8 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
       </ScreenWrapper>
     );
   }
+
+  console.log(`🎨 [TodayAssignments] Rendering ${assignments.length} assignments`);
 
   return (
     <ScreenWrapper style={styles.container}>
@@ -370,7 +419,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   );
 }
 
-// ===== UPDATED STYLES with consistent design =====
+// Styles remain the same as before...
 const styles = StyleSheet.create({
   container: {
     flex: 1,

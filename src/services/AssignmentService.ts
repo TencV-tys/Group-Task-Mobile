@@ -211,22 +211,20 @@ export interface TodayAssignment {
   willBePenalized?: boolean;
   finalPoints?: number;
 }
-
+ 
 export class AssignmentService {
   
-  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
+// services/AssignmentService.ts - FIXED photo upload
 
-  // services/AssignmentService.ts - UPDATED with better error handling
-
-// ========== COMPLETE ASSIGNMENT ==========
 static async completeAssignment(
   assignmentId: string, 
-  data: CompleteAssignmentParams
-): Promise<CompleteAssignmentResponse> {
+  data: CompleteAssignmentParams 
+): Promise<CompleteAssignmentResponse> { 
   try {
-    console.log('AssignmentService: Completing assignment', assignmentId, data);
+    console.log('AssignmentService: Completing assignment', assignmentId);
+    console.log('   Photo URI:', data.photoUri);
+    console.log('   Notes:', data.notes);
     
-    // ✅ Get token
     const token = await TokenUtils.getAccessToken();
     
     if (!token) {
@@ -236,23 +234,16 @@ static async completeAssignment(
       };
     }
     
-    // ✅ Check if we have a valid base URL
-    if (!API_BASE_URL) {
-      console.error('❌ API_BASE_URL is not defined:', API_BASE_URL);
-      return {
-        success: false,
-        message: 'API base URL is not configured'
-      };
-    }
-    
     const fullUrl = `${API_URL}/${assignmentId}/complete`;
-    console.log('📤 Full URL:', fullUrl);
+    console.log('📤 URL:', fullUrl);
     
-    if (data.photoUri) { 
-      // Create FormData for multipart upload
+    let response;
+    
+    if (data.photoUri) {
+      // ✅ Create FormData for multipart upload
       const formData = new FormData();
       
-      // Add notes to formData if present
+      // Add notes
       if (data.notes) {
         formData.append('notes', data.notes);
       }
@@ -263,31 +254,30 @@ static async completeAssignment(
       const match = /\.(\w+)$/.exec(filename);
       const mimeType = match ? `image/${match[1]}` : 'image/jpeg';
       
-      // Add the photo file
+      // ✅ Add the photo file with proper format
       formData.append('photo', {
         uri: uri,
         name: filename,
         type: mimeType,
       } as any);
       
-      // Prepare headers
+      console.log('📸 Photo details:', {
+        filename,
+        mimeType,
+        uri: uri.substring(0, 100) + '...'
+      });
+      
       const headers: HeadersInit = {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json',
       };
       
-      console.log('📤 Sending multipart form data:');
-      console.log('   URL:', fullUrl);
-      console.log('   Filename:', filename);
-      console.log('   Type:', mimeType);
-      console.log('   URI:', uri);
-      
-      // ✅ Add timeout to fetch
+      // ✅ Don't set Content-Type - let fetch set it with boundary
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
       
       try {
-        const response = await fetch(fullUrl, {
+        response = await fetch(fullUrl, {
           method: 'POST',
           headers,
           body: formData,
@@ -296,40 +286,14 @@ static async completeAssignment(
         
         clearTimeout(timeoutId);
         
-        console.log('📥 Response status:', response.status);
-        
-        const responseText = await response.text();
-        console.log('📥 Response text length:', responseText.length);
-        
-        let result;
-        try {
-          result = JSON.parse(responseText);
-        } catch (e) {
-          console.error('Failed to parse response as JSON:', responseText.substring(0, 500));
-          throw new Error('Invalid server response');
-        }
-        
-        if (!response.ok) {
-          throw new Error(result.message || `Failed: ${response.status}`);
-        }
-        
-        if (result.success) {
-          await NotificationService.getUnreadCount();
-        }
-        
-        return result;
-        
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
-        
         if (fetchError.name === 'AbortError') {
-          console.error('❌ Request timeout after 30 seconds');
           return {
             success: false,
-            message: 'Request timeout. Please check your connection and try again.'
+            message: 'Request timeout. Please check your connection.'
           };
         }
-        
         throw fetchError;
       }
       
@@ -337,15 +301,11 @@ static async completeAssignment(
       // No photo - send as JSON
       const headers = await TokenUtils.getAuthHeaders(true);
       
-      console.log('📤 Sending JSON data without photo');
-      console.log('   URL:', fullUrl);
-      console.log('   Notes:', data.notes);
-      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
       try {
-        const response = await fetch(fullUrl, {
+        response = await fetch(fullUrl, {
           method: 'POST',
           headers,
           body: JSON.stringify({ notes: data.notes }),
@@ -354,58 +314,39 @@ static async completeAssignment(
         
         clearTimeout(timeoutId);
         
-        console.log('📥 Response status:', response.status);
-        
-        const responseText = await response.text();
-        let result;
-        try {
-          result = JSON.parse(responseText);
-        } catch (e) {
-          console.error('Failed to parse response as JSON:', responseText);
-          throw new Error('Invalid server response');
-        }
-        
-        if (!response.ok) {
-          throw new Error(result.message || `Failed: ${response.status}`);
-        }
-        
-        if (result.success) {
-          await NotificationService.getUnreadCount();
-        }
-        
-        return result;
-        
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
-        
-        if (fetchError.name === 'AbortError') {
-          return {
-            success: false,
-            message: 'Request timeout. Please check your connection.'
-          };
-        }
-        
         throw fetchError;
       }
     }
-
-  } catch (error: any) {
-    console.error('AssignmentService.completeAssignment error:', error);
-    console.error('Error details:', {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
-      url: `${API_URL}/${assignmentId}/complete`
-    });
     
-    // Check for specific error types
-    if (error.message === 'Network request failed') {
+    console.log('📥 Response status:', response.status);
+    
+    const responseText = await response.text();
+    console.log('📥 Response text:', responseText.substring(0, 500));
+    
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Failed to parse JSON:', responseText);
       return {
         success: false,
-        message: 'Cannot connect to server. Please check your internet connection and ensure the server is running.'
+        message: 'Invalid server response'
       };
     }
     
+    if (!response.ok) {
+      return {
+        success: false,
+        message: result.message || `HTTP ${response.status}: ${response.statusText}`
+      };
+    }
+    
+    return result;
+
+  } catch (error: any) {
+    console.error('AssignmentService.completeAssignment error:', error);
     return {
       success: false,
       message: error.message || 'Failed to complete assignment',
@@ -469,12 +410,15 @@ static async completeAssignment(
     }
   }
 
+// services/AssignmentService.ts - ADD MORE DETAILED LOGGING in getUserAssignments
+
   // ========== GET USER'S ASSIGNMENTS ==========
   static async getUserAssignments(
     userId: string, 
     filters?: { status?: string; week?: number; limit?: number; offset?: number; }
   ) {
     try {
+      // ✅ Build URL with filters
       let url = `${API_URL}/user/${userId}`;
       const params = new URLSearchParams();
       
@@ -486,54 +430,185 @@ static async completeAssignment(
       const queryString = params.toString();
       if (queryString) url += `?${queryString}`;
 
-      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+      console.log('📥 [getUserAssignments] Fetching from URL:', url);
+      console.log('📥 [getUserAssignments] User ID:', userId);
+      console.log('📥 [getUserAssignments] Filters:', filters);
+      
+      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders(false);
+      console.log('📥 [getUserAssignments] Headers:', Object.keys(headers));
       
       const response = await fetch(url, {
         method: 'GET',
         headers,
       });
 
+      console.log('📥 [getUserAssignments] Response status:', response.status);
+      console.log('📥 [getUserAssignments] Response status text:', response.statusText);
+
       if (!response.ok) {
-        throw new Error(`Failed: ${response.status}`);
+        console.error('❌ [getUserAssignments] HTTP error:', response.status);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
-      return await response.json();
+      const result = await response.json();
+      console.log('📥 [getUserAssignments] Full response:', JSON.stringify(result, null, 2));
+      console.log(`✅ [getUserAssignments] Got ${result.data?.assignments?.length || 0} assignments for user ${userId}`);
+      
+      // Log first assignment if exists
+      if (result.data?.assignments?.length > 0) {
+        console.log('📋 [getUserAssignments] First assignment:', JSON.stringify(result.data.assignments[0], null, 2));
+      } else {
+        console.log('⚠️ [getUserAssignments] No assignments returned. Checking response structure:', {
+          hasData: !!result.data,
+          hasAssignments: !!result.data?.assignments,
+          dataKeys: result.data ? Object.keys(result.data) : [],
+          resultKeys: Object.keys(result)
+        });
+      }
+      
+      return result;
 
     } catch (error: any) {
-      console.error('AssignmentService.getUserAssignments error:', error);
-      return { success: false, message: error.message || 'Failed to load' };
+      console.error('❌ [getUserAssignments] Error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        url: `${API_URL}/user/${userId}`
+      });
+      return { 
+        success: false, 
+        message: error.message || 'Failed to load assignments',
+        data: { assignments: [], total: 0 }
+      };
     }
   }
 
-  // ========== GET TODAY'S ASSIGNMENTS ==========
   static async getTodayAssignments(groupId?: string) {
     try {
-      let url = `${API_URL}/today`;
-      if (groupId) url += `?groupId=${groupId}`;
+      console.log('📅 Getting today\'s assignments for group:', groupId);
       
-      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
-      const headers = await TokenUtils.getAuthHeaders(false);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
-
-      if (!response.ok) {
+      // ✅ First, get all assignments for the current user
+      const user = await TokenUtils.getUser();
+      if (!user) {
+        console.log('❌ No user found');
         return {
           success: false,
-          data: { assignments: [], currentTime: new Date().toISOString(), total: 0 }
+          data: { assignments: [], currentTime: new Date().toISOString(), total: 0 },
+          message: 'User not found'
         };
       }
       
-      return await response.json();
-
+      console.log('👤 Current user ID:', user.id);
+      
+      // Get assignments for the user
+      const userAssignmentsResult = await this.getUserAssignments(user.id);
+      
+      if (!userAssignmentsResult.success) {
+        console.log('❌ Failed to get user assignments:', userAssignmentsResult.message);
+        return {
+          success: false,
+          data: { assignments: [], currentTime: new Date().toISOString(), total: 0 },
+          message: userAssignmentsResult.message
+        };
+      }
+      
+      const allAssignments = userAssignmentsResult.data?.assignments || [];
+      console.log(`📊 Total assignments found: ${allAssignments.length}`);
+      
+      // Calculate today's date range (local time)
+      const now = new Date();
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(now);
+      endOfDay.setHours(23, 59, 59, 999);
+      
+      console.log('📅 Today\'s date range:', {
+        start: startOfDay.toISOString(),
+        end: endOfDay.toISOString(),
+        current: now.toISOString()
+      });
+      
+      // Filter assignments due today and not completed
+      const todayAssignments = allAssignments.filter((assignment: any) => {
+        // Skip completed assignments
+        if (assignment.completed) return false;
+        
+        // Check due date
+        if (!assignment.dueDate) return false;
+        
+        const dueDate = new Date(assignment.dueDate);
+        const isDueToday = dueDate >= startOfDay && dueDate <= endOfDay;
+        
+        // Filter by group if specified
+        const belongsToGroup = !groupId || assignment.task?.groupId === groupId;
+        
+        if (isDueToday) {
+          console.log(`✅ Assignment due today: ${assignment.task?.title} (${assignment.id})`);
+        }
+        
+        return isDueToday && belongsToGroup;
+      });
+      
+      console.log(`📋 Found ${todayAssignments.length} assignments due today`);
+      
+      // Transform to TodayAssignment format with time validation
+      const formattedAssignments = todayAssignments.map((assignment: any) => {
+        // Check submission time validation
+        const timeValidation = this.validateLocalSubmissionTime(
+          assignment.dueDate,
+          assignment.timeSlot,
+          now
+        );
+        
+        // Calculate time left if applicable
+        let timeLeft: number | undefined;
+        let willBePenalized = false;
+        let finalPoints = assignment.points;
+        
+        if (timeValidation.canSubmit && timeValidation.timeLeft) {
+          timeLeft = timeValidation.timeLeft;
+          willBePenalized = timeValidation.willBePenalized || false;
+          
+          if (willBePenalized) {
+            // Apply 50% penalty for late submissions
+            finalPoints = Math.floor(assignment.points * 0.5);
+          }
+        }
+        
+        return {
+          id: assignment.id,
+          taskId: assignment.taskId,
+          taskTitle: assignment.task?.title || 'Untitled Task',
+          taskPoints: assignment.points,
+          group: assignment.task?.group || { id: groupId || '', name: 'Unknown Group' },
+          dueDate: assignment.dueDate,
+          canSubmit: timeValidation.canSubmit,
+          timeLeft: timeLeft,
+          timeLeftText: timeValidation.timeLeftText,
+          reason: timeValidation.canSubmit ? undefined : timeValidation.reason,
+          timeSlot: assignment.timeSlot,
+          willBePenalized: willBePenalized,
+          finalPoints: finalPoints
+        };
+      });
+      
+      return {
+        success: true,
+        data: {
+          assignments: formattedAssignments,
+          currentTime: now.toISOString(),
+          total: formattedAssignments.length
+        },
+        message: 'Today\'s assignments retrieved successfully'
+      };
+      
     } catch (error: any) {
       console.error('AssignmentService.getTodayAssignments error:', error);
       return {
         success: false,
-        data: { assignments: [], currentTime: new Date().toISOString(), total: 0 }
+        data: { assignments: [], currentTime: new Date().toISOString(), total: 0 },
+        message: error.message || 'Failed to load today\'s assignments'
       };
     }
   }
@@ -803,79 +878,95 @@ static async completeAssignment(
     }
   }
 
-  // ========== LOCAL TIME VALIDATION HELPER ==========
-  static validateLocalSubmissionTime(
-    dueDate: string,
-    timeSlot?: { startTime: string; endTime: string },
-    currentTime: Date = new Date()
-  ) {
-    const due = new Date(dueDate);
-    const current = currentTime;
-    const isToday = due.toDateString() === current.toDateString();
-    
-    if (!isToday) {
-      return { canSubmit: false, reason: 'Not due date', timeLeft: 0, isToday: false, willBePenalized: false };
-    }
-    
-    if (!timeSlot) {
-      return { canSubmit: true, isToday: true, willBePenalized: false };
-    }
-    
-    const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
-    const endTime = new Date(due);
-    endTime.setHours(endHour, endMinute, 0, 0);
-    
-    const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
-    const submissionStart = new Date(endTime.getTime() - 30 * 60000);
-    
-    if (current < submissionStart) {
-      const timeUntilStart = submissionStart.getTime() - current.getTime();
-      return {
-        canSubmit: false,
-        reason: 'Submission not open yet',
-        timeLeft: Math.ceil(timeUntilStart / 1000),
-        submissionStart,
-        gracePeriodEnd,
-        isToday: true,
-        willBePenalized: false
-      };
-    }
-    
-    if (current <= endTime) {
-      const timeLeft = endTime.getTime() - current.getTime();
-      return {
-        canSubmit: true,
-        timeLeft: Math.ceil(timeLeft / 1000),
-        timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
-        submissionStart,
-        gracePeriodEnd,
-        isToday: true,
-        willBePenalized: false
-      };
-    }
-    
-    if (current <= gracePeriodEnd) {
-      const timeLeft = gracePeriodEnd.getTime() - current.getTime();
-      return {
-        canSubmit: true,
-        timeLeft: Math.ceil(timeLeft / 1000),
-        timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
-        submissionStart,
-        gracePeriodEnd,
-        isToday: true,
-        willBePenalized: true
-      };
-    }
-    
+ 
+// services/AssignmentService.ts - FIXED validateLocalSubmissionTime
+
+static validateLocalSubmissionTime(
+  dueDate: string,
+  timeSlot?: { startTime: string; endTime: string },
+  currentTime: Date = new Date()
+) {
+  const due = new Date(dueDate);
+  const current = currentTime;
+  const isToday = due.toDateString() === current.toDateString();
+  
+  if (!isToday) {
+    return { canSubmit: false, reason: 'Not due date', timeLeft: 0, isToday: false, willBePenalized: false };
+  }
+  
+  if (!timeSlot) {
+    return { canSubmit: true, isToday: true, willBePenalized: false };
+  }
+  
+  const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
+  const endTime = new Date(due);
+  endTime.setHours(endHour, endMinute, 0, 0);
+  
+  // ✅ FIXED: Match backend timing
+  const submissionStart = endTime; // Opens AT end time (not 30 minutes before)
+  const onTimeEnd = new Date(endTime.getTime() + 25 * 60000); // 0-25 minutes after
+  const lateWindowEnd = new Date(endTime.getTime() + 30 * 60000); // 25-30 minutes after
+  
+  console.log(`⏰ [validateLocalSubmissionTime]`, {
+    current: current.toLocaleTimeString(),
+    submissionStart: submissionStart.toLocaleTimeString(),
+    onTimeEnd: onTimeEnd.toLocaleTimeString(),
+    lateWindowEnd: lateWindowEnd.toLocaleTimeString()
+  });
+  
+  // BEFORE submission opens
+  if (current < submissionStart) {
+    const timeUntilStart = submissionStart.getTime() - current.getTime();
     return {
       canSubmit: false,
-      reason: 'Submission window closed',
-      timeLeft: 0,
-      gracePeriodEnd,
+      reason: 'Submission not open yet',
+      timeLeft: Math.ceil(timeUntilStart / 1000),
+      timeLeftText: this.formatTimeLeft(Math.ceil(timeUntilStart / 1000)),
+      submissionStart,
+      gracePeriodEnd: lateWindowEnd,
+      isToday: true,
+      willBePenalized: false
+    };
+  }
+  
+  // ON TIME: First 25 minutes after end time
+  if (current <= onTimeEnd) {
+    const timeLeft = onTimeEnd.getTime() - current.getTime();
+    return {
+      canSubmit: true,
+      timeLeft: Math.ceil(timeLeft / 1000),
+      timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
+      submissionStart,
+      gracePeriodEnd: lateWindowEnd,
+      isToday: true,
+      willBePenalized: false
+    };
+  }
+  
+  // LATE: Next 5 minutes (25-30 minutes after end time)
+  if (current <= lateWindowEnd) {
+    const timeLeft = lateWindowEnd.getTime() - current.getTime();
+    return {
+      canSubmit: true,
+      timeLeft: Math.ceil(timeLeft / 1000),
+      timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
+      submissionStart,
+      gracePeriodEnd: lateWindowEnd,
       isToday: true,
       willBePenalized: true
     };
   }
+  
+  // After 30 minutes - closed
+  return {
+    canSubmit: false,
+    reason: 'Submission window closed',
+    timeLeft: 0,
+    gracePeriodEnd: lateWindowEnd,
+    isToday: true,
+    willBePenalized: true
+  };
+}
 
   // ========== FORMAT TIME LEFT ==========
   private static formatTimeLeft(seconds: number): string {

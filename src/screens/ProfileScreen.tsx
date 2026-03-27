@@ -1,4 +1,4 @@
-// src/screens/ProfileScreen.tsx - UPDATED with TokenUtils
+// src/screens/ProfileScreen.tsx - Animated + Consistent Design
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -8,7 +8,9 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
-  Image  
+  Image,
+  Animated,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,10 +20,30 @@ import { useImageUpload } from '../uploadHook/useImageUpload';
 import { useFeedback } from '../feedbackHook/useFeedback';
 import { useNotifications } from '../notificationHook/useNotifications';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { API_BASE_URL } from '../config/api';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { profileStyles } from '../styles/profile.styles';
+
+const { width } = Dimensions.get('window');
+
+// ─── Color Palette ────────────────────────────────────────────────────────────
+const COLORS = {
+  primary: '#2b8a3e',
+  primaryDark: '#1e6b2c',
+  primaryLight: '#d3f9d8',
+  secondary: '#f8f9fa',
+  tertiary: '#e9ecef',
+  dark: '#212529',
+  gray: '#868e96',
+  lightGray: '#adb5bd',
+  error: '#fa5252',
+  white: '#ffffff',
+  black: '#1a1a2e',
+  warning: '#e67700',
+  red: '#fa5252',
+  redDark: '#e03131',
+};
 
 export default function ProfileScreen({ navigation }: any) {
   const [user, setUser] = useState<any>(null);
@@ -29,7 +51,16 @@ export default function ProfileScreen({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [authError, setAuthError] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  
+
+  // ── Animation Values
+  const headerAnim = useRef(new Animated.Value(0)).current;
+  const profileCardAnim = useRef(new Animated.Value(0)).current;
+  const accountSectionAnim = useRef(new Animated.Value(0)).current;
+  const feedbackSectionAnim = useRef(new Animated.Value(0)).current;
+  const supportSectionAnim = useRef(new Animated.Value(0)).current;
+  const aboutSectionAnim = useRef(new Animated.Value(0)).current;
+  const logoutAnim = useRef(new Animated.Value(0)).current;
+
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
 
@@ -60,11 +91,28 @@ export default function ProfileScreen({ navigation }: any) {
     }
   });
 
+  // ── Entrance Animations
+  useEffect(() => {
+    Animated.sequence([
+      Animated.timing(headerAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(profileCardAnim, { toValue: 1, duration: 500, delay: 100, useNativeDriver: true }),
+      Animated.parallel([
+        Animated.timing(accountSectionAnim, { toValue: 1, duration: 400, delay: 200, useNativeDriver: true }),
+        Animated.timing(feedbackSectionAnim, { toValue: 1, duration: 400, delay: 250, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(supportSectionAnim, { toValue: 1, duration: 400, delay: 300, useNativeDriver: true }),
+        Animated.timing(aboutSectionAnim, { toValue: 1, duration: 400, delay: 350, useNativeDriver: true }),
+      ]),
+      Animated.timing(logoutAnim, { toValue: 1, duration: 400, delay: 400, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
   // ===== REAL-TIME NOTIFICATIONS =====
   useRealtimeNotifications({
     onNewNotification: (notification) => {
-      if (notification.type === 'PROFILE_UPDATED' || 
-          notification.type === 'AVATAR_UPDATED') {
+      if (notification.type === 'PROFILE_UPDATED' ||
+        notification.type === 'AVATAR_UPDATED') {
         loadUserData(true);
       }
       loadUnreadCount();
@@ -72,22 +120,20 @@ export default function ProfileScreen({ navigation }: any) {
     showAlerts: true
   });
 
-  // ===== UPDATED: Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
-    
+
     setAuthError(!hasToken);
     return hasToken;
   }, []);
 
-  // ===== UPDATED: GET USER ID USING TOKENUTILS =====
   useEffect(() => {
     const getUserId = async () => {
       try {
-        const user = await TokenUtils.getUser(); // 👈 USE TOKENUTILS
+        const user = await TokenUtils.getUser();
         if (user) {
           setCurrentUserId(user.id);
         }
@@ -96,21 +142,20 @@ export default function ProfileScreen({ navigation }: any) {
       }
     };
     getUserId();
-    
+
     return () => {
       isMounted.current = false;
     };
   }, []);
 
-  // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
       Alert.alert(
         'Session Expired',
         'Please log in again',
         [
-          { 
-            text: 'OK', 
+          {
+            text: 'OK',
             onPress: () => {
               setAuthError(false);
               navigation.navigate('Login');
@@ -136,14 +181,14 @@ export default function ProfileScreen({ navigation }: any) {
       } else {
         userData = await AuthService.getCurrentUser();
       }
-      
+
       if (isMounted.current) {
         console.log('Loaded user data:', userData);
         setUser(userData);
         await loadStats();
         await loadUnreadCount();
       }
-      
+
     } catch (error) {
       console.error('Error loading user data:', error);
       if (isMounted.current) {
@@ -195,7 +240,7 @@ export default function ProfileScreen({ navigation }: any) {
   const performLogout = async () => {
     try {
       const result = await AuthService.logout();
-      
+
       if (result.success) {
         navigation.reset({
           index: 0,
@@ -215,7 +260,7 @@ export default function ProfileScreen({ navigation }: any) {
 
   const handleAvatarPress = () => {
     if (uploading) return;
-    
+
     Alert.alert(
       'Change Profile Picture',
       'How would you like to update your profile picture?',
@@ -223,10 +268,10 @@ export default function ProfileScreen({ navigation }: any) {
         { text: 'Cancel', style: 'cancel' },
         { text: 'Take Photo', onPress: handleTakePhoto },
         { text: 'Choose from Gallery', onPress: handleChooseFromGallery },
-        user?.avatarUrl && { 
-          text: 'Remove Picture', 
-          style: 'destructive', 
-          onPress: handleRemoveAvatar 
+        user?.avatarUrl && {
+          text: 'Remove Picture',
+          style: 'destructive',
+          onPress: handleRemoveAvatar
         },
       ].filter(Boolean) as any
     );
@@ -302,7 +347,7 @@ export default function ProfileScreen({ navigation }: any) {
     return (
       <ScreenWrapper style={profileStyles.container}>
         <View style={profileStyles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
+          <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={profileStyles.loadingText}>Loading profile...</Text>
         </View>
       </ScreenWrapper>
@@ -312,37 +357,37 @@ export default function ProfileScreen({ navigation }: any) {
   if (!user) {
     return (
       <ScreenWrapper style={profileStyles.container}>
-        <View style={profileStyles.header}>
-          <TouchableOpacity 
+        <Animated.View style={[profileStyles.header, { opacity: headerAnim }]}>
+          <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={profileStyles.backButton}
           >
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+            <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.gray} />
           </TouchableOpacity>
-          
+
           <Text style={profileStyles.headerTitle}>Profile</Text>
-          
+
           <View style={profileStyles.headerRight} />
-        </View>
+        </Animated.View>
 
         <View style={profileStyles.errorContainer}>
-          <MaterialCommunityIcons name="account-off" size={64} color="#fa5252" />
+          <MaterialCommunityIcons name="account-off" size={64} color={COLORS.error} />
           <Text style={profileStyles.errorText}>No user data found</Text>
           <Text style={profileStyles.errorSubText}>
             Please login again to view your profile
           </Text>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={profileStyles.primaryButton}
             onPress={() => navigation.navigate('Login')}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[COLORS.primary, COLORS.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={profileStyles.primaryButtonGradient}
             >
-              <MaterialCommunityIcons name="login" size={18} color="white" />
+              <MaterialCommunityIcons name="login" size={18} color={COLORS.white} />
               <Text style={profileStyles.primaryButtonText}>Go to Login</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -353,166 +398,222 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <ScreenWrapper style={profileStyles.container}>
-      {/* Header */}
-      <View style={profileStyles.header}>
-        <TouchableOpacity 
+      {/* Header with Animation */}
+      <Animated.View
+        style={[
+          profileStyles.header,
+          {
+            opacity: headerAnim,
+            transform: [{
+              translateY: headerAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [-20, 0]
+              })
+            }]
+          }
+        ]}
+      >
+        <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={profileStyles.backButton}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.gray} />
         </TouchableOpacity>
-        
+
         <Text style={profileStyles.headerTitle}>Profile</Text>
-        
-        <TouchableOpacity 
+
+        <TouchableOpacity
           onPress={handleNotifications}
           style={profileStyles.notificationButton}
         >
-          <MaterialCommunityIcons name="bell-outline" size={22} color="#2b8a3e" />
+          <MaterialCommunityIcons name="bell-outline" size={22} color={COLORS.primary} />
           {unreadCount > 0 && (
-            <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={profileStyles.notificationBadge}
+            <Animated.View
+              style={[
+                profileStyles.notificationBadge,
+                {
+                  transform: [{
+                    scale: new Animated.Value(1)
+                  }]
+                }
+              ]}
             >
-              <Text style={profileStyles.notificationBadgeText}>
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </Text>
-            </LinearGradient>
+              <LinearGradient
+                colors={[COLORS.primary, COLORS.primaryDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={profileStyles.notificationBadgeGradient}
+              >
+                <Text style={profileStyles.notificationBadgeText}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </LinearGradient>
+            </Animated.View>
           )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
 
       <ScrollView
         refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
+          <RefreshControl
+            refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
             enabled={!uploading}
           />
         }
         showsVerticalScrollIndicator={false}
         contentContainerStyle={profileStyles.scrollContent}
       >
-        {/* Profile Header Card */}
-        <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={profileStyles.profileCard}
+        {/* Profile Header Card with Animation */}
+        <Animated.View
+          style={[
+            {
+              opacity: profileCardAnim,
+              transform: [{
+                scale: profileCardAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.95, 1]
+                })
+              }]
+            }
+          ]}
         >
-          <TouchableOpacity 
-            onPress={handleAvatarPress}
-            disabled={uploading}
-            style={profileStyles.avatarTouchable}
+          <LinearGradient
+            colors={[COLORS.white, COLORS.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={profileStyles.profileCard}
           >
-            <View style={profileStyles.avatarContainer}>
-              {uploading ? (
-                <View style={profileStyles.avatarUploadingContainer}>
-                  <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={profileStyles.avatarPlaceholder}
-                  >
-                    <ActivityIndicator size="large" color="#2b8a3e" />
-                  </LinearGradient>
-                  <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={profileStyles.uploadingOverlay}
-                  >
-                    <Text style={profileStyles.uploadingText}>
-                      {Math.round(progress)}%
-                    </Text>
-                  </LinearGradient>
-                </View>
-              ) : user.avatarUrl ? (
+            <TouchableOpacity
+              onPress={handleAvatarPress}
+              disabled={uploading}
+              style={profileStyles.avatarTouchable}
+            >
+              <View style={profileStyles.avatarContainer}>
+                {uploading ? (
+                  <View style={profileStyles.avatarUploadingContainer}>
+                    <LinearGradient
+                      colors={[COLORS.secondary, COLORS.tertiary]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={profileStyles.avatarPlaceholder}
+                    >
+                      <ActivityIndicator size="large" color={COLORS.primary} />
+                    </LinearGradient>
+                    <LinearGradient
+                      colors={[COLORS.primary, COLORS.primaryDark]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={profileStyles.uploadingOverlay}
+                    >
+                      <Text style={profileStyles.uploadingText}>
+                        {Math.round(progress)}%
+                      </Text>
+                    </LinearGradient>
+                  </View>
+                ) : user.avatarUrl ? (
+                  <>
+                    <Image
+                      source={{ uri: user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API_BASE_URL}${user.avatarUrl}` }}
+                      style={profileStyles.avatarImage}
+                      onError={(e) => {
+                        console.log('Avatar load error:', e.nativeEvent.error);
+                        setUser({ ...user, avatarUrl: null });
+                      }}
+                    />
+                    <LinearGradient
+                      colors={[COLORS.primary, COLORS.primaryDark]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={profileStyles.editIcon}
+                    >
+                      <MaterialCommunityIcons name="camera" size={14} color={COLORS.white} />
+                    </LinearGradient>
+                  </>
+                ) : (
+                  <>
+                    <LinearGradient
+                      colors={[COLORS.primary, COLORS.primaryDark]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={profileStyles.avatarPlaceholder}
+                    >
+                      <Text style={profileStyles.avatarText}>
+                        {user.fullName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
+                      </Text>
+                    </LinearGradient>
+                    <LinearGradient
+                      colors={[COLORS.primary, COLORS.primaryDark]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={profileStyles.editIcon}
+                    >
+                      <MaterialCommunityIcons name="camera-plus" size={14} color={COLORS.white} />
+                    </LinearGradient>
+                  </>
+                )}
+              </View>
+            </TouchableOpacity>
+
+            <Text style={profileStyles.userName}>{user.fullName || 'User'}</Text>
+            <Text style={profileStyles.userEmail}>{user.email || 'No email'}</Text>
+
+            <View style={profileStyles.userStats}>
+              <View style={profileStyles.statItem}>
+                <MaterialCommunityIcons name="account" size={14} color={COLORS.gray} />
+                <Text style={profileStyles.statText}>
+                  {user.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1).toLowerCase() : 'Not set'}
+                </Text>
+              </View>
+
+              <View style={profileStyles.statDivider} />
+
+              <View style={profileStyles.statItem}>
+                <MaterialCommunityIcons name="shield-account" size={14} color={COLORS.gray} />
+                <Text style={profileStyles.statText}>{user.role || 'Member'}</Text>
+              </View>
+
+              {user.createdAt && (
                 <>
-                  <Image
-                    source={{ uri: user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API_BASE_URL}${user.avatarUrl}` }}
-                    style={profileStyles.avatarImage}
-                    onError={(e) => {
-                      console.log('Avatar load error:', e.nativeEvent.error);
-                      setUser({...user, avatarUrl: null});
-                    }}
-                  />
-                  <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={profileStyles.editIcon}
-                  >
-                    <MaterialCommunityIcons name="camera" size={14} color="white" />
-                  </LinearGradient>
-                </>
-              ) : (
-                <>
-                  <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={profileStyles.avatarPlaceholder}
-                  >
-                    <Text style={profileStyles.avatarText}>
-                      {user.fullName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
+                  <View style={profileStyles.statDivider} />
+                  <View style={profileStyles.statItem}>
+                    <MaterialCommunityIcons name="calendar" size={14} color={COLORS.gray} />
+                    <Text style={profileStyles.statText}>
+                      Joined {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                     </Text>
-                  </LinearGradient>
-                  <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={profileStyles.editIcon}
-                  >
-                    <MaterialCommunityIcons name="camera-plus" size={14} color="white" />
-                  </LinearGradient>
+                  </View>
                 </>
               )}
             </View>
-          </TouchableOpacity>
-          
-          <Text style={profileStyles.userName}>{user.fullName || 'User'}</Text>
-          <Text style={profileStyles.userEmail}>{user.email || 'No email'}</Text>
-          
-          <View style={profileStyles.userStats}>
-            <View style={profileStyles.statItem}>
-              <MaterialCommunityIcons name="account" size={14} color="#868e96" />
-              <Text style={profileStyles.statText}>
-                {user.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1).toLowerCase() : 'Not set'}
-              </Text>
-            </View>
-            
-            <View style={profileStyles.statDivider} />
-            
-            <View style={profileStyles.statItem}>
-              <MaterialCommunityIcons name="shield-account" size={14} color="#868e96" />
-              <Text style={profileStyles.statText}>{user.role || 'Member'}</Text>
-            </View>
-            
-            {user.createdAt && (
-              <>
-                <View style={profileStyles.statDivider} />
-                <View style={profileStyles.statItem}>
-                  <MaterialCommunityIcons name="calendar" size={14} color="#868e96" />
-                  <Text style={profileStyles.statText}>
-                    Joined {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                  </Text>
-                </View>
-              </>
-            )}
-          </View>
-        </LinearGradient>
+          </LinearGradient>
+        </Animated.View>
 
         {/* Account Settings Section */}
-        <View style={profileStyles.section}>
+        <Animated.View
+          style={[
+            profileStyles.section,
+            {
+              opacity: accountSectionAnim,
+              transform: [{
+                translateY: accountSectionAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [30, 0]
+                })
+              }]
+            }
+          ]}
+        >
           <Text style={profileStyles.sectionTitle}>Account Settings</Text>
-          
-          <View style={profileStyles.menuCard}>
-            <TouchableOpacity 
+
+          <LinearGradient
+            colors={[COLORS.white, COLORS.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={profileStyles.menuCard}
+          >
+            <TouchableOpacity
               style={profileStyles.menuItem}
               onPress={handleAccountSettings}
               activeOpacity={0.7}
@@ -520,21 +621,21 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <View style={profileStyles.menuItemLeft}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[COLORS.secondary, COLORS.tertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={profileStyles.menuIcon}
                 >
-                  <MaterialCommunityIcons name="account-cog" size={18} color="#2b8a3e" />
+                  <MaterialCommunityIcons name="account-cog" size={18} color={COLORS.primary} />
                 </LinearGradient>
                 <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>Account Settings</Text>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
             </TouchableOpacity>
-            
+
             <View style={profileStyles.divider} />
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={profileStyles.menuItem}
               onPress={handleAvatarPress}
               activeOpacity={0.7}
@@ -542,15 +643,15 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <View style={profileStyles.menuItemLeft}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[COLORS.secondary, COLORS.tertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={profileStyles.menuIcon}
                 >
-                  <MaterialCommunityIcons 
-                    name={uploading ? "image-sync" : "image-edit"} 
-                    size={18} 
-                    color="#2b8a3e" 
+                  <MaterialCommunityIcons
+                    name={uploading ? "image-sync" : "image-edit"}
+                    size={18}
+                    color={COLORS.primary}
                   />
                 </LinearGradient>
                 <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>
@@ -558,18 +659,36 @@ export default function ProfileScreen({ navigation }: any) {
                 </Text>
               </View>
               {!uploading && (
-                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
               )}
             </TouchableOpacity>
-          </View>
-        </View>
+          </LinearGradient>
+        </Animated.View>
 
         {/* Feedback Section */}
-        <View style={profileStyles.section}>
+        <Animated.View
+          style={[
+            profileStyles.section,
+            {
+              opacity: feedbackSectionAnim,
+              transform: [{
+                translateY: feedbackSectionAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [30, 0]
+                })
+              }]
+            }
+          ]}
+        >
           <Text style={profileStyles.sectionTitle}>Feedback</Text>
-          
-          <View style={profileStyles.menuCard}>
-            <TouchableOpacity 
+
+          <LinearGradient
+            colors={[COLORS.white, COLORS.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={profileStyles.menuCard}
+          >
+            <TouchableOpacity
               style={profileStyles.menuItem}
               onPress={handleSendFeedback}
               activeOpacity={0.7}
@@ -577,12 +696,12 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <View style={profileStyles.menuItemLeft}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[COLORS.secondary, COLORS.tertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={profileStyles.menuIcon}
                 >
-                  <MaterialCommunityIcons name="message" size={18} color="#e67700" />
+                  <MaterialCommunityIcons name="message" size={18} color={COLORS.warning} />
                 </LinearGradient>
                 <View style={profileStyles.menuTextContainer}>
                   <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>Send Feedback</Text>
@@ -593,12 +712,12 @@ export default function ProfileScreen({ navigation }: any) {
                   )}
                 </View>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
             </TouchableOpacity>
-            
+
             <View style={profileStyles.divider} />
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={profileStyles.menuItem}
               onPress={handleViewFeedbackHistory}
               activeOpacity={0.7}
@@ -606,22 +725,22 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <View style={profileStyles.menuItemLeft}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[COLORS.secondary, COLORS.tertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={profileStyles.menuIcon}
                 >
-                  <MaterialCommunityIcons name="history" size={18} color="#2b8a3e" />
+                  <MaterialCommunityIcons name="history" size={18} color={COLORS.primary} />
                 </LinearGradient>
                 <View style={profileStyles.menuTextContainer}>
                   <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>My Feedback History</Text>
                   {feedbackStats && (
                     <View style={profileStyles.feedbackStats}>
                       {feedbackStats.open > 0 && (
-                        <View style={[profileStyles.statusDot, { backgroundColor: '#e67700' }]} />
+                        <View style={[profileStyles.statusDot, { backgroundColor: COLORS.warning }]} />
                       )}
                       {feedbackStats.resolved > 0 && (
-                        <View style={[profileStyles.statusDot, { backgroundColor: '#2b8a3e' }]} />
+                        <View style={[profileStyles.statusDot, { backgroundColor: COLORS.primary }]} />
                       )}
                       <Text style={profileStyles.feedbackStatsText}>
                         {feedbackStats.open} open · {feedbackStats.resolved} resolved
@@ -630,17 +749,35 @@ export default function ProfileScreen({ navigation }: any) {
                   )}
                 </View>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
             </TouchableOpacity>
-          </View>
-        </View>
+          </LinearGradient>
+        </Animated.View>
 
         {/* Support Section */}
-        <View style={profileStyles.section}>
+        <Animated.View
+          style={[
+            profileStyles.section,
+            {
+              opacity: supportSectionAnim,
+              transform: [{
+                translateY: supportSectionAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [30, 0]
+                })
+              }]
+            }
+          ]}
+        >
           <Text style={profileStyles.sectionTitle}>Support & Legal</Text>
-          
-          <View style={profileStyles.menuCard}>
-            <TouchableOpacity 
+
+          <LinearGradient
+            colors={[COLORS.white, COLORS.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={profileStyles.menuCard}
+          >
+            <TouchableOpacity
               style={profileStyles.menuItem}
               onPress={handleHelpSupport}
               activeOpacity={0.7}
@@ -648,21 +785,21 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <View style={profileStyles.menuItemLeft}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[COLORS.secondary, COLORS.tertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={profileStyles.menuIcon}
                 >
-                  <MaterialCommunityIcons name="help-circle" size={18} color="#fa5252" />
+                  <MaterialCommunityIcons name="help-circle" size={18} color={COLORS.error} />
                 </LinearGradient>
                 <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>Help & Support</Text>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
             </TouchableOpacity>
-            
+
             <View style={profileStyles.divider} />
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={profileStyles.menuItem}
               onPress={handlePrivacyPolicy}
               activeOpacity={0.7}
@@ -670,21 +807,21 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <View style={profileStyles.menuItemLeft}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[COLORS.secondary, COLORS.tertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={profileStyles.menuIcon}
                 >
-                  <MaterialCommunityIcons name="shield" size={18} color="#2b8a3e" />
+                  <MaterialCommunityIcons name="shield" size={18} color={COLORS.primary} />
                 </LinearGradient>
                 <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>Privacy Policy</Text>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
             </TouchableOpacity>
-            
+
             <View style={profileStyles.divider} />
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={profileStyles.menuItem}
               onPress={handleTermsOfService}
               activeOpacity={0.7}
@@ -692,45 +829,58 @@ export default function ProfileScreen({ navigation }: any) {
             >
               <View style={profileStyles.menuItemLeft}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[COLORS.secondary, COLORS.tertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={profileStyles.menuIcon}
                 >
-                  <MaterialCommunityIcons name="file-document" size={18} color="#868e96" />
+                  <MaterialCommunityIcons name="file-document" size={18} color={COLORS.gray} />
                 </LinearGradient>
                 <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>Terms of Service</Text>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
             </TouchableOpacity>
-          </View>
-        </View>
+          </LinearGradient>
+        </Animated.View>
 
-        {/* App Info Section */}
-        <View style={profileStyles.section}>
+        {/* About Section */}
+        <Animated.View
+          style={[
+            profileStyles.section,
+            {
+              opacity: aboutSectionAnim,
+              transform: [{
+                translateY: aboutSectionAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [30, 0]
+                })
+              }]
+            }
+          ]}
+        >
           <Text style={profileStyles.sectionTitle}>About</Text>
-          
+
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[COLORS.white, COLORS.secondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={profileStyles.infoCard}
           >
             <View style={profileStyles.appInfo}>
               <LinearGradient
-                colors={['#2b8a3e', '#1e6b2c']}
+                colors={[COLORS.primary, COLORS.primaryDark]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={profileStyles.appIcon}
               >
-                <MaterialCommunityIcons name="checkbox-multiple-marked-circle" size={22} color="white" />
+                <MaterialCommunityIcons name="checkbox-multiple-marked-circle" size={22} color={COLORS.white} />
               </LinearGradient>
               <View style={profileStyles.appInfoText}>
                 <Text style={profileStyles.appName}>Group Task</Text>
                 <Text style={profileStyles.appDescription}>Flexible task management for any group</Text>
               </View>
             </View>
-            
+
             <View style={profileStyles.appDetails}>
               <View style={profileStyles.detailItem}>
                 <Text style={profileStyles.detailLabel}>Version</Text>
@@ -746,27 +896,41 @@ export default function ProfileScreen({ navigation }: any) {
               </View>
             </View>
           </LinearGradient>
-        </View>
+        </Animated.View>
 
         {/* Logout Button */}
-        <TouchableOpacity 
-          style={[profileStyles.logoutButton, uploading && profileStyles.buttonDisabled]}
-          onPress={handleLogout}
-          activeOpacity={0.7}
-          disabled={uploading}
+        <Animated.View
+          style={[
+            {
+              opacity: logoutAnim,
+              transform: [{
+                scale: logoutAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.95, 1]
+                })
+              }] 
+            }
+          ]}
         >
-          <LinearGradient
-            colors={['#fa5252', '#e03131']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={profileStyles.logoutButtonGradient}
+          <TouchableOpacity
+            style={[profileStyles.logoutButton, uploading && profileStyles.buttonDisabled]}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+            disabled={uploading}
           >
-            <MaterialCommunityIcons name="logout" size={18} color="white" />
-            <Text style={profileStyles.logoutButtonText}>
-              {uploading ? 'Please wait...' : 'Logout'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={[COLORS.red, COLORS.redDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={profileStyles.logoutButtonGradient}
+            >
+              <MaterialCommunityIcons name="logout" size={18} color={COLORS.white} />
+              <Text style={profileStyles.logoutButtonText}>
+                {uploading ? 'Please wait...' : 'Logout'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
       </ScrollView>
     </ScreenWrapper>
   );

@@ -16,7 +16,7 @@ export const profileStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e9ecef',
     minHeight: 60,
-  },
+  }, 
   backButton: {
     width: 36,
     height: 36,
@@ -54,7 +54,7 @@ export const profileStyles = StyleSheet.create({
     position: 'absolute',
     top: -2,
     right: -2,
-    borderRadius: 10,
+    borderRadius: 12,
     minWidth: 18,
     height: 18,
     justifyContent: 'center',
@@ -62,6 +62,7 @@ export const profileStyles = StyleSheet.create({
     paddingHorizontal: 4,
     borderWidth: 2,
     borderColor: 'white',
+    backgroundColor:'#2b8a3e'
   },
   notificationBadgeText: {
     color: 'white',
@@ -264,6 +265,13 @@ export const profileStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
+   notificationBadgeGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',

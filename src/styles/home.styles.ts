@@ -67,7 +67,6 @@ export const homeStyles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 80,
   },
-  // ✅ REMOVED pointsCard styles since it's no longer used
   
   statsGrid: {
     flexDirection: 'row',
@@ -127,7 +126,7 @@ export const homeStyles = StyleSheet.create({
     marginBottom: 24,
   },
   lastSection: {
-    marginBottom: 30,
+    marginBottom: 0, // Changed from 30 to 0 to remove extra bottom space
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -145,7 +144,6 @@ export const homeStyles = StyleSheet.create({
     color: '#2b8a3e',
     fontWeight: '600',
   },
-  // ✅ FIXED: Quick Actions Grid - properly sized
   quickActionsGrid: {
     flexDirection: 'row',
     gap: 12,
@@ -212,6 +210,7 @@ export const homeStyles = StyleSheet.create({
   groupsScroll: {
     marginHorizontal: -16,
     paddingHorizontal: 16,
+    marginBottom: 0, // Added to remove bottom margin
   },
   groupCard: {
     width: 120,
@@ -219,6 +218,7 @@ export const homeStyles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginRight: 12,
+    marginBottom:10,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -255,7 +255,7 @@ export const homeStyles = StyleSheet.create({
   groupRoleBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius:8,
     backgroundColor: '#f8f9fa',
   },
   groupRole: {
@@ -412,7 +412,7 @@ export const homeStyles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#fa5252',
+    color: '#fa5252', 
     textAlign: 'center',
     marginVertical: 20,
   },
@@ -442,6 +442,7 @@ export const homeStyles = StyleSheet.create({
     borderTopColor: '#e9ecef',
     paddingHorizontal: 20,
     paddingTop: 12,
+    paddingBottom: 12, // Added padding bottom
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.05,

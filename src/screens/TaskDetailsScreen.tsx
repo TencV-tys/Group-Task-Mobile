@@ -12,13 +12,13 @@ import {
   Linking
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 import { TaskService } from '../services/TaskService';
 import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { TokenUtils } from '../utils/tokenUtils';
-import { ScreenWrapper } from '../components/ScreenWrapper';
+import { ScreenWrapper } from '../components/ScreenWrapper'; 
 import { taskDetailsStyles as styles } from '../styles/taskDetails.styles';
 
 export default function TaskDetailsScreen({ navigation, route }: any) {
@@ -79,10 +79,12 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   } = useRealtimeTasks(groupId);
 
   const {
-    events: assignmentEvents,
-    clearAssignmentCompleted,
-    clearAssignmentVerified
-  } = useRealtimeAssignments(groupId, currentUserId || '');
+  events: assignmentEvents,
+  clearAssignmentCompleted,
+  clearAssignmentVerified,
+  clearAssignmentUpdated  // ✅ ADD THIS
+} = useRealtimeAssignments(groupId, currentUserId || '');
+
 
   useRealtimeNotifications({
     onNewNotification: (notification) => {
@@ -377,6 +379,15 @@ const convertTimeToMinutes = (time: string) => {
       setTimeLeft(null);
     }
   };
+
+  useEffect(() => {
+  if (assignmentEvents.assignmentUpdated && 
+      assignmentEvents.assignmentUpdated.assignmentId === task?.userAssignment?.id) {
+    console.log('🔄 Current assignment updated (swap), refreshing...');
+    fetchTaskDetails();
+    clearAssignmentUpdated();
+  }
+}, [assignmentEvents.assignmentUpdated, task?.userAssignment?.id, fetchTaskDetails, clearAssignmentUpdated]);
 
   const startCountdownTimer = () => {
     const timer = setInterval(() => {

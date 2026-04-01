@@ -1,7 +1,8 @@
-// hooks/useRealtimeAssignments.ts - UPDATED with TokenUtils
+// hooks/useRealtimeAssignments.ts - UPDATED with assignmentUpdated event
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 
 interface RealtimeAssignmentState {
   assignmentCreated: any | null;
@@ -9,6 +10,7 @@ interface RealtimeAssignmentState {
   assignmentPendingVerification: any | null;
   assignmentVerified: any | null;
   assignmentRejected: any | null;
+  assignmentUpdated: any | null;  // ✅ ADD THIS
 }
 
 export function useRealtimeAssignments(groupId: string, userId: string) {
@@ -20,13 +22,14 @@ export function useRealtimeAssignments(groupId: string, userId: string) {
     assignmentCompleted: null,
     assignmentPendingVerification: null,
     assignmentVerified: null,
-    assignmentRejected: null
+    assignmentRejected: null,
+    assignmentUpdated: null  // ✅ ADD THIS
   });
   
   const { on, off, isConnected } = useSocket();
   const mountedRef = useRef(true);
 
-  // ✅ UPDATED: Use TokenUtils.checkToken()
+  // ✅ Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -58,13 +61,19 @@ export function useRealtimeAssignments(groupId: string, userId: string) {
     setEvents(prev => ({ ...prev, assignmentRejected: null }));
   }, []);
 
+  // ✅ ADD THIS clear function
+  const clearAssignmentUpdated = useCallback(() => {
+    setEvents(prev => ({ ...prev, assignmentUpdated: null }));
+  }, []);
+
   const clearAll = useCallback(() => {
     setEvents({
       assignmentCreated: null,
       assignmentCompleted: null,
       assignmentPendingVerification: null,
       assignmentVerified: null,
-      assignmentRejected: null
+      assignmentRejected: null,
+      assignmentUpdated: null  // ✅ ADD THIS
     });
   }, []);
 
@@ -123,6 +132,14 @@ export function useRealtimeAssignments(groupId: string, userId: string) {
           }
         });
 
+        // ✅ ADD THIS: Assignment updated (for swaps)
+        on('assignment:updated', (data: any) => {
+          if ((data.userId === userId || data.groupId === groupId) && mounted) {
+            console.log('📢 Real-time: Assignment updated (swap)', data);
+            setEvents(prev => ({ ...prev, assignmentUpdated: data }));
+          }
+        });
+
       } catch (err: any) {
         if (mounted) {
           setError(err.message || 'Failed to setup real-time listeners');
@@ -144,6 +161,7 @@ export function useRealtimeAssignments(groupId: string, userId: string) {
       off('assignment:pending-verification');
       off('assignment:verified');
       off('assignment:rejected');
+      off('assignment:updated');  // ✅ ADD THIS
     };
   }, [groupId, userId, isConnected, checkToken, on, off]);
 
@@ -161,6 +179,7 @@ export function useRealtimeAssignments(groupId: string, userId: string) {
     clearAssignmentPendingVerification,
     clearAssignmentVerified,
     clearAssignmentRejected,
+    clearAssignmentUpdated,  // ✅ ADD THIS
     clearAll
   };
 }

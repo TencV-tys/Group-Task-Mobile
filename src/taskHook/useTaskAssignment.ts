@@ -18,7 +18,7 @@ export const useTaskAssignment = (groupId: string) => {
     return members.filter(member => 
       member.inRotation === true && 
       member.role !== 'ADMIN'
-    );
+    ); 
   }, [members]);
 
   // ✅ Filter members that can be assigned (available + in rotation)

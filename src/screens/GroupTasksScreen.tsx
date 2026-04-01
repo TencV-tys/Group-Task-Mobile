@@ -18,9 +18,9 @@ import * as SecureStore from 'expo-secure-store';
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { SettingsModal } from '../components/SettingsModal';
-import { ScreenWrapper } from '../components/ScreenWrapper';
+import { ScreenWrapper } from '../components/ScreenWrapper'; 
 import { useRotationStatus } from '../hooks/useRotationStatus';
-import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
+import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests'; 
 import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
@@ -86,19 +86,22 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     clearTaskAssigned
   } = useRealtimeTasks(groupId);
 
-  const {
-    events: assignmentEvents,
-    clearAssignmentCompleted,
-    clearAssignmentPendingVerification,
-    clearAssignmentVerified
-  } = useRealtimeAssignments(groupId, currentUserId || '');
+ const {
+  events: assignmentEvents,
+  clearAssignmentCompleted,
+  clearAssignmentPendingVerification,
+  clearAssignmentVerified,
+  clearAssignmentUpdated  // ✅ ADD THIS
+} = useRealtimeAssignments(groupId, currentUserId || '');
+
+
 
   const {
     events: swapEvents,
     clearSwapCreated
   } = useRealtimeSwapRequests(groupId, currentUserId || '');
 
- // ===== useMemo HOOKS (TOP LEVEL) =====
+
 
 // ===== useMemo HOOKS (TOP LEVEL) =====
 const groupedMyTasks = useMemo(() => {
@@ -444,10 +447,18 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
   useEffect(() => {
     if (authError) {
       Alert.alert('Session Expired', 'Please log in again', [
-        { text: 'OK', onPress: () => navigation.navigate('Login') }
+        { text: 'OK', onPress: () => navigation.navigate('Login') } 
       ]);
     }
   }, [authError, navigation]);
+
+  useEffect(() => {
+  if (assignmentEvents.assignmentUpdated) {
+    console.log('🔄 Assignment updated (swap), refreshing tasks...');
+    refreshTasks();
+    clearAssignmentUpdated();
+  }
+}, [assignmentEvents.assignmentUpdated, refreshTasks, clearAssignmentUpdated]);
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -1131,7 +1142,7 @@ const renderTask = ({ item }: any) => {
         </View>
       </LinearGradient>
     </TouchableOpacity>
-  );
+  ); 
 };
 
 const renderContent = () => {

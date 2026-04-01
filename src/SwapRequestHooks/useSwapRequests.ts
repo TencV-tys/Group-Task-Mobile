@@ -1,10 +1,11 @@
-// SwapRequestHooks/useSwapRequests.ts - UPDATED with TokenUtils
+// SwapRequestHooks/useSwapRequests.ts - COMPLETE UPDATED VERSION
+
 import { useState, useEffect, useCallback } from 'react';
 import { SwapRequestFilters, SwapRequest, SwapRequestService } from '../services/SwapRequestService';
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
 import { AuthService } from '../services/AuthService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 
 export const useSwapRequests = () => {
   const [userId, setUserId] = useState<string | null>(null);
@@ -16,10 +17,10 @@ export const useSwapRequests = () => {
   const [totalPendingForMe, setTotalPendingForMe] = useState(0);
   const [authError, setAuthError] = useState(false);
 
-  // ✅ UPDATED: Use TokenUtils.checkToken() instead of custom logic
+  // Check token
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
-      showAlert: false, // Don't show alert in hook
+      showAlert: false,
       onAuthError: () => setAuthError(true)
     });
     
@@ -31,12 +32,10 @@ export const useSwapRequests = () => {
   useEffect(() => {
     const loadUserId = async () => {
       try {
-        // ✅ Use TokenUtils.getUser()
         const user = await TokenUtils.getUser();
         if (user) {
           setUserId(user.id);
         } else {
-          // If no user data but token exists, fetch user data
           const token = await AuthService.getAccessToken();
           if (token) {
             const userData = await AuthService.getCurrentUser();
@@ -59,21 +58,13 @@ export const useSwapRequests = () => {
       Alert.alert(
         'Session Expired',
         'Please log in again',
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              setAuthError(false);
-            }
-          }
-        ]
+        [{ text: 'OK', onPress: () => setAuthError(false) }]
       );
     }
   }, [authError]);
 
   // Load my swap requests
   const loadMyRequests = useCallback(async (filters?: SwapRequestFilters) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -93,20 +84,13 @@ export const useSwapRequests = () => {
       console.log('📥 Loading my requests with filters:', filters);
       const response = await SwapRequestService.getMySwapRequests(filters);
       
-      console.log('📦 Load my requests response:', response);
-      
       if (response.success) {
         const requests = response.data?.requests || [];
         const total = response.data?.total || 0;
         
         console.log(`✅ Loaded ${requests.length} requests (total: ${total})`);
-        
         setMyRequests(requests);
         setTotalMyRequests(total);
-        
-        if (requests.length > 0) {
-          console.log('📋 First request:', JSON.stringify(requests[0], null, 2));
-        }
       } else {
         console.error('❌ Failed to load requests:', response.message);
         setError(response.message || 'Failed to load swap requests');
@@ -146,14 +130,11 @@ export const useSwapRequests = () => {
       console.log('📥 Loading pending for me with groupId:', groupId);
       const response = await SwapRequestService.getPendingForMe({ groupId });
       
-      console.log('📦 Load pending for me response:', response);
-      
       if (response.success) {
         const requests = response.data?.requests || [];
         const total = response.data?.total || 0;
         
         console.log(`✅ Loaded ${requests.length} pending requests (total: ${total})`);
-        
         setPendingForMe(requests);
         setTotalPendingForMe(total);
       } else {
@@ -241,8 +222,8 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
-  // Accept swap request
-  const acceptSwapRequest = useCallback(async (requestId: string) => {
+  // ✅ UPDATED: Accept swap request with callback for external refresh
+  const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () => void) => {
     const hasToken = await checkToken();
     if (!hasToken) {
       return { 
@@ -263,8 +244,14 @@ export const useSwapRequests = () => {
       console.log('📦 Accept response:', response);
       
       if (response.success) {
+        // Refresh both lists
         await loadMyRequests();
         await loadPendingForMe();
+        
+        // Call the onSuccess callback if provided (for external refresh)
+        if (onSuccess) {
+          onSuccess();
+        }
         
         const swapRequest = response.data?.swapRequest;
         const scope = response.data?.scope;
@@ -289,12 +276,14 @@ export const useSwapRequests = () => {
             response.message?.toLowerCase().includes('unauthorized')) {
           setAuthError(true);
         }
+        Alert.alert('Error', response.message || 'Failed to accept swap request');
       }
       
       return response;
     } catch (err: any) {
       console.error('❌ Error in acceptSwapRequest:', err);
       setError(err.message || 'Failed to accept swap request');
+      Alert.alert('Error', err.message || 'Failed to accept swap request');
       return { success: false, message: err.message };
     } finally {
       setLoading(false);
@@ -332,12 +321,14 @@ export const useSwapRequests = () => {
             response.message?.toLowerCase().includes('unauthorized')) {
           setAuthError(true);
         }
+        Alert.alert('Error', response.message || 'Failed to reject swap request');
       }
       
       return response;
     } catch (err: any) {
       console.error('❌ Error in rejectSwapRequest:', err);
       setError(err.message || 'Failed to reject swap request');
+      Alert.alert('Error', err.message || 'Failed to reject swap request');
       return { success: false, message: err.message };
     } finally {
       setLoading(false);
@@ -375,12 +366,14 @@ export const useSwapRequests = () => {
             response.message?.toLowerCase().includes('unauthorized')) {
           setAuthError(true);
         }
+        Alert.alert('Error', response.message || 'Failed to cancel swap request');
       }
       
       return response;
     } catch (err: any) {
       console.error('❌ Error in cancelSwapRequest:', err);
       setError(err.message || 'Failed to cancel swap request');
+      Alert.alert('Error', err.message || 'Failed to cancel swap request');
       return { success: false, message: err.message };
     } finally {
       setLoading(false);

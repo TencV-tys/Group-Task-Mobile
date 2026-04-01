@@ -13,7 +13,7 @@ import {
   Modal,
   ScrollView,
   RefreshControl
-} from 'react-native';
+} from 'react-native'; 
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTaskAssignment } from '../taskHook/useTaskAssignment';
@@ -419,10 +419,10 @@ const renderTask = ({ item }: any) => {
               <Text style={styles.modalTitle} numberOfLines={1}>
                 {selectedTask?.title}
               </Text>
-              <TouchableOpacity 
+              <TouchableOpacity  
                 onPress={() => !isReassigning && setShowAssigneeModal(false)}
                 disabled={isReassigning}
-                style={styles.closeButton}
+                style={styles.closeButton} 
               >
                 <MaterialCommunityIcons name="close" size={18} color="#868e96" />
               </TouchableOpacity>

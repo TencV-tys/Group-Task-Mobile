@@ -1,4 +1,4 @@
-// hooks/useAssignmentDetails.ts - COMPLETE WITH ADMIN/OWNER FLAGS
+// hooks/useAssignmentDetails.ts - COMPLETE WITH ADMIN/OWNER FLAGS AND ASSIGNMENT UPDATED
 
 import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
@@ -31,7 +31,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
   const [isTaskDeleted, setIsTaskDeleted] = useState(false);
   const [deletedTaskTitle, setDeletedTaskTitle] = useState<string>('');
   
-  // ✅ NEW: Admin/Owner flags from server
+  // Admin/Owner flags from server
   const [isAdmin, setIsAdmin] = useState(isAdminProp);
   const [isOwner, setIsOwner] = useState(false);
   
@@ -56,7 +56,8 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
   const {
     events: assignmentEvents,
     clearAssignmentVerified,
-    clearAssignmentRejected
+    clearAssignmentRejected,
+    clearAssignmentUpdated
   } = useRealtimeAssignments('', currentUserId || '');
 
   useRealtimeNotifications({
@@ -87,9 +88,8 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     }
   }, []);
 
-  // Get submission status info - UPDATED for admin view
+  // Get submission status info
   const getSubmissionStatusInfo = useCallback(() => {
-    // For admins, show read-only info
     if (isAdmin && !isOwner) {
       return {
         label: '👑 ADMIN VIEW',
@@ -251,7 +251,6 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
 
   // Check time validity
   const checkTimeValidity = useCallback((assignmentData: any) => {
-    // Admins can see time info but cannot submit
     if (isAdmin && !isOwner) {
       setIsSubmittable(false);
       setSubmissionStatus('waiting');
@@ -414,17 +413,19 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
         console.log('✅ [fetchAssignmentDetails] Success, setting data');
         
         const assignmentData = result.assignment;
-         console.log('✅ [fetchAssignmentDetails] Assignment data:', {
-    id: assignmentData.id,
-    dueDate: assignmentData.dueDate,
-    assignmentDay: assignmentData.assignmentDay,
-    taskTitle: assignmentData.task?.title,
-    timeSlot: assignmentData.timeSlot
-  });
+        console.log('✅ [fetchAssignmentDetails] Assignment data:', {
+          id: assignmentData.id,
+          dueDate: assignmentData.dueDate,
+          assignmentDay: assignmentData.assignmentDay,
+          taskTitle: assignmentData.task?.title,
+          timeSlot: assignmentData.timeSlot,
+          userId: assignmentData.userId,
+          isOwner: assignmentData.userId === currentUserId
+        });
         
-        // ✅ Set admin/owner flags from server
+        // Set admin/owner flags from server
         setIsAdmin(assignmentData.isAdmin || isAdminProp);
-        setIsOwner(assignmentData.isOwner || false);
+        setIsOwner(assignmentData.userId === currentUserId);
         
         if (assignmentData.isTaskDeleted || (!assignmentData.task && assignmentData.taskTitle)) {
           setIsTaskDeleted(true);
@@ -481,11 +482,10 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
       console.log('🏁 [fetchAssignmentDetails] END loading');
       setLoading(false);
     }
-  }, [assignmentId, checkTimeValidityWithServer, isAdminProp]);
+  }, [assignmentId, checkTimeValidityWithServer, isAdminProp, currentUserId]);
 
   // Handle complete assignment - only for owner
   const handleCompleteAssignment = useCallback((navigation: any, onComplete?: () => void) => {
-    // Only allow if user is the owner
     if (!isOwner) {
       Alert.alert(
         'Cannot Submit',
@@ -545,7 +545,6 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
   // Handle request swap - only for owner
   const handleRequestSwap = useCallback((navigation: any, preSelectedScope?: 'week' | 'day') => {
     return async () => {
-      // Only allow if user is the owner
       if (!isOwner) {
         Alert.alert(
           'Cannot Swap',
@@ -604,7 +603,6 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
 
   // Handle verify - only for admin
   const handleVerify = useCallback(async (verified: boolean) => {
-    // Only allow if user is admin
     if (!isAdmin) {
       Alert.alert(
         'Cannot Verify',
@@ -659,7 +657,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     }
   }, [assignment, assignmentId, adminNotes, fetchAssignmentDetails, onVerified, isTaskDeleted, isAdmin]);
 
-  // Handle view photo - SHOW MODAL
+  // Handle view photo
   const handleViewPhoto = useCallback(() => {
     if (assignment?.photoUrl) {
       const fullUrl = getFullImageUrl(assignment.photoUrl);
@@ -680,6 +678,16 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     setPhotoModalVisible(false);
     setSelectedPhotoUrl(null);
   }, []);
+
+  // Handle real-time assignment updated (when swapped)
+  useEffect(() => {
+    if (assignmentEvents.assignmentUpdated && 
+        assignmentEvents.assignmentUpdated.assignmentId === assignmentId) {
+      console.log('🔄 Current assignment was updated (possibly swapped), refreshing...');
+      fetchAssignmentDetails();
+      clearAssignmentUpdated();
+    }
+  }, [assignmentEvents.assignmentUpdated, assignmentId, fetchAssignmentDetails, clearAssignmentUpdated]);
 
   // Handle real-time verification
   useEffect(() => {
@@ -744,7 +752,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     isTaskDeleted,
     deletedTaskTitle,
     
-    // ✅ NEW: Admin/Owner flags
+    // Admin/Owner flags
     isAdmin,
     isOwner,
     

@@ -7,7 +7,7 @@ import { SwapRequestService } from '../services/SwapRequestService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { useRealtimeAssignments } from './useRealtimeAssignments';
-import { useRealtimeNotifications } from './useRealtimeNotifications';
+import { useRealtimeNotifications } from './useRealtimeNotifications'; 
 import { getFullImageUrl } from '../utils/imageUrl';
 
 export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean = false, onVerified?: () => void) => {
@@ -412,7 +412,15 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
       
       if (result.success) {
         console.log('✅ [fetchAssignmentDetails] Success, setting data');
+        
         const assignmentData = result.assignment;
+         console.log('✅ [fetchAssignmentDetails] Assignment data:', {
+    id: assignmentData.id,
+    dueDate: assignmentData.dueDate,
+    assignmentDay: assignmentData.assignmentDay,
+    taskTitle: assignmentData.task?.title,
+    timeSlot: assignmentData.timeSlot
+  });
         
         // ✅ Set admin/owner flags from server
         setIsAdmin(assignmentData.isAdmin || isAdminProp);

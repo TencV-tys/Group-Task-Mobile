@@ -1,4 +1,4 @@
-// src/screens/AssignmentDetailsScreen.tsx - WITH PHOTO MODAL
+// src/screens/AssignmentDetailsScreen.tsx - COMPLETE WITH ADMIN/OWNER FLAGS
 
 import React, { useEffect } from 'react';
 import {
@@ -25,7 +25,7 @@ import { getFullImageUrl } from '../utils/imageUrl';
 const { width, height } = Dimensions.get('window');
 
 export default function AssignmentDetailsScreen({ navigation, route }: any) {
-  const { assignmentId, isAdmin = false, onVerified } = route.params || {};
+  const { assignmentId, isAdmin: isAdminProp = false, onVerified } = route.params || {};
   
   // ===== HOOKS - ALL LOGIC IS HERE =====
   const {
@@ -42,7 +42,12 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     isLate,
     penaltyInfo,
     authError,
-    formatTimeLeft,
+    isTaskDeleted,
+    deletedTaskTitle,
+    
+    // ✅ NEW: Admin/Owner flags
+    isAdmin,
+    isOwner,
     
     // Setters
     setAdminNotes,
@@ -54,6 +59,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     // Photo modal
     photoModalVisible,
     selectedPhotoUrl,
+    closePhotoModal,
     
     // Helper functions
     getStatusColor,
@@ -61,6 +67,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     getStatusText,
     getTimeDifference,
     getSubmissionStatusInfo,
+    formatTimeLeft,
     
     // Actions
     fetchAssignmentDetails,
@@ -68,9 +75,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     handleRequestSwap,
     handleVerify,
     handleViewPhoto,
-    closePhotoModal,
     clearAuthError
-  } = useAssignmentDetails(assignmentId, isAdmin, onVerified);
+  } = useAssignmentDetails(assignmentId, isAdminProp, onVerified);
 
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
@@ -154,13 +160,12 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     </Modal>
   );
 
-  // ===== RENDER COMPLETE BUTTON (HIDDEN FOR ADMIN) =====
+  // ===== RENDER COMPLETE BUTTON (ONLY FOR OWNER) =====
   const renderCompleteButton = () => {
-    if (isAdmin) return null;
+    // ✅ Only show for the owner of the assignment
+    if (!isOwner) return null;
     
-    if (assignment?.completed) {
-      return null;
-    }
+    if (assignment?.completed) return null;
     
     const submissionStatusInfo = getSubmissionStatusInfo();
     
@@ -330,9 +335,10 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     );
   };
 
-  // ===== RENDER SWAP BUTTON (HIDDEN FOR ADMIN) =====
+  // ===== RENDER SWAP BUTTON (ONLY FOR OWNER) =====
   const renderSwapButton = () => {
-    if (isAdmin) return null;
+    // ✅ Only show for the owner of the assignment
+    if (!isOwner) return null;
     
     if (!assignment?.completed && assignment) {
       return (
@@ -394,7 +400,9 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
   // ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) =====
   const renderVerificationControls = () => {
-    if (!isAdmin || !assignment?.completed || assignment.verified !== null) return null;
+    // ✅ Only show for admins
+    if (!isAdmin) return null;
+    if (!assignment?.completed || assignment.verified !== null) return null;
 
     return (
       <View style={styles.verificationSection}>
@@ -483,7 +491,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       >
         <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
         <Text style={styles.adminInfoText}>
-          Admin View Only - You can see all assignment details but cannot complete or request swaps.
+          Admin View Only - You can see all assignment details and verify submissions, but cannot complete or request swaps.
         </Text>
       </LinearGradient>
     );
@@ -502,55 +510,53 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           style={styles.readOnlyFooter}
         >
           <MaterialCommunityIcons name="eye" size={20} color="#2b8a3e" />
-          <Text style={styles.readOnlyText}>Admin View Only - Cannot modify assignments</Text>
+          <Text style={styles.readOnlyText}>Admin View - Verification controls available below</Text>
         </LinearGradient>
       </View>
     );
   };
 
- 
   // ===== RENDER PHOTO SECTION =====
-const renderPhotoSection = () => { 
-  if (!assignment?.photoUrl) return null;
+  const renderPhotoSection = () => { 
+    if (!assignment?.photoUrl) return null;
 
-  // ✅ Build full URL for the preview image
-  const fullImageUrl = getFullImageUrl(assignment?.photoUrl);
+    const fullImageUrl = getFullImageUrl(assignment?.photoUrl);
 
-  if (!fullImageUrl) return null;
+    if (!fullImageUrl) return null;
 
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Proof Photo</Text>
-      <TouchableOpacity
-        style={styles.photoContainer}
-        onPress={handleViewPhoto}
-        activeOpacity={0.7}
-      >
-        <Image
-          source={{ uri: fullImageUrl }}
-          style={styles.photo}
-          resizeMode="cover"
-          onError={(e) => {
-            console.error('Image preview error:', e.nativeEvent.error);
-            console.log('Failed URL:', fullImageUrl);
-          }}
-          onLoad={() => {
-            console.log('Image preview loaded:', fullImageUrl);
-          }}
-        />
-        <LinearGradient
-          colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.photoOverlay}
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Proof Photo</Text>
+        <TouchableOpacity
+          style={styles.photoContainer}
+          onPress={handleViewPhoto}
+          activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="magnify" size={28} color="white" />
-          <Text style={styles.viewPhotoText}>Tap to view full image</Text>
-        </LinearGradient>
-      </TouchableOpacity>
-    </View> 
-  );
-};
+          <Image
+            source={{ uri: fullImageUrl }}
+            style={styles.photo}
+            resizeMode="cover"
+            onError={(e) => {
+              console.error('Image preview error:', e.nativeEvent.error);
+              console.log('Failed URL:', fullImageUrl);
+            }}
+            onLoad={() => {
+              console.log('Image preview loaded:', fullImageUrl);
+            }}
+          />
+          <LinearGradient
+            colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.8)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.photoOverlay}
+          >
+            <MaterialCommunityIcons name="magnify" size={28} color="white" />
+            <Text style={styles.viewPhotoText}>Tap to view full image</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View> 
+    );
+  };
  
   // ===== RENDER CONTENT =====
   const renderContent = () => {
@@ -609,7 +615,7 @@ const renderPhotoSection = () => {
             {/* Header with status */}
             <View style={styles.headerRow}>
               <Text style={styles.taskTitle} numberOfLines={2}>
-                {assignment.task?.title || 'Unknown Task'}
+                {isTaskDeleted ? deletedTaskTitle : (assignment.task?.title || 'Unknown Task')}
               </Text>
               <LinearGradient
                 colors={[getStatusColor() + '20', getStatusColor() + '10']}
@@ -646,6 +652,9 @@ const renderPhotoSection = () => {
               </LinearGradient>
               <View style={styles.userDetails}>
                 <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
+                {!isOwner && isAdmin && (
+                  <Text style={styles.assigneeBadge}>Assignee</Text>
+                )}
                 {assignment.completed && assignment.completedAt && (
                   <Text style={styles.completionDate}>
                     Completed {new Date(assignment.completedAt).toLocaleDateString()} • {getTimeDifference(assignment.dueDate, assignment.completedAt)}
@@ -653,11 +662,11 @@ const renderPhotoSection = () => {
                 )}
               </View>
             </View>
-
-            {/* Complete Assignment Button */}
+ 
+            {/* Complete Assignment Button - Only for Owner */}
             {renderCompleteButton()}
 
-            {/* Swap Request Button */}
+            {/* Swap Request Button - Only for Owner */}
             {renderSwapButton()}
 
             {/* Points and Details */}
@@ -735,10 +744,10 @@ const renderPhotoSection = () => {
               </View>
             )}
 
-            {/* Verification Controls */}
+            {/* Verification Controls - Only for Admin */}
             {renderVerificationControls()}
-
-            {/* Assignment Info */}
+ 
+            {/* Assignment Info */} 
             <LinearGradient
               colors={['#f8f9fa', '#e9ecef']}
               start={{ x: 0, y: 0 }}

@@ -19,6 +19,18 @@ export const assignmentDetailsStyles = StyleSheet.create({
     borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
+  assigneeBadge: {
+  fontSize: 10,
+  color: '#2b8a3e',
+  backgroundColor: '#d3f9d8',
+  paddingHorizontal: 8,
+  paddingVertical: 2,
+  borderRadius: 12,
+  overflow: 'hidden',
+  marginTop: 2,
+  alignSelf: 'flex-start',
+  fontWeight: '500',
+},
   backButton: {
     width: 36,
     height: 36,

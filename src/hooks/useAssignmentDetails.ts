@@ -1,4 +1,4 @@
-// hooks/useAssignmentDetails.ts - COMPLETE WITH PHOTO MODAL
+// hooks/useAssignmentDetails.ts - COMPLETE WITH ADMIN/OWNER FLAGS
 
 import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
@@ -10,7 +10,7 @@ import { useRealtimeAssignments } from './useRealtimeAssignments';
 import { useRealtimeNotifications } from './useRealtimeNotifications';
 import { getFullImageUrl } from '../utils/imageUrl';
 
-export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onVerified?: () => void) => {
+export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean = false, onVerified?: () => void) => {
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [assignment, setAssignment] = useState<any>(null);
@@ -30,6 +30,10 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
   const [authError, setAuthError] = useState(false);
   const [isTaskDeleted, setIsTaskDeleted] = useState(false);
   const [deletedTaskTitle, setDeletedTaskTitle] = useState<string>('');
+  
+  // ✅ NEW: Admin/Owner flags from server
+  const [isAdmin, setIsAdmin] = useState(isAdminProp);
+  const [isOwner, setIsOwner] = useState(false);
   
   // Photo modal state
   const [photoModalVisible, setPhotoModalVisible] = useState(false);
@@ -83,8 +87,22 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, []);
 
-  // Get submission status info
+  // Get submission status info - UPDATED for admin view
   const getSubmissionStatusInfo = useCallback(() => {
+    // For admins, show read-only info
+    if (isAdmin && !isOwner) {
+      return {
+        label: '👑 ADMIN VIEW',
+        color: '#2b8a3e',
+        bgColor: '#e7f5ff',
+        borderColor: '#b2f2bb',
+        icon: 'eye',
+        description: 'You are viewing this assignment as an admin',
+        buttonText: 'Read Only',
+        canSubmit: false
+      };
+    }
+    
     if (isTaskDeleted) {
       return {
         label: '🗑️ TASK DELETED',
@@ -185,7 +203,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
           canSubmit: false
         };
     }
-  }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft, isTaskDeleted]);
+  }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft, isTaskDeleted, isAdmin, isOwner]);
 
   const getStatusColor = useCallback(() => {
     if (isTaskDeleted) return '#868e96';
@@ -233,6 +251,13 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
 
   // Check time validity
   const checkTimeValidity = useCallback((assignmentData: any) => {
+    // Admins can see time info but cannot submit
+    if (isAdmin && !isOwner) {
+      setIsSubmittable(false);
+      setSubmissionStatus('waiting');
+      return;
+    }
+    
     if (isTaskDeleted) {
       setIsSubmittable(false);
       setSubmissionStatus('completed');
@@ -312,10 +337,16 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
       setIsLate(false);
       setPenaltyInfo(null);
     }
-  }, [isTaskDeleted]);
+  }, [isTaskDeleted, isAdmin, isOwner]);
 
   // Check time validity with server
   const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
+    if (isAdmin && !isOwner) {
+      setIsSubmittable(false);
+      setSubmissionStatus('waiting');
+      return;
+    }
+    
     if (isTaskDeleted) {
       setIsSubmittable(false);
       setSubmissionStatus('completed');
@@ -367,20 +398,25 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
       console.error(`❌ Server check failed, falling back to local:`, error);
       checkTimeValidity(assignmentData);
     }
-  }, [checkTimeValidity, isTaskDeleted]);
+  }, [checkTimeValidity, isTaskDeleted, isAdmin, isOwner]);
 
   // Fetch assignment details
   const fetchAssignmentDetails = useCallback(async () => {
-      console.log('🔄 [fetchAssignmentDetails] START loading');
+    console.log('🔄 [fetchAssignmentDetails] START loading');
     setLoading(true);
     setError(null);
 
     try {
       const result = await AssignmentService.getAssignmentDetails(assignmentId);
-          console.log('📦 [fetchAssignmentDetails] API response received');
+      console.log('📦 [fetchAssignmentDetails] API response received');
+      
       if (result.success) {
-          console.log('✅ [fetchAssignmentDetails] Success, setting data');
+        console.log('✅ [fetchAssignmentDetails] Success, setting data');
         const assignmentData = result.assignment;
+        
+        // ✅ Set admin/owner flags from server
+        setIsAdmin(assignmentData.isAdmin || isAdminProp);
+        setIsOwner(assignmentData.isOwner || false);
         
         if (assignmentData.isTaskDeleted || (!assignmentData.task && assignmentData.taskTitle)) {
           setIsTaskDeleted(true);
@@ -429,18 +465,28 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
         } else {
           setError(result.message || 'Failed to load assignment details');
         }
-      }
+      } 
     } catch (err: any) {
       console.error('Error fetching assignment:', err);
       setError(err.message || 'Network error');
     } finally { 
-       console.log('🏁 [fetchAssignmentDetails] END loading');
+      console.log('🏁 [fetchAssignmentDetails] END loading');
       setLoading(false);
     }
-  }, [assignmentId, checkTimeValidityWithServer]);
+  }, [assignmentId, checkTimeValidityWithServer, isAdminProp]);
 
-  // Handle complete assignment with refresh
+  // Handle complete assignment - only for owner
   const handleCompleteAssignment = useCallback((navigation: any, onComplete?: () => void) => {
+    // Only allow if user is the owner
+    if (!isOwner) {
+      Alert.alert(
+        'Cannot Submit',
+        'You can only submit your own assignments.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     if (isTaskDeleted) {
       Alert.alert(
         'Cannot Submit',
@@ -486,11 +532,21 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     } else {
       navigateToComplete();
     }
-  }, [assignment, isSubmittable, isLate, penaltyInfo, getSubmissionStatusInfo, fetchAssignmentDetails, onVerified, isTaskDeleted]);
+  }, [assignment, isSubmittable, isLate, penaltyInfo, getSubmissionStatusInfo, fetchAssignmentDetails, onVerified, isTaskDeleted, isOwner]);
 
-  // Handle request swap
+  // Handle request swap - only for owner
   const handleRequestSwap = useCallback((navigation: any, preSelectedScope?: 'week' | 'day') => {
     return async () => {
+      // Only allow if user is the owner
+      if (!isOwner) {
+        Alert.alert(
+          'Cannot Swap',
+          'You can only request swaps for your own assignments.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+      
       if (isTaskDeleted) {
         Alert.alert(
           'Cannot Swap',
@@ -536,10 +592,20 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
         Alert.alert('Error', error.message || 'Failed to check swap availability');
       }
     };
-  }, [assignment, isTaskDeleted]);
+  }, [assignment, isTaskDeleted, isOwner]);
 
-  // Handle verify
+  // Handle verify - only for admin
   const handleVerify = useCallback(async (verified: boolean) => {
+    // Only allow if user is admin
+    if (!isAdmin) {
+      Alert.alert(
+        'Cannot Verify',
+        'Only group admins can verify assignments.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     if (isTaskDeleted) {
       Alert.alert(
         'Cannot Verify',
@@ -583,7 +649,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
       Alert.alert('Error', error.message || 'Network error');
       setVerifying(false);
     }
-  }, [assignment, assignmentId, adminNotes, fetchAssignmentDetails, onVerified, isTaskDeleted]);
+  }, [assignment, assignmentId, adminNotes, fetchAssignmentDetails, onVerified, isTaskDeleted, isAdmin]);
 
   // Handle view photo - SHOW MODAL
   const handleViewPhoto = useCallback(() => {
@@ -634,17 +700,17 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     }
   }, [assignmentEvents.assignmentRejected, assignmentId, fetchAssignmentDetails, onVerified, clearAssignmentRejected]);
 
-  // Start countdown timer
+  // Start countdown timer - only for owner
   useEffect(() => {
-    if (assignment && !assignment.completed && !isTaskDeleted) {
+    if (assignment && !assignment.completed && !isTaskDeleted && isOwner) {
       const timer = setInterval(() => {
-        if (assignment && !assignment.completed && !isTaskDeleted) {
+        if (assignment && !assignment.completed && !isTaskDeleted && isOwner) {
           checkTimeValidity(assignment);
         }
       }, 1000);
       return () => clearInterval(timer);
     }
-  }, [assignment, checkTimeValidity, isTaskDeleted]);
+  }, [assignment, checkTimeValidity, isTaskDeleted, isOwner]);
 
   // Initial load
   useEffect(() => {
@@ -670,10 +736,14 @@ export const useAssignmentDetails = (assignmentId: string, isAdmin: boolean, onV
     isTaskDeleted,
     deletedTaskTitle,
     
+    // ✅ NEW: Admin/Owner flags
+    isAdmin,
+    isOwner,
+    
     // Photo modal state
     photoModalVisible,
     selectedPhotoUrl,
-    closePhotoModal,  // ✅ Added this
+    closePhotoModal,
     
     // Setters
     setAdminNotes,

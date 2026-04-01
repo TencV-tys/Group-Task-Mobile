@@ -1,4 +1,4 @@
-// src/screens/AssignmentDetailsScreen.tsx - COMPLETE WITH ADMIN/OWNER FLAGS
+// src/screens/AssignmentDetailsScreen.tsx - COMPLETE WITH UTC DATE FORMATTING
 
 import React, { useEffect } from 'react';
 import {
@@ -21,6 +21,7 @@ import { useAssignmentDetails } from '../hooks/useAssignmentDetails';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { assignmentDetailsStyles as styles } from '../styles/assignmentDetails.styles';
 import { getFullImageUrl } from '../utils/imageUrl';
+import { formatUTCDate, formatUTCDayAndDate, getUTCRelativeTime } from '../utils/timeUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -45,7 +46,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     isTaskDeleted,
     deletedTaskTitle,
     
-    // ✅ NEW: Admin/Owner flags
+    // Admin/Owner flags
     isAdmin,
     isOwner,
     
@@ -162,9 +163,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
   // ===== RENDER COMPLETE BUTTON (ONLY FOR OWNER) =====
   const renderCompleteButton = () => {
-    // ✅ Only show for the owner of the assignment
     if (!isOwner) return null;
-    
     if (assignment?.completed) return null;
     
     const submissionStatusInfo = getSubmissionStatusInfo();
@@ -337,7 +336,6 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
   // ===== RENDER SWAP BUTTON (ONLY FOR OWNER) =====
   const renderSwapButton = () => {
-    // ✅ Only show for the owner of the assignment
     if (!isOwner) return null;
     
     if (!assignment?.completed && assignment) {
@@ -400,7 +398,6 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
   // ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) =====
   const renderVerificationControls = () => {
-    // ✅ Only show for admins
     if (!isAdmin) return null;
     if (!assignment?.completed || assignment.verified !== null) return null;
 
@@ -687,7 +684,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
               <View style={styles.detailItem}>
                 <Text style={styles.detailLabel}>Due Date</Text>
                 <Text style={styles.detailValue}>
-                  {new Date(assignment.dueDate).toLocaleDateString()}
+                  {formatUTCDate(assignment.dueDate)}
                 </Text>
               </View>
 

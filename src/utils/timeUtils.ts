@@ -1,4 +1,4 @@
-// src/utils/timeUtils.ts
+// src/utils/timeUtils.ts - COMPLETE WITH UTC DATE FORMATTERS
 
 // Convert 12h time to 24h format for storage
 export const convertTo24Hour = (hour12: string, minute: string, period: string): string => {
@@ -62,3 +62,113 @@ export const DAY_OF_WEEK_OPTIONS = [
   { value: 'SATURDAY', label: 'Sat' },
   { value: 'SUNDAY', label: 'Sun' }
 ];
+
+// ========== UTC DATE FORMATTERS ==========
+
+/**
+ * Format a UTC date string to local date string in UTC timezone
+ * Example: "2026-04-01T21:00:00.000Z" → "Apr 1, 2026"
+ */
+export const formatUTCDate = (dateString: string): string => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+/**
+ * Format a UTC date string to local date string with time in UTC timezone
+ * Example: "2026-04-01T21:00:00.000Z" → "Apr 1, 2026, 9:00 PM"
+ */
+export const formatUTCDateTime = (dateString: string): string => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  return date.toLocaleString('en-US', {
+    timeZone: 'UTC',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
+/**
+ * Format a UTC date string to display day and date
+ * Example: "2026-04-01T21:00:00.000Z" → "Wednesday, Apr 1"
+ */
+export const formatUTCDayAndDate = (dateString: string): string => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayName = dayNames[date.getUTCDay()];
+  const formattedDate = date.toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    month: 'short',
+    day: 'numeric'
+  });
+  return `${dayName}, ${formattedDate}`;
+};
+
+/**
+ * Get the UTC day name from a date string
+ * Example: "2026-04-01T21:00:00.000Z" → "Wednesday"
+ */
+export const getUTCDayName = (dateString: string): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return dayNames[date.getUTCDay()];
+};
+
+/**
+ * Format a UTC date string to full date with day name
+ * Example: "2026-04-01T21:00:00.000Z" → "Wednesday, April 1, 2026"
+ */
+export const formatUTCFullDate = (dateString: string): string => {
+  if (!dateString) return 'N/A';
+  const date = new Date(dateString);
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayName = dayNames[date.getUTCDay()];
+  const formattedDate = date.toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+  return `${dayName}, ${formattedDate}`;
+};
+
+/**
+ * Check if a UTC date is today
+ */
+export const isUTCToday = (dateString: string): boolean => {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  const now = new Date();
+  return date.getUTCFullYear() === now.getUTCFullYear() &&
+         date.getUTCMonth() === now.getUTCMonth() &&
+         date.getUTCDate() === now.getUTCDate();
+};
+
+/**
+ * Get relative time from UTC date (e.g., "2 days ago", "in 3 days")
+ */
+export const getUTCRelativeTime = (dateString: string): string => {
+  if (!dateString) return '';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+  
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays === -1) return 'Yesterday';
+  if (diffDays > 0) return `in ${diffDays} days`;
+  return `${Math.abs(diffDays)} days ago`;
+};

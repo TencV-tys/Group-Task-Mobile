@@ -1,4 +1,4 @@
-// SwapRequestHooks/useSwapRequests.ts - COMPLETE UPDATED VERSION
+// SwapRequestHooks/useSwapRequests.ts - COMPLETE FIXED VERSION
 
 import { useState, useEffect, useCallback } from 'react';
 import { SwapRequestFilters, SwapRequest, SwapRequestService } from '../services/SwapRequestService';
@@ -11,10 +11,13 @@ export const useSwapRequests = () => {
   const [userId, setUserId] = useState<string | null>(null);
   const [myRequests, setMyRequests] = useState<SwapRequest[]>([]);
   const [pendingForMe, setPendingForMe] = useState<SwapRequest[]>([]);
+  const [pendingForAdmin, setPendingForAdmin] = useState<SwapRequest[]>([]);
+  const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [totalMyRequests, setTotalMyRequests] = useState(0);
   const [totalPendingForMe, setTotalPendingForMe] = useState(0);
+  const [totalPendingForAdmin, setTotalPendingForAdmin] = useState(0); 
   const [authError, setAuthError] = useState(false);
 
   // Check token
@@ -109,7 +112,7 @@ export const useSwapRequests = () => {
     }
   }, [userId, checkToken]); 
 
-  // Load pending requests for current user
+  // Load pending requests for current user (to accept/reject)
   const loadPendingForMe = useCallback(async (groupId?: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -155,6 +158,142 @@ export const useSwapRequests = () => {
     }
   }, [userId, checkToken]);
 
+  // Load pending requests for admin approval
+  const loadPendingForAdmin = useCallback(async (groupId: string) => {
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      return;
+    }
+
+    setCurrentGroupId(groupId);
+    setLoading(true);
+    setError(null);
+    setAuthError(false);
+    
+    try {
+      console.log('📥 Loading pending for admin approval with groupId:', groupId);
+      const response = await SwapRequestService.getPendingForAdminApproval(groupId);
+      
+      if (response.success) {
+        const requests = response.requests || [];
+        const total = response.total || 0;
+        
+        console.log(`✅ Loaded ${requests.length} pending admin approvals (total: ${total})`);
+        setPendingForAdmin(requests);
+        setTotalPendingForAdmin(total);
+      } else {
+        console.error('❌ Failed to load pending admin approvals:', response.message);
+        setError(response.message || 'Failed to load pending admin approvals');
+        
+        if (response.message?.toLowerCase().includes('token') || 
+            response.message?.toLowerCase().includes('auth') ||
+            response.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
+      }
+    } catch (err: any) {
+      console.error('❌ Error in loadPendingForAdmin:', err);
+      setError(err.message || 'Failed to load pending admin approvals');
+    } finally {
+      setLoading(false);
+    }
+  }, [checkToken]);
+
+  // Admin approve swap request
+  const adminApproveSwapRequest = useCallback(async (requestId: string, notes?: string) => {
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return { 
+        success: false, 
+        message: 'Authentication required',
+        authError: true 
+      };
+    }
+
+    setLoading(true);
+    setError(null);
+    setAuthError(false);
+    
+    try {
+      console.log('✅ Admin approving swap request:', requestId);
+      const response = await SwapRequestService.adminApproveSwapRequest(requestId, notes);
+      
+      console.log('📦 Admin approve response:', response);
+      
+      if (response.success) {
+        // Refresh pending admin approvals list
+        if (currentGroupId) {
+          await loadPendingForAdmin(currentGroupId);
+        }
+        Alert.alert('Success', response.message || 'Swap request approved successfully!');
+      } else {
+        if (response.message?.toLowerCase().includes('token') || 
+            response.message?.toLowerCase().includes('auth') ||
+            response.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
+        Alert.alert('Error', response.message || 'Failed to approve swap request');
+      }
+      
+      return response;
+    } catch (err: any) {
+      console.error('❌ Error in adminApproveSwapRequest:', err);
+      setError(err.message || 'Failed to approve swap request');
+      Alert.alert('Error', err.message || 'Failed to approve swap request');
+      return { success: false, message: err.message };
+    } finally {
+      setLoading(false);
+    }
+  }, [checkToken, currentGroupId, loadPendingForAdmin]);
+
+  // Admin reject swap request
+  const adminRejectSwapRequest = useCallback(async (requestId: string, reason: string) => {
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return { 
+        success: false, 
+        message: 'Authentication required',
+        authError: true 
+      };
+    }
+
+    setLoading(true);
+    setError(null);
+    setAuthError(false);
+    
+    try {
+      console.log('❌ Admin rejecting swap request:', requestId, 'reason:', reason);
+      const response = await SwapRequestService.adminRejectSwapRequest(requestId, reason);
+      
+      console.log('📦 Admin reject response:', response);
+      
+      if (response.success) {
+        // Refresh pending admin approvals list
+        if (currentGroupId) {
+          await loadPendingForAdmin(currentGroupId);
+        }
+        Alert.alert('Success', response.message || 'Swap request rejected successfully!');
+      } else {
+        if (response.message?.toLowerCase().includes('token') || 
+            response.message?.toLowerCase().includes('auth') ||
+            response.message?.toLowerCase().includes('unauthorized')) {
+          setAuthError(true);
+        }
+        Alert.alert('Error', response.message || 'Failed to reject swap request');
+      }
+      
+      return response;
+    } catch (err: any) {
+      console.error('❌ Error in adminRejectSwapRequest:', err);
+      setError(err.message || 'Failed to reject swap request');
+      Alert.alert('Error', err.message || 'Failed to reject swap request');
+      return { success: false, message: err.message };
+    } finally {
+      setLoading(false);
+    }
+  }, [checkToken, currentGroupId, loadPendingForAdmin]);
+
   // Create swap request
   const createSwapRequest = useCallback(async (data: {
     assignmentId: string;
@@ -181,7 +320,7 @@ export const useSwapRequests = () => {
     try {
       console.log('📝 Creating swap request with data:', data);
       
-      const checkResult = await SwapRequestService.checkCanSwap(data.assignmentId);
+      const checkResult = await SwapRequestService.checkCanSwap(data.assignmentId, data.scope, data.selectedDay);
       
       if (!checkResult.success) {
         return { 
@@ -204,25 +343,37 @@ export const useSwapRequests = () => {
       if (response.success) {
         await loadMyRequests();
         await loadPendingForMe();
+        
+        if (response.requiresAdminApproval === true) {
+          Alert.alert(
+            '⏳ Awaiting Admin Approval',
+            'Your swap request has been submitted and is waiting for admin approval. You will be notified once it is reviewed.',
+            [{ text: 'OK' }]
+          );
+        } else {
+          Alert.alert('Success', response.message || 'Swap request created successfully!');
+        }
       } else {
         if (response.message?.toLowerCase().includes('token') || 
             response.message?.toLowerCase().includes('auth') ||
             response.message?.toLowerCase().includes('unauthorized')) {
           setAuthError(true);
         }
+        Alert.alert('Error', response.message || 'Failed to create swap request');
       }
       
       return response;
     } catch (err: any) {
       console.error('❌ Error in createSwapRequest:', err);
       setError(err.message || 'Failed to create swap request');
+      Alert.alert('Error', err.message || 'Failed to create swap request');
       return { success: false, message: err.message };
     } finally {
       setLoading(false);
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
-  // ✅ UPDATED: Accept swap request with callback for external refresh
+  // Accept swap request
   const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () => void) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -244,28 +395,28 @@ export const useSwapRequests = () => {
       console.log('📦 Accept response:', response);
       
       if (response.success) {
-        // Refresh both lists
         await loadMyRequests();
         await loadPendingForMe();
         
-        // Call the onSuccess callback if provided (for external refresh)
         if (onSuccess) {
           onSuccess();
         }
         
-        const swapRequest = response.data?.swapRequest;
-        const scope = response.data?.scope;
-        const selectedDay = response.data?.selectedDay;
-        const transferredCount = response.data?.transferredCount;
+        // Get data from response - handle both response.data and direct properties
+        const scope = response.data?.scope || response.scope;
+        const selectedDay = response.data?.selectedDay || response.selectedDay;
+        const transferredCount = response.data?.transferredCount || response.transferredCount;
         
-        let successMessage = 'Swap request accepted successfully!';
+        let successMessage = response.message || 'Swap request accepted successfully!';
+        
+        // Override with more specific message if we have details
         if (scope === 'day') {
           if (transferredCount && transferredCount > 1) {
             successMessage = `Swap accepted! You've taken over ${transferredCount} assignments for ${selectedDay}.`;
-          } else {
+          } else if (selectedDay) {
             successMessage = `Swap accepted! You've taken over ${selectedDay}'s assignment.`;
           }
-        } else {
+        } else if (scope === 'week') {
           successMessage = 'Swap accepted! The entire week\'s assignment has been transferred to you.';
         }
         
@@ -314,7 +465,7 @@ export const useSwapRequests = () => {
       if (response.success) {
         await loadMyRequests();
         await loadPendingForMe();
-        Alert.alert('Success', 'Swap request rejected successfully.');
+        Alert.alert('Success', response.message || 'Swap request rejected successfully.');
       } else {
         if (response.message?.toLowerCase().includes('token') || 
             response.message?.toLowerCase().includes('auth') ||
@@ -359,7 +510,7 @@ export const useSwapRequests = () => {
       if (response.success) {
         await loadMyRequests();
         await loadPendingForMe();
-        Alert.alert('Success', 'Swap request cancelled successfully.');
+        Alert.alert('Success', response.message || 'Swap request cancelled successfully.');
       } else {
         if (response.message?.toLowerCase().includes('token') || 
             response.message?.toLowerCase().includes('auth') ||
@@ -413,24 +564,35 @@ export const useSwapRequests = () => {
     ]);
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
+  // Get admin approval status for a request
+  const getAdminApprovalStatus = useCallback((swapRequest: SwapRequest) => {
+    return SwapRequestService.getAdminApprovalStatus(swapRequest);
+  }, []);
+
   return {
     myRequests,
     pendingForMe,
+    pendingForAdmin,
     loading,
     error,
     totalMyRequests,
     totalPendingForMe,
+    totalPendingForAdmin,
     userId,
     authError,
     loadMyRequests,
     loadPendingForMe,
+    loadPendingForAdmin,
     createSwapRequest,
     acceptSwapRequest,
     rejectSwapRequest,
     cancelSwapRequest,
+    adminApproveSwapRequest,
+    adminRejectSwapRequest,
     hasPendingRequest,
     getPendingRequestForAssignment,
     getSwapDescription,
+    getAdminApprovalStatus,
     refreshAll,
   };
 };

@@ -1,4 +1,4 @@
-// services/SwapRequestService.ts - COMPLETE WITH checkUserHasAssignmentOnDay
+// services/SwapRequestService.ts - COMPLETE FIXED VERSION
 
 import { API_BASE_URL } from '../config/api';
 import { TokenUtils } from '../utils/tokenUtils';
@@ -16,6 +16,7 @@ export interface CreateSwapRequestData {
   selectedTimeSlotId?: string;
 }
 
+
 export interface SwapRequest {
   id: string;
   assignmentId: string;
@@ -24,11 +25,21 @@ export interface SwapRequest {
   requestedBy: string;
   targetUserId?: string;
   expiresAt?: string;
-  createdAt: string;
+  createdAt: string;  // ✅ Add this
   updatedAt: string;
   scope: 'week' | 'day';
   selectedDay?: string;
   selectedTimeSlotId?: string;
+  
+  // Admin approval fields
+  requiresAdminApproval: boolean;
+  adminApproved: boolean | null;
+  adminApprovedBy?: string;
+  adminApprovedAt?: string;
+  adminRejectionReason?: string;
+  autoApproved: boolean;
+  acceptedBy?: string;
+  acceptedAt?: string;
   
   assignment?: {
     id: string;
@@ -39,6 +50,7 @@ export interface SwapRequest {
       id: string;
       title: string;
       executionFrequency: string;
+      points: number;  // ✅ Add points here
       group?: {
         id: string;
         name: string;
@@ -87,10 +99,13 @@ export interface SwapRequestFilters {
   offset?: number;
 }
 
+// services/SwapRequestService.ts - UPDATE THE SwapRequestResponse INTERFACE
+
 export interface SwapRequestResponse {
   success: boolean;
   message: string;
   data?: any;
+  swapRequest?: any;
   notifications?: {
     notifiedUsers?: number;
     notifiedAdmins?: number;
@@ -98,6 +113,24 @@ export interface SwapRequestResponse {
     notifiedTarget?: boolean;
     notifiedAcceptor?: boolean;
   };
+  requiresAdminApproval?: boolean;
+  eligibleMembersCount?: number;
+  // ✅ Add these properties for acceptSwapRequest response
+  scope?: 'week' | 'day';
+  selectedDay?: string;
+  transferredCount?: number;
+  previousAssignee?: {
+    id: string;
+    name: string;
+  };
+  newAssignee?: {
+    id: string;
+    name: string;
+  };
+  requesterNewAssignments?: any[];
+  acceptorNewAssignments?: any[];
+  requesterTaskCount?: number;
+  acceptorTaskCount?: number;
 }
 
 export class SwapRequestService {
@@ -134,13 +167,125 @@ export class SwapRequestService {
         await NotificationService.getUnreadCount();
       }
       
-      return result;
+      return {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+        swapRequest: result.swapRequest,
+        notifications: result.notifications,
+        requiresAdminApproval: result.requiresAdminApproval,
+        eligibleMembersCount: result.eligibleMembersCount
+      };
 
     } catch (error: any) {
       console.error('SwapRequestService.createSwapRequest error:', error);
       return {
         success: false,
         message: error.message || 'Failed to create swap request',
+      };
+    }
+  }
+
+  // GET: Pending swap requests for admin approval
+  static async getPendingForAdminApproval(groupId: string, filters?: { limit?: number; offset?: number }) {
+    try {
+      let url = `${API_URL}/admin/pending/${groupId}`;
+      const params = new URLSearchParams();
+      
+      if (filters?.limit) params.append('limit', filters.limit.toString());
+      if (filters?.offset) params.append('offset', filters.offset.toString());
+      
+      const queryString = params.toString();
+      if (queryString) url += `?${queryString}`;
+
+      const headers = await TokenUtils.getAuthHeaders(false);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to load pending approvals: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      return result;
+
+    } catch (error: any) {
+      console.error('SwapRequestService.getPendingForAdminApproval error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to load pending approvals',
+        requests: [],
+        total: 0
+      };
+    }
+  }
+
+  // POST: Admin approve swap request
+  static async adminApproveSwapRequest(requestId: string, notes?: string): Promise<SwapRequestResponse> {
+    try {
+      const headers = await TokenUtils.getAuthHeaders();
+      
+      const response = await fetch(`${API_URL}/admin/${requestId}/approve`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ notes }),
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || `Failed to approve swap request: ${response.status}`);
+      }
+      
+      if (result.success) {
+        await NotificationService.getUnreadCount();
+      }
+      
+      return result;
+
+    } catch (error: any) {
+      console.error('SwapRequestService.adminApproveSwapRequest error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to approve swap request',
+      };
+    }
+  }
+
+  // POST: Admin reject swap request
+  static async adminRejectSwapRequest(requestId: string, reason: string): Promise<SwapRequestResponse> {
+    try {
+      const headers = await TokenUtils.getAuthHeaders();
+      
+      const response = await fetch(`${API_URL}/admin/${requestId}/reject`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ reason }),
+        credentials: 'include'
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || `Failed to reject swap request: ${response.status}`);
+      }
+      
+      if (result.success) {
+        await NotificationService.getUnreadCount();
+      }
+      
+      return result;
+
+    } catch (error: any) {
+      console.error('SwapRequestService.adminRejectSwapRequest error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to reject swap request',
       };
     }
   }
@@ -181,7 +326,7 @@ export class SwapRequestService {
     }
   }
 
-  // ✅ NEW: Check if a user has an assignment on a specific day
+  // CHECK: Check if a user has an assignment on a specific day
   static async checkUserHasAssignmentOnDay(
     userId: string,
     groupId: string,
@@ -189,8 +334,6 @@ export class SwapRequestService {
     week: number
   ): Promise<{ hasAssignment: boolean; assignment?: any }> {
     try {
-      console.log(`🔍 Checking if user ${userId} has assignment on ${day} (week ${week})`);
-      
       const headers = await TokenUtils.getAuthHeaders(false);
       
       const url = `${API_URL}/check-user-assignment?targetUserId=${encodeURIComponent(userId)}&groupId=${encodeURIComponent(groupId)}&day=${encodeURIComponent(day)}&week=${week}`;
@@ -206,8 +349,6 @@ export class SwapRequestService {
       }
       
       const result = await response.json();
-      console.log('SwapRequestService: checkUserHasAssignmentOnDay response:', result);
-      
       return {
         hasAssignment: result.hasAssignment || false,
         assignment: result.assignment || null
@@ -559,6 +700,19 @@ export class SwapRequestService {
     }
   }
 
+  static getAdminApprovalStatus(swapRequest: SwapRequest): { label: string; color: string; icon: string } {
+    if (!swapRequest.requiresAdminApproval) {
+      return { label: 'Auto-approved', color: '#10B981', icon: 'check-circle' };
+    }
+    if (swapRequest.adminApproved === true) {
+      return { label: 'Admin Approved', color: '#10B981', icon: 'check-circle' };
+    }
+    if (swapRequest.adminApproved === false) {
+      return { label: 'Admin Rejected', color: '#EF4444', icon: 'close-circle' };
+    }
+    return { label: 'Awaiting Admin Approval', color: '#F59E0B', icon: 'clock-outline' };
+  }
+
   static canRequestSwap(dueDate: string): { canSwap: boolean; reason?: string } {
     const now = new Date();
     const due = new Date(dueDate);
@@ -588,5 +742,5 @@ export class SwapRequestService {
 
   static formatDay(day: string): string {
     return day.charAt(0) + day.slice(1).toLowerCase();
-  }
+  } 
 }

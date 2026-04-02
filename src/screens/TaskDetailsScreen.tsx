@@ -1,4 +1,5 @@
-// src/screens/TaskDetailsScreen.tsx - COMPLETE REFACTORED VERSION
+// src/screens/TaskDetailsScreen.tsx - UPDATED with edit restriction for assigned tasks
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -79,12 +80,11 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   } = useRealtimeTasks(groupId);
 
   const {
-  events: assignmentEvents,
-  clearAssignmentCompleted,
-  clearAssignmentVerified,
-  clearAssignmentUpdated  // ✅ ADD THIS
-} = useRealtimeAssignments(groupId, currentUserId || '');
-
+    events: assignmentEvents,
+    clearAssignmentCompleted,
+    clearAssignmentVerified,
+    clearAssignmentUpdated
+  } = useRealtimeAssignments(groupId, currentUserId || '');
 
   useRealtimeNotifications({
     onNewNotification: (notification) => {
@@ -125,6 +125,8 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       clearAssignmentVerified();
     }
   }, [assignmentEvents.assignmentVerified]);
+
+ 
 
   useEffect(() => {
     if (task?.userAssignment && !task.userAssignment.completed) {
@@ -175,7 +177,15 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       setLoading(false);
     }
   };
-
+ useEffect(() => {
+    if (assignmentEvents.assignmentUpdated && 
+        assignmentEvents.assignmentUpdated.assignmentId === task?.userAssignment?.id) {
+      console.log('🔄 Current assignment updated (swap), refreshing...');
+      fetchTaskDetails();
+      clearAssignmentUpdated();
+    }
+  }, [assignmentEvents.assignmentUpdated, task?.userAssignment?.id, fetchTaskDetails, clearAssignmentUpdated]);
+  
   const findTodayAssignment = (taskData: any) => {
     if (!taskData.assignments || !taskData.userId) {
       setTodayAssignment(null);
@@ -210,101 +220,94 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  // In processTaskData function, add proper typing
-
-const processTaskData = (taskData: any) => {
-  // ✅ FIX: Sort time slots by start time (earliest first) with proper typing
-  if (taskData.timeSlots && taskData.timeSlots.length > 0) {
-    console.log('📅 Before sorting time slots:', taskData.timeSlots.map((s: any) => s.startTime));
-    
-    taskData.timeSlots.sort((a: any, b: any) => {
-      const timeA = convertTimeToMinutes(a.startTime);
-      const timeB = convertTimeToMinutes(b.startTime);
-      return timeA - timeB;
-    });
-    
-    console.log('📅 After sorting time slots:', taskData.timeSlots.map((s: any) => s.startTime));
-  }
-  
-  // Sort selected days with proper typing
-  if (taskData.selectedDays && taskData.selectedDays.length > 0) {
-    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    taskData.selectedDays.sort((a: string, b: string) => 
-      dayOrder.indexOf(a) - dayOrder.indexOf(b)
-    );
-  }
-  
-  // Sort assignments with proper typing
-  if (taskData.assignments && taskData.assignments.length > 0) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    taskData.assignments.sort((a: any, b: any) => {
-      const dateA = new Date(a.dueDate);
-      const dateB = new Date(b.dueDate);
+  const processTaskData = (taskData: any) => {
+    if (taskData.timeSlots && taskData.timeSlots.length > 0) {
+      console.log('📅 Before sorting time slots:', taskData.timeSlots.map((s: any) => s.startTime));
       
-      const dayA = new Date(dateA);
-      dayA.setHours(0, 0, 0, 0);
-      
-      const dayB = new Date(dateB);
-      dayB.setHours(0, 0, 0, 0);
-      
-      const isAToday = dayA.getTime() === today.getTime();
-      const isBToday = dayB.getTime() === today.getTime();
-      
-      if (isAToday && !isBToday) return -1;
-      if (!isAToday && isBToday) return 1;
-      
-      if (isAToday && isBToday) {
-        const timeA = dateA.getHours() * 60 + dateA.getMinutes();
-        const timeB = dateB.getHours() * 60 + dateB.getMinutes();
+      taskData.timeSlots.sort((a: any, b: any) => {
+        const timeA = convertTimeToMinutes(a.startTime);
+        const timeB = convertTimeToMinutes(b.startTime);
         return timeA - timeB;
-      }
+      });
       
-      const isAFuture = dayA.getTime() >= today.getTime();
-      const isBFuture = dayB.getTime() >= today.getTime();
-      
-      if (isAFuture && !isBFuture) return -1;
-      if (!isAFuture && isBFuture) return 1;
-      
-      if (isAFuture && isBFuture) {
-        return dateA.getTime() - dateB.getTime();
-      }
-      
-      return dateB.getTime() - dateA.getTime();
-    });
-  }
-  
-  return taskData;
-};
-
-const convertTimeToMinutes = (time: string) => {
-  if (!time) return 0;
-  
-  // Handle 12-hour format (e.g., "9:00 AM" or "9:00PM")
-  const timeLower = time.toLowerCase();
-  let hours = 0;
-  let minutes = 0;
-  
-  if (timeLower.includes('am') || timeLower.includes('pm')) {
-    // 12-hour format
-    const isPM = timeLower.includes('pm');
-    const timeWithoutSuffix = time.replace(/[ap]m/gi, '').trim();
-    const [hourStr, minuteStr] = timeWithoutSuffix.split(':');
-    hours = parseInt(hourStr || '0', 10);
-    minutes = parseInt(minuteStr || '0', 10);
+      console.log('📅 After sorting time slots:', taskData.timeSlots.map((s: any) => s.startTime));
+    }
     
-    if (isPM && hours !== 12) hours += 12;
-    if (!isPM && hours === 12) hours = 0;
-  } else {
-    // 24-hour format
-    const [hourStr, minuteStr] = time.split(':');
-    hours = parseInt(hourStr || '0', 10);
-    minutes = parseInt(minuteStr || '0', 10);
-  }
-  
-  return hours * 60 + minutes;
-};
+    if (taskData.selectedDays && taskData.selectedDays.length > 0) {
+      const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      taskData.selectedDays.sort((a: string, b: string) => 
+        dayOrder.indexOf(a) - dayOrder.indexOf(b)
+      );
+    }
+    
+    if (taskData.assignments && taskData.assignments.length > 0) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      taskData.assignments.sort((a: any, b: any) => {
+        const dateA = new Date(a.dueDate);
+        const dateB = new Date(b.dueDate);
+        
+        const dayA = new Date(dateA);
+        dayA.setHours(0, 0, 0, 0);
+        
+        const dayB = new Date(dateB);
+        dayB.setHours(0, 0, 0, 0);
+        
+        const isAToday = dayA.getTime() === today.getTime();
+        const isBToday = dayB.getTime() === today.getTime();
+        
+        if (isAToday && !isBToday) return -1;
+        if (!isAToday && isBToday) return 1;
+        
+        if (isAToday && isBToday) {
+          const timeA = dateA.getHours() * 60 + dateA.getMinutes();
+          const timeB = dateB.getHours() * 60 + dateB.getMinutes();
+          return timeA - timeB;
+        }
+        
+        const isAFuture = dayA.getTime() >= today.getTime();
+        const isBFuture = dayB.getTime() >= today.getTime();
+        
+        if (isAFuture && !isBFuture) return -1;
+        if (!isAFuture && isBFuture) return 1;
+        
+        if (isAFuture && isBFuture) {
+          return dateA.getTime() - dateB.getTime();
+        }
+        
+        return dateB.getTime() - dateA.getTime();
+      });
+    }
+    
+    return taskData;
+  };
+
+  const convertTimeToMinutes = (time: string) => {
+    if (!time) return 0;
+    
+    const timeLower = time.toLowerCase();
+    let hours = 0;
+    let minutes = 0;
+    
+    if (timeLower.includes('am') || timeLower.includes('pm')) {
+      const isPM = timeLower.includes('pm');
+      const timeWithoutSuffix = time.replace(/[ap]m/gi, '').trim();
+      const [hourStr, minuteStr] = timeWithoutSuffix.split(':');
+      hours = parseInt(hourStr || '0', 10);
+      minutes = parseInt(minuteStr || '0', 10);
+      
+      if (isPM && hours !== 12) hours += 12;
+      if (!isPM && hours === 12) hours = 0;
+    } else {
+      const [hourStr, minuteStr] = time.split(':');
+      hours = parseInt(hourStr || '0', 10);
+      minutes = parseInt(minuteStr || '0', 10);
+    }
+    
+    return hours * 60 + minutes;
+  };
+
   const checkTimeValidity = (taskData: any) => {
     if (!taskData?.userAssignment || taskData.userAssignment.completed) {
       setIsSubmittable(false);
@@ -379,15 +382,6 @@ const convertTimeToMinutes = (time: string) => {
       setTimeLeft(null);
     }
   };
-
-  useEffect(() => {
-  if (assignmentEvents.assignmentUpdated && 
-      assignmentEvents.assignmentUpdated.assignmentId === task?.userAssignment?.id) {
-    console.log('🔄 Current assignment updated (swap), refreshing...');
-    fetchTaskDetails();
-    clearAssignmentUpdated();
-  }
-}, [assignmentEvents.assignmentUpdated, task?.userAssignment?.id, fetchTaskDetails, clearAssignmentUpdated]);
 
   const startCountdownTimer = () => {
     const timer = setInterval(() => {
@@ -543,15 +537,35 @@ const convertTimeToMinutes = (time: string) => {
 
   const handleBack = () => navigation.goBack();
   
+  // ✅ FIXED: Check if task is assigned before allowing edit
+  const isTaskAssigned = () => {
+    // Check if task has a current assignee
+    if (task?.currentAssignee) return true;
+    // Check if there are any assignments for current week
+    if (task?.assignments?.some((a: any) => a.rotationWeek === task.group?.currentRotationWeek)) return true;
+    return false;
+  };
+
   const handleEdit = () => {
-    if (task) {
-      navigation.navigate('UpdateTask', {
-        task,
-        groupId: task.groupId || groupId,
-        groupName: task.group?.name,
-        onTaskUpdated: fetchTaskDetails
-      });
+    if (!task) return;
+    
+    // ✅ Prevent editing if task is already assigned
+    if (isTaskAssigned()) {
+      Alert.alert(
+        'Cannot Edit Task',
+        'This task is already assigned to members. Editing assigned tasks could break the rotation system.\n\n' +
+        'Consider creating a new task instead, or wait until the rotation week ends.',
+        [{ text: 'OK' }]
+      );
+      return;
     }
+    
+    navigation.navigate('UpdateTask', {
+      task,
+      groupId: task.groupId || groupId,
+      groupName: task.group?.name,
+      onTaskUpdated: fetchTaskDetails
+    });
   };
 
   const handleDelete = async () => {
@@ -618,21 +632,56 @@ const convertTimeToMinutes = (time: string) => {
     });
   };
 
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-        <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
-      </TouchableOpacity>
-      <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1}>Task Details</Text>
-      </View>
-      {isAdmin && task && (
-        <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
-          <MaterialCommunityIcons name="pencil" size={20} color="#495057" />
+  const renderHeader = () => {
+    const assigned = isTaskAssigned();
+    
+    return (
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
-      )}
-    </View>
-  );
+        <View style={styles.titleContainer}>
+          <Text style={styles.title} numberOfLines={1}>Task Details</Text>
+        </View>
+        {isAdmin && task && (
+          <TouchableOpacity 
+            style={[styles.editButton, assigned && styles.editButtonDisabled]} 
+            onPress={handleEdit}
+            disabled={assigned}
+          >
+            <MaterialCommunityIcons 
+              name="pencil" 
+              size={20} 
+              color={assigned ? "#adb5bd" : "#495057"} 
+            />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  // ✅ Add a warning banner for assigned tasks
+  const renderAssignedWarning = () => {
+    if (!isAdmin) return null;
+    if (!isTaskAssigned()) return null;
+    
+    return (
+      <LinearGradient
+        colors={['#fff3bf', '#ffec99']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.warningBanner}
+      >
+        <MaterialCommunityIcons name="alert" size={20} color="#e67700" />
+        <View style={styles.warningContent}>
+          <Text style={styles.warningTitle}>Task is Assigned</Text>
+          <Text style={styles.warningText}>
+            This task is currently assigned to members. Edit is disabled to prevent rotation issues.
+          </Text>
+        </View>
+      </LinearGradient>
+    );
+  };
 
   const renderWeekInfo = () => (
     <View style={styles.section}>
@@ -1212,6 +1261,9 @@ const convertTimeToMinutes = (time: string) => {
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       {renderHeader()}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* ✅ Show warning banner if task is assigned */}
+        {renderAssignedWarning()}
+        
         <LinearGradient colors={['#ffffff', '#f8f9fa']} style={styles.card}>
           <View style={styles.taskHeader}>
             <LinearGradient colors={['#e7f5ff', '#d0ebff']} style={styles.taskIcon}>
@@ -1321,11 +1373,17 @@ const convertTimeToMinutes = (time: string) => {
 
           {isAdmin && renderAdminView()}
 
-          {isAdmin && !isAdmin && (
-            <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-              <LinearGradient colors={['#fff5f5', '#ffe3e3']} style={styles.deleteButtonGradient}>
-                <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
-                <Text style={styles.deleteButtonText}>Delete Task</Text>
+          {isAdmin && (
+            <TouchableOpacity 
+              style={[styles.deleteButton, isTaskAssigned() && styles.deleteButtonDisabled]} 
+              onPress={handleDelete}
+              disabled={isTaskAssigned()}
+            >
+              <LinearGradient colors={isTaskAssigned() ? ['#f8f9fa', '#e9ecef'] : ['#fff5f5', '#ffe3e3']} style={styles.deleteButtonGradient}>
+                <MaterialCommunityIcons name="delete" size={18} color={isTaskAssigned() ? "#adb5bd" : "#fa5252"} />
+                <Text style={[styles.deleteButtonText, isTaskAssigned() && styles.deleteButtonTextDisabled]}>
+                  Delete Task
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
           )}
@@ -1342,4 +1400,4 @@ const convertTimeToMinutes = (time: string) => {
       </ScrollView>
     </ScreenWrapper>
   );
-}
+} 

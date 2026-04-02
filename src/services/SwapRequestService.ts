@@ -743,4 +743,39 @@ export class SwapRequestService {
   static formatDay(day: string): string {
     return day.charAt(0) + day.slice(1).toLowerCase();
   } 
+
+// CHECK: Check if a user has any assignments this week (for WEEK swap exchange)
+static async checkUserHasAnyAssignmentThisWeek(
+  userId: string,
+  groupId: string,
+  week: number
+): Promise<{ hasAssignment: boolean; assignmentCount?: number; assignments?: any[] }> {
+  try {
+    const headers = await TokenUtils.getAuthHeaders(false);
+    
+    const url = `${API_URL}/check-user-week-assignments?targetUserId=${encodeURIComponent(userId)}&groupId=${encodeURIComponent(groupId)}&week=${week}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to check user week assignments: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return {
+      hasAssignment: result.hasAssignment || false,
+      assignmentCount: result.assignmentCount || 0,
+      assignments: result.assignments || []
+    };
+
+  } catch (error: any) {
+    console.error('SwapRequestService.checkUserHasAnyAssignmentThisWeek error:', error);
+    return { hasAssignment: false, assignmentCount: 0, assignments: [] };
+  }
+}
+
 }

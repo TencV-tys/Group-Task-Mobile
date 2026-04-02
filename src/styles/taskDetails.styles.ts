@@ -17,6 +17,41 @@ export const taskDetailsStyles = StyleSheet.create({
     borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
+warningBanner: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  padding: 12,
+  marginHorizontal: 16,
+  marginTop: 12,
+  marginBottom: 4,
+  borderRadius: 12,
+  gap: 10,
+  borderWidth: 1,
+  borderColor: '#ffec99',
+},
+warningContent: {
+  flex: 1,
+},
+warningTitle: {
+  fontSize: 13,
+  fontWeight: '600',
+  color: '#e67700',
+  marginBottom: 2,
+},
+warningText: {
+  fontSize: 12,
+  color: '#495057',
+  lineHeight: 16,
+},
+editButtonDisabled: {
+  opacity: 0.5,
+},
+deleteButtonDisabled: {
+  opacity: 0.5,
+},
+deleteButtonTextDisabled: {
+  color: '#adb5bd',
+},
   backButton: {
     width: 36,
     height: 36,

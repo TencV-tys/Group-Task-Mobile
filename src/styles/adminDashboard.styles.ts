@@ -1,4 +1,4 @@
-// src/styles/adminDashboard.styles.ts - ADDED badge styles
+// src/styles/adminDashboard.styles.ts - COMPLETE FINAL VERSION
 
 import { StyleSheet, Dimensions } from 'react-native';
 
@@ -13,7 +13,7 @@ export const adminDashboardStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16, 
+    paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: 'white',
     borderBottomWidth: 1,
@@ -176,6 +176,11 @@ export const adminDashboardStyles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
+  statValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   statValue: {
     fontSize: 24,
     fontWeight: '700',
@@ -189,6 +194,22 @@ export const adminDashboardStyles = StyleSheet.create({
   statSubtitle: {
     fontSize: 11,
     color: '#adb5bd',
+  },
+  statBadge: {
+    backgroundColor: '#fa5252',
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 1,
+    borderColor: 'white',
+  },
+  statBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   rotationCard: {
     padding: 16,
@@ -392,15 +413,18 @@ export const adminDashboardStyles = StyleSheet.create({
     width: (width - 40) / 2,
     marginBottom: 12,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: 'visible',
     borderWidth: 1,
     borderColor: '#e9ecef',
     position: 'relative',
+    backgroundColor: 'transparent',
   },
   actionGradient: {
     padding: 16,
     alignItems: 'center',
     gap: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
   actionText: {
     fontSize: 13,
@@ -408,20 +432,25 @@ export const adminDashboardStyles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
   },
-  // ✅ NEW: Badge styles for notification count
   badge: {
     position: 'absolute',
-    top: -8,
-    right: -8,
+    top: -10,
+    right: -10,
     backgroundColor: '#fa5252',
     borderRadius: 12,
-    minWidth: 20,
-    height: 20,
+    minWidth: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: 6,
     borderWidth: 2,
     borderColor: 'white',
+    zIndex: 10,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   badgeText: {
     color: 'white',

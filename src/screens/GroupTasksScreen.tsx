@@ -1,4 +1,5 @@
-// src/screens/GroupTasksScreen.tsx - COMPLETE FIXED VERSION
+// src/screens/GroupTasksScreen.tsx - COMPLETE FIXED VERSION with edit prevention on assigned tasks
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
@@ -14,7 +15,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
-import { TaskDraftService } from '../services/TaskDraftService';
 
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
@@ -87,100 +87,90 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     clearTaskAssigned
   } = useRealtimeTasks(groupId);
 
- const {
-  events: assignmentEvents,
-  clearAssignmentCompleted,
-  clearAssignmentPendingVerification,
-  clearAssignmentVerified,
-  clearAssignmentUpdated  // ✅ ADD THIS
-} = useRealtimeAssignments(groupId, currentUserId || '');
-
-
+  const {
+    events: assignmentEvents,
+    clearAssignmentCompleted,
+    clearAssignmentPendingVerification,
+    clearAssignmentVerified,
+    clearAssignmentUpdated
+  } = useRealtimeAssignments(groupId, currentUserId || '');
 
   const {
     events: swapEvents,
     clearSwapCreated
   } = useRealtimeSwapRequests(groupId, currentUserId || '');
 
+  // ===== CHECK IF TASK IS ASSIGNED =====
+  const isTaskAssigned = useCallback((task: any): boolean => {
+    // Check if task has a current assignee
+    if (task.currentAssignee) return true;
+    // Check if there are any assignments for current week
+    if (task.assignments && task.assignments.length > 0) return true;
+    return false;
+  }, []);
 
-
-// ===== useMemo HOOKS (TOP LEVEL) =====
-const groupedMyTasks = useMemo(() => {
-  if (selectedTab !== 'my') return [];
-  
-  const taskMap = new Map();
-  myTasks.forEach((item: any) => {
-    const taskId = item.id;
-    if (!taskMap.has(taskId)) {
-      // Try to find original task, but if not found, use data from assignment
-      const originalTask = tasks.find(t => t.id === taskId);
+  // ===== useMemo HOOKS =====
+  const groupedMyTasks = useMemo(() => {
+    if (selectedTab !== 'my') return [];
+    
+    const taskMap = new Map();
+    myTasks.forEach((item: any) => {
+      const taskId = item.id;
+      if (!taskMap.has(taskId)) {
+        const originalTask = tasks.find(t => t.id === taskId);
+        const isDeletedTask = !originalTask && item.assignment?.isHistorical === true;
+        
+        taskMap.set(taskId, {
+          id: taskId,
+          title: originalTask?.title 
+            || item.title 
+            || item.taskTitle 
+            || (isDeletedTask ? '🗑️ Deleted Task' : 'Unknown Task'),
+          description: originalTask?.description || item.description,
+          points: originalTask?.points || item.points || item.assignment?.points || 0,
+          executionFrequency: originalTask?.executionFrequency || item.executionFrequency,
+          timeFormat: originalTask?.timeFormat || item.timeFormat,
+          timeSlots: originalTask?.timeSlots || item.timeSlots || [],
+          selectedDays: originalTask?.selectedDays || item.selectedDays,
+          dayOfWeek: originalTask?.dayOfWeek || item.dayOfWeek,
+          isRecurring: originalTask?.isRecurring ?? item.isRecurring ?? true,
+          category: originalTask?.category || item.category,
+          rotationOrder: originalTask?.rotationOrder || item.rotationOrder,
+          currentAssignee: originalTask?.currentAssignee || item.currentAssignee,
+          lastAssignedAt: originalTask?.lastAssignedAt || item.lastAssignedAt,
+          createdAt: originalTask?.createdAt || item.createdAt || new Date(),
+          creator: originalTask?.creator || item.creator,
+          userAssignment: item.assignment,
+          assignmentsCount: 0,
+          completedCount: 0,
+          totalPoints: 0,
+          earnedPoints: 0,
+          isFullyCompleted: false,
+          hasAnyCompleted: false,
+          isDeleted: isDeletedTask
+        });
+      }
       
-      // ✅ Check if this is a deleted task (no original task found)
-      const isDeletedTask = !originalTask && item.assignment?.isHistorical === true;
+      const taskData = taskMap.get(taskId);
+      taskData.assignmentsCount++;
       
-      taskMap.set(taskId, {
-        id: taskId,
-        // Use original task data if available, otherwise use from assignment
-        title: originalTask?.title 
-          || item.title 
-          || item.taskTitle 
-          || (isDeletedTask ? '🗑️ Deleted Task' : 'Unknown Task'),
-        description: originalTask?.description || item.description,
-        points: originalTask?.points || item.points || item.assignment?.points || 0,
-        executionFrequency: originalTask?.executionFrequency || item.executionFrequency,
-        timeFormat: originalTask?.timeFormat || item.timeFormat,
-        timeSlots: originalTask?.timeSlots || item.timeSlots || [],
-        selectedDays: originalTask?.selectedDays || item.selectedDays,
-        dayOfWeek: originalTask?.dayOfWeek || item.dayOfWeek,
-        isRecurring: originalTask?.isRecurring ?? item.isRecurring ?? true,
-        category: originalTask?.category || item.category,
-        rotationOrder: originalTask?.rotationOrder || item.rotationOrder,
-        currentAssignee: originalTask?.currentAssignee || item.currentAssignee,
-        lastAssignedAt: originalTask?.lastAssignedAt || item.lastAssignedAt,
-        createdAt: originalTask?.createdAt || item.createdAt || new Date(),
-        creator: originalTask?.creator || item.creator,
-        userAssignment: item.assignment,
-        assignmentsCount: 0,
-        completedCount: 0,
-        totalPoints: 0,
-        earnedPoints: 0,
-        isFullyCompleted: false,
-        hasAnyCompleted: false,
-        isDeleted: isDeletedTask  // ✅ Add flag for deleted tasks
-      });
-    }
+      const isCompleted = item.assignment?.completed === true;
+      
+      if (isCompleted) {
+        taskData.completedCount++;
+        taskData.earnedPoints += item.assignment?.points || 0;
+        taskData.hasAnyCompleted = true;
+      }
+      taskData.totalPoints += item.assignment?.points || 0;
+    });
     
-    const taskData = taskMap.get(taskId);
-    taskData.assignmentsCount++;
+    const result = Array.from(taskMap.values()).map(task => ({
+      ...task,
+      isFullyCompleted: task.assignmentsCount > 0 && task.completedCount === task.assignmentsCount
+    }));
     
-    const isCompleted = item.assignment?.completed === true;
-    
-    if (isCompleted) {
-      taskData.completedCount++;
-      taskData.earnedPoints += item.assignment?.points || 0;
-      taskData.hasAnyCompleted = true;
-    }
-    taskData.totalPoints += item.assignment?.points || 0;
-  });
-  
-  // Calculate isFullyCompleted after processing all
-  const result = Array.from(taskMap.values()).map(task => ({
-    ...task,
-    isFullyCompleted: task.assignmentsCount > 0 && task.completedCount === task.assignmentsCount
-  }));
-  
-  console.log('📊 Grouped myTasks:', result.map(t => ({
-    title: t.title,
-    assignmentsCount: t.assignmentsCount,
-    completedCount: t.completedCount,
-    isFullyCompleted: t.isFullyCompleted,
-    earnedPoints: t.earnedPoints,
-    totalPoints: t.totalPoints,
-    isDeleted: t.isDeleted
-  })));
-  
-  return result;
-}, [selectedTab, myTasks, tasks]);
+    return result;
+  }, [selectedTab, myTasks, tasks]);
 
   // ===== useCallback HOOKS =====
   const checkToken = useCallback(async (): Promise<boolean> => {
@@ -279,63 +269,34 @@ const groupedMyTasks = useMemo(() => {
     return result;
   }, []);
 
- // In GroupTasksScreen.tsx - Update analyzeTaskCreationDays
-
-const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
-  console.log('🔍🔍🔍 [analyzeTaskCreationDays] START 🔍🔍🔍');
-  console.log(`📊 Total tasks to analyze: ${taskList.length}`);
-  
-  if (!taskList.length) {
-    console.log('⚠️ No tasks to analyze');
-    return;
-  }
-  
-  const dayCounts = new Map<string, number>();
-  let maxCount = 0;
-  let mostCommonDay = '';
-  
-  // Log each task's creation date
-  taskList.forEach((task, index) => {
-    if (task.createdAt) {
-      const creationDate = new Date(task.createdAt);
-      const dayName = creationDate.toLocaleDateString('en-US', { weekday: 'long' });
-      const fullDate = creationDate.toLocaleDateString();
-      
-      console.log(`   Task ${index + 1}: "${task.title}" - Created on ${dayName}, ${fullDate}`);
-      
-      const count = (dayCounts.get(dayName) || 0) + 1;
-      dayCounts.set(dayName, count);
-      if (count > maxCount) {
-        maxCount = count;
-        mostCommonDay = dayName;
+  const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
+    if (!taskList.length) return;
+    
+    const dayCounts = new Map<string, number>();
+    let maxCount = 0;
+    let mostCommonDay = '';
+    
+    taskList.forEach((task) => {
+      if (task.createdAt) {
+        const creationDate = new Date(task.createdAt);
+        const dayName = creationDate.toLocaleDateString('en-US', { weekday: 'long' });
+        const count = (dayCounts.get(dayName) || 0) + 1;
+        dayCounts.set(dayName, count);
+        if (count > maxCount) {
+          maxCount = count;
+          mostCommonDay = dayName;
+        }
       }
-    } else {
-      console.log(`   Task ${index + 1}: "${task.title}" - No createdAt date`);
-    }
-  });
-  
-  console.log(`📊 Day counts:`);
-  dayCounts.forEach((count, day) => {
-    console.log(`   ${day}: ${count} task${count > 1 ? 's' : ''}`);
-  });
-  
-  console.log(`🏆 Most common creation day: ${mostCommonDay} (${maxCount} tasks)`);
-  console.log(`📅 Has mixed creation days? ${dayCounts.size > 1}`);
-  
-  setTaskCreationDays(dayCounts);
-  setBaselineCreationDay(mostCommonDay);
-  setHasMixedCreationDays(dayCounts.size > 1);
-  
-  const membersInRotationCount = rotationStatus?.membersInRotation ?? 0;
-  const tasksNeededCount = Math.max(0, membersInRotationCount - taskList.length);
-  setTasksNeeded(tasksNeededCount);
-  
-  console.log(`👥 Members in rotation: ${membersInRotationCount}`);
-  console.log(`📝 Tasks needed for perfect rotation: ${tasksNeededCount}`);
-  console.log(`📊 Final stats: tasks=${taskList.length}, membersInRotation=${membersInRotationCount}, tasksNeeded=${tasksNeededCount}`);
-  console.log('🔍🔍🔍 [analyzeTaskCreationDays] END 🔍🔍🔍');
-  
-}, [rotationStatus?.membersInRotation]);
+    });
+    
+    setTaskCreationDays(dayCounts);
+    setBaselineCreationDay(mostCommonDay);
+    setHasMixedCreationDays(dayCounts.size > 1);
+    
+    const membersInRotationCount = rotationStatus?.membersInRotation ?? 0;
+    const tasksNeededCount = Math.max(0, membersInRotationCount - taskList.length);
+    setTasksNeeded(tasksNeededCount);
+  }, [rotationStatus?.membersInRotation]);
 
   const findTodayAssignments = useCallback((tasks: any[]) => {
     const today = new Date().toDateString();
@@ -377,7 +338,6 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
         const members = membersResult.members || [];
         const inRotation = members.filter((m: any) => m.inRotation === true);
         setMembersInRotation(inRotation);
-        console.log(`✅ Loaded ${inRotation.length} members in rotation`);
       }
     } catch (err) {
       console.error('Error fetching members:', err);
@@ -454,12 +414,11 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
   }, [authError, navigation]);
 
   useEffect(() => {
-  if (assignmentEvents.assignmentUpdated) {
-    console.log('🔄 Assignment updated (swap), refreshing tasks...');
-    refreshTasks();
-    clearAssignmentUpdated();
-  }
-}, [assignmentEvents.assignmentUpdated, refreshTasks, clearAssignmentUpdated]);
+    if (assignmentEvents.assignmentUpdated) {
+      refreshTasks();
+      clearAssignmentUpdated();
+    }
+  }, [assignmentEvents.assignmentUpdated, refreshTasks, clearAssignmentUpdated]);
 
   useEffect(() => {
     const getCurrentUser = async () => {
@@ -553,6 +512,34 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
   }, [navigation, groupId, loadingUser, refreshTasks]);
 
   // ===== HANDLER FUNCTIONS =====
+  
+  // ✅ FIXED: Check if task is assigned before allowing edit
+  const handleEditTask = async (task: any) => {
+    if (!await checkToken()) return;
+    if (!isAdmin) {
+      Alert.alert('Restricted', 'Only admins can edit tasks');
+      return;
+    }
+    
+    // Check if task is assigned
+    if (isTaskAssigned(task)) {
+      Alert.alert(
+        'Cannot Edit Task',
+        'This task is already assigned to members. Editing assigned tasks could break the rotation system.\n\n' +
+        'Consider creating a new task instead, or wait until the rotation week ends.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    navigation.navigate('UpdateTask', { 
+      task, 
+      groupId, 
+      groupName, 
+      onTaskUpdated: refreshTasks 
+    });
+  };
+
   const handleViewRotationSchedule = () => {
     navigation.navigate('RotationSchedule', { groupId, groupName, userRole });
   };
@@ -564,15 +551,6 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
       return;
     }
     navigation.navigate('CreateTask', { groupId, groupName, onTaskCreated: refreshTasks });
-  };
-
-  const handleEditTask = async (task: any) => {
-    if (!await checkToken()) return;
-    if (!isAdmin) {
-      Alert.alert('Restricted', 'Only admins can edit tasks');
-      return;
-    }
-    navigation.navigate('UpdateTask', { task, groupId, groupName, onTaskUpdated: refreshTasks });
   };
 
   const handleViewTaskDetails = async (taskId: string) => {
@@ -591,31 +569,6 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
       isAdmin: false,
       onVerified: refreshTasks
     });
-  };
-
-  const handleDeleteTask = async (taskId: string, taskTitle: string) => {
-    if (!await checkToken()) return;
-    if (!isAdmin) {
-      Alert.alert('Restricted', 'Only admins can delete tasks');
-      return;
-    }
-    
-    Alert.alert('Delete Task', `Delete "${taskTitle}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Delete', 
-        style: 'destructive',
-        onPress: async () => {
-          const result = await TaskService.deleteTask(taskId);
-          if (result.success) {
-            setTasks(prev => prev.filter(t => t.id !== taskId));
-            setMyTasks(prev => prev.filter(t => t.id !== taskId));
-          } else {
-            Alert.alert('Error', result.message);
-          }
-        }
-      }
-    ]);
   };
 
   const handleNavigateToSwapRequests = async () => {
@@ -651,9 +604,9 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
     }
   };
 
-     const handleViewDrafts = () => {
-  navigation.navigate('TaskDrafts', { groupId, groupName });
-};
+  const handleViewDrafts = () => {
+    navigation.navigate('TaskDrafts', { groupId, groupName });
+  };
 
   // ===== RENDER FUNCTIONS =====
   const renderAssignmentInfo = (task: any) => {
@@ -708,7 +661,6 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
         </View>
       );
     }
- 
 
     const getIcon = () => {
       if (isCompleted) return "check-circle";
@@ -739,18 +691,7 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
   };
 
   const renderCreationDayBanner = () => {
-     console.log('🎨 [renderCreationDayBanner] Rendering banner');
-  console.log(`   isAdmin: ${isAdmin}`);
-  console.log(`   selectedTab: ${selectedTab}`);
-  console.log(`   tasks.length: ${tasks.length}`);
-  console.log(`   hasMixedCreationDays: ${hasMixedCreationDays}`);
-  console.log(`   baselineCreationDay: ${baselineCreationDay}`);
-  console.log(`   taskCreationDays:`, Array.from(taskCreationDays.entries()));
-  
-     if (!isAdmin || selectedTab !== 'all' || !tasks.length) {
-    console.log('   ⏭️ Skipping banner - conditions not met');
-    return null;
-  } 
+    if (!isAdmin || selectedTab !== 'all' || !tasks.length) return null;
 
     const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
     const isTodayBaseline = today === baselineCreationDay;
@@ -758,15 +699,6 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
     const hasPerfectCount = tasks.length === membersInRotationCount;
     const needsTasks = tasks.length < membersInRotationCount;
     const tasksNeededCount = Math.max(0, membersInRotationCount - tasks.length);
-    
-
- console.log(`   Today: ${today}`);
-  console.log(`   Is today the baseline? ${isTodayBaseline} (baseline: ${baselineCreationDay})`);
-  console.log(`   Members in rotation: ${membersInRotationCount}`);
-  console.log(`   Has perfect count? ${hasPerfectCount} (tasks: ${tasks.length}, members: ${membersInRotationCount})`);
-  console.log(`   Needs tasks? ${needsTasks}`);
-  console.log(`   Tasks needed count: ${tasksNeededCount}`);
-   
 
     return (
       <LinearGradient
@@ -853,9 +785,9 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
         )}
       </View>
       <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.draftsButton} onPress={handleViewDrafts}>
-    <MaterialCommunityIcons name="file-document-outline" size={22} color="#2b8a3e" />
-  </TouchableOpacity>
+        <TouchableOpacity style={styles.draftsButton} onPress={handleViewDrafts}>
+          <MaterialCommunityIcons name="file-document-outline" size={22} color="#2b8a3e" />
+        </TouchableOpacity>
         {!isAdmin && (
           <TouchableOpacity style={styles.swapButton} onPress={handleNavigateToSwapRequests}>
             <MaterialCommunityIcons name="swap-horizontal" size={22} color="#2b8a3e" />
@@ -989,218 +921,223 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
     );
   };
 
-const renderTask = ({ item }: any) => {
-  const isMyTasksView = selectedTab === 'my';
-  
-  // ✅ Determine task completion status based on view
-  let isFullyCompleted = false;
-  let completionPercentage = 0;
-  let completedCount = 0;
-  let totalCount = 0;
-  let earnedPoints = 0;
-  let totalPoints = 0;
-  
-  if (isMyTasksView) {
-    // MY TASKS VIEW: Show user's personal progress
-    if (item.assignmentsCount && item.assignmentsCount > 1) {
-      // Multi-slot task
-      totalCount = item.assignmentsCount;
-      completedCount = item.completedCount || 0;
-      isFullyCompleted = completedCount === totalCount;
-      completionPercentage = (completedCount / totalCount) * 100;
-      earnedPoints = item.earnedPoints || 0;
-      totalPoints = item.totalPoints || 0;
+  const renderTask = ({ item }: any) => {
+    const isMyTasksView = selectedTab === 'my';
+    const taskIsAssigned = isTaskAssigned(item);
+    
+    // Determine if task can be edited (admin, not my tasks view, and NOT assigned)
+    const canEdit = isAdmin && !isMyTasksView && !taskIsAssigned;
+    
+    // Determine task completion status
+    let isFullyCompleted = false;
+    let completionPercentage = 0;
+    let completedCount = 0;
+    let totalCount = 0;
+    let earnedPoints = 0;
+    let totalPoints = 0;
+    
+    if (isMyTasksView) {
+      if (item.assignmentsCount && item.assignmentsCount > 1) {
+        totalCount = item.assignmentsCount;
+        completedCount = item.completedCount || 0;
+        isFullyCompleted = completedCount === totalCount;
+        completionPercentage = (completedCount / totalCount) * 100;
+        earnedPoints = item.earnedPoints || 0;
+        totalPoints = item.totalPoints || 0;
+      } else {
+        isFullyCompleted = item.assignment?.completed || item.userAssignment?.completed || false;
+        completionPercentage = isFullyCompleted ? 100 : 0;
+        completedCount = isFullyCompleted ? 1 : 0;
+        totalCount = 1;
+        earnedPoints = isFullyCompleted ? (item.points || 0) : 0;
+        totalPoints = item.points || 0;
+      }
     } else {
-      // Single assignment task
-      isFullyCompleted = item.assignment?.completed || item.userAssignment?.completed || false;
-      completionPercentage = isFullyCompleted ? 100 : 0;
-      completedCount = isFullyCompleted ? 1 : 0;
-      totalCount = 1;
-      earnedPoints = isFullyCompleted ? (item.points || 0) : 0;
-      totalPoints = item.points || 0;
+      if (item.assignments && item.assignments.length > 0) {
+        const allAssignments = item.assignments;
+        totalCount = allAssignments.length;
+        const completedAssignments = allAssignments.filter((a: any) => a.completed === true);
+        completedCount = completedAssignments.length;
+        isFullyCompleted = completedCount === totalCount;
+        completionPercentage = (completedCount / totalCount) * 100;
+        earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+        totalPoints = allAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+      } else {
+        totalCount = 0;
+        completedCount = 0;
+        isFullyCompleted = false;
+        completionPercentage = 0;
+        earnedPoints = 0;
+        totalPoints = 0;
+      }
     }
-  } else {
-    // ALL TASKS VIEW (ADMIN): Show overall task completion across ALL members
-    if (item.assignments && item.assignments.length > 0) {
-      // Get all assignments for this task
-      const allAssignments = item.assignments;
-      totalCount = allAssignments.length;
-      
-      // Count completed assignments
-      const completedAssignments = allAssignments.filter((a: any) => a.completed === true);
-      completedCount = completedAssignments.length;
-      isFullyCompleted = completedCount === totalCount;
-      completionPercentage = (completedCount / totalCount) * 100;
-      
-      // Calculate total points earned across all members
-      earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-      totalPoints = allAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-    } else {
-      // No assignments yet
-      totalCount = 0;
-      completedCount = 0;
-      isFullyCompleted = false;
-      completionPercentage = 0;
-      earnedPoints = 0;
-      totalPoints = 0;
-    }
-  }
-  
-  const validation = validateTaskTime(item);
-  
-  const getGradientColors = (): [string, string] => {
-    if (isFullyCompleted) return ['#f8f9fa', '#e9ecef'];
-    if (isMyTasksView && validation.isSubmittableNow) {
-      return validation.willBePenalized ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb'];
-    }
-    return ['#ffffff', '#f8f9fa'];
-  };
+    
+    const validation = validateTaskTime(item);
+    
+    const getGradientColors = (): [string, string] => {
+      if (isFullyCompleted) return ['#f8f9fa', '#e9ecef'];
+      if (isMyTasksView && validation.isSubmittableNow) {
+        return validation.willBePenalized ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb'];
+      }
+      return ['#ffffff', '#f8f9fa'];
+    };
 
-  return (
-    <TouchableOpacity
-      onPress={() => handleViewTaskDetails(item.id)}
-      onLongPress={() => !isMyTasksView && isAdmin && (() => {
-        Alert.alert('Task Options', `"${item.title}"`, [
-          { text: 'Edit', onPress: () => handleEditTask(item) },
-          { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item.id, item.title) },
-          { text: 'View Details', onPress: () => handleViewTaskDetails(item.id) },
-          { text: 'Cancel', style: 'cancel' }
-        ]);
-      })()}
-    >
-      <LinearGradient colors={getGradientColors()} style={styles.taskCard}>
-        <View style={styles.taskHeader}>
-          <LinearGradient 
-            colors={isFullyCompleted ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']} 
-            style={styles.taskIcon}
-          >
-            <MaterialCommunityIcons 
-              name={isFullyCompleted ? "check" : "format-list-checks"} 
-              size={20} 
-              color={isFullyCompleted ? "white" : "#495057"} 
-            />
-          </LinearGradient>
-          <View style={styles.taskInfo}>
-            <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
-              {item.title}
-            </Text>
-            <View style={styles.taskMeta}>
-              <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.pointsBadge}>
-                <MaterialCommunityIcons name="star" size={12} color="#e67700" />
-                <Text style={styles.taskPoints}>
-                  {isMyTasksView 
-                    ? (item.assignmentsCount > 1 
-                        ? `${earnedPoints}/${totalPoints} pts` 
-                        : `${item.points} pts`)
-                    : `${earnedPoints}/${totalPoints} pts (${completedCount}/${totalCount} completed)`
-                  }
-                </Text>
-              </LinearGradient>
-            </View>
-          </View>
-        </View>
-        
-        {renderAssignmentInfo(item)}
-        
-        {/* ✅ Progress Bar - Show for BOTH views when there are multiple assignments */}
-        {((isMyTasksView && item.assignmentsCount && item.assignmentsCount > 1 && !isFullyCompleted) ||
-          (!isMyTasksView && totalCount > 1 && !isFullyCompleted)) && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
-            </View>
-            <Text style={styles.progressText}>
-              {isMyTasksView 
-                ? `${completedCount}/${totalCount} slots completed • ${earnedPoints}/${totalPoints} pts`
-                : `${completedCount}/${totalCount} assignments completed • ${earnedPoints}/${totalPoints} total points`
-              }
-            </Text>
-          </View>
-        )}
-        
-        {/* ✅ Show progress bar for single assignment but not fully completed in ADMIN view */}
-        {!isMyTasksView && totalCount === 1 && !isFullyCompleted && totalCount > 0 && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
-            </View>
-            <Text style={styles.progressText}>
-              {completedCount === 0 ? 'Not completed yet' : 'Completed'}
-            </Text>
-          </View>
-        )}
-        
-        {isMyTasksView && !isFullyCompleted && validation.isSubmittableNow && (
-          <TouchableOpacity onPress={() => handleCompleteNow(item)}>
-            <LinearGradient colors={validation.willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']} style={styles.completeNowButton}>
-              <View style={styles.completeNowContent}>
-                <MaterialCommunityIcons name={validation.willBePenalized ? "timer-alert" : "check-circle"} size={20} color="white" />
-                <Text style={styles.completeNowText}>
-                  {validation.willBePenalized ? 'Submit Late' : 'Complete Now'}
-                </Text>
-              </View>
+    return (
+      <TouchableOpacity
+        onPress={() => handleViewTaskDetails(item.id)}
+        onLongPress={() => {
+          // Only show edit option if admin, not in my tasks view, and task is NOT assigned
+          if (canEdit) {
+            Alert.alert('Task Options', `"${item.title}"`, [
+              { text: 'Edit', onPress: () => handleEditTask(item) },
+              { text: 'View Details', onPress: () => handleViewTaskDetails(item.id) },
+              { text: 'Cancel', style: 'cancel' }
+            ]);
+          } else if (isAdmin && !isMyTasksView && taskIsAssigned) {
+            // Show message that task cannot be edited because it's assigned
+            Alert.alert(
+              'Cannot Edit',
+              'This task is already assigned to members. Editing assigned tasks could break the rotation system.\n\n' +
+              'Consider creating a new task instead, or wait until the rotation week ends.',
+              [{ text: 'OK' }]
+            );
+          } else {
+            // Just view details
+            handleViewTaskDetails(item.id);
+          }
+        }}
+      >
+        <LinearGradient colors={getGradientColors()} style={styles.taskCard}>
+          <View style={styles.taskHeader}>
+            <LinearGradient 
+              colors={isFullyCompleted ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']} 
+              style={styles.taskIcon}
+            >
+              <MaterialCommunityIcons 
+                name={isFullyCompleted ? "check" : "format-list-checks"} 
+                size={20} 
+                color={isFullyCompleted ? "white" : "#495057"} 
+              />
             </LinearGradient>
-          </TouchableOpacity>
-        )}
-        
-        <View style={styles.taskFooter}>
-          <Text style={styles.taskCreator}>
-            <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
-          </Text>
-          <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  ); 
-};
-
-const renderContent = () => {
-  // ✅ Filter out deleted tasks for BOTH admin and member views
-  let currentTasks = [];
-  
-  if (selectedTab === 'my') {
-    // For 'my' tab, filter out deleted tasks
-    currentTasks = groupedMyTasks.filter((task: any) => task.isDeleted !== true);
-  } else {
-    // For 'all' tab, filter out deleted tasks
-    currentTasks = tasks.filter((task: any) => task.isDeleted !== true);
-  }
-  
-  const showEmpty = !loading && currentTasks.length === 0;
-  
-  return (
-    <FlatList
-      data={currentTasks}
-      renderItem={renderTask}
-      keyExtractor={item => item.id}
-      ListHeaderComponent={
-        <>
-          {renderCreationDayBanner()}
-          {renderTodaySection()}
-        </>
-      }
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={refreshTasks} colors={['#2b8a3e']} />
-      }
-      ListEmptyComponent={showEmpty ? (
-        <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons name={selectedTab === 'my' ? "clipboard-text" : "clipboard-list"} size={64} color="#dee2e6" />
-          <Text style={styles.emptyText}>
-            {selectedTab === 'my' ? 'No tasks assigned to you' : 'No tasks yet'}
-          </Text>
-          {isAdmin && selectedTab === 'all' && (
-            <TouchableOpacity style={styles.emptyButton} onPress={handleCreateTask}>
-              <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.emptyButtonGradient}>
-                <Text style={styles.emptyButtonText}>Create First Task</Text>
+            <View style={styles.taskInfo}>
+              <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
+                {item.title}
+              </Text>
+              <View style={styles.taskMeta}>
+                <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.pointsBadge}>
+                  <MaterialCommunityIcons name="star" size={12} color="#e67700" />
+                  <Text style={styles.taskPoints}>
+                    {isMyTasksView 
+                      ? (item.assignmentsCount > 1 
+                          ? `${earnedPoints}/${totalPoints} pts` 
+                          : `${item.points} pts`)
+                      : `${earnedPoints}/${totalPoints} pts (${completedCount}/${totalCount} completed)`
+                    }
+                  </Text>
+                </LinearGradient>
+              </View>
+            </View>
+          </View>
+          
+          {renderAssignmentInfo(item)}
+          
+          {/* Progress Bar for multiple assignments */}
+          {((isMyTasksView && item.assignmentsCount && item.assignmentsCount > 1 && !isFullyCompleted) ||
+            (!isMyTasksView && totalCount > 1 && !isFullyCompleted)) && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+              </View>
+              <Text style={styles.progressText}>
+                {isMyTasksView 
+                  ? `${completedCount}/${totalCount} slots completed • ${earnedPoints}/${totalPoints} pts`
+                  : `${completedCount}/${totalCount} assignments completed • ${earnedPoints}/${totalPoints} total points`
+                }
+              </Text>
+            </View>
+          )}
+          
+          {/* Progress bar for single assignment in admin view */}
+          {!isMyTasksView && totalCount === 1 && !isFullyCompleted && totalCount > 0 && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+              </View>
+              <Text style={styles.progressText}>
+                {completedCount === 0 ? 'Not completed yet' : 'Completed'}
+              </Text>
+            </View>
+          )}
+          
+          {isMyTasksView && !isFullyCompleted && validation.isSubmittableNow && (
+            <TouchableOpacity onPress={() => handleCompleteNow(item)}>
+              <LinearGradient colors={validation.willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']} style={styles.completeNowButton}>
+                <View style={styles.completeNowContent}>
+                  <MaterialCommunityIcons name={validation.willBePenalized ? "timer-alert" : "check-circle"} size={20} color="white" />
+                  <Text style={styles.completeNowText}>
+                    {validation.willBePenalized ? 'Submit Late' : 'Complete Now'}
+                  </Text>
+                </View>
               </LinearGradient>
             </TouchableOpacity>
           )}
-        </View>
-      ) : null}
-      contentContainerStyle={[styles.listContainer, { paddingBottom: 70 + insets.bottom }]}
-    />
-  );
-};
+          
+          <View style={styles.taskFooter}>
+            <Text style={styles.taskCreator}>
+              <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
+            </Text>
+            <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    ); 
+  };
+
+  const renderContent = () => {
+    let currentTasks = [];
+    
+    if (selectedTab === 'my') {
+      currentTasks = groupedMyTasks.filter((task: any) => task.isDeleted !== true);
+    } else {
+      currentTasks = tasks.filter((task: any) => task.isDeleted !== true);
+    }
+    
+    const showEmpty = !loading && currentTasks.length === 0;
+    
+    return (
+      <FlatList
+        data={currentTasks}
+        renderItem={renderTask}
+        keyExtractor={item => item.id}
+        ListHeaderComponent={
+          <>
+            {renderCreationDayBanner()}
+            {renderTodaySection()}
+          </>
+        }
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refreshTasks} colors={['#2b8a3e']} />
+        }
+        ListEmptyComponent={showEmpty ? (
+          <View style={styles.emptyContainer}>
+            <MaterialCommunityIcons name={selectedTab === 'my' ? "clipboard-text" : "clipboard-list"} size={64} color="#dee2e6" />
+            <Text style={styles.emptyText}>
+              {selectedTab === 'my' ? 'No tasks assigned to you' : 'No tasks yet'}
+            </Text>
+            {isAdmin && selectedTab === 'all' && (
+              <TouchableOpacity style={styles.emptyButton} onPress={handleCreateTask}>
+                <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.emptyButtonGradient}>
+                  <Text style={styles.emptyButtonText}>Create First Task</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
+        ) : null}
+        contentContainerStyle={[styles.listContainer, { paddingBottom: 70 + insets.bottom }]}
+      />
+    );
+  };
+
   // ===== BOTTOM TABS =====
   const renderBottomTabs = () => {
     return (

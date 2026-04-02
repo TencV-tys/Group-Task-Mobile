@@ -1,4 +1,5 @@
-// src/styles/adminDashboard.styles.ts
+// src/styles/adminDashboard.styles.ts - ADDED badge styles
+
 import { StyleSheet, Dimensions } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -12,7 +13,7 @@ export const adminDashboardStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 16, 
     paddingVertical: 12,
     backgroundColor: 'white',
     borderBottomWidth: 1,
@@ -147,7 +148,7 @@ export const adminDashboardStyles = StyleSheet.create({
     marginBottom: 8,
   },
   statCard: {
-    width: (width - 40) / 2, // Exactly half width minus padding
+    width: (width - 40) / 2,
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
@@ -301,6 +302,11 @@ export const adminDashboardStyles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
+  memberAvatarImage: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
   memberInfo: {
     flex: 1,
   },
@@ -389,6 +395,7 @@ export const adminDashboardStyles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#e9ecef',
+    position: 'relative',
   },
   actionGradient: {
     padding: 16,
@@ -401,10 +408,24 @@ export const adminDashboardStyles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
   },
-  memberAvatarImage: {
-  width: 40,
-  height: 40,
-  borderRadius: 20,
-  marginRight: 12,
-},
+  // ✅ NEW: Badge styles for notification count
+  badge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#fa5252',
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  badgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
 });

@@ -1,4 +1,5 @@
-// src/screens/AdminDashboardScreen.tsx - UPDATED with profile images in MemberCard
+// src/screens/AdminDashboardScreen.tsx - UPDATED with Swap Approvals button
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -8,7 +9,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  Image // 👈 Add Image import
+  Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -40,6 +41,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
   const [rotationStatus, setRotationStatus] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [pendingSwapCount, setPendingSwapCount] = useState(0);
   
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
@@ -150,6 +152,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
         'SUBMISSION_VERIFIED',
         'SUBMISSION_REJECTED',
         'SWAP_ADMIN_NOTIFICATION',
+        'SWAP_PENDING_APPROVAL',
         'NEGLECT_DETECTED'
       ].includes(notification.type)) {
         console.log(`🔔 Admin notification ${notification.type} received, refreshing...`);
@@ -231,6 +234,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
           setStats(dashboardResult.data.stats);
           setMembers(dashboardResult.data.members);
           setRecentActivity(dashboardResult.data.recentActivity || []);
+          setPendingSwapCount(dashboardResult.data.pendingSwapApprovals || 0);
           initialLoadDone.current = true;
         }
       } else {
@@ -334,100 +338,99 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
     );
   };
 
-// ===== UPDATED MemberCard - Admins don't show rotation badges =====
-const MemberCard = ({ member }: { member: any }) => (
-  <TouchableOpacity
-    onPress={() => {
-      const memberId = member.userId || member.id;
-      
-      if (!memberId) {
-        console.error('❌ No member ID available for:', member);
-        Alert.alert('Error', 'Cannot view member details - missing ID');
-        return;
-      }
-      
-      navigation.navigate('MemberContributions', { 
-        groupId, 
-        groupName, 
-        memberId,
-        userRole: 'ADMIN'
-      }); 
-    }}
-    activeOpacity={0.7}
-  >
-    <LinearGradient
-      colors={member.inRotation ? ['#ffffff', '#f8f9fa'] : ['#f8f9fa', '#e9ecef']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.memberCard}
-    >
-      <View style={styles.memberHeader}>
-        {/* Profile Image or Avatar Placeholder */}
-        {member.avatarUrl ? (
-          <Image source={{ uri: member.avatarUrl }} style={styles.memberAvatarImage} />
-        ) : (
-          <LinearGradient
-            colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#495057', '#343a40']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.memberAvatar}
-          >
-            <Text style={styles.memberAvatarText}>
-              {member.fullName?.charAt(0).toUpperCase() || '?'}
-            </Text>
-          </LinearGradient>
-        )}
+  // ===== UPDATED MemberCard - Admins don't show rotation badges =====
+  const MemberCard = ({ member }: { member: any }) => (
+    <TouchableOpacity
+      onPress={() => {
+        const memberId = member.userId || member.id;
         
-        <View style={styles.memberInfo}>
-          <Text style={styles.memberName}>{member.fullName}</Text>
-          <View style={styles.memberBadges}>
-            {/* Always show role badge */}
+        if (!memberId) {
+          console.error('❌ No member ID available for:', member);
+          Alert.alert('Error', 'Cannot view member details - missing ID');
+          return;
+        }
+        
+        navigation.navigate('MemberContributions', { 
+          groupId, 
+          groupName, 
+          memberId,
+          userRole: 'ADMIN'
+        }); 
+      }}
+      activeOpacity={0.7}
+    >
+      <LinearGradient
+        colors={member.inRotation ? ['#ffffff', '#f8f9fa'] : ['#f8f9fa', '#e9ecef']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.memberCard}
+      >
+        <View style={styles.memberHeader}>
+          {/* Profile Image or Avatar Placeholder */}
+          {member.avatarUrl ? (
+            <Image source={{ uri: member.avatarUrl }} style={styles.memberAvatarImage} />
+          ) : (
             <LinearGradient
-              colors={member.role === 'ADMIN' ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+              colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#495057', '#343a40']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.roleBadge}
+              style={styles.memberAvatar}
             >
-              <Text style={[
-                styles.roleBadgeText,
-                member.role === 'ADMIN' && styles.adminRoleText
-              ]}>
-                {member.role}
+              <Text style={styles.memberAvatarText}>
+                {member.fullName?.charAt(0).toUpperCase() || '?'}
               </Text>
             </LinearGradient>
-            
-            {/* Only show rotation badge for non-admin members */}
-            {member.role !== 'ADMIN' && (
-              member.inRotation ? (
-                <LinearGradient
-                  colors={['#d3f9d8', '#b2f2bb']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.rotationBadge}
-                >
-                  <MaterialCommunityIcons name="sync" size={12} color="#2b8a3e" />
-                  <Text style={styles.rotationBadgeText}>In Rotation</Text>
-                </LinearGradient>
-              ) : (
-                <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.rotationBadge}
-                >
-                  <MaterialCommunityIcons name="sync-off" size={12} color="#868e96" />
-                  <Text style={styles.rotationBadgeTextOff}>No Rotation</Text>
-                </LinearGradient>
-              )
-            )}
+          )}
+          
+          <View style={styles.memberInfo}>
+            <Text style={styles.memberName}>{member.fullName}</Text>
+            <View style={styles.memberBadges}>
+              {/* Always show role badge */}
+              <LinearGradient
+                colors={member.role === 'ADMIN' ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.roleBadge}
+              >
+                <Text style={[
+                  styles.roleBadgeText,
+                  member.role === 'ADMIN' && styles.adminRoleText
+                ]}>
+                  {member.role}
+                </Text>
+              </LinearGradient>
+              
+              {/* Only show rotation badge for non-admin members */}
+              {member.role !== 'ADMIN' && (
+                member.inRotation ? (
+                  <LinearGradient
+                    colors={['#d3f9d8', '#b2f2bb']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.rotationBadge}
+                  >
+                    <MaterialCommunityIcons name="sync" size={12} color="#2b8a3e" />
+                    <Text style={styles.rotationBadgeText}>In Rotation</Text>
+                  </LinearGradient>
+                ) : (
+                  <LinearGradient
+                    colors={['#f8f9fa', '#e9ecef']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.rotationBadge}
+                  >
+                    <MaterialCommunityIcons name="sync-off" size={12} color="#868e96" />
+                    <Text style={styles.rotationBadgeTextOff}>No Rotation</Text>
+                  </LinearGradient>
+                )
+              )}
+            </View>
           </View>
+          <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
         </View>
-        <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
-      </View>
-    </LinearGradient>
-  </TouchableOpacity>
-);
-
+      </LinearGradient>
+    </TouchableOpacity>
+  );
 
   const ActivityItem = ({ activity }: { activity: any }) => {
     const getIcon = (type: string) => {
@@ -661,7 +664,7 @@ const MemberCard = ({ member }: { member: any }) => (
             navigateTo="GroupMembers"
             navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
-           <StatCard
+          <StatCard
             title="Neglected Tasks"
             value={stats?.neglectedCount || 0}
             icon="timer-off"
@@ -780,7 +783,7 @@ const MemberCard = ({ member }: { member: any }) => (
           </>
         )}
 
-        {/* ===== FIXED: Changed from "Team Members" to "Group Members" ===== */}
+        {/* Group Members */}
         <Text style={styles.sectionTitle}>Group Members</Text>
         {members.map(member => (
           <MemberCard key={member.id} member={member} />
@@ -846,6 +849,27 @@ const MemberCard = ({ member }: { member: any }) => (
             >
               <MaterialCommunityIcons name="calendar-sync" size={24} color="white" />
               <Text style={styles.actionText}>Rotation</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* ✅ NEW: Swap Approvals Button */}
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => navigation.navigate('AdminSwapApprovals', { groupId, groupName })}
+          >
+            <LinearGradient
+              colors={['#e67700', '#cc5c00']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.actionGradient}
+            >
+              <MaterialCommunityIcons name="swap-horizontal" size={24} color="white" />
+              <Text style={styles.actionText}>Swap Approvals</Text>
+              {pendingSwapCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{pendingSwapCount}</Text>
+                </View>
+              )}
             </LinearGradient>
           </TouchableOpacity>
         </View>

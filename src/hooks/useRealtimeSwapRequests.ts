@@ -1,7 +1,8 @@
-// hooks/useRealtimeSwapRequests.ts - UPDATED with TokenUtils
+// hooks/useRealtimeSwapRequests.ts - UPDATED with admin approval events
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 
 interface RealtimeSwapState {
   swapRequested: any | null;
@@ -11,6 +12,10 @@ interface RealtimeSwapState {
   swapRejected: any | null;
   swapCancelled: any | null;
   swapExpired: any | null;
+  // ✅ NEW: Admin approval events
+  swapPendingApproval: any | null;
+  swapAdminAction: any | null;
+  swapReadyForAcceptance: any | null;
 }
 
 export function useRealtimeSwapRequests(groupId: string, userId: string) {
@@ -24,13 +29,15 @@ export function useRealtimeSwapRequests(groupId: string, userId: string) {
     swapAccepted: null,
     swapRejected: null,
     swapCancelled: null,
-    swapExpired: null
+    swapExpired: null,
+    swapPendingApproval: null,
+    swapAdminAction: null,
+    swapReadyForAcceptance: null
   });
   
   const { on, off, isConnected } = useSocket();
   const mountedRef = useRef(true);
 
-  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -70,6 +77,19 @@ export function useRealtimeSwapRequests(groupId: string, userId: string) {
     setEvents(prev => ({ ...prev, swapExpired: null }));
   }, []);
 
+  // ✅ NEW: Clear admin approval events
+  const clearSwapPendingApproval = useCallback(() => {
+    setEvents(prev => ({ ...prev, swapPendingApproval: null }));
+  }, []);
+
+  const clearSwapAdminAction = useCallback(() => {
+    setEvents(prev => ({ ...prev, swapAdminAction: null }));
+  }, []);
+
+  const clearSwapReadyForAcceptance = useCallback(() => {
+    setEvents(prev => ({ ...prev, swapReadyForAcceptance: null }));
+  }, []);
+
   const clearAll = useCallback(() => {
     setEvents({
       swapRequested: null,
@@ -78,7 +98,10 @@ export function useRealtimeSwapRequests(groupId: string, userId: string) {
       swapAccepted: null,
       swapRejected: null,
       swapCancelled: null,
-      swapExpired: null
+      swapExpired: null,
+      swapPendingApproval: null,
+      swapAdminAction: null,
+      swapReadyForAcceptance: null
     });
   }, []);
 
@@ -153,6 +176,30 @@ export function useRealtimeSwapRequests(groupId: string, userId: string) {
           }
         });
 
+        // ✅ NEW: Swap pending approval (for admins)
+        on('swap:pending:approval', (data: any) => {
+          if (data.groupId === groupId && mounted) {
+            console.log('📢 Real-time: Swap pending approval', data);
+            setEvents(prev => ({ ...prev, swapPendingApproval: data }));
+          }
+        });
+
+        // ✅ NEW: Swap admin action (approve/reject)
+        on('swap:admin:action', (data: any) => {
+          if ((data.requesterId === userId || data.groupId === groupId) && mounted) {
+            console.log('📢 Real-time: Swap admin action', data);
+            setEvents(prev => ({ ...prev, swapAdminAction: data }));
+          }
+        });
+
+        // ✅ NEW: Swap ready for acceptance
+        on('swap:ready:accept', (data: any) => {
+          if ((data.requesterId === userId || data.groupId === groupId) && mounted) {
+            console.log('📢 Real-time: Swap ready for acceptance', data);
+            setEvents(prev => ({ ...prev, swapReadyForAcceptance: data }));
+          }
+        });
+
       } catch (err: any) {
         if (mounted) {
           setError(err.message || 'Failed to setup real-time listeners');
@@ -176,6 +223,9 @@ export function useRealtimeSwapRequests(groupId: string, userId: string) {
       off('swap:rejected');
       off('swap:cancelled');
       off('swap:expired');
+      off('swap:pending:approval');
+      off('swap:admin:action');
+      off('swap:ready:accept');
     };
   }, [groupId, userId, isConnected, checkToken, on, off]);
 
@@ -195,6 +245,9 @@ export function useRealtimeSwapRequests(groupId: string, userId: string) {
     clearSwapRejected,
     clearSwapCancelled,
     clearSwapExpired,
+    clearSwapPendingApproval,
+    clearSwapAdminAction,
+    clearSwapReadyForAcceptance,
     clearAll
   };
 }

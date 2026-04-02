@@ -32,13 +32,14 @@ import HelpSupportScreen from '../screens/HelpSupportScreen';
 import AccountSettingsScreen from '../screens/AccountSettingsScreen';
 import { NeglectedTasksScreen } from '../screens/NeglectedTasksScreen'; 
 import { TeamOverviewScreen } from '../screens/TeamOverviewScreen';  
-import TaskDraftsScreen from '../screens/TaskDraftsScreen'; // ✅ ADD THIS
+import TaskDraftsScreen from '../screens/TaskDraftsScreen';
 
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
 import { MySwapRequestsScreen } from '../screens/MySwapRequestScreen';
 import { CreateSwapRequestScreen } from '../screens/CreateSwapRequestScreen';
 import { SwapRequestDetailsScreen } from '../screens/SwapRequestDetailsScreen';
+import { AdminSwapApprovalsScreen } from '../screens/AdminSwapApprovalsScreen'; // ✅ ADD THIS
 
 // Import Dashboard Screens
 import { AdminDashboardScreen } from '../screens/AdminDashboardScreen';
@@ -130,7 +131,6 @@ export default function AppNavigator() {
         }}
       />
       
-      {/* ✅ ADD TASK DRAFTS SCREEN */}
       <Stack.Screen 
         name="TaskDrafts" 
         component={TaskDraftsScreen}
@@ -157,7 +157,8 @@ export default function AppNavigator() {
         }}
       /> 
 
-      <Stack.Screen name="TeamOverview"
+      <Stack.Screen 
+        name="TeamOverview"
         component={TeamOverviewScreen}
         options={{ headerShown: false }}
       />
@@ -264,6 +265,13 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
 
+      {/* ✅ Admin Swap Approvals Screen */}
+      <Stack.Screen
+        name="AdminSwapApprovals"
+        component={AdminSwapApprovalsScreen}
+        options={{ headerShown: false }}
+      />
+
       {/* Statistics & Leaderboard */}
       <Stack.Screen 
         name="DetailedStatistics" 
@@ -280,19 +288,19 @@ export default function AppNavigator() {
       <Stack.Screen 
         name="Feedback" 
         component={FeedbackScreen} 
-        options={{headerShown:false}} 
+        options={{headerShown: false}} 
       />
 
       <Stack.Screen 
         name="FeedbackDetails" 
         component={FeedbackDetailsScreen}
-        options={{headerShown:false}} 
+        options={{headerShown: false}} 
       />
      
       <Stack.Screen 
         name="Notifications"
         component={NotificationsScreen}
-        options={{headerShown:false}} 
+        options={{headerShown: false}} 
       />
 
       <Stack.Screen 

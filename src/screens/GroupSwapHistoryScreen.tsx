@@ -1,4 +1,5 @@
-// src/screens/GroupSwapHistoryScreen.tsx - UPDATED with TokenUtils
+// src/screens/GroupSwapHistoryScreen.tsx - UPDATED with navigation to approvals
+
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
@@ -17,7 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import * as SecureStore from 'expo-secure-store';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 
@@ -35,25 +36,27 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const limit = 20;
    
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
 
-  // ===== GET USER ID ON MOUNT =====
+  // ===== GET USER ID AND ROLE ON MOUNT =====
   useEffect(() => {
-    const getUserId = async () => {
+    const getUserData = async () => {
       try {
-        const userStr = await SecureStore.getItemAsync('user');
-        if (userStr) {
-          const user = JSON.parse(userStr);
+        const user = await TokenUtils.getUser();
+        if (user) {
           setCurrentUserId(user.id);
+          setUserRole(user.role);
+          console.log('✅ User role:', user.role);
         }
       } catch (error) {
-        console.error('Error getting user ID:', error);
+        console.error('Error getting user data:', error);
       }
     };
-    getUserId();
+    getUserData();
     
     return () => {
       isMounted.current = false;
@@ -70,7 +73,9 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
         swapEvents.swapAccepted ||
         swapEvents.swapRejected ||
         swapEvents.swapCancelled ||
-        swapEvents.swapExpired) {
+        swapEvents.swapExpired ||
+        swapEvents.swapPendingApproval ||
+        swapEvents.swapAdminAction) {
       console.log('🔄 Swap event detected, refreshing group swap history...');
       refreshRequests();
     }
@@ -80,7 +85,9 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
     swapEvents.swapAccepted,
     swapEvents.swapRejected,
     swapEvents.swapCancelled,
-    swapEvents.swapExpired
+    swapEvents.swapExpired,
+    swapEvents.swapPendingApproval,
+    swapEvents.swapAdminAction
   ]);
 
   // Listen for notifications
@@ -92,7 +99,10 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
         'SWAP_REJECTED',
         'SWAP_CANCELLED',
         'SWAP_EXPIRED',
-        'SWAP_ADMIN_NOTIFICATION'
+        'SWAP_ADMIN_NOTIFICATION',
+        'SWAP_PENDING_APPROVAL',
+        'SWAP_ADMIN_APPROVED',
+        'SWAP_ADMIN_REJECTED'
       ].includes(notification.type)) {
         console.log(`🔔 Swap notification ${notification.type} received, refreshing...`);
         refreshRequests();
@@ -109,7 +119,7 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
     }, [activeFilter, groupId])
   );
 
-  // ===== UPDATED: Use TokenUtils.checkToken() =====
+  // ===== TOKEN CHECK =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -139,74 +149,73 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
     }
   }, [authError, navigation]);
 
-  // Add this after your state declarations
-useEffect(() => {
-  if (initialLoadDone.current) {
-    console.log(`🎯 Filter changed to: ${activeFilter}, reloading...`);
-    loadRequests(true);
-  }
-}, [activeFilter]);
-
-// Update loadRequests to use the current activeFilter
-const loadRequests = useCallback(async (resetPage = true) => {
-  const hasToken = await checkToken();
-  if (!hasToken) {
-    setLoading(false);
-    setRefreshing(false);
-    return;
-  }
-
-  if (resetPage) {
-    setPage(0);
-    if (!initialLoadDone.current) {
-      setLoading(true);
+  // Filter changed handler
+  useEffect(() => {
+    if (initialLoadDone.current) {
+      console.log(`🎯 Filter changed to: ${activeFilter}, reloading...`);
+      loadRequests(true);
     }
-  }
-  setError(null);
+  }, [activeFilter]);
 
-  try {
-    // ✅ Use the current activeFilter
-    const statusParam = activeFilter === 'ALL' ? undefined : activeFilter;
-    
-    console.log(`📥 Loading group swap history for group: ${groupId}, filter: ${statusParam || 'ALL'}, page: ${resetPage ? 0 : page}`);
-    
-    const result = await SwapRequestService.getGroupSwapRequests(groupId, {
-      status: statusParam,
-      limit,
-      offset: resetPage ? 0 : page * limit
-    });
-    
-    console.log('🔍 API Response:', JSON.stringify(result, null, 2));
-    
-    if (result.success && isMounted.current) {
-      const newRequests = result.data?.requests || [];
-      const totalCount = result.data?.total || newRequests.length;
-      
-      console.log(`✅ Received ${newRequests.length} requests (filtered by: ${statusParam || 'ALL'})`);
-      console.log(`✅ Request statuses:`, newRequests.map((r: any) => r.status));
-      
-      if (resetPage) {
-        setRequests(newRequests);
-      } else {
-        setRequests(prev => [...prev, ...newRequests]);
-      }
-      setTotal(totalCount);
-      initialLoadDone.current = true;
-    } else if (isMounted.current) {
-      setError(result.message || 'Failed to load swap history');
-    }
-  } catch (err: any) {
-    console.error('❌ Error loading group swap history:', err);
-    if (isMounted.current) {
-      setError(err.message || 'Failed to load swap history');
-    }
-  } finally {
-    if (isMounted.current) {
+  // Load requests with current filter
+  const loadRequests = useCallback(async (resetPage = true) => {
+    const hasToken = await checkToken();
+    if (!hasToken) {
       setLoading(false);
       setRefreshing(false);
+      return;
     }
-  }
-}, [groupId, activeFilter, checkToken, limit]); // ← Add activeFilter to dependencies
+
+    if (resetPage) {
+      setPage(0);
+      if (!initialLoadDone.current) {
+        setLoading(true);
+      }
+    }
+    setError(null);
+
+    try {
+      const statusParam = activeFilter === 'ALL' ? undefined : activeFilter;
+      
+      console.log(`📥 Loading group swap history for group: ${groupId}, filter: ${statusParam || 'ALL'}, page: ${resetPage ? 0 : page}`);
+      
+      const result = await SwapRequestService.getGroupSwapRequests(groupId, {
+        status: statusParam,
+        limit,
+        offset: resetPage ? 0 : page * limit
+      });
+      
+      console.log('🔍 API Response:', JSON.stringify(result, null, 2));
+      
+      if (result.success && isMounted.current) {
+        const newRequests = result.data?.requests || [];
+        const totalCount = result.data?.total || newRequests.length;
+        
+        console.log(`✅ Received ${newRequests.length} requests (filtered by: ${statusParam || 'ALL'})`);
+        console.log(`✅ Request statuses:`, newRequests.map((r: any) => r.status));
+        
+        if (resetPage) {
+          setRequests(newRequests);
+        } else {
+          setRequests(prev => [...prev, ...newRequests]);
+        }
+        setTotal(totalCount);
+        initialLoadDone.current = true;
+      } else if (isMounted.current) {
+        setError(result.message || 'Failed to load swap history');
+      }
+    } catch (err: any) {
+      console.error('❌ Error loading group swap history:', err);
+      if (isMounted.current) {
+        setError(err.message || 'Failed to load swap history');
+      }
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, [groupId, activeFilter, checkToken, limit]);
 
   const refreshRequests = useCallback(() => {
     setRefreshing(true);
@@ -223,6 +232,11 @@ const loadRequests = useCallback(async (resetPage = true) => {
       setPage(nextPage);
       loadRequests(false);
     }
+  };
+
+  // ✅ Navigate to Admin Swap Approvals
+  const handleGoToApprovals = () => {
+    navigation.navigate('AdminSwapApprovals', { groupId, groupName });
   };
 
   const renderFilterButton = (filter: FilterStatus, label: string) => (
@@ -257,6 +271,9 @@ const loadRequests = useCallback(async (resetPage = true) => {
     const statusLabel = SwapRequestService.getStatusLabel(item.status);
     const statusIcon = SwapRequestService.getStatusIcon(item.status);
     
+    // ✅ Check if this request is pending admin approval
+    const isPendingAdminApproval = item.requiresAdminApproval && item.adminApproved === null;
+    
     return (
       <TouchableOpacity
         style={styles.requestCard}
@@ -283,6 +300,19 @@ const loadRequests = useCallback(async (resetPage = true) => {
         <Text style={styles.taskTitle} numberOfLines={1}>
           {item.assignment?.task?.title || 'Task'}
         </Text>
+
+        {/* ✅ Show admin approval status badge if pending */}
+        {isPendingAdminApproval && (
+          <LinearGradient
+            colors={['#fff3bf', '#ffec99']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.adminPendingBadge}
+          >
+            <MaterialCommunityIcons name="clock-outline" size={12} color="#e67700" />
+            <Text style={styles.adminPendingText}>Awaiting Admin Approval</Text>
+          </LinearGradient>
+        )}
 
         <View style={styles.peopleRow}>
           <View style={styles.person}>
@@ -323,6 +353,9 @@ const loadRequests = useCallback(async (resetPage = true) => {
       </TouchableOpacity>
     );
   };
+
+  // Check if user is admin
+  const isAdmin = userRole === 'ADMIN';
 
   if (loading && !refreshing) {
     return (
@@ -388,6 +421,29 @@ const loadRequests = useCallback(async (resetPage = true) => {
           <MaterialCommunityIcons name="filter" size={20} color="#2b8a3e" />
         </TouchableOpacity>
       </View>
+
+      {/* ✅ Admin Banner with button to approvals */}
+      {isAdmin && (
+        <TouchableOpacity onPress={handleGoToApprovals} activeOpacity={0.9}>
+          <LinearGradient
+            colors={['#e8f5e9', '#c8e6c9']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.adminBanner}
+          >
+            <View style={styles.adminBannerContent}>
+              <MaterialCommunityIcons name="swap-horizontal" size={22} color="#2b8a3e" />
+              <View style={styles.adminBannerTextContainer}>
+                <Text style={styles.adminBannerTitle}>Pending Approvals</Text>
+                <Text style={styles.adminBannerSubtitle}>
+                  Review and manage swap requests that need your approval
+                </Text>
+              </View>
+            </View>
+            <MaterialCommunityIcons name="chevron-right" size={24} color="#2b8a3e" />
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
 
       {/* Filter Tabs */}
       <View style={styles.filterContainer}>
@@ -512,6 +568,54 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+  },
+  // ✅ Admin banner styles
+  adminBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#b2f2bb',
+  },
+  adminBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  adminBannerTextContainer: {
+    flex: 1,
+  },
+  adminBannerTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2b8a3e',
+  },
+  adminBannerSubtitle: {
+    fontSize: 12,
+    color: '#495057',
+    marginTop: 2,
+  },
+  adminPendingBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    gap: 4,
+  },
+  adminPendingText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#e67700',
   },
   filterContainer: {
     paddingVertical: 12,

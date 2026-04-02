@@ -621,16 +621,39 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     });
   };
 
-  const handleViewAssignmentDetails = (assignment?: any) => {
-    const assignmentId = assignment?.id || task?.userAssignment?.id;
-    if (!assignmentId) return;
-    
+const handleViewAssignmentDetails = (assignment?: any) => {
+  const assignmentId = assignment?.id || task?.userAssignment?.id;
+  if (!assignmentId) return;
+
+  // If no assignment passed, it's the current user's own assignment — always allow
+  if (!assignment) {
     navigation.navigate('AssignmentDetails', {
       assignmentId,
       isAdmin: isAdmin,
       onVerified: fetchTaskDetails
     });
-  };
+    return;
+  }
+
+  // ✅ Block members from tapping other people's pending assignments
+  const isOwner = assignment.userId === currentUserId;
+  const isCompleted = assignment.completed === true;
+
+  if (!isAdmin && !isOwner && !isCompleted) {
+    Alert.alert(
+      'Access Restricted',
+      'You can only view your own pending assignments.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+
+  navigation.navigate('AssignmentDetails', {
+    assignmentId,
+    isAdmin: isAdmin,
+    onVerified: fetchTaskDetails
+  });
+};
 
   const renderHeader = () => {
     const assigned = isTaskAssigned();

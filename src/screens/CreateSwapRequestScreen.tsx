@@ -213,77 +213,97 @@ export const CreateSwapRequestScreen = () => {
   };
 
   // Filter eligible members based on swap scope
-  const filterEligibleMembers = async () => {
-    if (allMembers.length === 0) return;
+const filterEligibleMembers = async () => {
+  if (allMembers.length === 0) return;
+  
+  setLoadingMembers(true);
+  
+  // Filter out current user and admins
+  const eligibleBaseMembers = allMembers.filter(m => 
+    m.userId !== currentUserId && 
+    m.role !== 'ADMIN' &&
+    m.inRotation === true
+  );
+  
+  try {
+    let eligible: any[] = [];
     
-    setLoadingMembers(true);
-    
-    // Filter out current user and admins
-    const eligibleBaseMembers = allMembers.filter(m => 
-      m.userId !== currentUserId && 
-      m.role !== 'ADMIN' &&
-      m.inRotation === true
-    );
-    
-    try {
-      let eligible: any[] = [];
+    if (swapScope === 'day' && selectedDay) {
+      // DAY SWAP: ONLY members who:
+      // 1. Have ANY tasks this week (are assigned to something)
+      // 2. Are FREE on the specific day
+      console.log(`🔍 Filtering for DAY swap on ${selectedDay}`);
+      console.log(`   Only showing members who are assigned (have tasks) but free on ${selectedDay}`);
       
-      if (swapScope === 'day' && selectedDay) {
-        // DAY SWAP: ONLY members who have NO task on this specific day
-        console.log(`🔍 Filtering for DAY swap on ${selectedDay}`);
+      for (const member of eligibleBaseMembers) {
+        // First check: Does this member have ANY tasks this week?
+        const hasAnyAssignment = await checkMemberHasAnyAssignmentThisWeek(
+          member.userId || member.id,
+          currentWeek
+        );
         
-        for (const member of eligibleBaseMembers) {
-          const hasAssignmentOnDay = await checkMemberHasAssignmentOnDay(
-            member.userId || member.id,
-            selectedDay,
-            currentWeek
-          );
-          
-          // ONLY eligible if they have NO assignment on this day (FREE to receive)
-          if (!hasAssignmentOnDay) {
-            eligible.push(member);
-            console.log(`   ✅ ${member.fullName} is eligible (free on ${selectedDay})`);
-          } else {
-            console.log(`   ❌ ${member.fullName} is NOT eligible (already has task on ${selectedDay})`);
-          }
+        // If they have NO tasks at all, skip them (unassigned members)
+        if (!hasAnyAssignment) {
+          console.log(`   ❌ ${member.fullName} is NOT eligible (no tasks at all this week - unassigned)`);
+          continue;
         }
         
-        setEligibleCount(eligible.length);
-        console.log(`✅ Found ${eligible.length} eligible members for day swap on ${selectedDay}`);
+        // Second check: Does this member have a task on the specific day?
+        const hasAssignmentOnDay = await checkMemberHasAssignmentOnDay(
+          member.userId || member.id,
+          selectedDay,
+          currentWeek
+        );
         
-      } else if (swapScope === 'week') {
-        // WEEK SWAP: ONLY members who HAVE assignments this week (for exchange)
-        console.log(`🔍 Filtering for WEEK swap - checking members WITH assignments this week`);
-        
-        for (const member of eligibleBaseMembers) {
-          const hasAnyAssignment = await checkMemberHasAnyAssignmentThisWeek(
-            member.userId || member.id,
-            currentWeek
-          );
-          
-          // ONLY eligible if they HAVE assignments this week (for fair exchange)
-          if (hasAnyAssignment) {
-            eligible.push(member);
-            console.log(`   ✅ ${member.fullName} is eligible (has tasks to exchange)`);
-          } else {
-            console.log(`   ❌ ${member.fullName} is NOT eligible (no tasks to exchange)`);
-          }
+        // Eligible if they HAVE tasks this week BUT are FREE on this specific day
+        if (!hasAssignmentOnDay) {
+          eligible.push(member);
+          console.log(`   ✅ ${member.fullName} is eligible (has tasks, but free on ${selectedDay})`);
+        } else {
+          console.log(`   ❌ ${member.fullName} is NOT eligible (has tasks AND has task on ${selectedDay})`);
         }
-        
-        setEligibleCount(eligible.length);
-        console.log(`✅ Found ${eligible.length} eligible members for week swap`);
       }
       
-      setMembers(eligible);
+      setEligibleCount(eligible.length);
+      console.log(`✅ Found ${eligible.length} eligible members for day swap on ${selectedDay}`);
       
-    } catch (error) {
-      console.error('Error filtering members:', error);
-      setMembers(eligibleBaseMembers);
-      setEligibleCount(eligibleBaseMembers.length);
-    } finally {
-      setLoadingMembers(false);
+    } else if (swapScope === 'week') {
+      // WEEK SWAP: ONLY members who HAVE assignments this week (for exchange)
+      console.log(`🔍 Filtering for WEEK swap`);
+      
+      for (const member of eligibleBaseMembers) {
+        const hasAnyAssignment = await checkMemberHasAnyAssignmentThisWeek(
+          member.userId || member.id,
+          currentWeek
+        );
+        
+        // ONLY eligible if they HAVE assignments this week (for fair exchange)
+        if (hasAnyAssignment) {
+          eligible.push(member);
+          console.log(`   ✅ ${member.fullName} is eligible (has tasks to exchange)`);
+        } else {
+          console.log(`   ❌ ${member.fullName} is NOT eligible (no tasks to exchange - unassigned)`);
+        }
+      }
+      
+      setEligibleCount(eligible.length);
+      console.log(`✅ Found ${eligible.length} eligible members for week swap`);
     }
-  };
+    
+    setMembers(eligible);
+    
+    if (eligible.length === 0) {
+      console.log(`⚠️ No eligible members found for ${swapScope} swap`);
+    }
+    
+  } catch (error) {
+    console.error('Error filtering members:', error);
+    setMembers(eligibleBaseMembers);
+    setEligibleCount(eligibleBaseMembers.length);
+  } finally {
+    setLoadingMembers(false);
+  }
+};
 
   const checkSwapAvailability = async () => {
     setChecking(true);
@@ -892,7 +912,7 @@ export const CreateSwapRequestScreen = () => {
         )}
       </KeyboardAvoidingView>
     </ScreenWrapper>
-  );
+  ); 
 };
 
 export default CreateSwapRequestScreen;

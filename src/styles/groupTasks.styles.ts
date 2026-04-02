@@ -72,7 +72,7 @@ export const styles = StyleSheet.create({
     color: '#868e96',
   },
   headerRight: {
-    flexDirection: 'row',
+    flexDirection: 'row', 
     alignItems: 'center',
     gap: 8,
     width: 80,
@@ -83,6 +83,11 @@ export const styles = StyleSheet.create({
   alignItems: 'center',
   gap: 6,
   marginBottom: 4,
+},
+// ✅ ADD THIS - Disabled task card style for non-clickable tasks
+disabledTaskCard: {
+  opacity: 0.6,
+  backgroundColor: '#f8f9fa',
 },
 draftsButton: {
   padding: 8,

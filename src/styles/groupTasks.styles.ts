@@ -84,6 +84,9 @@ export const styles = StyleSheet.create({
   gap: 6,
   marginBottom: 4,
 },
+draftsButton: {
+  padding: 8,
+},
   swapButton: {
     position: 'relative',
     padding: 8,

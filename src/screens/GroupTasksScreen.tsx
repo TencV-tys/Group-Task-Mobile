@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from 'expo-secure-store';
+import { TaskDraftService } from '../services/TaskDraftService';
 
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
@@ -650,6 +651,10 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
     }
   };
 
+     const handleViewDrafts = () => {
+  navigation.navigate('TaskDrafts', { groupId, groupName });
+};
+
   // ===== RENDER FUNCTIONS =====
   const renderAssignmentInfo = (task: any) => {
     const hasAssignment = task.userAssignment || task.assignments?.length > 0;
@@ -703,6 +708,7 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
         </View>
       );
     }
+ 
 
     const getIcon = () => {
       if (isCompleted) return "check-circle";
@@ -847,6 +853,9 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
         )}
       </View>
       <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.draftsButton} onPress={handleViewDrafts}>
+    <MaterialCommunityIcons name="file-document-outline" size={22} color="#2b8a3e" />
+  </TouchableOpacity>
         {!isAdmin && (
           <TouchableOpacity style={styles.swapButton} onPress={handleNavigateToSwapRequests}>
             <MaterialCommunityIcons name="swap-horizontal" size={22} color="#2b8a3e" />
@@ -855,7 +864,7 @@ const analyzeTaskCreationDays = useCallback((taskList: any[]) => {
                 <Text style={styles.swapBadgeText}>{totalPendingForMe}</Text>
               </View>
             )}
-          </TouchableOpacity>
+          </TouchableOpacity> 
         )}
         <TouchableOpacity style={styles.settingsButton} onPress={() => setShowSettingsModal(true)}>
           <MaterialCommunityIcons name="cog" size={22} color="#2b8a3e" />

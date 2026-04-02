@@ -30,8 +30,9 @@ import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import HelpSupportScreen from '../screens/HelpSupportScreen';
 import AccountSettingsScreen from '../screens/AccountSettingsScreen';
-import { NeglectedTasksScreen } from '../screens/NeglectedTasksScreen';
-import { TeamOverviewScreen } from '../screens/TeamOverviewScreen';
+import { NeglectedTasksScreen } from '../screens/NeglectedTasksScreen'; 
+import { TeamOverviewScreen } from '../screens/TeamOverviewScreen';  
+import TaskDraftsScreen from '../screens/TaskDraftsScreen'; // ✅ ADD THIS
 
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
@@ -129,6 +130,16 @@ export default function AppNavigator() {
         }}
       />
       
+      {/* ✅ ADD TASK DRAFTS SCREEN */}
+      <Stack.Screen 
+        name="TaskDrafts" 
+        component={TaskDraftsScreen}
+        options={{ 
+          headerShown: false,
+          title: 'Task Drafts'
+        }}
+      />
+      
       <Stack.Screen 
         name="UpdateTask" 
         component={UpdateTaskScreen}
@@ -146,10 +157,10 @@ export default function AppNavigator() {
         }}
       /> 
 
-<Stack.Screen name="TeamOverview"
- component={TeamOverviewScreen}
-    options={{ headerShown: false }}
- />
+      <Stack.Screen name="TeamOverview"
+        component={TeamOverviewScreen}
+        options={{ headerShown: false }}
+      />
 
       <Stack.Screen 
         name="AccountSettings" 
@@ -209,7 +220,7 @@ export default function AppNavigator() {
         options={{ headerShown: false }}
       />
 
-      {/* ===== NEW: Dashboard Screens ===== */}
+      {/* Dashboard Screens */}
       <Stack.Screen
         name="AdminDashboard"
         component={AdminDashboardScreen}
@@ -315,10 +326,10 @@ export default function AppNavigator() {
       />
 
       <Stack.Screen
-  name="NeglectedTasks"
-  component={NeglectedTasksScreen}
-  options={{ headerShown: false }}
-/>
+        name="NeglectedTasks"
+        component={NeglectedTasksScreen}
+        options={{ headerShown: false }}
+      />
     </Stack.Navigator> 
   );
 }

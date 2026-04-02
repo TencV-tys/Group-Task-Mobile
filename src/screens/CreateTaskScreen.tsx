@@ -1,10 +1,10 @@
+// src/screens/CreateTaskScreen.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
   ScrollView,
   Alert,
   ActivityIndicator,
@@ -14,408 +14,403 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+
+import { createTaskStyles as styles } from '../styles/createTask.styles';
 import { useCreateTask } from '../taskHook/useCreateTask';
 import { useRotationStatus } from '../hooks/useRotationStatus';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TimeSlotModal } from '../components/TimeSlotModal';
-import { DAY_OF_WEEK_OPTIONS, formatTimeDisplay } from '../utils/timeUtils';
+import { DAY_OF_WEEK_OPTIONS } from '../utils/timeUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { TaskDraftService } from '../services/TaskDraftService';
 
-// Helper function to convert time to minutes
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+type Category = 'Work' | 'Study' | 'Chores' | '';
+
+const CATEGORIES: { value: Category; icon: string }[] = [
+  { value: 'Work',   icon: 'briefcase-outline' },
+  { value: 'Study',  icon: 'book-open-outline' },
+  { value: 'Chores', icon: 'broom' },
+];
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
 const convertTimeToMinutes = (time: string): number => {
-  const [hours, minutes] = time.split(':').map(Number);
-  return hours * 60 + (minutes || 0);
+  const [h, m] = time.split(':').map(Number);
+  return h * 60 + (m || 0);
 };
 
-// Helper to format time for display
 const formatTimeForDisplay = (time: string): string => {
-  const [hours, minutes] = time.split(':').map(Number);
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const displayHour = hours % 12 || 12;
-  return `${displayHour}:${minutes.toString().padStart(2, '0')} ${period}`;
+  const [h, m] = time.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const display = h % 12 || 12;
+  return `${display}:${m.toString().padStart(2, '0')} ${period}`;
 };
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface TimeSlot {
+  id?: string;
+  startTime: string;
+  endTime: string;
+  label?: string;
+  points?: string;
+}
+
+interface FormState {
+  title: string;
+  description: string;
+  points: string;
+  executionFrequency: 'DAILY' | 'WEEKLY';
+  selectedDays: string[];
+  dayOfWeek: string;
+  isRecurring: boolean;
+  category: Category;
+  timeSlots: TimeSlot[];
+}
+
+const DEFAULT_FORM: FormState = {
+  title: '',
+  description: '',
+  points: '1',
+  executionFrequency: 'WEEKLY',
+  selectedDays: [],
+  dayOfWeek: '',
+  isRecurring: true,
+  category: '',
+  timeSlots: [],
+};
+
+// ─── Screen ─────────────────────────────────────────────────────────────────
 
 export default function CreateTaskScreen({ navigation, route }: any) {
-  const { groupId, groupName } = route.params || {};
+  const { groupId, groupName, draftData, isEditingDraft, createFromDraft } = route.params || {};
   const { loading, error, success, createTask, reset, authError } = useCreateTask();
   const { status, checkStatus, getTaskRecommendation } = useRotationStatus(groupId);
-  
+
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const [form, setForm] = useState<FormState>(DEFAULT_FORM);
   const [showTimeSlotModal, setShowTimeSlotModal] = useState(false);
   const [editingSlotIndex, setEditingSlotIndex] = useState<number | null>(null);
-  const [editingSlot, setEditingSlot] = useState<any>(null);
+  const [editingSlot, setEditingSlot] = useState<TimeSlot | null>(null);
   const [modalInitialTime, setModalInitialTime] = useState<{
     startTime: { hour: string; minute: string; period: string };
     endTime: { hour: string; minute: string; period: string };
   } | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
 
-  const [form, setForm] = useState({
-    title: '',
-    description: '',
-    points: '1',
-    executionFrequency: 'WEEKLY' as 'DAILY' | 'WEEKLY',
-    selectedDays: [] as string[],
-    dayOfWeek: '',
-    isRecurring: true,
-    category: '',
-    timeSlots: [] as Array<{ 
-      id?: string;
-      startTime: string; 
-      endTime: string; 
-      label?: string;
-      points?: string;
-    }>,
-  });
+  // ─── Points derived state ────────────────────────────────────────────────
+
+  const totalPoints = parseInt(form.points, 10) || 0;
+  const usedPoints = form.timeSlots.reduce(
+    (sum, s) => sum + (parseInt(s.points || '0', 10) || 0),
+    0,
+  );
+  const remainingPoints = totalPoints - usedPoints;
+  const canAddMoreSlots = remainingPoints > 0 && form.timeSlots.length < 10;
+
+  // ─── Effects ─────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    if (draftData && (isEditingDraft || createFromDraft)) {
+      setForm({
+        title: draftData.title,
+        description: draftData.description || '',
+        points: draftData.points.toString(),
+        executionFrequency: draftData.executionFrequency,
+        selectedDays: draftData.selectedDays || [],
+        dayOfWeek: '',
+        isRecurring: draftData.isRecurring,
+        category: (draftData.category as Category) || '',
+        timeSlots: draftData.timeSlots.map((s: any) => ({
+          ...s,
+          points: s.points?.toString() || '',
+        })),
+      });
+      setCurrentDraftId(draftData.id);
+
+      if (createFromDraft) {
+        Alert.alert(
+          'Draft Loaded',
+          'Edit and create this task. Keep the draft afterwards?',
+          [
+            { text: 'Keep Draft', style: 'cancel' },
+            {
+              text: 'Delete Draft',
+              onPress: async () => {
+                await TaskDraftService.deleteDraft(draftData.id);
+                setCurrentDraftId(null);
+              },
+            },
+          ],
+        );
+      }
+    }
+  }, [draftData, isEditingDraft, createFromDraft]);
 
   useEffect(() => {
     if (authError) {
-      Alert.alert(
-        'Session Expired',
-        'Please log in again',
-        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-      );
+      Alert.alert('Session Expired', 'Please log in again', [
+        { text: 'OK', onPress: () => navigation.navigate('Login') },
+      ]);
     }
   }, [authError]);
 
   useEffect(() => {
-    if (groupId) {
-      checkStatus();
-    }
+    if (groupId) checkStatus();
   }, [groupId]);
 
-  // ✅ Calculate points
-  const totalPoints = parseInt(form.points, 10);
-  const usedPoints = form.timeSlots.reduce((sum, slot) => {
-    return sum + (parseInt(slot.points || '0', 10));
-  }, 0);
-  const remainingPoints = totalPoints - usedPoints;
-  const canAddMoreSlots = remainingPoints > 0 && form.timeSlots.length < 10;
+  // ─── Time slot helpers ───────────────────────────────────────────────────
 
-  // ✅ Auto-detect next available start time based on existing slots
-  const getNextAvailableStartTime = (): { hour: string; minute: string; period: string } => {
-    if (form.timeSlots.length === 0) {
-      return { hour: '8', minute: '00', period: 'AM' };
-    }
-    
-    // Sort slots by start time
-    const sortedSlots = [...form.timeSlots].sort((a, b) => {
-      const timeA = convertTimeToMinutes(a.startTime);
-      const timeB = convertTimeToMinutes(b.startTime);
-      return timeA - timeB;
-    });
-    
-    const lastSlot = sortedSlots[sortedSlots.length - 1];
-    const lastEndTime = lastSlot.endTime;
-    
-    let [hour, minute] = lastEndTime.split(':').map(Number);
-    let period = hour >= 12 ? 'PM' : 'AM';
-    
-    // Add 30 minutes
-    minute += 30;
-    if (minute >= 60) {
-      minute -= 60;
-      hour += 1;
-    }
-    
-    // Handle hour rollover
-    if (hour >= 24) {
-      hour = 0;
-      period = 'AM';
-    }
-    
-    const displayHour = hour % 12 || 12;
-    
-    // Update period if crossing noon/midnight
-    if (hour === 12 && minute === 0) {
-      period = period === 'AM' ? 'PM' : 'AM';
-    } else if (hour > 12) {
-      period = 'PM';
-    }
-    
-    return {
-      hour: displayHour.toString(),
-      minute: minute.toString().padStart(2, '0'),
-      period
-    };
+  const getNextAvailableStartTime = () => {
+    if (form.timeSlots.length === 0) return { hour: '8', minute: '00', period: 'AM' };
+
+    const sorted = [...form.timeSlots].sort(
+      (a, b) => convertTimeToMinutes(a.startTime) - convertTimeToMinutes(b.startTime),
+    );
+    const last = sorted[sorted.length - 1];
+    let [h, m] = last.endTime.split(':').map(Number);
+
+    m += 30;
+    if (m >= 60) { m -= 60; h += 1; }
+    if (h >= 24) { h = 0; }
+
+    const period = h >= 12 ? 'PM' : 'AM';
+    const display = h % 12 || 12;
+    return { hour: display.toString(), minute: m.toString().padStart(2, '0'), period };
   };
 
-  // ✅ Calculate end time from start time (add 1 hour)
   const getEndTimeFromStart = (start: { hour: string; minute: string; period: string }) => {
-    let hour = parseInt(start.hour, 10);
-    let minute = start.minute;
-    let period = start.period;
-    
-    if (start.period === 'AM' && start.hour === '11') {
-      return { hour: '12', minute, period: 'PM' };
-    } else if (start.period === 'PM' && start.hour === '11') {
-      return { hour: '12', minute, period: 'AM' };
-    } else if (start.hour === '12') {
-      return { hour: '1', minute, period };
-    } else {
-      return { hour: (hour + 1).toString(), minute, period };
-    }
+    const h = parseInt(start.hour, 10);
+    if (start.period === 'AM' && start.hour === '11') return { ...start, period: 'PM', hour: '12' };
+    if (start.period === 'PM' && start.hour === '11') return { ...start, period: 'AM', hour: '12' };
+    if (start.hour === '12') return { ...start, hour: '1' };
+    return { ...start, hour: (h + 1).toString() };
   };
 
-  const handleSubmit = async () => {
-    Keyboard.dismiss();
-    
-    if (!groupId) {
-      Alert.alert('Error', 'Group ID is missing');
-      return;
-    }
+  // ─── Handlers ────────────────────────────────────────────────────────────
 
-    if (!form.title.trim()) {
-      Alert.alert('Error', 'Please enter a task title');
-      return;
-    }
+  const updateForm = (patch: Partial<FormState>) =>
+    setForm(prev => ({ ...prev, ...patch }));
 
-    const points = parseInt(form.points, 10);
-    
-    if (isNaN(points) || points < 1) {
-      Alert.alert('Error', 'Total points must be at least 1');
-      return;
-    }
-    
-    if (points > 10) {
-      Alert.alert('Error', 'Total points cannot exceed 10');
-      return;
-    }
-
-    if (usedPoints > points) {
-      Alert.alert('Error', `Time slots points (${usedPoints}) exceed total task points (${points}). Please adjust the points.`);
-      return;
-    }
-
-    if (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) {
-      Alert.alert('Error', 'Daily tasks require at least one time slot');
-      return;
-    }
-
-    if (form.executionFrequency === 'WEEKLY') {
-      if (form.selectedDays.length === 0 && !form.dayOfWeek) {
-        Alert.alert('Error', 'Weekly tasks require at least one day selection');
-        return;
-      }
-    }
-
-    const taskData: any = {
-      title: form.title,
-      description: form.description || undefined,
-      points: points,
-      executionFrequency: form.executionFrequency,
-      timeFormat: '12h',
-      isRecurring: form.isRecurring,
-      category: form.category || undefined,
-      timeSlots: form.timeSlots.length > 0 ? form.timeSlots.map(slot => ({
-        startTime: slot.startTime,
-        endTime: slot.endTime,
-        label: slot.label || undefined,
-        points: slot.points ? parseInt(slot.points, 10) : undefined
-      })) : undefined,
-    };
-
-    if (form.executionFrequency === 'WEEKLY') {
-      if (form.selectedDays.length > 0) {
-        taskData.selectedDays = form.selectedDays;
-      } else if (form.dayOfWeek) {
-        taskData.dayOfWeek = form.dayOfWeek;
-      }
-    }
-
-    const result = await createTask(groupId, taskData);
-    if (result.success) {
-      Alert.alert(
-        'Success!',
-        'Task created successfully',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              reset();
-              setForm({
-                title: '',
-                description: '',
-                points: '1',
-                executionFrequency: 'WEEKLY',
-                selectedDays: [],
-                dayOfWeek: '',
-                isRecurring: true,
-                category: '',
-                timeSlots: [],
-              });
-              if (route.params?.onTaskCreated) {
-                route.params.onTaskCreated(result.task);
-              }
-              navigation.navigate('GroupTasks', {
-                groupId: groupId,
-                groupName: groupName,
-                userRole: 'ADMIN',
-                switchToAllTasks: true,
-                refreshTasks: true
-              });
-            }
-          }
-        ]
-      );
-    }
-  };
-
-  const handleCancel = () => {
-    Keyboard.dismiss();
-    navigation.goBack();
-  };
-
-  const toggleDaySelection = (day: string) => {
-    if (form.selectedDays.includes(day)) {
-      setForm(prev => ({
-        ...prev,
-        selectedDays: prev.selectedDays.filter(d => d !== day)
-      }));
-    } else {
-      setForm(prev => ({
-        ...prev,
-        selectedDays: [...prev.selectedDays, day]
-      }));
-    }
-  };
-
-  const handleFrequencyChange = (frequency: 'DAILY' | 'WEEKLY') => {
-    setForm(prev => ({
-      ...prev,
-      executionFrequency: frequency,
-      selectedDays: frequency === 'DAILY' ? [] : prev.selectedDays,
-      dayOfWeek: frequency === 'DAILY' ? '' : prev.dayOfWeek,
-    }));
-  };
+  const handleFrequencyChange = (executionFrequency: 'DAILY' | 'WEEKLY') =>
+    updateForm({
+      executionFrequency,
+      selectedDays: executionFrequency === 'DAILY' ? [] : form.selectedDays,
+      dayOfWeek: executionFrequency === 'DAILY' ? '' : form.dayOfWeek,
+    });
 
   const handlePointsChange = (text: string) => {
     const num = parseInt(text, 10);
-    if (text === '' || (!isNaN(num) && num >= 1 && num <= 10)) {
-      setForm({ ...form, points: text });
-    }
+    if (text === '' || (!isNaN(num) && num >= 1 && num <= 10)) updateForm({ points: text });
   };
 
-  // ✅ Enhanced handleAddTimeSlot with auto-detection
+  const toggleDaySelection = (day: string) =>
+    updateForm({
+      selectedDays: form.selectedDays.includes(day)
+        ? form.selectedDays.filter(d => d !== day)
+        : [...form.selectedDays, day],
+    });
+
+  const toggleCategory = (cat: Category) =>
+    updateForm({ category: form.category === cat ? '' : cat });
+
   const handleAddTimeSlot = () => {
     if (!canAddMoreSlots) {
       Alert.alert(
         'Cannot Add More Slots',
-        `You have used ${usedPoints} out of ${totalPoints} points. Remaining: ${remainingPoints} points.\n\nAdjust total points or remove existing slots.`,
-        [{ text: 'OK' }]
+        `${usedPoints}/${totalPoints} points used. Remaining: ${remainingPoints}.`,
       );
       return;
     }
-    
-    // Auto-detect next start time
-    const nextStartTime = getNextAvailableStartTime();
-    const nextEndTime = getEndTimeFromStart(nextStartTime);
-    
-    setModalInitialTime({
-      startTime: nextStartTime,
-      endTime: nextEndTime
-    });
-    
+    const start = getNextAvailableStartTime();
+    setModalInitialTime({ startTime: start, endTime: getEndTimeFromStart(start) });
     setEditingSlot(null);
     setEditingSlotIndex(null);
     setShowTimeSlotModal(true);
   };
 
   const handleEditTimeSlot = (index: number) => {
-    const slot = form.timeSlots[index];
-    setEditingSlot(slot);
+    setEditingSlot(form.timeSlots[index]);
     setEditingSlotIndex(index);
     setModalInitialTime(null);
     setShowTimeSlotModal(true);
   };
 
   const handleRemoveTimeSlot = (index: number) => {
-    Alert.alert(
-      'Remove Time Slot',
-      'Are you sure you want to remove this time slot?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            const updatedSlots = [...form.timeSlots];
-            updatedSlots.splice(index, 1);
-            setForm(prev => ({ ...prev, timeSlots: updatedSlots }));
-          }
-        }
-      ]
-    );
+    Alert.alert('Remove Time Slot', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: () => {
+          const slots = [...form.timeSlots];
+          slots.splice(index, 1);
+          updateForm({ timeSlots: slots });
+        },
+      },
+    ]);
   };
 
-  const handleSaveTimeSlot = (slot: { 
-    startTime: string; 
-    endTime: string; 
-    label?: string;
-    points?: string;
-  }) => {
-    // Sort slots by start time after adding/updating
-    let updatedSlots: any[];
-    
+  const handleSaveTimeSlot = (slot: TimeSlot) => {
+    let slots: TimeSlot[];
     if (editingSlotIndex !== null) {
-      updatedSlots = [...form.timeSlots];
-      updatedSlots[editingSlotIndex] = slot;
+      slots = [...form.timeSlots];
+      slots[editingSlotIndex] = slot;
     } else {
-      updatedSlots = [...form.timeSlots, slot];
+      slots = [...form.timeSlots, slot];
     }
-    
-    // Sort by start time
-    updatedSlots.sort((a, b) => {
-      const timeA = convertTimeToMinutes(a.startTime);
-      const timeB = convertTimeToMinutes(b.startTime);
-      return timeA - timeB;
-    });
-    
-    setForm(prev => ({ ...prev, timeSlots: updatedSlots }));
-    
+    slots.sort((a, b) => convertTimeToMinutes(a.startTime) - convertTimeToMinutes(b.startTime));
+    updateForm({ timeSlots: slots });
     setEditingSlot(null);
     setEditingSlotIndex(null);
     setModalInitialTime(null);
     setShowTimeSlotModal(false);
   };
 
-  const hasTimeSlotExceedingLimit = () => {
-    return form.timeSlots.some(slot => {
-      const points = parseInt(slot.points || '0', 10);
-      return points > 10;
-    });
-  };
+  // ─── Validation helpers ──────────────────────────────────────────────────
+
+  const hasSlotExceedingLimit = () =>
+    form.timeSlots.some(s => parseInt(s.points || '0', 10) > 10);
 
   const isPointsWithinLimit = () => {
-    const points = parseInt(form.points, 10);
-    return !isNaN(points) && points >= 1 && points <= 10;
+    const p = parseInt(form.points, 10);
+    return !isNaN(p) && p >= 1 && p <= 10;
   };
 
-  const isSubmitDisabled = () => {
+  const weeklyDaysOk =
+    form.executionFrequency === 'WEEKLY'
+      ? form.selectedDays.length > 0 || !!form.dayOfWeek
+      : true;
+
+  const isSubmitDisabled = () =>
+    !form.title.trim() ||
+    !isPointsWithinLimit() ||
+    usedPoints > totalPoints ||
+    hasSlotExceedingLimit() ||
+    (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
+    !weeklyDaysOk ||
+    loading;
+
+  const isDraftDisabled = () =>
+    !form.title.trim() ||
+    !isPointsWithinLimit() ||
+    usedPoints > totalPoints ||
+    hasSlotExceedingLimit() ||
+    (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
+    !weeklyDaysOk;
+
+  // ─── Submit / Draft ───────────────────────────────────────────────────────
+
+  const buildTaskPayload = () => {
     const points = parseInt(form.points, 10);
-    const isPointsInvalid = isNaN(points) || points < 1 || points > 10;
-    
-    return (
-      !form.title.trim() ||
-      isPointsInvalid ||
-      usedPoints > totalPoints ||
-      hasTimeSlotExceedingLimit() ||
-      (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
-      (form.executionFrequency === 'WEEKLY' && form.selectedDays.length === 0 && !form.dayOfWeek) ||
-      loading
-    );
+    const payload: any = {
+      title: form.title,
+      description: form.description || undefined,
+      points,
+      executionFrequency: form.executionFrequency,
+      timeFormat: '12h',
+      isRecurring: form.isRecurring,
+      category: form.category || undefined,
+      timeSlots: form.timeSlots.length
+        ? form.timeSlots.map(s => ({
+            startTime: s.startTime,
+            endTime: s.endTime,
+            label: s.label || undefined,
+            points: s.points ? parseInt(s.points, 10) : undefined,
+          }))
+        : undefined,
+    };
+    if (form.executionFrequency === 'WEEKLY') {
+      if (form.selectedDays.length > 0) payload.selectedDays = form.selectedDays;
+      else if (form.dayOfWeek) payload.dayOfWeek = form.dayOfWeek;
+    }
+    return payload;
+  };
+
+  const handleSaveAsDraft = async () => {
+    if (!groupId) return Alert.alert('Error', 'Group ID is missing');
+    if (!form.title.trim()) return Alert.alert('Error', 'Please enter a task title');
+    const points = parseInt(form.points, 10);
+    if (isNaN(points) || points < 1 || points > 10)
+      return Alert.alert('Error', 'Points must be between 1 and 10');
+    if (usedPoints > points)
+      return Alert.alert('Error', `Slot points (${usedPoints}) exceed total (${points})`);
+
+    setIsSavingDraft(true);
+    try {
+      const data = {
+        ...buildTaskPayload(),
+        selectedDays: form.executionFrequency === 'WEEKLY' ? form.selectedDays : undefined,
+      };
+      if (currentDraftId) {
+        await TaskDraftService.updateDraft(currentDraftId, data);
+        Alert.alert('Draft Updated', 'Your draft has been updated.');
+      } else {
+        const draft = await TaskDraftService.saveDraft(groupId, groupName, data);
+        setCurrentDraftId(draft.id);
+        Alert.alert('Draft Saved', 'Task saved as draft.', [
+          {
+            text: 'View Drafts',
+            onPress: () => navigation.navigate('TaskDrafts', { groupId, groupName }),
+          },
+          { text: 'Continue Editing', style: 'cancel' },
+        ]);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to save draft');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    Keyboard.dismiss();
+    if (!groupId) return Alert.alert('Error', 'Group ID is missing');
+    if (!form.title.trim()) return Alert.alert('Error', 'Please enter a task title');
+
+    const result = await createTask(groupId, buildTaskPayload());
+    if (result.success) {
+      if (createFromDraft && currentDraftId) {
+        await TaskDraftService.deleteDraft(currentDraftId);
+      }
+      Alert.alert('Success!', 'Task created successfully', [
+        {
+          text: 'OK',
+          onPress: () => {
+            reset();
+            setForm(DEFAULT_FORM);
+            setCurrentDraftId(null);
+            if (route.params?.onTaskCreated) route.params.onTaskCreated(result.task);
+            navigation.navigate('GroupTasks', {
+              groupId,
+              groupName,
+              userRole: 'ADMIN',
+              switchToAllTasks: true,
+              refreshTasks: true,
+            });
+          },
+        },
+      ]);
+    }
   };
 
   const recommendation = getTaskRecommendation();
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <ScreenWrapper style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>
-          Create Task
+          {currentDraftId ? 'Edit Draft' : 'Create Task'}
         </Text>
         <View style={styles.headerSpacer} />
       </View>
@@ -423,7 +418,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <ScrollView
@@ -433,6 +427,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scrollContent}
           >
+            {/* Group Banner */}
             {groupName && (
               <LinearGradient
                 colors={['#e7f5ff', '#d0ebff']}
@@ -453,6 +448,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               </LinearGradient>
             )}
 
+            {/* Rotation Warning */}
             {status && !status.hasEnoughTasks && status.totalTasks > 0 && (
               <LinearGradient
                 colors={['#fff3bf', '#ffec99']}
@@ -464,14 +460,13 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   <MaterialCommunityIcons name="alert" size={20} color="#e67700" />
                   <View style={styles.warningTextContainer}>
                     <Text style={styles.warningTitle}>Rotation Warning</Text>
-                    <Text style={styles.warningMessage}>
-                      {recommendation?.message}
-                    </Text>
+                    <Text style={styles.warningMessage}>{recommendation?.message}</Text>
                   </View>
                 </View>
               </LinearGradient>
             )}
 
+            {/* No Tasks Info */}
             {status && status.totalTasks === 0 && (
               <LinearGradient
                 colors={['#e7f5ff', '#d0ebff']}
@@ -491,6 +486,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               </LinearGradient>
             )}
 
+            {/* ── Form ── */}
             <LinearGradient
               colors={['#ffffff', '#f8f9fa']}
               start={{ x: 0, y: 0 }}
@@ -499,7 +495,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
             >
               <Text style={styles.sectionTitle}>Task Details</Text>
 
-              {/* Title Input */}
+              {/* Title */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Title *</Text>
                 <LinearGradient
@@ -513,17 +509,15 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     placeholder="What needs to be done?"
                     placeholderTextColor="#adb5bd"
                     value={form.title}
-                    onChangeText={(text) => setForm({ ...form, title: text })}
+                    onChangeText={t => updateForm({ title: t })}
                     maxLength={100}
                     editable={!loading}
                   />
                 </LinearGradient>
-                <Text style={styles.helperText}>
-                  {form.title.length}/100 characters
-                </Text>
+                <Text style={styles.helperText}>{form.title.length}/100 characters</Text>
               </View>
 
-              {/* Description Input */}
+              {/* Description */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Description</Text>
                 <LinearGradient
@@ -537,7 +531,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     placeholder="Add more details about this task..."
                     placeholderTextColor="#adb5bd"
                     value={form.description}
-                    onChangeText={(text) => setForm({ ...form, description: text })}
+                    onChangeText={t => updateForm({ description: t })}
                     multiline
                     numberOfLines={4}
                     textAlignVertical="top"
@@ -545,12 +539,10 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     editable={!loading}
                   />
                 </LinearGradient>
-                <Text style={styles.helperText}>
-                  {form.description.length}/500 characters
-                </Text>
+                <Text style={styles.helperText}>{form.description.length}/500 characters</Text>
               </View>
 
-              {/* Points Input */}
+              {/* Points */}
               <View style={styles.inputGroup}>
                 <View style={styles.labelContainer}>
                   <Text style={styles.label}>Total Task Points *</Text>
@@ -563,7 +555,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     <Text style={styles.pointsLimitText}>Max: 10</Text>
                   </LinearGradient>
                 </View>
-                
                 <View style={styles.pointsInputContainer}>
                   <LinearGradient
                     colors={['#f8f9fa', '#e9ecef']}
@@ -571,10 +562,10 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     end={{ x: 1, y: 1 }}
                     style={[
                       styles.pointsInputGradient,
-                      !isPointsWithinLimit() && styles.inputErrorGradient
+                      !isPointsWithinLimit() && styles.inputErrorGradient,
                     ]}
                   >
-                    <TextInput 
+                    <TextInput
                       style={styles.pointsInput}
                       value={form.points}
                       onChangeText={handlePointsChange}
@@ -586,18 +577,13 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   </LinearGradient>
                   <Text style={styles.pointsLabel}>points</Text>
                 </View>
-                
-                <Text style={styles.helperText}>
-                  Total reward points for this task (1-10)
-                </Text>
+                <Text style={styles.helperText}>Total reward points for this task (1-10)</Text>
                 {!isPointsWithinLimit() && (
-                  <Text style={styles.errorText}>
-                    Points must be between 1 and 10
-                  </Text>
+                  <Text style={styles.errorText}>Points must be between 1 and 10</Text>
                 )}
               </View>
 
-              {/* Points Usage Indicator */}
+              {/* Points Usage Bar */}
               <View style={styles.pointsUsageContainer}>
                 <LinearGradient
                   colors={remainingPoints > 0 ? ['#d3f9d8', '#b2f2bb'] : ['#fff5f5', '#ffe3e3']}
@@ -605,18 +591,15 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   end={{ x: 1, y: 1 }}
                   style={styles.pointsUsageBar}
                 >
-                  <View 
+                  <View
                     style={[
                       styles.pointsUsageFill,
-                      { width: `${Math.min(100, (usedPoints / totalPoints) * 100)}%` }
-                    ]} 
+                      { width: `${Math.min(100, (usedPoints / (totalPoints || 1)) * 100)}%` },
+                    ]}
                   />
                 </LinearGradient>
                 <View style={styles.pointsUsageInfo}>
-                  <Text style={[
-                    styles.pointsUsageText,
-                    remainingPoints === 0 && styles.pointsUsageFull
-                  ]}>
+                  <Text style={[styles.pointsUsageText, remainingPoints === 0 && styles.pointsUsageFull]}>
                     {usedPoints}/{totalPoints} points used
                   </Text>
                   {remainingPoints > 0 ? (
@@ -624,87 +607,86 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                       {remainingPoints} point{remainingPoints !== 1 ? 's' : ''} remaining
                     </Text>
                   ) : (
-                    <Text style={styles.pointsFullText}>
-                      All points allocated ✓
-                    </Text>
+                    <Text style={styles.pointsFullText}>All points allocated ✓</Text>
                   )}
                 </View>
               </View>
 
-              {/* Category Input */}
+              {/* ── Category Chip Selector ── */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Category</Text>
-                <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.inputGradient}
-                >
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g., Chores, Work, Study"
-                    placeholderTextColor="#adb5bd"
-                    value={form.category}
-                    onChangeText={(text) => setForm({ ...form, category: text })}
-                    maxLength={50}
-                    editable={!loading}
-                  />
-                </LinearGradient>
-                <Text style={styles.helperText}>Optional</Text>
+                <View style={styles.categoryChipsContainer}>
+                  {CATEGORIES.map(({ value, icon }) => {
+                    const isActive = form.category === value;
+                    return (
+                      <TouchableOpacity
+                        key={value}
+                        style={[styles.categoryChip, isActive && styles.categoryChipActive]}
+                        onPress={() => toggleCategory(value)}
+                        disabled={loading}
+                      >
+                        <LinearGradient
+                          colors={isActive ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.categoryChipGradient}
+                        >
+                          <MaterialCommunityIcons
+                            name={icon as any}
+                            size={16}
+                            color={isActive ? 'white' : '#495057'}
+                          />
+                          <Text
+                            style={[
+                              styles.categoryChipText,
+                              isActive && styles.categoryChipTextActive,
+                            ]}
+                          >
+                            {value}
+                          </Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <Text style={styles.helperText}>Optional — tap to select, tap again to deselect</Text>
               </View>
 
-              {/* Frequency Selection */}
+              {/* Frequency */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Frequency *</Text>
                 <View style={styles.frequencyContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.frequencyButton,
-                      form.executionFrequency === 'WEEKLY' && styles.frequencyButtonActive
-                    ]}
-                    onPress={() => handleFrequencyChange('WEEKLY')}
-                    disabled={loading}
-                  >
-                    <LinearGradient
-                      colors={form.executionFrequency === 'WEEKLY' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.frequencyButtonGradient}
-                    >
-                      <Text style={[
-                        styles.frequencyButtonText,
-                        form.executionFrequency === 'WEEKLY' && styles.frequencyButtonTextActive
-                      ]}>
-                        Weekly
-                      </Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.frequencyButton,
-                      form.executionFrequency === 'DAILY' && styles.frequencyButtonActive
-                    ]}
-                    onPress={() => handleFrequencyChange('DAILY')}
-                    disabled={loading}
-                  >
-                    <LinearGradient
-                      colors={form.executionFrequency === 'DAILY' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.frequencyButtonGradient}
-                    >
-                      <Text style={[
-                        styles.frequencyButtonText,
-                        form.executionFrequency === 'DAILY' && styles.frequencyButtonTextActive
-                      ]}>
-                        Daily
-                      </Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
+                  {(['WEEKLY', 'DAILY'] as const).map(freq => {
+                    const isActive = form.executionFrequency === freq;
+                    return (
+                      <TouchableOpacity
+                        key={freq}
+                        style={[styles.frequencyButton, isActive && styles.frequencyButtonActive]}
+                        onPress={() => handleFrequencyChange(freq)}
+                        disabled={loading}
+                      >
+                        <LinearGradient
+                          colors={isActive ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.frequencyButtonGradient}
+                        >
+                          <Text
+                            style={[
+                              styles.frequencyButtonText,
+                              isActive && styles.frequencyButtonTextActive,
+                            ]}
+                          >
+                            {freq.charAt(0) + freq.slice(1).toLowerCase()}
+                          </Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 
-              {/* Time Slots Section */}
+              {/* Time Slots */}
               <View style={styles.inputGroup}>
                 <View style={styles.timeSlotsHeader}>
                   <View style={styles.timeSlotsTitleContainer}>
@@ -712,13 +694,13 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                       Time Slots {form.executionFrequency === 'DAILY' ? '*' : ''}
                     </Text>
                     <Text style={styles.timeSlotsSubtitle}>
-                      Max 10 points per slot • {remainingPoints} points left
+                      Max 10 pts per slot • {remainingPoints} pts left
                     </Text>
                   </View>
                   <TouchableOpacity
                     style={[
                       styles.addTimeSlotButton,
-                      (!canAddMoreSlots || loading) && styles.addTimeSlotDisabled
+                      (!canAddMoreSlots || loading) && styles.addTimeSlotDisabled,
                     ]}
                     onPress={handleAddTimeSlot}
                     disabled={!canAddMoreSlots || loading}
@@ -729,15 +711,17 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                       end={{ x: 1, y: 1 }}
                       style={styles.addTimeSlotGradient}
                     >
-                      <MaterialCommunityIcons 
-                        name="plus" 
-                        size={16} 
-                        color={canAddMoreSlots ? "white" : "#868e96"} 
+                      <MaterialCommunityIcons
+                        name="plus"
+                        size={16}
+                        color={canAddMoreSlots ? 'white' : '#868e96'}
                       />
-                      <Text style={[
-                        styles.addTimeSlotText,
-                        !canAddMoreSlots && styles.addTimeSlotTextDisabled
-                      ]}>
+                      <Text
+                        style={[
+                          styles.addTimeSlotText,
+                          !canAddMoreSlots && styles.addTimeSlotTextDisabled,
+                        ]}
+                      >
                         Add
                       </Text>
                     </LinearGradient>
@@ -747,46 +731,45 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 {form.timeSlots.length === 0 ? (
                   <View style={styles.emptyTimeSlots}>
                     <MaterialCommunityIcons name="clock-outline" size={40} color="#dee2e6" />
-                    <Text style={styles.emptyTimeSlotsText}>
-                      No time slots added yet
-                    </Text>
+                    <Text style={styles.emptyTimeSlotsText}>No time slots added yet</Text>
                     <Text style={styles.emptyTimeSlotsSubtext}>
-                      Click "Add" to create time slots with points
+                      Tap "Add" to create time slots with points
                     </Text>
                   </View>
                 ) : (
                   <View style={styles.timeSlotsList}>
                     {form.timeSlots.map((slot, index) => {
-                      const slotPoints = parseInt(slot.points || '0', 10);
-                      const exceedsLimit = slotPoints > 10;
-                      
+                      const slotPts = parseInt(slot.points || '0', 10);
+                      const exceeds = slotPts > 10;
                       return (
                         <LinearGradient
                           key={index}
-                          colors={exceedsLimit ? ['#fff5f5', '#ffe3e3'] : ['#f8f9fa', '#e9ecef']}
+                          colors={exceeds ? ['#fff5f5', '#ffe3e3'] : ['#f8f9fa', '#e9ecef']}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
-                          style={[
-                            styles.timeSlotItem,
-                            exceedsLimit && styles.timeSlotItemError
-                          ]}
+                          style={[styles.timeSlotItem, exceeds && styles.timeSlotItemError]}
                         >
                           <View style={styles.timeSlotInfo}>
                             <View style={styles.timeSlotHeader}>
                               <Text style={styles.timeSlotTime}>
-                                {formatTimeForDisplay(slot.startTime)} - {formatTimeForDisplay(slot.endTime)}
+                                {formatTimeForDisplay(slot.startTime)} –{' '}
+                                {formatTimeForDisplay(slot.endTime)}
                               </Text>
-                              {slot.points && slotPoints > 0 && (
+                              {slot.points && slotPts > 0 && (
                                 <LinearGradient
-                                  colors={exceedsLimit ? ['#fff5f5', '#ffe3e3'] : ['#d3f9d8', '#b2f2bb']}
+                                  colors={
+                                    exceeds ? ['#fff5f5', '#ffe3e3'] : ['#d3f9d8', '#b2f2bb']
+                                  }
                                   start={{ x: 0, y: 0 }}
                                   end={{ x: 1, y: 1 }}
                                   style={styles.pointsBadge}
                                 >
-                                  <Text style={[
-                                    styles.pointsBadgeText,
-                                    exceedsLimit && styles.pointsBadgeErrorText
-                                  ]}>
+                                  <Text
+                                    style={[
+                                      styles.pointsBadgeText,
+                                      exceeds && styles.pointsBadgeErrorText,
+                                    ]}
+                                  >
                                     {slot.points} pts
                                   </Text>
                                 </LinearGradient>
@@ -817,8 +800,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     })}
                   </View>
                 )}
-                
-                {/* Warning when can't add more slots */}
+
                 {!canAddMoreSlots && totalPoints > 0 && form.timeSlots.length > 0 && (
                   <LinearGradient
                     colors={['#fff5f5', '#ffe3e3']}
@@ -828,42 +810,44 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   >
                     <MaterialCommunityIcons name="alert-circle" size={16} color="#fa5252" />
                     <Text style={styles.limitWarningText}>
-                      All {totalPoints} points have been allocated. Adjust total points or remove slots to add more.
+                      All {totalPoints} points allocated. Adjust total or remove slots.
                     </Text>
                   </LinearGradient>
                 )}
               </View>
 
-              {/* Days Selection (Weekly) */}
+              {/* Days (Weekly only) */}
               {form.executionFrequency === 'WEEKLY' && (
                 <View style={styles.inputGroup}>
                   <Text style={styles.label}>Days *</Text>
                   <View style={styles.daysContainer}>
-                    {DAY_OF_WEEK_OPTIONS.map((day) => (
-                      <TouchableOpacity
-                        key={day.value}
-                        style={[
-                          styles.dayButton,
-                          form.selectedDays.includes(day.value) && styles.dayButtonActive
-                        ]}
-                        onPress={() => toggleDaySelection(day.value)}
-                        disabled={loading}
-                      >
-                        <LinearGradient
-                          colors={form.selectedDays.includes(day.value) ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
-                          style={styles.dayButtonGradient}
+                    {DAY_OF_WEEK_OPTIONS.map(day => {
+                      const isActive = form.selectedDays.includes(day.value);
+                      return (
+                        <TouchableOpacity
+                          key={day.value}
+                          style={[styles.dayButton, isActive && styles.dayButtonActive]}
+                          onPress={() => toggleDaySelection(day.value)}
+                          disabled={loading}
                         >
-                          <Text style={[
-                            styles.dayButtonText,
-                            form.selectedDays.includes(day.value) && styles.dayButtonTextActive
-                          ]}>
-                            {day.label}
-                          </Text>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    ))}
+                          <LinearGradient
+                            colors={isActive ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={styles.dayButtonGradient}
+                          >
+                            <Text
+                              style={[
+                                styles.dayButtonText,
+                                isActive && styles.dayButtonTextActive,
+                              ]}
+                            >
+                              {day.label}
+                            </Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
               )}
@@ -873,17 +857,16 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 <View style={styles.toggleContainer}>
                   <Text style={styles.label}>Recurring Task</Text>
                   <TouchableOpacity
-                    style={[
-                      styles.toggleSwitch,
-                      form.isRecurring && styles.toggleSwitchActive
-                    ]}
-                    onPress={() => setForm({ ...form, isRecurring: !form.isRecurring })}
+                    style={[styles.toggleSwitch, form.isRecurring && styles.toggleSwitchActive]}
+                    onPress={() => updateForm({ isRecurring: !form.isRecurring })}
                     disabled={loading}
                   >
-                    <View style={[
-                      styles.toggleCircle,
-                      form.isRecurring && styles.toggleCircleActive
-                    ]} />
+                    <View
+                      style={[
+                        styles.toggleCircle,
+                        form.isRecurring && styles.toggleCircleActive,
+                      ]}
+                    />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.helperText}>
@@ -892,6 +875,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               </View>
             </LinearGradient>
 
+            {/* Error */}
             {error && (
               <LinearGradient
                 colors={['#fff5f5', '#ffe3e3']}
@@ -906,9 +890,10 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
             {/* Action Buttons */}
             <View style={styles.actions}>
+              {/* Cancel */}
               <TouchableOpacity
                 style={[styles.cancelButton, loading && styles.buttonDisabled]}
-                onPress={handleCancel}
+                onPress={() => navigation.goBack()}
                 disabled={loading}
               >
                 <LinearGradient
@@ -921,11 +906,37 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 </LinearGradient>
               </TouchableOpacity>
 
+              {/* Save as Draft */}
               <TouchableOpacity
                 style={[
-                  styles.submitButton,
-                  isSubmitDisabled() && styles.buttonDisabled
+                  styles.draftButton,
+                  (isDraftDisabled() || isSavingDraft) && styles.buttonDisabled,
                 ]}
+                onPress={handleSaveAsDraft}
+                disabled={isDraftDisabled() || isSavingDraft}
+              >
+                <LinearGradient
+                  colors={['#6c757d', '#495057']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.draftButtonGradient}
+                >
+                  {isSavingDraft ? (
+                    <ActivityIndicator color="white" size="small" />
+                  ) : (
+                    <>
+                      <MaterialCommunityIcons name="content-save" size={16} color="white" />
+                      <Text style={styles.draftButtonText}>
+                        {currentDraftId ? 'Update' : 'Draft'}
+                      </Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+
+              {/* Create Task */}
+              <TouchableOpacity
+                style={[styles.submitButton, isSubmitDisabled() && styles.buttonDisabled]}
                 onPress={handleSubmit}
                 disabled={isSubmitDisabled()}
               >
@@ -936,19 +947,24 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   style={styles.submitButtonGradient}
                 >
                   {loading ? (
-                    <ActivityIndicator color={isSubmitDisabled() ? "#495057" : "white"} size="small" />
+                    <ActivityIndicator
+                      color={isSubmitDisabled() ? '#495057' : 'white'}
+                      size="small"
+                    />
                   ) : (
                     <>
-                      <MaterialCommunityIcons 
-                        name="plus-circle" 
-                        size={18} 
-                        color={isSubmitDisabled() ? "#868e96" : "white"} 
+                      <MaterialCommunityIcons
+                        name="plus-circle"
+                        size={16}
+                        color={isSubmitDisabled() ? '#868e96' : 'white'}
                       />
-                      <Text style={[
-                        styles.submitButtonText,
-                        isSubmitDisabled() && styles.submitButtonTextDisabled
-                      ]}>
-                        Create Task
+                      <Text
+                        style={[
+                          styles.submitButtonText,
+                          isSubmitDisabled() && styles.submitButtonTextDisabled,
+                        ]}
+                      >
+                        Create
                       </Text>
                     </>
                   )}
@@ -965,26 +981,18 @@ export default function CreateTaskScreen({ navigation, route }: any) {
             >
               <Text style={styles.infoTitle}>💡 Important Rules</Text>
               <View style={styles.infoList}>
-                <View style={styles.infoItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
-                  <Text style={styles.infoText}>Total task points: 1-10 only</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
-                  <Text style={styles.infoText}>Time slot points: Max 10 per slot</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
-                  <Text style={styles.infoText}>Daily tasks require time slots</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
-                  <Text style={styles.infoText}>Weekly tasks need at least one day</Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
-                  <Text style={styles.infoText}>End time must be after start time</Text>
-                </View>
+                {[
+                  'Total task points: 1-10 only',
+                  'Time slot points: Max 10 per slot',
+                  'Daily tasks require time slots',
+                  'Weekly tasks need at least one day',
+                  'End time must be after start time',
+                ].map(rule => (
+                  <View key={rule} style={styles.infoItem}>
+                    <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
+                    <Text style={styles.infoText}>{rule}</Text>
+                  </View>
+                ))}
               </View>
             </LinearGradient>
           </ScrollView>
@@ -993,10 +1001,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
       <TimeSlotModal
         visible={showTimeSlotModal}
-        onClose={() => {
-          setShowTimeSlotModal(false);
-          setModalInitialTime(null);
-        }}
+        onClose={() => { setShowTimeSlotModal(false); setModalInitialTime(null); }}
         onSave={handleSaveTimeSlot}
         editingSlot={editingSlot}
         initialTime={modalInitialTime}
@@ -1007,552 +1012,3 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     </ScreenWrapper>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa'
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    minHeight: 60,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    flex: 1,
-    textAlign: 'center'
-  },
-  headerSpacer: {
-    width: 36
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  groupInfo: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#b2f2bb',
-  },
-  groupInfoContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  groupLabel: {
-    fontSize: 12,
-    color: '#2b8a3e',
-  },
-  groupName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529'
-  },
-  groupNote: {
-    fontSize: 12,
-    color: '#495057',
-    fontStyle: 'italic',
-    marginLeft: 24,
-  },
-  warningContainer: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#ffec99',
-  },
-  infoContainer: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#b2f2bb',
-  },
-  warningContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  warningTextContainer: {
-    flex: 1,
-  },
-  warningTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#e67700',
-    marginBottom: 2,
-  },
-  warningMessage: {
-    fontSize: 13,
-    color: '#e67700',
-    lineHeight: 18,
-  },
-  infoTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#2b8a3e',
-    marginBottom: 2,
-  },
-  infoMessage: {
-    fontSize: 13,
-    color: '#2b8a3e',
-    lineHeight: 18,
-  },
-  formSection: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    marginBottom: 20
-  },
-  inputGroup: {
-    marginBottom: 24
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#495057',
-    marginBottom: 6
-  },
-  labelContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  pointsLimitBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  pointsLimitText: {
-    fontSize: 11,
-    color: '#fa5252',
-    fontWeight: '600',
-  },
-  inputGradient: {
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  inputErrorGradient: {
-    borderColor: '#fa5252',
-  },
-  input: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#212529',
-    backgroundColor: 'transparent',
-  },
-  textArea: {
-    minHeight: 100,
-    paddingTop: 12,
-    paddingBottom: 12,
-    textAlignVertical: 'top',
-  },
-  textAreaGradient: {
-    minHeight: 100,
-  },
-  helperText: {
-    fontSize: 11,
-    color: '#868e96',
-    marginTop: 4,
-    marginLeft: 2
-  },
-  errorText: {
-    color: '#fa5252',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  pointsUsageContainer: {
-    marginBottom: 20,
-  },
-  pointsUsageBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    backgroundColor: '#e9ecef',
-    marginBottom: 8,
-  },
-  pointsUsageFill: {
-    height: '100%',
-    backgroundColor: '#2b8a3e',
-    borderRadius: 4,
-  },
-  pointsUsageInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  pointsUsageText: {
-    fontSize: 12,
-    color: '#495057',
-  },
-  pointsUsageFull: {
-    color: '#2b8a3e',
-    fontWeight: '600',
-  },
-  pointsRemainingText: {
-    fontSize: 12,
-    color: '#2b8a3e',
-    fontWeight: '500',
-  },
-  pointsFullText: {
-    fontSize: 12,
-    color: '#2b8a3e',
-    fontWeight: '600',
-  },
-  frequencyContainer: {
-    flexDirection: 'row',
-    gap: 10
-  },
-  frequencyButton: {
-    flex: 1,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  frequencyButtonGradient: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  frequencyButtonActive: {
-    borderColor: '#2b8a3e',
-  },
-  frequencyButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#495057'
-  },
-  frequencyButtonTextActive: {
-    color: 'white'
-  },
-  timeSlotsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12
-  },
-  timeSlotsTitleContainer: {
-    flex: 1,
-    marginRight: 12
-  },
-  timeSlotsSubtitle: {
-    fontSize: 11,
-    color: '#868e96',
-    marginTop: 2
-  },
-  addTimeSlotButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  addTimeSlotDisabled: {
-    opacity: 0.6,
-  },
-  addTimeSlotGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 4,
-  },
-  addTimeSlotText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'white'
-  },
-  addTimeSlotTextDisabled: {
-    color: '#868e96'
-  },
-  emptyTimeSlots: {
-    alignItems: 'center',
-    paddingVertical: 30,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    borderStyle: 'dashed'
-  },
-  emptyTimeSlotsText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#868e96',
-    marginTop: 12,
-    marginBottom: 4
-  },
-  emptyTimeSlotsSubtext: {
-    fontSize: 12,
-    color: '#adb5bd',
-    textAlign: 'center'
-  },
-  timeSlotsList: {
-    gap: 8
-  },
-  timeSlotItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  timeSlotItemError: {
-    borderColor: '#fa5252',
-  },
-  timeSlotInfo: {
-    flex: 1,
-    marginRight: 8
-  },
-  timeSlotHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4
-  },
-  timeSlotTime: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#212529'
-  },
-  timeSlotLabel: {
-    fontSize: 12,
-    color: '#868e96',
-  },
-  pointsBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  pointsBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#2b8a3e',
-  },
-  pointsBadgeErrorText: {
-    color: '#fa5252',
-  },
-  timeSlotActions: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  timeSlotActionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  limitWarning: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#ffc9c9',
-  },
-  limitWarningText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#fa5252',
-  },
-  daysContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  dayButton: {
-    width: '13%',
-    aspectRatio: 1,
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  dayButtonGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dayButtonActive: {
-    borderColor: '#2b8a3e',
-  },
-  dayButtonText: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: '#495057'
-  },
-  dayButtonTextActive: {
-    color: 'white'
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  toggleSwitch: {
-    width: 48,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#e9ecef',
-    padding: 2,
-    justifyContent: 'center'
-  },
-  toggleSwitchActive: {
-    backgroundColor: '#2b8a3e'
-  },
-  toggleCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2
-  },
-  toggleCircleActive: {
-    transform: [{ translateX: 22 }]
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#ffc9c9',
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20
-  },
-  cancelButton: {
-    flex: 1,
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  cancelButtonGradient: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#495057'
-  },
-  submitButton: {
-    flex: 2,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  submitButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    gap: 8,
-  },
-  submitButtonText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: 'white'
-  },
-  submitButtonTextDisabled: {
-    color: '#868e96'
-  },
-  buttonDisabled: {
-    opacity: 0.7
-  },
-  infoBox: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  infoList: {
-    gap: 6,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  infoText: {
-    fontSize: 13,
-    color: '#495057',
-    lineHeight: 18,
-    flex: 1,
-  },
-  pointsInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  pointsInputGradient: {
-    flex: 1,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  pointsInput: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-    backgroundColor: 'transparent',
-    textAlign: 'center'
-  },
-  pointsLabel: {
-    fontSize: 14,
-    color: '#495057',
-    width: 50,
-  },
-});

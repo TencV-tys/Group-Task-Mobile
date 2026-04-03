@@ -1,12 +1,13 @@
-// src/styles/assignmentDetails.styles.ts
+// src/styles/assignmentDetails.styles.ts - Dark Mode Version with Fixed Header
 import { StyleSheet, Dimensions } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
-const { width,height } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
-export const assignmentDetailsStyles = StyleSheet.create({
+export const makeAssignmentDetailsStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa'
+    backgroundColor: theme.bgSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -14,74 +15,60 @@ export const assignmentDetailsStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
-  assigneeBadge: {
-  fontSize: 10,
-  color: '#2b8a3e',
-  backgroundColor: '#d3f9d8',
-  paddingHorizontal: 8,
-  paddingVertical: 2,
-  borderRadius: 12,
-  overflow: 'hidden',
-  marginTop: 2,
-  alignSelf: 'flex-start',
-  fontWeight: '500',
-},
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8
-  },
-  title: {
+  headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
-    textAlign: 'center'
+    flex: 1,
+    textAlign: 'center',
   },
-  headerSpacer: {
-    width: 36
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    gap: 4,
+  },
+  adminBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 80
+    paddingBottom: 80,
   },
   loadingText: {
     marginTop: 12,
-    color: '#868e96',
-    fontSize: 14
+    fontSize: 14,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20
+    padding: 20,
   },
   errorText: {
-    color: '#fa5252',
     textAlign: 'center',
     marginBottom: 16,
     fontSize: 16,
-    marginTop: 12
+    marginTop: 12,
   },
   retryButton: {
     borderRadius: 8,
@@ -92,45 +79,42 @@ export const assignmentDetailsStyles = StyleSheet.create({
     paddingVertical: 12,
   },
   retryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
-    fontSize: 16
+    fontSize: 16,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20
+    padding: 20,
   },
   emptyText: {
     fontSize: 16,
-    color: '#868e96',
     marginTop: 16,
-    textAlign: 'center'
+    textAlign: 'center',
   },
   content: {
     flex: 1,
-    padding: 16
+    padding: 16,
   },
   card: {
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 20
+    marginBottom: 20,
   },
   taskTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#212529',
     flex: 1,
-    marginRight: 12
+    marginRight: 12,
   },
   statusBadge: {
     flexDirection: 'row',
@@ -139,11 +123,11 @@ export const assignmentDetailsStyles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 16,
     borderWidth: 1,
-    gap: 4
+    gap: 4,
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   userInfo: {
     flexDirection: 'row',
@@ -152,7 +136,6 @@ export const assignmentDetailsStyles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   avatar: {
     width: 44,
@@ -162,7 +145,6 @@ export const assignmentDetailsStyles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   avatarImage: {
     width: 42,
@@ -170,25 +152,32 @@ export const assignmentDetailsStyles = StyleSheet.create({
     borderRadius: 21,
   },
   avatarText: {
-    color: '#495057',
     fontSize: 18,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   userDetails: {
-    flex: 1
+    flex: 1,
   },
   userName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
-    marginBottom: 2
+    marginBottom: 2,
+  },
+  assigneeBadge: {
+    fontSize: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 2,
+    alignSelf: 'flex-start',
+    fontWeight: '500',
   },
   completionDate: {
     fontSize: 12,
-    color: '#868e96'
   },
   completeSection: {
-    marginBottom: 16
+    marginBottom: 16,
   },
   submissionStatusCard: {
     borderRadius: 12,
@@ -242,7 +231,6 @@ export const assignmentDetailsStyles = StyleSheet.create({
   },
   urgentMessage: {
     fontSize: 12,
-    color: '#fa5252',
     fontWeight: '600',
     marginTop: 4,
     marginLeft: 4,
@@ -262,7 +250,6 @@ export const assignmentDetailsStyles = StyleSheet.create({
   },
   waitingText: {
     fontSize: 13,
-    color: '#e67700',
     fontWeight: '600',
   },
   completeButton: {
@@ -280,7 +267,7 @@ export const assignmentDetailsStyles = StyleSheet.create({
     gap: 8,
   },
   completeButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 15,
     fontWeight: '700',
   },
@@ -292,7 +279,7 @@ export const assignmentDetailsStyles = StyleSheet.create({
     marginTop: 8,
   },
   completeButtonSubtext: {
-    color: 'white',
+    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -303,7 +290,6 @@ export const assignmentDetailsStyles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   disabledButtonGradient: {
     flexDirection: 'row',
@@ -313,13 +299,11 @@ export const assignmentDetailsStyles = StyleSheet.create({
     padding: 16,
   },
   disabledButtonText: {
-    color: '#868e96',
     fontSize: 15,
     fontWeight: '600',
   },
   disabledButtonHint: {
     fontSize: 12,
-    color: '#868e96',
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
@@ -332,25 +316,20 @@ export const assignmentDetailsStyles = StyleSheet.create({
     marginTop: 8,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#ffec99',
   },
   penaltyText: {
     fontSize: 12,
-    color: '#e67700',
-    fontWeight: '600'
+    fontWeight: '600',
   },
   timeWindowInfo: {
     marginTop: 12,
     marginLeft: 52,
     padding: 8,
-    backgroundColor: '#f8f9fa',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   timeWindowText: {
     fontSize: 11,
-    color: '#868e96',
     fontStyle: 'italic',
     textAlign: 'center',
   },
@@ -361,7 +340,6 @@ export const assignmentDetailsStyles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#dbe4ff',
   },
   swapButtonGradient: {
     padding: 16,
@@ -379,14 +357,12 @@ export const assignmentDetailsStyles = StyleSheet.create({
   },
   swapButtonSubtext: {
     fontSize: 12,
-    color: '#6B7280',
     marginLeft: 32,
   },
   pendingSwapButton: {
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#F59E0B',
   },
   pendingSwapGradient: {
     padding: 16,
@@ -394,31 +370,27 @@ export const assignmentDetailsStyles = StyleSheet.create({
   pendingSwapText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#F59E0B',
   },
   pendingSwapSubtext: {
     fontSize: 12,
-    color: '#92400E',
     marginLeft: 32,
   },
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 24
+    marginBottom: 24,
   },
   detailItem: {
-    width: '48%'
+    width: '48%',
   },
   detailLabel: {
     fontSize: 11,
-    color: '#868e96',
-    marginBottom: 2
+    marginBottom: 2,
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#212529'
   },
   pointsBadge: {
     flexDirection: 'row',
@@ -432,27 +404,25 @@ export const assignmentDetailsStyles = StyleSheet.create({
   pointsValue: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#e67700',
-    marginLeft: 4
+    marginLeft: 4,
   },
   section: {
-    marginBottom: 24
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
-    marginBottom: 12
+    marginBottom: 12,
   },
   photoContainer: {
     position: 'relative',
     borderRadius: 12,
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
   photo: {
     width: '100%',
     height: 220,
-    backgroundColor: '#f8f9fa'
+    backgroundColor: theme.bgSecondary,
   },
   photoOverlay: {
     position: 'absolute',
@@ -460,48 +430,39 @@ export const assignmentDetailsStyles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 10,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   viewPhotoText: {
-    color: 'white',
     fontSize: 12,
     fontWeight: '500',
-    marginTop: 2
+    marginTop: 2,
   },
   notesCard: {
     padding: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#d0ebff',
   },
   notesText: {
     fontSize: 14,
-    color: '#2b8a3e',
-    lineHeight: 20
+    lineHeight: 20,
   },
   adminNotesCard: {
     padding: 14,
     borderRadius: 10,
     borderWidth: 1,
   },
-  rejectedNotes: {
-    borderColor: '#ffc9c9',
-  },
-  verifiedNotes: {
-    borderColor: '#b2f2bb',
-  },
+  rejectedNotes: {},
+  verifiedNotes: {},
   adminNotesText: {
     fontSize: 14,
-    color: '#495057',
-    lineHeight: 20
+    lineHeight: 20,
   },
   verificationSection: {
-    marginBottom: 24
+    marginBottom: 24,
   },
   notesInputGradient: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
     marginBottom: 8,
   },
   notesInput: {
@@ -514,13 +475,12 @@ export const assignmentDetailsStyles = StyleSheet.create({
   },
   charCount: {
     textAlign: 'right',
-    color: '#868e96',
     fontSize: 11,
-    marginBottom: 16
+    marginBottom: 16,
   },
   verificationButtons: {
     flexDirection: 'row',
-    gap: 12
+    gap: 12,
   },
   verifyButton: {
     flex: 1,
@@ -537,37 +497,58 @@ export const assignmentDetailsStyles = StyleSheet.create({
   rejectButton: {},
   approveButton: {},
   verifyButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 15,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   infoSection: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    gap: 8
+    gap: 8,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8
+    gap: 8,
   },
   infoText: {
     fontSize: 13,
-    color: '#495057'
   },
-adminBadge: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 10,
-  paddingVertical: 4,
-  borderRadius: 16,
-  gap: 4,
-},
-modalOverlay: {
+  adminInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    borderRadius: 12,
+    gap: 10,
+    borderWidth: 1,
+  },
+  adminInfoText: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  readOnlyFooterContainer: {
+    padding: 16,
+    borderTopWidth: 1,
+  },
+  readOnlyFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+  },
+  readOnlyText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -582,61 +563,17 @@ modalOverlay: {
     top: 40,
     right: 20,
     zIndex: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 20,
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   modalImage: {
     width: width - 40,
     height: height - 100,
     borderRadius: 8,
   },
-adminBadgeText: {
-  color: 'white',
-  fontSize: 10,
-  fontWeight: '600',
-},
-adminInfoBanner: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 16,
-  paddingVertical: 12,
-  marginBottom: 16,
-  borderRadius: 12,
-  gap: 10,
-  borderWidth: 1,
-  borderColor: '#b2f2bb',
-},
-adminInfoText: {
-  flex: 1,
-  fontSize: 13,
-  color: '#2b8a3e',
-  lineHeight: 18,
-},
-readOnlyFooterContainer: {
-  padding: 16,
-  backgroundColor: 'white',
-  borderTopWidth: 1,
-  borderTopColor: '#e9ecef',
-},
-readOnlyFooter: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  paddingVertical: 14,
-  borderRadius: 12,
-  gap: 8,
-  borderWidth: 1,
-  borderColor: '#e9ecef',
-},
-readOnlyText: {
-  fontSize: 14,
-  color: '#2b8a3e',
-  fontWeight: '500',
-},
 });

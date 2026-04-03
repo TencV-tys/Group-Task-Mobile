@@ -280,7 +280,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleTaskStatistics = async () => {
     const hasToken = await checkToken();
     if (!hasToken) return;
-    navigation.navigate('DetailedStatistics', { groupId, groupName });
+    navigation.navigate('DetailedStatistics', { groupId, groupName,userRole });
     onClose();
   };
 

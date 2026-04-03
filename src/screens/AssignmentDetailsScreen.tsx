@@ -1,5 +1,4 @@
-// src/screens/AssignmentDetailsScreen.tsx - COMPLETE WITH UTC DATE FORMATTING
-
+// src/screens/AssignmentDetailsScreen.tsx - Dark Mode Added with Fixed Header
 import React, { useEffect } from 'react';
 import {
   View,
@@ -19,13 +18,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useAssignmentDetails } from '../hooks/useAssignmentDetails';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { assignmentDetailsStyles as styles } from '../styles/assignmentDetails.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeAssignmentDetailsStyles } from '../styles/assignmentDetails.styles';
 import { getFullImageUrl } from '../utils/imageUrl';
 import { formatUTCDate, formatUTCDayAndDate, getUTCRelativeTime } from '../utils/timeUtils';
 
 const { width, height } = Dimensions.get('window');
 
 export default function AssignmentDetailsScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
+  const styles = makeAssignmentDetailsStyles(theme);
   const { assignmentId, isAdmin: isAdminProp = false, onVerified } = route.params || {};
   
   // ===== HOOKS - ALL LOGIC IS HERE =====
@@ -100,29 +102,27 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
   // ===== RENDER HEADER =====
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
       <TouchableOpacity 
         onPress={() => navigation.goBack()}
-        style={styles.backButton}
+        style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
       >
-        <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
       </TouchableOpacity>
       
-      <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1}>
-          Assignment Details
-        </Text>
-      </View>
+      <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
+        Assignment Details
+      </Text>
       
       {isAdmin && (
         <LinearGradient
-          colors={['#2b8a3e', '#1e6b2c']}
+          colors={[theme.primary, theme.primaryDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.adminBadge}
         >
-          <MaterialCommunityIcons name="shield-account" size={12} color="white" />
+          <MaterialCommunityIcons name="shield-account" size={12} color="#fff" />
           <Text style={styles.adminBadgeText}>Admin View</Text>
         </LinearGradient>
       )}
@@ -138,16 +138,16 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       onRequestClose={closePhotoModal}
     >
       <TouchableOpacity
-        style={styles.modalOverlay}
+        style={[styles.modalOverlay, { backgroundColor: theme.overlay }]}
         activeOpacity={1}
         onPress={closePhotoModal}
       >
         <View style={styles.modalContent}>
           <TouchableOpacity
-            style={styles.closeButton}
+            style={[styles.closeButton, { backgroundColor: 'rgba(0,0,0,0.6)' }]}
             onPress={closePhotoModal}
           >
-            <MaterialCommunityIcons name="close" size={24} color="white" />
+            <MaterialCommunityIcons name="close" size={24} color="#fff" />
           </TouchableOpacity>
           {selectedPhotoUrl && (
             <Image
@@ -170,7 +170,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     
     return ( 
       <View style={styles.completeSection}>
-        <Text style={styles.sectionTitle}>Complete This Assignment</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Complete This Assignment</Text>
         
         <LinearGradient
           colors={[submissionStatusInfo.bgColor, submissionStatusInfo.bgColor]}
@@ -197,8 +197,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           </View>
           
           {assignment?.timeSlot && submissionStatus === 'available' && (
-            <View style={styles.timeWindowInfo}>
-              <Text style={styles.timeWindowText}>
+            <View style={[styles.timeWindowInfo, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+              <Text style={[styles.timeWindowText, { color: theme.textMuted }]}>
                 Submit within time window for full points
               </Text>
             </View>
@@ -206,13 +206,13 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           
           {isLate && penaltyInfo && (
             <LinearGradient
-              colors={['#fff3bf', '#ffec99']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.penaltyInfo}
+              style={[styles.penaltyInfo, { borderColor: theme.primaryBorder }]}
             >
-              <MaterialCommunityIcons name="alert" size={16} color="#e67700" />
-              <Text style={styles.penaltyText}>
+              <MaterialCommunityIcons name="alert" size={16} color={theme.primary} />
+              <Text style={[styles.penaltyText, { color: theme.primary }]}>
                 Points: {penaltyInfo.finalPoints} / {penaltyInfo.originalPoints} 
                 (Penalty: -{penaltyInfo.penaltyAmount})
               </Text>
@@ -222,7 +222,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           {submissionStatus === 'available' && timeLeft !== null && (
             <View style={styles.timerContainer}>
               <LinearGradient
-                colors={timeLeft < 300 ? ['#ffc9c9', '#ffb3b3'] : isLate ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb']}
+                colors={timeLeft < 300 ? [theme.errorBg, theme.errorBg] : isLate ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[
@@ -234,14 +234,14 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                 <MaterialCommunityIcons 
                   name={timeLeft < 300 ? "timer-alert" : isLate ? "timer-alert" : "timer"} 
                   size={16} 
-                  color={timeLeft < 300 ? "#fa5252" : isLate ? "#e67700" : "#2b8a3e"} 
+                  color={timeLeft < 300 ? theme.error : isLate ? theme.primary : theme.primary} 
                 />
-                <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : isLate ? "#e67700" : "#2b8a3e" }]}>
+                <Text style={[styles.timerText, { color: timeLeft < 300 ? theme.error : isLate ? theme.primary : theme.primary }]}>
                   {formatTimeLeft(timeLeft)} remaining
                 </Text>
               </LinearGradient>
               {timeLeft < 300 && (
-                <Text style={styles.urgentMessage}>Hurry! Grace period ending soon.</Text>
+                <Text style={[styles.urgentMessage, { color: theme.error }]}>Hurry! Grace period ending soon.</Text>
               )}
             </View>
           )}
@@ -249,13 +249,13 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
           {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
             <View style={styles.waitingContainer}>
               <LinearGradient
-                colors={['#fff3bf', '#ffec99']}
+                colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.waitingBadge}
               >
-                <MaterialCommunityIcons name="clock-start" size={16} color="#e67700" />
-                <Text style={styles.waitingText}>
+                <MaterialCommunityIcons name="clock-start" size={16} color={theme.primary} />
+                <Text style={[styles.waitingText, { color: theme.primary }]}>
                   Opens in {formatTimeLeft(timeLeft)}
                 </Text>
               </LinearGradient>
@@ -273,7 +273,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={isLate ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']}
+              colors={isLate ? [theme.primary, theme.primaryDark] : [theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.completeButtonGradient}
@@ -282,13 +282,13 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                 <MaterialCommunityIcons 
                   name={isLate ? "timer-alert" : "check-circle"} 
                   size={20} 
-                  color="white" 
+                  color="#fff" 
                 />
                 <Text style={styles.completeButtonText}>{submissionStatusInfo.buttonText}</Text>
               </View>
               {timeLeft && timeLeft < 600 && (
                 <View style={styles.completeButtonFooter}>
-                  <MaterialCommunityIcons name="alert" size={14} color="white" />
+                  <MaterialCommunityIcons name="alert" size={14} color="#fff" />
                   <Text style={styles.completeButtonSubtext}>
                     {timeLeft < 300 ? 'Urgent! ' : ''}{formatTimeLeft(timeLeft)} left
                   </Text>
@@ -299,7 +299,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
         ) : (
           <View style={styles.disabledButtonContainer}>
             <TouchableOpacity
-              style={styles.disabledButton}
+              style={[styles.disabledButton, { borderColor: theme.border }]}
               disabled={true}
               onPress={() => {
                 Alert.alert(
@@ -310,7 +310,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
               }}
             >
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.disabledButtonGradient}
@@ -318,14 +318,14 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                 <MaterialCommunityIcons 
                   name={submissionStatusInfo.icon as any} 
                   size={20} 
-                  color="#868e96" 
+                  color={theme.textMuted} 
                 />
-                <Text style={styles.disabledButtonText}>
+                <Text style={[styles.disabledButtonText, { color: theme.textMuted }]}>
                   {submissionStatusInfo.buttonText}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
-            <Text style={styles.disabledButtonHint}>
+            <Text style={[styles.disabledButtonHint, { color: theme.textMuted }]}>
               ⓘ {submissionStatusInfo.description}
             </Text>
           </View>
@@ -341,11 +341,11 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     if (!assignment?.completed && assignment) {
       return (
         <View style={styles.swapSection}>
-          <Text style={styles.sectionTitle}>Need to Swap?</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Need to Swap?</Text>
           
           {!hasPendingRequest ? (
             <TouchableOpacity
-              style={styles.swapButton}
+              style={[styles.swapButton, { borderColor: '#dbe4ff' }]}
               onPress={handleRequestSwap(navigation)}
               activeOpacity={0.8}
             >
@@ -359,14 +359,14 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                   <MaterialCommunityIcons name="swap-horizontal" size={20} color="#4F46E5" />
                   <Text style={styles.swapButtonText}>Request Swap</Text>
                 </View>
-                <Text style={styles.swapButtonSubtext}>
+                <Text style={[styles.swapButtonSubtext, { color: '#6B7280' }]}>
                   Find someone to take over this assignment
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              style={styles.pendingSwapButton}
+              style={[styles.pendingSwapButton, { borderColor: '#F59E0B' }]}
               onPress={() => {
                 if (pendingRequest) {
                   navigation.navigate('SwapRequestDetails', { requestId: pendingRequest.id });
@@ -382,9 +382,9 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
               >
                 <View style={styles.swapButtonContent}>
                   <MaterialCommunityIcons name="clock" size={20} color="#F59E0B" />
-                  <Text style={styles.pendingSwapText}>Swap Request Pending</Text>
+                  <Text style={[styles.pendingSwapText, { color: '#F59E0B' }]}>Swap Request Pending</Text>
                 </View>
-                <Text style={styles.pendingSwapSubtext}>
+                <Text style={[styles.pendingSwapSubtext, { color: '#92400E' }]}>
                   Tap to view request details
                 </Text>
               </LinearGradient>
@@ -403,26 +403,27 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
     return (
       <View style={styles.verificationSection}>
-        <Text style={styles.sectionTitle}>Admin Verification</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Admin Verification</Text>
         
         <LinearGradient
-          colors={['#f8f9fa', '#e9ecef']}
+          colors={[theme.bgSecondary, theme.bgTertiary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.notesInputGradient}
+          style={[styles.notesInputGradient, { borderColor: theme.border }]}
         >
           <TextInput
-            style={styles.notesInput}
+            style={[styles.notesInput, { color: theme.text }]}
             value={adminNotes}
             onChangeText={setAdminNotes}
             placeholder="Add notes for the user (optional)..."
-            placeholderTextColor="#adb5bd"
+            placeholderTextColor={theme.textPlaceholder}
             multiline
             numberOfLines={3}
             maxLength={500}
+            selectionColor={theme.primary}
           />
         </LinearGradient>
-        <Text style={styles.charCount}>
+        <Text style={[styles.charCount, { color: theme.textMuted }]}>
           {adminNotes.length}/500 characters
         </Text>
 
@@ -433,16 +434,16 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             disabled={verifying}
           >
             <LinearGradient
-              colors={['#fa5252', '#e03131']}
+              colors={[theme.error, theme.error]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.verifyButtonGradient}
             >
               {verifying ? (
-                <ActivityIndicator size="small" color="white" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
-                  <MaterialCommunityIcons name="close-circle" size={20} color="white" />
+                  <MaterialCommunityIcons name="close-circle" size={20} color="#fff" />
                   <Text style={styles.verifyButtonText}>Reject</Text>
                 </>
               )}
@@ -455,16 +456,16 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             disabled={verifying}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.verifyButtonGradient}
             >
               {verifying ? (
-                <ActivityIndicator size="small" color="white" />
+                <ActivityIndicator size="small" color="#fff" />
               ) : (
                 <>
-                  <MaterialCommunityIcons name="check-circle" size={20} color="white" />
+                  <MaterialCommunityIcons name="check-circle" size={20} color="#fff" />
                   <Text style={styles.verifyButtonText}>Approve</Text>
                 </>
               )}
@@ -481,13 +482,13 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     
     return (
       <LinearGradient
-        colors={['#e7f5ff', '#d0ebff']}
+        colors={[theme.primaryLight, theme.primaryLight]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.adminInfoBanner}
+        style={[styles.adminInfoBanner, { borderColor: theme.primaryBorder }]}
       >
-        <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
-        <Text style={styles.adminInfoText}>
+        <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
+        <Text style={[styles.adminInfoText, { color: theme.primary }]}>
           Admin View Only - You can see all assignment details and verify submissions, but cannot complete or request swaps.
         </Text>
       </LinearGradient>
@@ -499,15 +500,15 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     if (!isAdmin) return null;
     
     return (
-      <View style={styles.readOnlyFooterContainer}>
+      <View style={[styles.readOnlyFooterContainer, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
         <LinearGradient
-          colors={['#f8f9fa', '#e9ecef']}
+          colors={[theme.bgSecondary, theme.bgTertiary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.readOnlyFooter}
+          style={[styles.readOnlyFooter, { borderColor: theme.border }]}
         >
-          <MaterialCommunityIcons name="eye" size={20} color="#2b8a3e" />
-          <Text style={styles.readOnlyText}>Admin View - Verification controls available below</Text>
+          <MaterialCommunityIcons name="eye" size={20} color={theme.primary} />
+          <Text style={[styles.readOnlyText, { color: theme.primary }]}>Admin View - Verification controls available below</Text>
         </LinearGradient>
       </View>
     );
@@ -523,7 +524,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Proof Photo</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Proof Photo</Text>
         <TouchableOpacity
           style={styles.photoContainer}
           onPress={handleViewPhoto}
@@ -547,8 +548,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             end={{ x: 1, y: 1 }}
             style={styles.photoOverlay}
           >
-            <MaterialCommunityIcons name="magnify" size={28} color="white" />
-            <Text style={styles.viewPhotoText}>Tap to view full image</Text>
+            <MaterialCommunityIcons name="magnify" size={28} color="#fff" />
+            <Text style={[styles.viewPhotoText, { color: '#fff' }]}>Tap to view full image</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View> 
@@ -560,8 +561,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     if (loading) {
       return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading assignment...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading assignment...</Text>
         </View>
       );
     }
@@ -569,14 +570,14 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     if (error) {
       return (
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
-          <Text style={styles.errorText}>{error}</Text>
+          <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={fetchAssignmentDetails}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.retryButtonGradient}
@@ -591,8 +592,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     if (!assignment) {
       return (
         <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons name="file-question" size={64} color="#dee2e6" />
-          <Text style={styles.emptyText}>Assignment not found</Text>
+          <MaterialCommunityIcons name="file-question" size={64} color={theme.border} />
+          <Text style={[styles.emptyText, { color: theme.textMuted }]}>Assignment not found</Text>
         </View>
       );
     }
@@ -601,17 +602,17 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       <>
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.card}
+            style={[styles.card, { borderColor: theme.border }]}
           >
             {/* Admin Info Banner */}
             {renderAdminInfoBanner()}
 
             {/* Header with status */}
             <View style={styles.headerRow}>
-              <Text style={styles.taskTitle} numberOfLines={2}>
+              <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
                 {isTaskDeleted ? deletedTaskTitle : (assignment.task?.title || 'Unknown Task')}
               </Text>
               <LinearGradient
@@ -632,28 +633,28 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             </View>
 
             {/* User Info */}
-            <View style={styles.userInfo}>
+            <View style={[styles.userInfo, { borderColor: theme.border }]}>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.avatar}
+                style={[styles.avatar, { borderColor: theme.border }]}
               >
                 {assignment.user?.avatarUrl ? (
                   <Image source={{ uri: assignment.user.avatarUrl }} style={styles.avatarImage} />
                 ) : (
-                  <Text style={styles.avatarText}>
+                  <Text style={[styles.avatarText, { color: theme.textSecondary }]}>
                     {assignment.user?.fullName?.charAt(0) || 'U'}
                   </Text>
                 )}
               </LinearGradient>
               <View style={styles.userDetails}>
-                <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
+                <Text style={[styles.userName, { color: theme.text }]}>{assignment.user?.fullName || 'Unknown User'}</Text>
                 {!isOwner && isAdmin && (
-                  <Text style={styles.assigneeBadge}>Assignee</Text>
+                  <Text style={[styles.assigneeBadge, { color: theme.primary, backgroundColor: theme.primaryLight }]}>Assignee</Text>
                 )}
                 {assignment.completed && assignment.completedAt && (
-                  <Text style={styles.completionDate}>
+                  <Text style={[styles.completionDate, { color: theme.textMuted }]}>
                     Completed {new Date(assignment.completedAt).toLocaleDateString()} • {getTimeDifference(assignment.dueDate, assignment.completedAt)}
                   </Text>
                 )}
@@ -669,29 +670,29 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             {/* Points and Details */}
             <View style={styles.detailsGrid}>
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Points</Text>
+                <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Points</Text>
                 <LinearGradient
-                  colors={['#fff3bf', '#ffec99']}
+                  colors={[theme.primaryLight, theme.primaryLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.pointsBadge}
                 >
-                  <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-                  <Text style={styles.pointsValue}>{assignment.points || 0}</Text>
+                  <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+                  <Text style={[styles.pointsValue, { color: theme.primary }]}>{assignment.points || 0}</Text>
                 </LinearGradient>
               </View>
               
               <View style={styles.detailItem}>
-                <Text style={styles.detailLabel}>Due Date</Text>
-                <Text style={styles.detailValue}>
+                <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Due Date</Text>
+                <Text style={[styles.detailValue, { color: theme.text }]}>
                   {formatUTCDate(assignment.dueDate)}
                 </Text>
               </View>
 
               {assignment.timeSlot && (
                 <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Time Slot</Text>
-                  <Text style={styles.detailValue}>
+                  <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Time Slot</Text>
+                  <Text style={[styles.detailValue, { color: theme.text }]}>
                     {assignment.timeSlot.startTime} - {assignment.timeSlot.endTime}
                   </Text>
                 </View>
@@ -699,8 +700,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
               {assignment.assignmentDay && (
                 <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Day</Text>
-                  <Text style={styles.detailValue}>{assignment.assignmentDay}</Text>
+                  <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Day</Text>
+                  <Text style={[styles.detailValue, { color: theme.text }]}>{assignment.assignmentDay}</Text>
                 </View>
               )}
             </View>
@@ -711,14 +712,14 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             {/* User Notes */}
             {assignment.notes && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>User Notes</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>User Notes</Text>
                 <LinearGradient
-                  colors={['#e7f5ff', '#d0ebff']}
+                  colors={[theme.primaryLight, theme.primaryLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.notesCard}
+                  style={[styles.notesCard, { borderColor: theme.primaryBorder }]}
                 >
-                  <Text style={styles.notesText}>{assignment.notes}</Text>
+                  <Text style={[styles.notesText, { color: theme.primary }]}>{assignment.notes}</Text>
                 </LinearGradient>
               </View>
             )}
@@ -726,17 +727,18 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
             {/* Admin Notes */}
             {assignment.adminNotes && (
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Admin Feedback</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Admin Feedback</Text>
                 <LinearGradient
-                  colors={assignment.verified === false ? ['#fff5f5', '#ffe3e3'] : ['#d3f9d8', '#b2f2bb']}
+                  colors={assignment.verified === false ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[
                     styles.adminNotesCard,
-                    assignment.verified === false ? styles.rejectedNotes : styles.verifiedNotes
+                    assignment.verified === false ? styles.rejectedNotes : styles.verifiedNotes,
+                    { borderColor: theme.border }
                   ]}
                 >
-                  <Text style={styles.adminNotesText}>{assignment.adminNotes}</Text>
+                  <Text style={[styles.adminNotesText, { color: theme.textSecondary }]}>{assignment.adminNotes}</Text>
                 </LinearGradient>
               </View>
             )}
@@ -746,27 +748,27 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
  
             {/* Assignment Info */} 
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.infoSection}
+              style={[styles.infoSection, { borderColor: theme.border }]}
             >
               <View style={styles.infoRow}>
-                <MaterialCommunityIcons name="calendar-week" size={14} color="#868e96" />
-                <Text style={styles.infoText}>
+                <MaterialCommunityIcons name="calendar-week" size={14} color={theme.textMuted} />
+                <Text style={[styles.infoText, { color: theme.textSecondary }]}>
                   Rotation Week: {assignment.rotationWeek || 1}
                 </Text>
               </View>
               <View style={styles.infoRow}>
-                <MaterialCommunityIcons name="calendar-range" size={14} color="#868e96" />
-                <Text style={styles.infoText}>
+                <MaterialCommunityIcons name="calendar-range" size={14} color={theme.textMuted} />
+                <Text style={[styles.infoText, { color: theme.textSecondary }]}>
                   Week: {new Date(assignment.weekStart).toLocaleDateString()} - {new Date(assignment.weekEnd).toLocaleDateString()}
                 </Text>
               </View>
               {assignment.task?.group && (
                 <View style={styles.infoRow}>
-                  <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
-                  <Text style={styles.infoText}>
+                  <MaterialCommunityIcons name="account-group" size={14} color={theme.textMuted} />
+                  <Text style={[styles.infoText, { color: theme.textSecondary }]}>
                     Group: {assignment.task.group.name}
                   </Text>
                 </View>
@@ -782,8 +784,8 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
   };
 
   return (
-    <ScreenWrapper style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.card} />
       {renderHeader()}
       {renderContent()}
       {renderPhotoModal()}

@@ -1,4 +1,4 @@
-// src/screens/GroupSwapHistoryScreen.tsx - UPDATED with navigation to approvals
+// src/screens/GroupSwapHistoryScreen.tsx - Dark Mode Added
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
@@ -21,10 +21,12 @@ import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { TokenUtils } from '../utils/tokenUtils';
 import * as SecureStore from 'expo-secure-store';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 type FilterStatus = 'ALL' | 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED' | 'EXPIRED';
 
 export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
+  const { theme, isDark } = useTheme();
   const { groupId, groupName } = route.params;
   
   const [requests, setRequests] = useState<any[]>([]);
@@ -234,7 +236,6 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
     }
   };
 
-  // ✅ Navigate to Admin Swap Approvals
   const handleGoToApprovals = () => {
     navigation.navigate('AdminSwapApprovals', { groupId, groupName });
   };
@@ -242,14 +243,18 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
   const renderFilterButton = (filter: FilterStatus, label: string) => (
     <TouchableOpacity
       key={filter}
-      style={[styles.filterButton, activeFilter === filter && styles.filterButtonActive]}
+      style={[
+        styles.filterButton,
+        activeFilter === filter && styles.filterButtonActive,
+        { borderColor: theme.border }
+      ]}
       onPress={() => {
         setActiveFilter(filter);
         setPage(0);
       }}
     >
       <LinearGradient
-        colors={activeFilter === filter ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+        colors={activeFilter === filter ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.filterButtonGradient}
@@ -258,6 +263,7 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
           style={[
             styles.filterButtonText,
             activeFilter === filter && styles.filterButtonTextActive,
+            { color: activeFilter === filter ? '#fff' : theme.textSecondary }
           ]}
         >
           {label}
@@ -271,12 +277,11 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
     const statusLabel = SwapRequestService.getStatusLabel(item.status);
     const statusIcon = SwapRequestService.getStatusIcon(item.status);
     
-    // ✅ Check if this request is pending admin approval
     const isPendingAdminApproval = item.requiresAdminApproval && item.adminApproved === null;
     
     return (
       <TouchableOpacity
-        style={styles.requestCard}
+        style={[styles.requestCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}
         onPress={() => navigation.navigate('SwapRequestDetails', { requestId: item.id })}
         activeOpacity={0.7}
       >
@@ -285,46 +290,45 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
             colors={[statusColor + '20', statusColor + '10']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.statusBadge}
+            style={[styles.statusBadge, { borderColor: theme.border }]}
           >
             <MaterialCommunityIcons name={statusIcon as any} size={12} color={statusColor} />
             <Text style={[styles.statusText, { color: statusColor }]}>
               {statusLabel}
             </Text>
           </LinearGradient>
-          <Text style={styles.dateText}>
+          <Text style={[styles.dateText, { color: theme.textMuted }]}>
             {new Date(item.createdAt).toLocaleDateString()}
           </Text>
         </View>
 
-        <Text style={styles.taskTitle} numberOfLines={1}>
+        <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={1}>
           {item.assignment?.task?.title || 'Task'}
         </Text>
 
-        {/* ✅ Show admin approval status badge if pending */}
         {isPendingAdminApproval && (
           <LinearGradient
-            colors={['#fff3bf', '#ffec99']}
+            colors={[theme.primaryLight, theme.primaryLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.adminPendingBadge}
+            style={[styles.adminPendingBadge, { borderColor: theme.primaryBorder }]}
           >
-            <MaterialCommunityIcons name="clock-outline" size={12} color="#e67700" />
-            <Text style={styles.adminPendingText}>Awaiting Admin Approval</Text>
+            <MaterialCommunityIcons name="clock-outline" size={12} color={theme.primary} />
+            <Text style={[styles.adminPendingText, { color: theme.primary }]}>Awaiting Admin Approval</Text>
           </LinearGradient>
         )}
 
-        <View style={styles.peopleRow}>
+        <View style={[styles.peopleRow, { backgroundColor: theme.bgSecondary }]}>
           <View style={styles.person}>
-            <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.avatarSmall}>
+            <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.avatarSmall}>
               <Text style={styles.avatarText}>
                 {item.requester?.fullName?.charAt(0) || '?'}
               </Text>
             </LinearGradient>
-            <Text style={styles.personName} numberOfLines={1}>
+            <Text style={[styles.personName, { color: theme.textSecondary }]} numberOfLines={1}>
               {item.requester?.fullName || 'Unknown'}
             </Text>
-            <Text style={styles.personRole}>→</Text>
+            <Text style={[styles.personRole, { color: theme.textMuted }]}>→</Text>
           </View>
 
           <View style={styles.person}>
@@ -334,42 +338,41 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
                  (item.targetUserId ? '?' : '🌐')}
               </Text>
             </LinearGradient>
-            <Text style={styles.personName} numberOfLines={1}>
+            <Text style={[styles.personName, { color: theme.textSecondary }]} numberOfLines={1}>
               {item.targetUser?.fullName || 
                (item.targetUserId ? 'Unknown' : 'Anyone')}
             </Text>
           </View>
         </View>
 
-        <View style={styles.detailsRow}>
-          <MaterialCommunityIcons name="calendar" size={14} color="#868e96" />
-          <Text style={styles.detailText}>
+        <View style={[styles.detailsRow, { backgroundColor: theme.bgSecondary }]}>
+          <MaterialCommunityIcons name="calendar" size={14} color={theme.textMuted} />
+          <Text style={[styles.detailText, { color: theme.textSecondary }]}>
             {item.scope === 'day' ? item.selectedDay : 'Full Week'}
           </Text>
-          <View style={styles.dot} />
-          <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-          <Text style={styles.detailText}>{item.assignment?.points || 0} pts</Text>
+          <View style={[styles.dot, { backgroundColor: theme.border }]} />
+          <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+          <Text style={[styles.detailText, { color: theme.textSecondary }]}>{item.assignment?.points || 0} pts</Text>
         </View>
       </TouchableOpacity>
     );
   };
 
-  // Check if user is admin
   const isAdmin = userRole === 'ADMIN';
 
   if (loading && !refreshing) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Swap History</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Swap History</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading swap history...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading swap history...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -377,20 +380,20 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
 
   if (error && !refreshing) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Swap History</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Swap History</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={styles.centerContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
-          <Text style={styles.errorText}>{error}</Text>
+          <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => loadRequests(true)}>
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.retryButtonGradient}
@@ -404,49 +407,49 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{groupName}</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>{groupName}</Text>
         <TouchableOpacity
-          style={styles.filterIconButton}
+          style={[styles.filterIconButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
           onPress={() => {
             setActiveFilter('ALL');
             setPage(0);
           }}
         >
-          <MaterialCommunityIcons name="filter" size={20} color="#2b8a3e" />
+          <MaterialCommunityIcons name="filter" size={20} color={theme.primary} />
         </TouchableOpacity>
       </View>
 
-      {/* ✅ Admin Banner with button to approvals */}
+      {/* Admin Banner with button to approvals */}
       {isAdmin && (
         <TouchableOpacity onPress={handleGoToApprovals} activeOpacity={0.9}>
           <LinearGradient
-            colors={['#e8f5e9', '#c8e6c9']}
+            colors={[theme.primaryLight, theme.primaryLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.adminBanner}
+            style={[styles.adminBanner, { borderColor: theme.primaryBorder }]}
           >
             <View style={styles.adminBannerContent}>
-              <MaterialCommunityIcons name="swap-horizontal" size={22} color="#2b8a3e" />
+              <MaterialCommunityIcons name="swap-horizontal" size={22} color={theme.primary} />
               <View style={styles.adminBannerTextContainer}>
-                <Text style={styles.adminBannerTitle}>Pending Approvals</Text>
-                <Text style={styles.adminBannerSubtitle}>
+                <Text style={[styles.adminBannerTitle, { color: theme.primary }]}>Pending Approvals</Text>
+                <Text style={[styles.adminBannerSubtitle, { color: theme.textSecondary }]}>
                   Review and manage swap requests that need your approval
                 </Text>
               </View>
             </View>
-            <MaterialCommunityIcons name="chevron-right" size={24} color="#2b8a3e" />
+            <MaterialCommunityIcons name="chevron-right" size={24} color={theme.primary} />
           </LinearGradient>
         </TouchableOpacity>
       )}
 
       {/* Filter Tabs */}
-      <View style={styles.filterContainer}>
+      <View style={[styles.filterContainer, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {renderFilterButton('ALL', 'All')}
           {renderFilterButton('PENDING', 'Pending')}
@@ -466,8 +469,8 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
           <RefreshControl 
             refreshing={refreshing}  
             onRefresh={handleRefresh}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         onEndReached={handleLoadMore}
@@ -476,15 +479,15 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
           !loading ? (
             <View style={styles.emptyContainer}>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.emptyIconContainer}
+                style={[styles.emptyIconContainer, { borderColor: theme.border }]}
               >
-                <MaterialCommunityIcons name="swap-horizontal" size={40} color="#2b8a3e" />
+                <MaterialCommunityIcons name="swap-horizontal" size={40} color={theme.primary} />
               </LinearGradient>
-              <Text style={styles.emptyTitle}>No Swap History</Text>
-              <Text style={styles.emptyText}>
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>No Swap History</Text>
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
                 {activeFilter === 'ALL' 
                   ? 'No swap requests found for this group'
                   : `No ${activeFilter.toLowerCase()} swap requests found`}
@@ -498,7 +501,7 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
                   }}
                 >
                   <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
+                    colors={[theme.primary, theme.primaryDark]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.clearFilterGradient}
@@ -512,7 +515,7 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
         }
         ListFooterComponent={
           loading && requests.length > 0 ? (
-            <ActivityIndicator style={styles.loader} color="#2b8a3e" />
+            <ActivityIndicator style={styles.loader} color={theme.primary} />
           ) : null
         }
       />
@@ -523,7 +526,6 @@ export const GroupSwapHistoryScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   header: {
     flexDirection: 'row',
@@ -531,19 +533,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -552,7 +550,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     flex: 1,
     textAlign: 'center',
   },
@@ -560,16 +557,13 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
-  // ✅ Admin banner styles
   adminBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -581,7 +575,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#b2f2bb',
   },
   adminBannerContent: {
     flexDirection: 'row',
@@ -595,11 +588,9 @@ const styles = StyleSheet.create({
   adminBannerTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2b8a3e',
   },
   adminBannerSubtitle: {
     fontSize: 12,
-    color: '#495057',
     marginTop: 2,
   },
   adminPendingBadge: {
@@ -611,57 +602,48 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     marginBottom: 12,
     gap: 4,
+    borderWidth: 1,
   },
   adminPendingText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#e67700',
   },
   filterContainer: {
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
   },
   filterButton: {
     borderRadius: 20,
     marginRight: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   filterButtonGradient: {
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   filterButtonActive: {
-    borderColor: '#2b8a3e',
+    borderWidth: 2,
   },
   filterButtonText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#495057',
   },
-  filterButtonTextActive: {
-    color: 'white',
-  },
+  filterButtonTextActive: {},
   listContent: {
     padding: 16,
     flexGrow: 1,
   },
   requestCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -677,7 +659,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 4,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   statusText: {
     fontSize: 11,
@@ -685,12 +666,10 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 11,
-    color: '#868e96',
   },
   taskTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 12,
   },
   peopleRow: {
@@ -698,7 +677,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
-    backgroundColor: '#f8f9fa',
     padding: 12,
     borderRadius: 12,
   },
@@ -716,25 +694,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
   },
   personName: {
     fontSize: 12,
-    color: '#495057',
     flex: 1,
   },
   personRole: {
     fontSize: 14,
-    color: '#868e96',
     marginHorizontal: 4,
   },
   detailsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f8f9fa',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
@@ -742,13 +717,11 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 12,
-    color: '#495057',
   },
   dot: {
     width: 3,
     height: 3,
     borderRadius: 1.5,
-    backgroundColor: '#ced4da',
     marginHorizontal: 4,
   },
   centerContainer: {
@@ -760,12 +733,10 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
   },
   errorText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#fa5252',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -778,7 +749,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   retryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -796,17 +767,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#868e96',
     textAlign: 'center',
     paddingHorizontal: 32,
     lineHeight: 20,
@@ -816,7 +784,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#2b8a3e',
   },
   clearFilterGradient: {
     paddingHorizontal: 20,
@@ -825,7 +792,7 @@ const styles = StyleSheet.create({
   clearFilterText: {
     fontSize: 13,
     fontWeight: '600',
-    color: 'white',
+    color: '#fff',
   },
   loader: {
     marginVertical: 20,

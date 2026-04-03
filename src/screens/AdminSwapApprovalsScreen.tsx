@@ -1,5 +1,4 @@
-// screens/AdminSwapApprovalsScreen.tsx - COMPLETE FIXED VERSION
-
+// screens/AdminSwapApprovalsScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -17,16 +16,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
-import { SwapRequestService, SwapRequest } from '../services/SwapRequestService'; // ✅ Import SwapRequest type
+import { SwapRequestService, SwapRequest } from '../services/SwapRequestService';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { TokenUtils } from '../utils/tokenUtils';
-
-// ✅ Remove local interface and use imported one
-// interface SwapRequest { ... } - DELETE THIS
+import { useTheme } from '../context/ThemeContext';
 
 export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
+  const { theme } = useTheme();
   const { groupId, groupName } = route.params;
-  
+
   const {
     pendingForAdmin,
     loading,
@@ -35,7 +33,7 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
     adminApproveSwapRequest,
     adminRejectSwapRequest,
   } = useSwapRequests();
-  
+
   const [refreshing, setRefreshing] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
@@ -43,7 +41,6 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
   const [rejectionReason, setRejectionReason] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // Load user ID
   useEffect(() => {
     const loadUser = async () => {
       const user = await TokenUtils.getUser();
@@ -52,7 +49,6 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
     loadUser();
   }, []);
 
-  // Load pending approvals when screen focuses
   useFocusEffect(
     useCallback(() => {
       if (groupId) {
@@ -80,7 +76,7 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
             setProcessingId(requestId);
             const result = await adminApproveSwapRequest(requestId);
             setProcessingId(null);
-            
+
             if (result.success) {
               Alert.alert('Success', 'Swap request approved');
               await loadPendingForAdmin(groupId);
@@ -125,21 +121,20 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
     const requesterName = item.requester?.fullName || 'Unknown';
     const taskTitle = item.assignment?.task?.title || 'Task';
     const points = item.assignment?.task?.points || 0;
-    // ✅ Use targetUserId instead of targetUser for checking
     const targetName = item.targetUser?.fullName || (item.targetUserId ? 'Specific user' : 'Anyone');
     const currentAssignee = item.assignment?.user?.fullName || 'Unknown';
 
     return (
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.requestCard}
+        style={[styles.requestCard, { borderColor: theme.border }]}
       >
         <View style={styles.cardHeader}>
           <View style={styles.requesterInfo}>
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               style={styles.avatar}
             >
               <Text style={styles.avatarText}>
@@ -147,69 +142,69 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
               </Text>
             </LinearGradient>
             <View>
-              <Text style={styles.requesterName}>{requesterName}</Text>
-              <Text style={styles.requestTime}>
+              <Text style={[styles.requesterName, { color: theme.text }]}>{requesterName}</Text>
+              <Text style={[styles.requestTime, { color: theme.textMuted }]}>
                 {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Unknown date'}
               </Text>
             </View>
           </View>
           <LinearGradient
-            colors={['#fff3bf', '#ffec99']}
+            colors={[theme.primaryLight, theme.primaryLight]}
             style={styles.pendingBadge}
           >
-            <MaterialCommunityIcons name="clock-outline" size={12} color="#e67700" />
-            <Text style={styles.pendingBadgeText}>Awaiting Approval</Text>
+            <MaterialCommunityIcons name="clock-outline" size={12} color={theme.primary} />
+            <Text style={[styles.pendingBadgeText, { color: theme.primary }]}>Awaiting Approval</Text>
           </LinearGradient>
         </View>
 
-        <Text style={styles.taskTitle}>{taskTitle}</Text>
+        <Text style={[styles.taskTitle, { color: theme.text }]}>{taskTitle}</Text>
 
         <View style={styles.detailsContainer}>
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="swap-horizontal" size={14} color="#2b8a3e" />
-            <Text style={styles.detailText}>
+          <View style={[styles.detailRow, { backgroundColor: theme.bgSecondary }]}>
+            <MaterialCommunityIcons name="swap-horizontal" size={14} color={theme.primary} />
+            <Text style={[styles.detailText, { color: theme.textSecondary }]}>
               {item.scope === 'day' ? `Swap for ${item.selectedDay}` : 'Swap entire week'}
             </Text>
           </View>
 
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="account" size={14} color="#868e96" />
-            <Text style={styles.detailText}>
+          <View style={[styles.detailRow, { backgroundColor: theme.bgSecondary }]}>
+            <MaterialCommunityIcons name="account" size={14} color={theme.textMuted} />
+            <Text style={[styles.detailText, { color: theme.textSecondary }]}>
               Current: {currentAssignee}
             </Text>
           </View>
 
-          <View style={styles.detailRow}>
+          <View style={[styles.detailRow, { backgroundColor: theme.bgSecondary }]}>
             <MaterialCommunityIcons name="account-switch" size={14} color="#4F46E5" />
-            <Text style={styles.detailText}>
+            <Text style={[styles.detailText, { color: theme.textSecondary }]}>
               Requested to: {targetName}
             </Text>
           </View>
 
-          <View style={styles.detailRow}>
+          <View style={[styles.detailRow, { backgroundColor: theme.bgSecondary }]}>
             <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-            <Text style={styles.detailText}>{points} pts</Text>
+            <Text style={[styles.detailText, { color: theme.textSecondary }]}>{points} pts</Text>
           </View>
         </View>
 
         {item.reason && (
           <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
+            colors={[theme.bgSecondary, theme.bgTertiary]}
             style={styles.reasonContainer}
           >
-            <Text style={styles.reasonLabel}>Reason:</Text>
-            <Text style={styles.reasonText}>{item.reason}</Text>
+            <Text style={[styles.reasonLabel, { color: theme.textMuted }]}>Reason:</Text>
+            <Text style={[styles.reasonText, { color: theme.text }]}>{item.reason}</Text>
           </LinearGradient>
         )}
 
         <View style={styles.actionButtons}>
           <TouchableOpacity
-            style={[styles.actionButton, styles.approveButton]}
+            style={[styles.actionButton, styles.approveButton, { borderColor: theme.primaryBorder }]}
             onPress={() => handleApprove(item.id)}
             disabled={isProcessing}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.actionButtonGradient}
@@ -226,7 +221,7 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.actionButton, styles.rejectButton]}
+            style={[styles.actionButton, styles.rejectButton, { borderColor: theme.errorBorder ?? '#ffc9c9' }]}
             onPress={() => openRejectModal(item.id)}
             disabled={isProcessing}
           >
@@ -247,36 +242,42 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
 
   if (loading && !refreshing && pendingForAdmin.length === 0) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
+          >
+            <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Pending Approvals</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Pending Approvals</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading pending approvals...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading pending approvals...</Text>
         </View>
       </ScreenWrapper>
     );
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{groupName || 'Swap Approvals'}</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>{groupName || 'Swap Approvals'}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       {totalPendingForAdmin > 0 && (
-        <View style={styles.infoBanner}>
-          <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
-          <Text style={styles.infoText}>
+        <View style={[styles.infoBanner, { backgroundColor: theme.primaryLight }]}>
+          <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
+          <Text style={[styles.infoText, { color: theme.primary }]}>
             {totalPendingForAdmin} swap request{totalPendingForAdmin !== 1 ? 's' : ''} waiting for your approval
           </Text>
         </View>
@@ -291,20 +292,20 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
-              style={styles.emptyIconContainer}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
+              style={[styles.emptyIconContainer, { borderColor: theme.border }]}
             >
-              <MaterialCommunityIcons name="check-circle" size={48} color="#2b8a3e" />
+              <MaterialCommunityIcons name="check-circle" size={48} color={theme.primary} />
             </LinearGradient>
-            <Text style={styles.emptyTitle}>No Pending Approvals</Text>
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>No Pending Approvals</Text>
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
               All swap requests have been processed. New requests will appear here.
             </Text>
           </View>
@@ -320,17 +321,21 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
       >
         <View style={styles.modalOverlay}>
           <LinearGradient
-            colors={['white', '#f8f9fa']}
-            style={styles.modalContent}
+            colors={[theme.card, theme.bgSecondary]}
+            style={[styles.modalContent, { borderColor: theme.border }]}
           >
-            <Text style={styles.modalTitle}>Reject Swap Request</Text>
-            <Text style={styles.modalSubtitle}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Reject Swap Request</Text>
+            <Text style={[styles.modalSubtitle, { color: theme.textMuted }]}>
               Please provide a reason for rejection
             </Text>
             <TextInput
-              style={styles.reasonInput}
+              style={[styles.reasonInput, {
+                backgroundColor: theme.bgSecondary,
+                color: theme.text,
+                borderColor: theme.border
+              }]}
               placeholder="Enter rejection reason..."
-              placeholderTextColor="#adb5bd"
+              placeholderTextColor={theme.textPlaceholder ?? theme.textMuted}
               value={rejectionReason}
               onChangeText={setRejectionReason}
               multiline
@@ -339,10 +344,10 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={styles.modalCancelButton}
+                style={[styles.modalCancelButton, { borderColor: theme.border }]}
                 onPress={() => setRejectModalVisible(false)}
               >
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={[styles.modalCancelText, { color: theme.textMuted }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.modalConfirmButton}
@@ -366,7 +371,6 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   header: {
     flexDirection: 'row',
@@ -374,18 +378,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -394,7 +394,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
   },
   centerContainer: {
     flex: 1,
@@ -404,12 +403,10 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
   },
   infoBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e8f5e9',
     marginHorizontal: 16,
     marginTop: 12,
     marginBottom: 4,
@@ -421,7 +418,6 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 12,
-    color: '#2b8a3e',
   },
   listContent: {
     padding: 16,
@@ -431,8 +427,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
@@ -464,11 +458,9 @@ const styles = StyleSheet.create({
   requesterName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
   },
   requestTime: {
     fontSize: 11,
-    color: '#868e96',
     marginTop: 2,
   },
   pendingBadge: {
@@ -482,12 +474,10 @@ const styles = StyleSheet.create({
   pendingBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#e67700',
   },
   taskTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 12,
   },
   detailsContainer: {
@@ -498,7 +488,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#f8f9fa',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
@@ -506,7 +495,6 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 12,
-    color: '#495057',
   },
   reasonContainer: {
     padding: 12,
@@ -516,12 +504,10 @@ const styles = StyleSheet.create({
   reasonLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#868e96',
     marginBottom: 4,
   },
   reasonText: {
     fontSize: 13,
-    color: '#212529',
     lineHeight: 18,
   },
   actionButtons: {
@@ -547,11 +533,9 @@ const styles = StyleSheet.create({
   },
   approveButton: {
     borderWidth: 1,
-    borderColor: '#b2f2bb',
   },
   rejectButton: {
     borderWidth: 1,
-    borderColor: '#ffc9c9',
   },
   emptyContainer: {
     flex: 1,
@@ -566,16 +550,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    borderWidth: 1,
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#868e96',
     textAlign: 'center',
     paddingHorizontal: 32,
   },
@@ -590,30 +573,24 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#212529',
     marginBottom: 4,
   },
   modalSubtitle: {
     fontSize: 13,
-    color: '#868e96',
     marginBottom: 16,
   },
   reasonInput: {
-    backgroundColor: '#f8f9fa',
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#212529',
     minHeight: 80,
     textAlignVertical: 'top',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -626,11 +603,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   modalCancelText: {
     fontSize: 14,
-    color: '#868e96',
     fontWeight: '500',
   },
   modalConfirmButton: {

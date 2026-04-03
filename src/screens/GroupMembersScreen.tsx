@@ -1,5 +1,4 @@
-
-// src/screens/GroupMembersScreen.tsx - Just update checkToken
+// src/screens/GroupMembersScreen.tsx - Dark Mode Added
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
@@ -25,11 +24,15 @@ import { useGroupMembers } from '../groupHook/useGroupMembers';
 import { useImageUpload } from '../uploadHook/useImageUpload';
 import { useRealtimeGroup } from '../hooks/useRealtimeGroup';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { groupMembersStyles as styles } from '../styles/groupMembers.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeGroupMembersStyles } from '../styles/groupMembers.styles';
 
 export default function GroupMembersScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
+  const styles = makeGroupMembersStyles(theme);
+  
   const { groupId, groupName, userRole, inviteCode } = route.params || {};
   
   const {
@@ -119,12 +122,6 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     });
     return hasToken;
   }, []); 
-
-  // ===== AUTH ERROR HANDLER =====
-  useEffect(() => {
-    // The TokenUtils.checkToken already handles alerts,
-    // but you can add navigation here if needed
-  }, []);
 
   // ===== HANDLE REAL-TIME GROUP EVENTS =====
   useEffect(() => {
@@ -332,8 +329,8 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     const isLow = memberCount < 6;
     const isFull = memberCount >= maxMembers;
     
-    let bannerColor = isFull ? '#fa5252' : (isLow ? '#e67700' : '#2b8a3e');
-    let bannerBg = isFull ? '#fff5f5' : (isLow ? '#fff3bf' : '#d3f9d8');
+    let bannerColor = isFull ? theme.error : (isLow ? theme.primary : theme.primary);
+    let bannerBg = isFull ? theme.errorBg : (isLow ? theme.primaryLight : theme.primaryLight);
     let message = '';
     
     if (isFull) {
@@ -365,7 +362,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             onPress={() => setShowMaxModal(true)}
             style={styles.editLimitButton}
           >
-            <MaterialCommunityIcons name="pencil" size={18} color="#2b8a3e" />
+            <MaterialCommunityIcons name="pencil" size={18} color={theme.primary} />
           </TouchableOpacity>
         )}
       </LinearGradient>
@@ -664,7 +661,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       return (
         <View style={[styles.avatarContainer, { left: index * (avatarSize + overlap) }]}>
           <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
+            colors={[theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.avatar, styles.moreAvatar]}
@@ -688,13 +685,13 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 height: avatarSize, 
                 borderRadius: avatarSize / 2,
                 borderWidth: 2,
-                borderColor: member.role === 'ADMIN' ? '#2b8a3e' : '#e9ecef'
+                borderColor: member.role === 'ADMIN' ? theme.primary : theme.border
               }
             ]}
           />
         ) : (
           <LinearGradient
-            colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+            colors={member.role === 'ADMIN' ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[
@@ -704,13 +701,13 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 height: avatarSize, 
                 borderRadius: avatarSize / 2,
                 borderWidth: 2,
-                borderColor: member.role === 'ADMIN' ? '#2b8a3e' : '#e9ecef'
+                borderColor: member.role === 'ADMIN' ? theme.primary : theme.border
               }
             ]}
           >
             <Text style={[
               styles.avatarText,
-              { color: member.role === 'ADMIN' ? 'white' : '#495057' }
+              { color: member.role === 'ADMIN' ? '#fff' : theme.textSecondary }
             ]}>
               {member.fullName?.charAt(0)?.toUpperCase() || 'U'}
             </Text>
@@ -718,7 +715,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         )}
         {member.role === 'ADMIN' && (
           <View style={styles.adminCrown}>
-            <MaterialCommunityIcons name="crown" size={10} color="#2b8a3e" />
+            <MaterialCommunityIcons name="crown" size={10} color={theme.primary} />
           </View>
         )}
       </View>
@@ -732,7 +729,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                       members.filter(m => m.role === 'ADMIN').length <= 1;
 
     return (
-      <View style={styles.memberCard}>
+      <View style={[styles.memberCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <View style={styles.memberInfo}>
           {item.avatarUrl ? (
             <Image
@@ -742,23 +739,23 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 styles.memberAvatarImage,
                 { 
                   borderWidth: 2,
-                  borderColor: item.role === 'ADMIN' ? '#2b8a3e' : '#e9ecef'
+                  borderColor: item.role === 'ADMIN' ? theme.primary : theme.border
                 }
               ]}
             />
           ) : (
             <LinearGradient
-              colors={item.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+              colors={item.role === 'ADMIN' ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={[
                 styles.memberAvatar,
-                { borderWidth: 2, borderColor: item.role === 'ADMIN' ? '#2b8a3e' : '#e9ecef' }
+                { borderWidth: 2, borderColor: item.role === 'ADMIN' ? theme.primary : theme.border }
               ]}
             >
               <Text style={[
                 styles.memberAvatarText,
-                { color: item.role === 'ADMIN' ? 'white' : '#495057' }
+                { color: item.role === 'ADMIN' ? '#fff' : theme.textSecondary }
               ]}>
                 {item.fullName?.charAt(0)?.toUpperCase() || 'U'}
               </Text>
@@ -766,26 +763,26 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           )}
           <View style={styles.memberDetails}>
             <View style={styles.memberHeader}>
-              <Text style={styles.memberName}>
+              <Text style={[styles.memberName, { color: theme.text }]}>
                 {item.fullName} {isCurrentUser && '(You)'}
               </Text>
               {item.role === 'ADMIN' && (
                 <LinearGradient
-                  colors={['#d3f9d8', '#b2f2bb']}
+                  colors={[theme.primaryLight, theme.primaryLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.adminBadge}
                 >
-                  <MaterialCommunityIcons name="crown" size={12} color="#2b8a3e" />
-                  <Text style={styles.adminBadgeText}>Admin</Text>
+                  <MaterialCommunityIcons name="crown" size={12} color={theme.primary} />
+                  <Text style={[styles.adminBadgeText, { color: theme.primary }]}>Admin</Text>
                 </LinearGradient>
               )}
             </View>
             {item.email && (
-              <Text style={styles.memberEmail}>{item.email}</Text>
+              <Text style={[styles.memberEmail, { color: theme.textMuted }]}>{item.email}</Text>
             )}
             {item.joinedAt && (
-              <Text style={styles.memberJoined}>
+              <Text style={[styles.memberJoined, { color: theme.textMuted }]}>
                 Joined {new Date(item.joinedAt).toLocaleDateString()}
               </Text>
             )}
@@ -805,7 +802,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 <MaterialCommunityIcons 
                   name={item.role === 'ADMIN' ? 'account-arrow-down' : 'account-arrow-up'} 
                   size={16} 
-                  color={item.role === 'ADMIN' ? '#fa5252' : '#2b8a3e'} 
+                  color={item.role === 'ADMIN' ? theme.error : theme.primary} 
                 />
               </TouchableOpacity>
             )}
@@ -815,18 +812,18 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 style={styles.removeButton}
                 onPress={() => handleRemoveMember(item)}
               >
-                <MaterialCommunityIcons name="account-remove" size={16} color="#fa5252" />
+                <MaterialCommunityIcons name="account-remove" size={16} color={theme.error} />
               </TouchableOpacity>
             )}
             
             {isOnlyAdmin && (
               <LinearGradient
-                colors={['#fff3bf', '#ffec99']}
+                colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.protectedBadge}
               >
-                <MaterialCommunityIcons name="shield-check" size={14} color="#e67700" />
+                <MaterialCommunityIcons name="shield-check" size={14} color={theme.primary} />
               </LinearGradient>
             )}
           </View>
@@ -834,12 +831,12 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
         {isCurrentUser && (
           <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
+            colors={[theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.currentUserBadge}
           >
-            <Text style={styles.currentUserBadgeText}>You</Text>
+            <Text style={[styles.currentUserBadgeText, { color: theme.textSecondary }]}>You</Text>
           </LinearGradient>
         )}
       </View>
@@ -848,10 +845,10 @@ export default function GroupMembersScreen({ navigation, route }: any) {
 
   if (loading && !refreshing) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading group...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading group...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -863,28 +860,28 @@ export default function GroupMembersScreen({ navigation, route }: any) {
   const isOnlyAdmin = currentUserRole === 'ADMIN' && adminCount <= 1;
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        style={styles.header}
+        style={[styles.header, { borderBottomColor: theme.border }]}
       >
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Group Info</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Group Info</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => fetchData(true)} style={styles.headerIcon}>
-            <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+            <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
           </TouchableOpacity>
           {currentUserRole === 'ADMIN' && (
             <TouchableOpacity 
               onPress={() => setShowSettingsModal(true)} 
               style={styles.headerIcon}
             >
-              <MaterialCommunityIcons name="cog" size={20} color="#495057" />
+              <MaterialCommunityIcons name="cog" size={20} color={theme.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -898,18 +895,18 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => fetchData(true)}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         showsVerticalScrollIndicator={false}
       >
         {/* Group Avatar Banner */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.avatarBanner}
+          style={[styles.avatarBanner, { borderColor: theme.border }]}
         >
           <View style={styles.avatarCircleContainer}>
             {members.slice(0, 7).map((member, index) => renderAvatar(member, index))}
@@ -925,7 +922,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             <View style={styles.groupAvatarContainer}>
               {uploadingAvatar ? (
                 <View style={[styles.groupMainAvatar, styles.uploadingAvatar]}>
-                  <ActivityIndicator size="small" color="#2b8a3e" />
+                  <ActivityIndicator size="small" color={theme.primary} />
                 </View>
               ) : groupInfo?.avatarUrl ? (
                 <Image
@@ -934,7 +931,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 />
               ) : (
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}
+                  colors={[theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.groupMainAvatar}
@@ -947,29 +944,29 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               
               {currentUserRole === 'ADMIN' && !uploadingAvatar && (
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}
+                  colors={[theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.editAvatarIcon}
                 >
-                  <MaterialCommunityIcons name="camera-plus" size={14} color="white" />
+                  <MaterialCommunityIcons name="camera-plus" size={14} color="#fff" />
                 </LinearGradient>
               )}
             </View>
             
             <View style={styles.groupTextInfo}>
-              <Text style={styles.groupName}>{groupInfo?.name || groupName || 'Group'}</Text>
+              <Text style={[styles.groupName, { color: theme.text }]}>{groupInfo?.name || groupName || 'Group'}</Text>
               {groupInfo?.description && (
-                <Text style={styles.groupDescription}>{groupInfo.description}</Text>
+                <Text style={[styles.groupDescription, { color: theme.textMuted }]}>{groupInfo.description}</Text>
               )}
               <View style={styles.groupStats}>
                 <View style={styles.statItem}>
-                  <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
-                  <Text style={styles.statText}>{members.length} members</Text>
+                  <MaterialCommunityIcons name="account-group" size={14} color={theme.textMuted} />
+                  <Text style={[styles.statText, { color: theme.textMuted }]}>{members.length} members</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <MaterialCommunityIcons name="crown" size={14} color="#2b8a3e" />
-                  <Text style={styles.statText}>{adminCount} admins</Text>
+                  <MaterialCommunityIcons name="crown" size={14} color={theme.primary} />
+                  <Text style={[styles.statText, { color: theme.textMuted }]}>{adminCount} admins</Text>
                 </View>
               </View>
             </View>
@@ -984,13 +981,13 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 activeOpacity={0.7}
               >
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.adminButtonGradient}
                 >
-                  <MaterialCommunityIcons name="pencil" size={16} color="#495057" />
-                  <Text style={styles.adminButtonText}>Edit</Text>
+                  <MaterialCommunityIcons name="pencil" size={16} color={theme.textSecondary} />
+                  <Text style={[styles.adminButtonText, { color: theme.textSecondary }]}>Edit</Text>
                 </LinearGradient>
               </TouchableOpacity>
               
@@ -1000,13 +997,13 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 activeOpacity={0.7}
               >
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.adminButtonGradient}
                 >
-                  <MaterialCommunityIcons name="share-variant" size={16} color="#495057" />
-                  <Text style={styles.adminButtonText}>Share</Text>
+                  <MaterialCommunityIcons name="share-variant" size={16} color={theme.textSecondary} />
+                  <Text style={[styles.adminButtonText, { color: theme.textSecondary }]}>Share</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -1018,18 +1015,18 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           <View style={styles.inviteSection}>
             <View style={styles.sectionHeader}>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.sectionIcon}
               >
-                <MaterialCommunityIcons name="qrcode" size={14} color="#495057" />
+                <MaterialCommunityIcons name="qrcode" size={14} color={theme.textSecondary} />
               </LinearGradient>
-              <Text style={styles.sectionTitle}>Invite Code</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Invite Code</Text>
             </View>
             
             <TouchableOpacity 
-              style={styles.inviteCodeCard}
+              style={[styles.inviteCodeCard, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}
               onPress={() => {
                 Alert.alert('Invite Code', inviteCodeToShow, [
                   { text: 'Copy', onPress: () => {/* Copy to clipboard */} },
@@ -1039,11 +1036,11 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               }}
               activeOpacity={0.7}
             >
-              <Text style={styles.inviteCode}>{inviteCodeToShow}</Text>
-              <MaterialCommunityIcons name="content-copy" size={18} color="#495057" />
+              <Text style={[styles.inviteCode, { color: theme.text }]}>{inviteCodeToShow}</Text>
+              <MaterialCommunityIcons name="content-copy" size={18} color={theme.textMuted} />
             </TouchableOpacity>
             
-            <Text style={styles.inviteInstructions}>
+            <Text style={[styles.inviteInstructions, { color: theme.textMuted }]}>
               Share this code with friends to join the group
             </Text>
 
@@ -1054,13 +1051,13 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 activeOpacity={0.7}
               >
                 <LinearGradient
-                  colors={['#fff3bf', '#ffec99']}
+                  colors={[theme.primaryLight, theme.primaryLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.regenerateButtonGradient}
                 >
-                  <MaterialCommunityIcons name="refresh" size={14} color="#e67700" />
-                  <Text style={styles.regenerateButtonText}>Regenerate</Text>
+                  <MaterialCommunityIcons name="refresh" size={14} color={theme.primary} />
+                  <Text style={[styles.regenerateButtonText, { color: theme.primary }]}>Regenerate</Text>
                 </LinearGradient>
               </TouchableOpacity>
             )}
@@ -1070,15 +1067,15 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         {/* Admin Warning */}
         {isOnlyAdmin && (
           <LinearGradient
-            colors={['#fff3bf', '#ffec99']}
+            colors={[theme.primaryLight, theme.primaryLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.warningSection}
+            style={[styles.warningSection, { borderColor: theme.primaryBorder }]}
           >
-            <MaterialCommunityIcons name="alert-circle" size={20} color="#e67700" />
+            <MaterialCommunityIcons name="alert-circle" size={20} color={theme.primary} />
             <View style={styles.warningContent}>
-              <Text style={styles.warningTitle}>You are the only admin</Text>
-              <Text style={styles.warningText}>
+              <Text style={[styles.warningTitle, { color: theme.primary }]}>You are the only admin</Text>
+              <Text style={[styles.warningText, { color: theme.primary }]}>
                 Transfer ownership before leaving
               </Text>
             </View>
@@ -1089,26 +1086,26 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         <View style={styles.membersSection}>
           <View style={styles.sectionHeader}>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.sectionIcon}
             >
-              <MaterialCommunityIcons name="account-multiple" size={14} color="#495057" />
+              <MaterialCommunityIcons name="account-multiple" size={14} color={theme.textSecondary} />
             </LinearGradient>
-            <Text style={styles.sectionTitle}>Members ({members.length})</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Members ({members.length})</Text>
           </View>
 
           {error ? (
             <View style={styles.errorContainer}>
-              <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
-              <Text style={styles.errorText}>{error}</Text>
+              <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
+              <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
               <TouchableOpacity
                 style={styles.retryButton}
                 onPress={() => fetchData()}
               >
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}
+                  colors={[theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.retryButtonGradient}
@@ -1125,8 +1122,8 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               scrollEnabled={false}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <MaterialCommunityIcons name="account-group" size={48} color="#dee2e6" />
-                  <Text style={styles.emptyText}>No members found</Text>
+                  <MaterialCommunityIcons name="account-group" size={48} color={theme.border} />
+                  <Text style={[styles.emptyText, { color: theme.textMuted }]}>No members found</Text>
                 </View>
               }
             />
@@ -1144,7 +1141,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
           activeOpacity={0.7}
         >
           <LinearGradient
-            colors={isOnlyAdmin ? ['#f8f9fa', '#e9ecef'] : ['#fff5f5', '#ffe3e3']}
+            colors={isOnlyAdmin ? [theme.bgSecondary, theme.bgTertiary] : [theme.errorBg, theme.errorBg]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.leaveButtonGradient}
@@ -1152,11 +1149,12 @@ export default function GroupMembersScreen({ navigation, route }: any) {
             <MaterialCommunityIcons 
               name="exit-to-app" 
               size={18} 
-              color={isOnlyAdmin ? "#adb5bd" : "#fa5252"} 
+              color={isOnlyAdmin ? theme.textPlaceholder : theme.error} 
             />
             <Text style={[
               styles.leaveButtonText,
-              isOnlyAdmin && styles.disabledLeaveButtonText
+              isOnlyAdmin && styles.disabledLeaveButtonText,
+              { color: isOnlyAdmin ? theme.textPlaceholder : theme.error }
             ]}>
               {isOnlyAdmin ? 'Cannot Leave' : 'Leave Group'}
             </Text>
@@ -1164,31 +1162,31 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Settings Modal */}
+      {/* Settings Modal - Keep original styles with inline colors */}
       <Modal
         visible={showSettingsModal}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setShowSettingsModal(false)}
       >
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { backgroundColor: theme.overlay }]}>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.modalContent}
           >
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Group Settings</Text>
-              <TouchableOpacity onPress={() => setShowSettingsModal(false)} style={styles.closeButton}>
-                <MaterialCommunityIcons name="close" size={20} color="#868e96" />
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Group Settings</Text>
+              <TouchableOpacity onPress={() => setShowSettingsModal(false)} style={[styles.closeButton, { backgroundColor: theme.bgSecondary }]}>
+                <MaterialCommunityIcons name="close" size={20} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               {/* Transfer Ownership */}
               <TouchableOpacity 
-                style={styles.settingsItem}
+                style={[styles.settingsItem, { borderBottomColor: theme.border }]}
                 onPress={() => {
                   setShowSettingsModal(false);
                   handleTransferOwnership();
@@ -1204,17 +1202,17 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                   <MaterialCommunityIcons name="swap-horizontal" size={18} color="#4F46E5" />
                 </LinearGradient>
                 <View style={styles.settingsContent}>
-                  <Text style={styles.settingsTitle}>Transfer Ownership</Text>
-                  <Text style={styles.settingsDescription}>
+                  <Text style={[styles.settingsTitle, { color: theme.text }]}>Transfer Ownership</Text>
+                  <Text style={[styles.settingsDescription, { color: theme.textMuted }]}>
                     Make another member admin
                   </Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
               </TouchableOpacity>
 
               {/* Regenerate Invite Code */}
               <TouchableOpacity 
-                style={styles.settingsItem}
+                style={[styles.settingsItem, { borderBottomColor: theme.border }]}
                 onPress={() => {
                   setShowSettingsModal(false);
                   handleRegenerateInviteCode();
@@ -1222,25 +1220,25 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 activeOpacity={0.7}
               >
                 <LinearGradient
-                  colors={['#fff3bf', '#ffec99']}
+                  colors={[theme.primaryLight, theme.primaryLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.settingsIcon}
                 >
-                  <MaterialCommunityIcons name="refresh" size={18} color="#e67700" />
+                  <MaterialCommunityIcons name="refresh" size={18} color={theme.primary} />
                 </LinearGradient>
                 <View style={styles.settingsContent}>
-                  <Text style={styles.settingsTitle}>Regenerate Code</Text>
-                  <Text style={styles.settingsDescription}>
+                  <Text style={[styles.settingsTitle, { color: theme.text }]}>Regenerate Code</Text>
+                  <Text style={[styles.settingsDescription, { color: theme.textMuted }]}>
                     Create new invite code
                   </Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
               </TouchableOpacity>
 
               {/* Delete Group - Danger */}
               <TouchableOpacity 
-                style={[styles.settingsItem, styles.dangerItem]}
+                style={[styles.settingsItem, styles.dangerItem, { borderBottomColor: theme.border }]}
                 onPress={() => {
                   setShowSettingsModal(false);
                   handleDeleteGroup();
@@ -1248,20 +1246,20 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 activeOpacity={0.7}
               >
                 <LinearGradient
-                  colors={['#fff5f5', '#ffe3e3']}
+                  colors={[theme.errorBg, theme.errorBg]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.settingsIcon}
                 >
-                  <MaterialCommunityIcons name="trash-can" size={18} color="#fa5252" />
+                  <MaterialCommunityIcons name="trash-can" size={18} color={theme.error} />
                 </LinearGradient>
                 <View style={styles.settingsContent}>
-                  <Text style={[styles.settingsTitle, styles.dangerText]}>Delete Group</Text>
-                  <Text style={styles.settingsDescription}>
+                  <Text style={[styles.settingsTitle, styles.dangerText, { color: theme.error }]}>Delete Group</Text>
+                  <Text style={[styles.settingsDescription, { color: theme.textMuted }]}>
                     Permanently delete group
                   </Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={18} color="#fa5252" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.error} />
               </TouchableOpacity>
             </ScrollView>
 
@@ -1269,30 +1267,30 @@ export default function GroupMembersScreen({ navigation, route }: any) {
               style={styles.modalCloseButton}
               onPress={() => setShowSettingsModal(false)}
             >
-              <Text style={styles.modalCloseText}>Close</Text>
+              <Text style={[styles.modalCloseText, { color: theme.primary }]}>Close</Text>
             </TouchableOpacity>
           </LinearGradient>
         </View>
       </Modal>
 
-      {/* Edit Group Modal */}
+      {/* Edit Group Modal - Keep original styles with inline colors */}
       <Modal
         visible={showEditModal}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setShowEditModal(false)}
       >
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { backgroundColor: theme.overlay }]}>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.modalContent}
           >
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Group</Text>
-              <TouchableOpacity onPress={() => setShowEditModal(false)} style={styles.closeButton}>
-                <MaterialCommunityIcons name="close" size={20} color="#868e96" />
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Edit Group</Text>
+              <TouchableOpacity onPress={() => setShowEditModal(false)} style={[styles.closeButton, { backgroundColor: theme.bgSecondary }]}>
+                <MaterialCommunityIcons name="close" size={20} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
 
@@ -1309,7 +1307,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 >
                   {uploadingAvatar ? (
                     <View style={[styles.editAvatar, styles.uploadingAvatar]}>
-                      <ActivityIndicator size="small" color="#2b8a3e" />
+                      <ActivityIndicator size="small" color={theme.primary} />
                     </View>
                   ) : groupInfo?.avatarUrl ? (
                     <Image
@@ -1318,12 +1316,12 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                     />
                   ) : (
                     <LinearGradient
-                      colors={['#2b8a3e', '#1e6b2c']}
+                      colors={[theme.primary, theme.primaryDark]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.editAvatar}
                     >
-                      <MaterialCommunityIcons name="camera-plus" size={28} color="white" />
+                      <MaterialCommunityIcons name="camera-plus" size={28} color="#fff" />
                     </LinearGradient>
                   )}
                   
@@ -1334,11 +1332,11 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                       end={{ x: 1, y: 1 }}
                       style={styles.editAvatarOverlay}
                     >
-                      <MaterialCommunityIcons name="pencil" size={14} color="white" />
+                      <MaterialCommunityIcons name="pencil" size={14} color="#fff" />
                     </LinearGradient>
                   )}
                 </TouchableOpacity>
-                <Text style={styles.avatarNote}>
+                <Text style={[styles.avatarNote, { color: theme.textMuted }]}>
                   Tap to change group avatar
                 </Text>
                 
@@ -1350,77 +1348,79 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                       setTimeout(() => handleRemoveGroupAvatar(), 300);
                     }}
                   >
-                    <MaterialCommunityIcons name="trash-can" size={14} color="#fa5252" />
-                    <Text style={styles.removeAvatarText}>Remove Avatar</Text>
+                    <MaterialCommunityIcons name="trash-can" size={14} color={theme.error} />
+                    <Text style={[styles.removeAvatarText, { color: theme.error }]}>Remove Avatar</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               {/* Name Field */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Group Name</Text>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Group Name</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.inputGradient}
+                  style={[styles.inputGradient, { borderColor: theme.border }]}
                 >
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     value={editingGroup.name}
                     onChangeText={(text) => setEditingGroup({...editingGroup, name: text})}
                     placeholder="Enter group name"
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
                     maxLength={100}
+                    selectionColor={theme.primary}
                   />
                 </LinearGradient>
               </View>
 
               {/* Description Field */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Description</Text>
+                <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Description</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[styles.inputGradient, styles.textAreaGradient]}
+                  style={[styles.inputGradient, styles.textAreaGradient, { borderColor: theme.border }]}
                 >
                   <TextInput
-                    style={[styles.input, styles.textArea]}
+                    style={[styles.input, styles.textArea, { color: theme.text }]}
                     value={editingGroup.description}
                     onChangeText={(text) => setEditingGroup({...editingGroup, description: text})}
                     placeholder="Enter group description"
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
                     multiline
                     numberOfLines={3}
                     maxLength={500}
                     textAlignVertical="top"
+                    selectionColor={theme.primary}
                   />
                 </LinearGradient>
-                <Text style={styles.charCount}>
+                <Text style={[styles.charCount, { color: theme.textMuted }]}>
                   {editingGroup.description.length}/500
                 </Text>
               </View>
 
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.infoBox}
+                style={[styles.infoBox, { borderColor: theme.border }]}
               >
-                <MaterialCommunityIcons name="information" size={14} color="#868e96" />
-                <Text style={styles.infoText}>
+                <MaterialCommunityIcons name="information" size={14} color={theme.textMuted} />
+                <Text style={[styles.infoText, { color: theme.textMuted }]}>
                   Group name helps members identify the group
                 </Text>
               </LinearGradient>
             </ScrollView>
 
-            <View style={styles.modalFooter}>
+            <View style={[styles.modalFooter, { borderTopColor: theme.border }]}>
               <TouchableOpacity 
-                style={styles.cancelButton}
+                style={[styles.cancelButton, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}
                 onPress={() => setShowEditModal(false)}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
@@ -1433,17 +1433,18 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 activeOpacity={0.7}
               >
                 <LinearGradient
-                  colors={editingGroup.name.trim() ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                  colors={editingGroup.name.trim() ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.saveButtonGradient}
                 >
                   {savingGroup ? (
-                    <ActivityIndicator size="small" color="white" />
+                    <ActivityIndicator size="small" color="#fff" />
                   ) : (
                     <Text style={[
                       styles.saveButtonText,
-                      !editingGroup.name.trim() && styles.saveButtonTextDisabled
+                      !editingGroup.name.trim() && styles.saveButtonTextDisabled,
+                      { color: editingGroup.name.trim() ? '#fff' : theme.textMuted }
                     ]}>
                       Save
                     </Text>
@@ -1455,41 +1456,42 @@ export default function GroupMembersScreen({ navigation, route }: any) {
         </View>
       </Modal>
 
-      {/* ===== NEW: Max Members Modal ===== */}
+      {/* Max Members Modal */}
       <Modal
         visible={showMaxModal}
         transparent={true}
         animationType="slide"
         onRequestClose={() => setShowMaxModal(false)}
       >
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { backgroundColor: theme.overlay }]}>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.modalContent}
           >
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Update Group Capacity</Text>
-              <TouchableOpacity onPress={() => setShowMaxModal(false)} style={styles.closeButton}>
-                <MaterialCommunityIcons name="close" size={20} color="#868e96" />
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Update Group Capacity</Text>
+              <TouchableOpacity onPress={() => setShowMaxModal(false)} style={[styles.closeButton, { backgroundColor: theme.bgSecondary }]}>
+                <MaterialCommunityIcons name="close" size={20} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalBody}>
-              <Text style={styles.modalSubtitle}>
+              <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
                 Current: {members.length}/{groupInfo?.maxMembers || 6} members
               </Text>
 
               <View style={styles.sliderContainer}>
-                <Text style={styles.sliderLabel}>Max Members: {newMax}</Text>
+                <Text style={[styles.sliderLabel, { color: theme.text }]}>Max Members: {newMax}</Text>
                 <View style={styles.slider}>
                   {[6, 7, 8, 9, 10].map((num) => (
                     <TouchableOpacity
                       key={num}
                       style={[
                         styles.sliderOption,
-                        parseInt(newMax) === num && styles.sliderOptionActive
+                        parseInt(newMax) === num && styles.sliderOptionActive,
+                        { borderColor: theme.border }
                       ]}
                       onPress={() => setNewMax(num.toString())}
                       disabled={num < members.length}
@@ -1497,7 +1499,8 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                       <Text style={[
                         styles.sliderOptionText,
                         parseInt(newMax) === num && styles.sliderOptionTextActive,
-                        num < members.length && styles.sliderOptionDisabled
+                        num < members.length && styles.sliderOptionDisabled,
+                        { color: parseInt(newMax) === num ? '#fff' : theme.textSecondary }
                       ]}>
                         {num}
                       </Text>
@@ -1506,12 +1509,12 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                 </View>
               </View>
 
-              <View style={styles.modalFooter}>
+              <View style={[styles.modalFooter, { borderTopColor: theme.border }]}>
                 <TouchableOpacity
-                  style={styles.cancelButton}
+                  style={[styles.cancelButton, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}
                   onPress={() => setShowMaxModal(false)}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1520,13 +1523,13 @@ export default function GroupMembersScreen({ navigation, route }: any) {
                   disabled={updatingMax}
                 >
                   <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
+                    colors={[theme.primary, theme.primaryDark]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.saveButtonGradient}
                   >
                     {updatingMax ? (
-                      <ActivityIndicator size="small" color="white" />
+                      <ActivityIndicator size="small" color="#fff" />
                     ) : (
                       <Text style={styles.saveButtonText}>Save</Text>
                     )}

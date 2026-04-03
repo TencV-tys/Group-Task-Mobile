@@ -1,4 +1,4 @@
-// src/screens/SwapRequestDetailsScreen.tsx - COMPLETE WITH ADMIN READ-ONLY
+// src/screens/SwapRequestDetailsScreen.tsx - FULLY UPDATED with fixed header
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -11,7 +11,6 @@ import {
   Image,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
@@ -20,12 +19,14 @@ import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 type SwapRequestDetailsRouteParams = {
   requestId: string;
 };
 
 export const SwapRequestDetailsScreen = () => {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation();
   const route = useRoute<RouteProp<{ params: SwapRequestDetailsRouteParams }, 'params'>>();
   const { requestId } = route.params;
@@ -34,7 +35,7 @@ export const SwapRequestDetailsScreen = () => {
     acceptSwapRequest,
     rejectSwapRequest,
     cancelSwapRequest,
-  } = useSwapRequests();
+  } = useSwapRequests(); 
   
   const [request, setRequest] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -166,7 +167,6 @@ export const SwapRequestDetailsScreen = () => {
     if (response.success) {
       setRequest(response.data);
     } else {
-      // ✅ Check if this is a deleted/not found error
       if (response.message?.includes('404') || response.message?.includes('not found') || response.message?.includes('400')) {
         setError('This swap request is no longer available (may have been deleted or expired).');
       } else {
@@ -253,17 +253,17 @@ export const SwapRequestDetailsScreen = () => {
 
   if (loading) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Swap Request</Text>
-          <View style={{ width: 40 }} />
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Swap Request</Text>
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading request details...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading request details...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -271,27 +271,27 @@ export const SwapRequestDetailsScreen = () => {
 
   if (error || !request) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Swap Request</Text>
-          <View style={{ width: 40 }} />
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Swap Request</Text>
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.centerContainer}>
           <LinearGradient
-            colors={['#fff5f5', '#ffe3e3']}
+            colors={[theme.errorBg, theme.errorBg]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.errorIconContainer}
+            style={[styles.errorIconContainer, { borderColor: theme.errorBorder }]}
           >
-            <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
+            <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
           </LinearGradient>
-          <Text style={styles.errorText}>{error || 'Request not found'}</Text>
+          <Text style={[styles.errorText, { color: theme.error }]}>{error || 'Request not found'}</Text>
           <TouchableOpacity style={styles.goBackButton} onPress={() => navigation.goBack()}>
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.goBackButtonGradient}
@@ -314,28 +314,33 @@ export const SwapRequestDetailsScreen = () => {
   const isTarget = request.targetUserId === currentUserId;
   const isOpenToAnyone = !request.targetUserId;
   
-  // ✅ Admin can view but cannot act
+  // Admin can view but cannot act
   const canAccept = !isAdmin && isPending && !isRequester && (isTarget || isOpenToAnyone);
   const canReject = !isAdmin && isPending && !isRequester && (isTarget || isOpenToAnyone);
   const canCancel = !isAdmin && isPending && isRequester;
 
   return (
-    <ScreenWrapper style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+      {/* Header - Fixed layout with centered title */}
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Swap Request</Text>
-        {isAdmin && (
+        
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Swap Request</Text>
+        
+        {isAdmin ? (
           <LinearGradient
-            colors={['#2b8a3e', '#1e6b2c']}
+            colors={[theme.primary, theme.primaryDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.adminBadge}
           >
-            <MaterialCommunityIcons name="shield-account" size={12} color="white" />
+            <MaterialCommunityIcons name="shield-account" size={12} color="#fff" />
             <Text style={styles.adminBadgeText}>Admin View</Text>
           </LinearGradient>
+        ) : (
+          <View style={styles.headerSpacer} />
         )}
       </View>
 
@@ -343,13 +348,13 @@ export const SwapRequestDetailsScreen = () => {
         {/* Admin Info Banner */}
         {isAdmin && (
           <LinearGradient
-            colors={['#e7f5ff', '#d0ebff']}
+            colors={[theme.primaryLight, theme.primaryLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.adminInfoBanner}
+            style={[styles.adminInfoBanner, { borderColor: theme.primaryBorder }]}
           >
-            <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
-            <Text style={styles.adminInfoText}>
+            <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
+            <Text style={[styles.adminInfoText, { color: theme.primary }]}>
               Admin View Only - You can see all swap request details but cannot accept, reject, or cancel.
             </Text>
           </LinearGradient>
@@ -357,16 +362,16 @@ export const SwapRequestDetailsScreen = () => {
 
         {/* Status Banner */}
         <LinearGradient
-          colors={[`${statusColor}10`, `${statusColor}05`]}
+          colors={[statusColor + '10', statusColor + '05']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.statusBanner}
+          style={[styles.statusBanner, { borderColor: theme.border }]}
         >
           <LinearGradient
-            colors={[`${statusColor}20`, `${statusColor}10`]}
+            colors={[statusColor + '20', statusColor + '10']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.statusIconLarge}
+            style={[styles.statusIconLarge, { borderColor: theme.border }]}
           >
             <MaterialCommunityIcons name={statusIcon as any} size={32} color={statusColor} />
           </LinearGradient>
@@ -374,7 +379,7 @@ export const SwapRequestDetailsScreen = () => {
             <Text style={[styles.statusTitle, { color: statusColor }]}>
               {statusLabel}
             </Text>
-            <Text style={styles.statusDate}>
+            <Text style={[styles.statusDate, { color: theme.textMuted }]}>
               Requested on {new Date(request.createdAt).toLocaleDateString()}
             </Text>
           </View>
@@ -382,31 +387,31 @@ export const SwapRequestDetailsScreen = () => {
 
         {/* Swap Scope Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Swap Details</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Swap Details</Text>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.scopeCard}
+            style={[styles.scopeCard, { borderColor: theme.border }]}
           >
             <View style={styles.scopeHeader}>
               <LinearGradient
-                colors={request.scope === 'day' ? ['#e8f5e9', '#c8e6c9'] : ['#f8f9fa', '#e9ecef']}
+                colors={request.scope === 'day' ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.scopeIcon}
+                style={[styles.scopeIcon, { borderColor: theme.border }]}
               >
                 <MaterialCommunityIcons 
                   name={request.scope === 'day' ? 'calendar-today' : 'calendar-week'} 
                   size={22} 
-                  color={request.scope === 'day' ? '#2b8a3e' : '#495057'} 
+                  color={request.scope === 'day' ? theme.primary : theme.textSecondary} 
                 />
               </LinearGradient>
               <View style={styles.scopeTitleContainer}>
-                <Text style={styles.scopeTitle}>
+                <Text style={[styles.scopeTitle, { color: theme.text }]}>
                   {request.scope === 'day' ? 'Specific Day Swap' : 'Full Week Swap'}
                 </Text>
-                <Text style={styles.scopeBadge}>
+                <Text style={[styles.scopeBadge, { color: theme.textMuted }]}>
                   {request.scope === 'day' ? '📅 One day only' : '📆 Entire week'}
                 </Text>
               </View>
@@ -414,17 +419,17 @@ export const SwapRequestDetailsScreen = () => {
             
             {request.scope === 'day' && request.selectedDay && (
               <View style={styles.scopeDetails}>
-                <View style={styles.scopeDetailRow}>
-                  <MaterialCommunityIcons name="calendar" size={16} color="#2b8a3e" />
-                  <Text style={styles.scopeDetailLabel}>Day:</Text>
-                  <Text style={styles.scopeDetailValue}>{request.selectedDay}</Text>
+                <View style={[styles.scopeDetailRow, { backgroundColor: theme.bgSecondary }]}>
+                  <MaterialCommunityIcons name="calendar" size={16} color={theme.primary} />
+                  <Text style={[styles.scopeDetailLabel, { color: theme.textMuted }]}>Day:</Text>
+                  <Text style={[styles.scopeDetailValue, { color: theme.text }]}>{request.selectedDay}</Text>
                 </View>
                 
                 {request.selectedTimeSlot && (
-                  <View style={styles.scopeDetailRow}>
-                    <MaterialCommunityIcons name="clock-outline" size={16} color="#2b8a3e" />
-                    <Text style={styles.scopeDetailLabel}>Time Slot:</Text>
-                    <Text style={styles.scopeDetailValue}>
+                  <View style={[styles.scopeDetailRow, { backgroundColor: theme.bgSecondary }]}>
+                    <MaterialCommunityIcons name="clock-outline" size={16} color={theme.primary} />
+                    <Text style={[styles.scopeDetailLabel, { color: theme.textMuted }]}>Time Slot:</Text>
+                    <Text style={[styles.scopeDetailValue, { color: theme.text }]}>
                       {request.selectedTimeSlot.startTime} - {request.selectedTimeSlot.endTime}
                       {request.selectedTimeSlot.label ? ` (${request.selectedTimeSlot.label})` : ''}
                     </Text>
@@ -432,13 +437,13 @@ export const SwapRequestDetailsScreen = () => {
                 )}
                 
                 <LinearGradient
-                  colors={['#e8f5e9', '#c8e6c9']}
+                  colors={[theme.primaryLight, theme.primaryLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.scopeNote}
+                  style={[styles.scopeNote, { borderColor: theme.primaryBorder }]}
                 >
-                  <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
-                  <Text style={styles.scopeNoteText}>
+                  <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
+                  <Text style={[styles.scopeNoteText, { color: theme.primary }]}>
                     After {request.selectedDay}, assignments will automatically return to the original assignee.
                   </Text>
                 </LinearGradient>
@@ -447,17 +452,17 @@ export const SwapRequestDetailsScreen = () => {
             
             {request.scope === 'week' && (
               <View style={styles.scopeDetails}>
-                <Text style={styles.scopeDescription}>
+                <Text style={[styles.scopeDescription, { backgroundColor: theme.bgSecondary, color: theme.textSecondary }]}>
                   This swap will transfer ALL assignments for the entire week to the acceptor.
                 </Text>
                 <LinearGradient
-                  colors={['#fff3bf', '#ffec99']}
+                  colors={[theme.primaryLight, theme.primaryLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.scopeNote}
+                  style={[styles.scopeNote, { borderColor: theme.primaryBorder }]}
                 >
-                  <MaterialCommunityIcons name="information" size={16} color="#e67700" />
-                  <Text style={[styles.scopeNoteText, { color: '#e67700' }]}>
+                  <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
+                  <Text style={[styles.scopeNoteText, { color: theme.primary }]}>
                     Next week, the normal rotation will resume automatically.
                   </Text>
                 </LinearGradient>
@@ -468,18 +473,18 @@ export const SwapRequestDetailsScreen = () => {
 
         {/* Requester Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Requested By</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Requested By</Text>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.userCard}
+            style={[styles.userCard, { borderColor: theme.border }]}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.avatarLarge}
+              style={[styles.avatarLarge, { borderColor: theme.card }]}
             >
               {request.requester?.avatarUrl ? (
                 <Image source={{ uri: request.requester.avatarUrl }} style={styles.avatarImage} />
@@ -490,11 +495,11 @@ export const SwapRequestDetailsScreen = () => {
               )}
             </LinearGradient>
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{request.requester?.fullName || 'Unknown User'}</Text>
-              <Text style={styles.userRole}>Requester</Text>
+              <Text style={[styles.userName, { color: theme.text }]}>{request.requester?.fullName || 'Unknown User'}</Text>
+              <Text style={[styles.userRole, { color: theme.textMuted }]}>Requester</Text>
               {isRequester && (
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}
+                  colors={[theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.youBadge}
@@ -509,18 +514,18 @@ export const SwapRequestDetailsScreen = () => {
         {/* Target User */}
         {request.targetUser ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Requested To</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Requested To</Text>
             <LinearGradient
-              colors={['#ffffff', '#f8f9fa']}
+              colors={[theme.card, theme.bgSecondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.userCard}
+              style={[styles.userCard, { borderColor: theme.border }]}
             >
               <LinearGradient
                 colors={['#4F46E5', '#3730a3']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.avatarLarge}
+                style={[styles.avatarLarge, { borderColor: theme.card }]}
               >
                 {request.targetUser.avatarUrl ? (
                   <Image source={{ uri: request.targetUser.avatarUrl }} style={styles.avatarImage} />
@@ -531,11 +536,11 @@ export const SwapRequestDetailsScreen = () => {
                 )}
               </LinearGradient>
               <View style={styles.userInfo}>
-                <Text style={styles.userName}>{request.targetUser.fullName}</Text>
-                <Text style={styles.userRole}>Target User</Text>
+                <Text style={[styles.userName, { color: theme.text }]}>{request.targetUser.fullName}</Text>
+                <Text style={[styles.userRole, { color: theme.textMuted }]}>Target User</Text>
                 {request.targetUserId === currentUserId && (
                   <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
+                    colors={[theme.primary, theme.primaryDark]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.youBadge}
@@ -548,69 +553,69 @@ export const SwapRequestDetailsScreen = () => {
           </View>
         ) : (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Open To</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Open To</Text>
             <LinearGradient
-              colors={['#e8f5e9', '#c8e6c9']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.openToCard}
+              style={[styles.openToCard, { borderColor: theme.primaryBorder }]}
             >
-              <MaterialCommunityIcons name="account-group" size={24} color="#2b8a3e" />
-              <Text style={styles.openToText}>Anyone in the group can accept</Text>
+              <MaterialCommunityIcons name="account-group" size={24} color={theme.primary} />
+              <Text style={[styles.openToText, { color: theme.primary }]}>Anyone in the group can accept</Text>
             </LinearGradient>
           </View>
         )}
 
         {/* Assignment Details */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Assignment Details</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Assignment Details</Text>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.assignmentCard}
+            style={[styles.assignmentCard, { borderColor: theme.border }]}
           >
-            <Text style={styles.taskTitle}>{request.assignment?.task?.title}</Text>
+            <Text style={[styles.taskTitle, { color: theme.text }]}>{request.assignment?.task?.title}</Text>
             
-            <View style={styles.detailRow}>
-              <MaterialCommunityIcons name="calendar" size={18} color="#868e96" />
-              <Text style={styles.detailLabel}>Due Date:</Text>
-              <Text style={styles.detailValue}>
+            <View style={[styles.detailRow, { backgroundColor: theme.bgSecondary }]}>
+              <MaterialCommunityIcons name="calendar" size={18} color={theme.textMuted} />
+              <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Due Date:</Text>
+              <Text style={[styles.detailValue, { color: theme.textSecondary }]}>
                 {new Date(request.assignment?.dueDate).toLocaleDateString()}
               </Text>
             </View>
 
             {request.assignment?.timeSlot && (
-              <View style={styles.detailRow}>
-                <MaterialCommunityIcons name="clock-outline" size={18} color="#868e96" />
-                <Text style={styles.detailLabel}>Time:</Text>
-                <Text style={styles.detailValue}>
+              <View style={[styles.detailRow, { backgroundColor: theme.bgSecondary }]}>
+                <MaterialCommunityIcons name="clock-outline" size={18} color={theme.textMuted} />
+                <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Time:</Text>
+                <Text style={[styles.detailValue, { color: theme.textSecondary }]}>
                   {request.assignment.timeSlot.startTime} - {request.assignment.timeSlot.endTime}
                 </Text>
               </View>
             )}
 
-            <View style={styles.detailRow}>
-              <MaterialCommunityIcons name="star" size={18} color="#e67700" />
-              <Text style={styles.detailLabel}>Points:</Text>
-              <Text style={[styles.detailValue, styles.pointsValue]}>
+            <View style={[styles.detailRow, { backgroundColor: theme.bgSecondary }]}>
+              <MaterialCommunityIcons name="star" size={18} color={theme.primary} />
+              <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Points:</Text>
+              <Text style={[styles.detailValue, styles.pointsValue, { color: theme.primary }]}>
                 {request.assignment?.points || 0}
               </Text>
             </View>
 
-            <View style={styles.detailRow}>
-              <MaterialCommunityIcons name="account" size={18} color="#868e96" />
-              <Text style={styles.detailLabel}>Current Assignee:</Text>
-              <Text style={styles.detailValue}>
+            <View style={[styles.detailRow, { backgroundColor: theme.bgSecondary }]}>
+              <MaterialCommunityIcons name="account" size={18} color={theme.textMuted} />
+              <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Current Assignee:</Text>
+              <Text style={[styles.detailValue, { color: theme.textSecondary }]}>
                 {request.assignment?.user?.fullName || 'Unknown'}
               </Text>
             </View>
 
             {request.assignment?.task?.executionFrequency && (
-              <View style={styles.detailRow}>
-                <MaterialCommunityIcons name="repeat" size={18} color="#868e96" />
-                <Text style={styles.detailLabel}>Frequency:</Text>
-                <Text style={styles.detailValue}> 
+              <View style={[styles.detailRow, { backgroundColor: theme.bgSecondary }]}>
+                <MaterialCommunityIcons name="repeat" size={18} color={theme.textMuted} />
+                <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Frequency:</Text>
+                <Text style={[styles.detailValue, { color: theme.textSecondary }]}> 
                   {request.assignment.task.executionFrequency}
                 </Text>
               </View>
@@ -621,14 +626,14 @@ export const SwapRequestDetailsScreen = () => {
         {/* Reason */}
         {request.reason && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Reason for Swap</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Reason for Swap</Text>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.reasonCard}
+              style={[styles.reasonCard, { borderColor: theme.border }]}
             >
-              <Text style={styles.reasonText}>{request.reason}</Text>
+              <Text style={[styles.reasonText, { color: theme.textSecondary }]}>{request.reason}</Text>
             </LinearGradient>
           </View>
         )}
@@ -636,15 +641,15 @@ export const SwapRequestDetailsScreen = () => {
         {/* Expiry */}
         {request.expiresAt && request.status === 'PENDING' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Expiry</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Expiry</Text>
             <LinearGradient
-              colors={['#fff3bf', '#ffec99']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.expiryCard}
+              style={[styles.expiryCard, { borderColor: theme.primaryBorder }]}
             >
-              <MaterialCommunityIcons name="clock-outline" size={20} color="#e67700" />
-              <Text style={styles.expiryText}>
+              <MaterialCommunityIcons name="clock-outline" size={20} color={theme.primary} />
+              <Text style={[styles.expiryText, { color: theme.primary }]}>
                 This request will expire on {new Date(request.expiresAt).toLocaleString()}
               </Text>
             </LinearGradient>
@@ -654,7 +659,7 @@ export const SwapRequestDetailsScreen = () => {
 
       {/* Action Buttons - Only show if user has permission and NOT admin */}
       {isPending && !isAdmin && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
           {canAccept && (
             <TouchableOpacity
               style={[styles.actionButton]}
@@ -662,16 +667,16 @@ export const SwapRequestDetailsScreen = () => {
               disabled={processing}
             >
               <LinearGradient
-                colors={['#2b8a3e', '#1e6b2c']}
+                colors={[theme.primary, theme.primaryDark]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.actionButtonGradient}
               >
                 {processing ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color="#fff" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="check-circle" size={20} color="white" />
+                    <MaterialCommunityIcons name="check-circle" size={20} color="#fff" />
                     <Text style={styles.actionButtonText}>Accept Swap</Text>
                   </>
                 )}
@@ -686,16 +691,16 @@ export const SwapRequestDetailsScreen = () => {
               disabled={processing}
             >
               <LinearGradient
-                colors={['#fa5252', '#e03131']}
+                colors={[theme.error, theme.error]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.actionButtonGradient}
               >
                 {processing ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color="#fff" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="close-circle" size={20} color="white" />
+                    <MaterialCommunityIcons name="close-circle" size={20} color="#fff" />
                     <Text style={styles.actionButtonText}>Reject</Text>
                   </>
                 )}
@@ -710,16 +715,16 @@ export const SwapRequestDetailsScreen = () => {
               disabled={processing}
             >
               <LinearGradient
-                colors={['#868e96', '#495057']}
+                colors={[theme.textMuted, theme.textMuted]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.actionButtonGradient}
               >
                 {processing ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color="#fff" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="close-circle" size={20} color="white" />
+                    <MaterialCommunityIcons name="close-circle" size={20} color="#fff" />
                     <Text style={styles.actionButtonText}>Cancel Request</Text>
                   </>
                 )}
@@ -731,27 +736,26 @@ export const SwapRequestDetailsScreen = () => {
 
       {/* Admin Read-Only Message */}
       {isPending && isAdmin && (
-        <View style={styles.footer}>
+        <View style={[styles.footer, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
           <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
+            colors={[theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.readOnlyFooter}
+            style={[styles.readOnlyFooter, { borderColor: theme.border }]}
           >
-            <MaterialCommunityIcons name="eye" size={20} color="#2b8a3e" />
-            <Text style={styles.readOnlyText}>Admin View Only - Cannot modify swap requests</Text>
+            <MaterialCommunityIcons name="eye" size={20} color={theme.primary} />
+            <Text style={[styles.readOnlyText, { color: theme.primary }]}>Admin View Only - Cannot modify swap requests</Text>
           </LinearGradient>
         </View>
       )}
     </ScreenWrapper>
   );
-}
+};
 
-// Complete styles with admin-specific additions
+// Complete styles with fixed header
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   header: {
     flexDirection: 'row',
@@ -759,19 +763,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -780,7 +780,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 36,
   },
   adminBadge: {
     flexDirection: 'row',
@@ -791,7 +795,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   adminBadgeText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 10,
     fontWeight: '600',
   },
@@ -804,12 +808,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#b2f2bb',
   },
   adminInfoText: {
     flex: 1,
     fontSize: 13,
-    color: '#2b8a3e',
     lineHeight: 18,
   },
   readOnlyFooter: {
@@ -820,11 +822,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   readOnlyText: {
     fontSize: 14,
-    color: '#2b8a3e',
     fontWeight: '500',
   },
   centerContainer: {
@@ -836,7 +836,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
   },
   errorIconContainer: {
     width: 80,
@@ -846,12 +845,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
   },
   errorText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#fa5252',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -864,7 +861,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   goBackButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -878,7 +875,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   statusIconLarge: {
     width: 60,
@@ -888,7 +884,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   statusInfo: {
     flex: 1,
@@ -900,7 +895,6 @@ const styles = StyleSheet.create({
   },
   statusDate: {
     fontSize: 13,
-    color: '#868e96',
   },
   section: {
     marginBottom: 24,
@@ -908,7 +902,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 8,
     paddingLeft: 4,
     textTransform: 'uppercase',
@@ -918,7 +911,6 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   scopeHeader: {
     flexDirection: 'row',
@@ -933,7 +925,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   scopeTitleContainer: {
     flex: 1,
@@ -941,16 +932,13 @@ const styles = StyleSheet.create({
   scopeTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 2,
   },
   scopeBadge: {
     fontSize: 12,
-    color: '#868e96',
   },
   scopeDetails: {
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
     paddingTop: 12,
     gap: 8,
   },
@@ -958,27 +946,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#f8f9fa',
     padding: 8,
     borderRadius: 8,
   },
   scopeDetailLabel: {
     fontSize: 13,
-    color: '#868e96',
     width: 70,
   },
   scopeDetailValue: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#212529',
     flex: 1,
   },
   scopeDescription: {
     fontSize: 13,
-    color: '#495057',
     lineHeight: 18,
     marginBottom: 8,
-    backgroundColor: '#f8f9fa',
     padding: 10,
     borderRadius: 8,
   },
@@ -989,12 +972,10 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   scopeNoteText: {
     flex: 1,
     fontSize: 12,
-    color: '#495057',
     fontStyle: 'italic',
   },
   userCard: {
@@ -1003,7 +984,6 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   avatarLarge: {
     width: 56,
@@ -1013,7 +993,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 16,
     borderWidth: 2,
-    borderColor: 'white',
   },
   avatarImage: {
     width: 56,
@@ -1021,7 +1000,7 @@ const styles = StyleSheet.create({
     borderRadius: 28,
   },
   avatarText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 22,
     fontWeight: '600',
   },
@@ -1031,12 +1010,10 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 2,
   },
   userRole: {
     fontSize: 13,
-    color: '#868e96',
   },
   youBadge: {
     paddingHorizontal: 8,
@@ -1046,7 +1023,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   youBadgeText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 10,
     fontWeight: '600',
   },
@@ -1057,12 +1034,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 12,
     borderWidth: 2,
-    borderColor: '#2b8a3e',
     borderStyle: 'dashed',
   },
   openToText: {
     fontSize: 14,
-    color: '#2b8a3e',
     fontWeight: '600',
     flex: 1,
   },
@@ -1070,48 +1045,40 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   taskTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 12,
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    backgroundColor: '#f8f9fa',
     padding: 8,
     borderRadius: 8,
   },
   detailLabel: {
     fontSize: 13,
-    color: '#868e96',
     marginLeft: 6,
     marginRight: 4,
     width: 80,
   },
   detailValue: {
     fontSize: 13,
-    color: '#495057',
     fontWeight: '500',
     flex: 1,
   },
   pointsValue: {
-    color: '#e67700',
     fontWeight: '700',
   },
   reasonCard: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   reasonText: {
     fontSize: 14,
-    color: '#495057',
     lineHeight: 20,
   },
   expiryCard: {
@@ -1121,19 +1088,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#ffec99',
   },
   expiryText: {
     flex: 1,
     fontSize: 13,
-    color: '#e67700',
     fontWeight: '500',
   },
   footer: {
     padding: 16,
-    backgroundColor: 'white',
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
     gap: 12,
   },
   actionButton: {
@@ -1148,7 +1111,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

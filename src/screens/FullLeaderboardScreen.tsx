@@ -1,4 +1,4 @@
-// src/screens/FullLeaderboardScreen.tsx - Updated checkToken with TokenUtils
+// src/screens/FullLeaderboardScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -8,24 +8,24 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Image,
-  RefreshControl,
+  RefreshControl, 
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 export const FullLeaderboardScreen = ({ navigation, route }: any) => {
+  const { theme, isDark } = useTheme();
   const { groupId, groupName } = route.params;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [authError, setAuthError] = useState(false);
 
-  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -40,7 +40,6 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     loadLeaderboardData();
   }, [groupId]);
 
-  // Auth error handler
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -60,7 +59,6 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   }, [authError, navigation]);
 
   const loadLeaderboardData = async () => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -69,15 +67,12 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     }
 
     try {
-      // Using TaskService.getTaskStatistics which already has pointsByUser
       const result = await TaskService.getTaskStatistics(groupId);
       if (result.success && result.statistics?.pointsByUser) {
-        // Convert pointsByUser object to array and sort by points
         const sortedUsers = Object.values(result.statistics.pointsByUser)
           .sort((a: any, b: any) => b.totalPoints - a.totalPoints);
         setLeaderboard(sortedUsers);
       } else {
-        // Check if error is auth-related
         if (result.message?.toLowerCase().includes('token') || 
             result.message?.toLowerCase().includes('auth')) {
           setAuthError(true);
@@ -105,17 +100,18 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
       case 2:
         return <MaterialCommunityIcons name="trophy" size={20} color="#CD7F32" />;
       default:
-        return <Text style={styles.rankNumber}>{index + 1}</Text>;
+        return <Text style={[styles.rankNumber, { color: theme.textMuted }]}>{index + 1}</Text>;
     }
   };
 
   const renderLeaderboardItem = ({ item, index }: { item: any; index: number }) => (
     <LinearGradient
-      colors={['#ffffff', '#f8f9fa']}
+      colors={[theme.card, theme.bgSecondary]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[
         styles.leaderboardItem,
+        { borderColor: theme.border },
         index === 0 && styles.firstPlace,
         index === 1 && styles.secondPlace,
         index === 2 && styles.thirdPlace,
@@ -127,78 +123,81 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
 
       <View style={styles.userContainer}>
         <LinearGradient
-          colors={['#f8f9fa', '#e9ecef']}
+          colors={[theme.bgSecondary, theme.bgTertiary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.avatar}
+          style={[styles.avatar, { borderColor: theme.border }]}
         >
           {item.avatarUrl ? (
             <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
           ) : (
-            <Text style={styles.avatarText}>
+            <Text style={[styles.avatarText, { color: theme.textSecondary }]}>
               {item.userName?.charAt(0).toUpperCase() || '?'}
             </Text>
           )}
         </LinearGradient>
         
         <View style={styles.userInfo}>
-          <Text style={styles.userName} numberOfLines={1}>
+          <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
             {item.userName}
           </Text>
-          <Text style={styles.userStats}>
+          <Text style={[styles.userStats, { color: theme.textMuted }]}>
             {item.assignments?.length || 0} tasks
           </Text>
         </View>
       </View>
 
       <View style={styles.pointsContainer}>
-        <Text style={styles.pointsValue}>{item.totalPoints}</Text>
-        <Text style={styles.pointsLabel}>points</Text>
+        <Text style={[styles.pointsValue, { color: theme.primary }]}>{item.totalPoints}</Text>
+        <Text style={[styles.pointsLabel, { color: theme.textMuted }]}>points</Text>
       </View>
     </LinearGradient>
   );
 
   if (loading && !refreshing) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#495057" />
-          <Text style={styles.loadingText}>Loading leaderboard...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading leaderboard...</Text>
         </View>
       </ScreenWrapper>
     );
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Leaderboard</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Leaderboard</Text>
         <TouchableOpacity 
           onPress={handleRefresh} 
-          style={styles.refreshButton}
+          style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
           disabled={refreshing}
         >
           {refreshing ? (
-            <ActivityIndicator size="small" color="#495057" />
+            <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+            <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
           )}
         </TouchableOpacity>
       </View>
 
       {/* Group Name Banner */}
       <LinearGradient
-        colors={['#f8f9fa', '#e9ecef']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.groupBanner}
+        style={[styles.groupBanner, { borderBottomColor: theme.border }]}
       >
-        <MaterialCommunityIcons name="account-group" size={16} color="#495057" />
-        <Text style={styles.groupBannerText}>{groupName}</Text>
+        <MaterialCommunityIcons name="account-group" size={16} color={theme.textMuted} />
+        <Text style={[styles.groupBannerText, { color: theme.textSecondary }]}>{groupName}</Text>
       </LinearGradient>
 
       <FlatList
@@ -210,14 +209,14 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={handleRefresh}
-            colors={['#495057']}
-            tintColor="#495057"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         ListHeaderComponent={
           <View style={styles.statsHeader}>
-            <Text style={styles.statsTitle}>Top Performers</Text>
-            <Text style={styles.statsSubtitle}>
+            <Text style={[styles.statsTitle, { color: theme.text }]}>Top Performers</Text>
+            <Text style={[styles.statsSubtitle, { color: theme.textMuted }]}>
               {leaderboard.length} members • Based on points earned
             </Text>
           </View>
@@ -225,15 +224,15 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.emptyIconContainer}
+              style={[styles.emptyIconContainer, { borderColor: theme.border }]}
             >
-              <MaterialCommunityIcons name="trophy-outline" size={48} color="#adb5bd" />
+              <MaterialCommunityIcons name="trophy-outline" size={48} color={theme.primary} />
             </LinearGradient>
-            <Text style={styles.emptyTitle}>No Data Yet</Text>
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>No Data Yet</Text>
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
               Complete tasks to earn points and appear on the leaderboard
             </Text>
           </View>
@@ -246,7 +245,6 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   centerContainer: {
     flex: 1,
@@ -256,7 +254,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
   },
   header: {
     flexDirection: 'row',
@@ -264,19 +261,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -285,16 +278,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
   },
   refreshButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -307,11 +297,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
   },
   groupBannerText: {
     fontSize: 14,
-    color: '#495057',
     fontWeight: '500',
   },
   listContent: {
@@ -323,12 +311,10 @@ const styles = StyleSheet.create({
   statsTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#212529',
     marginBottom: 4,
   },
   statsSubtitle: {
     fontSize: 13,
-    color: '#868e96',
   },
   leaderboardItem: {
     flexDirection: 'row',
@@ -337,7 +323,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   firstPlace: {
     borderColor: '#ffd43b',
@@ -359,7 +344,6 @@ const styles = StyleSheet.create({
   rankNumber: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#868e96',
   },
   userContainer: {
     flex: 1,
@@ -374,7 +358,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   avatarImage: {
     width: 42,
@@ -382,7 +365,6 @@ const styles = StyleSheet.create({
     borderRadius: 21,
   },
   avatarText: {
-    color: '#495057',
     fontSize: 18,
     fontWeight: '600',
   },
@@ -392,12 +374,10 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 2,
   },
   userStats: {
     fontSize: 11,
-    color: '#868e96',
   },
   pointsContainer: {
     alignItems: 'center',
@@ -406,11 +386,9 @@ const styles = StyleSheet.create({
   pointsValue: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#2b8a3e',
   },
   pointsLabel: {
     fontSize: 9,
-    color: '#868e96',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -424,18 +402,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#868e96',
     textAlign: 'center',
     paddingHorizontal: 32,
     lineHeight: 20,

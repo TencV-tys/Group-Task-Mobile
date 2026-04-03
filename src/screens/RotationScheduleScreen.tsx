@@ -1,4 +1,4 @@
-// src/screens/RotationScheduleScreen.tsx - FIXED for weekly rotation (NO new theme properties)
+// src/screens/RotationScheduleScreen.tsx - COMPLETE FIXED VERSION
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -51,13 +51,27 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
   const [showPredictions, setShowPredictions] = useState(true);
   const [rotationCycle, setRotationCycle] = useState<number>(0);
 
+  // ===== CHECK AUTH USING TOKENUTILS =====
+  useEffect(() => {
+    const checkAuth = async () => {
+      const hasToken = await TokenUtils.checkToken({
+        showAlert: false,
+        onAuthError: () => setAuthError(true)
+      });
+      if (!hasToken) {
+        setAuthError(true);
+      }
+    };
+    checkAuth();
+  }, []);
+
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
       Alert.alert(
         'Session Expired',
         'Please log in again',
-        [ 
+        [
           { 
             text: 'OK', 
             onPress: () => {
@@ -110,65 +124,63 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     }
   }, [selectedWeekData]);
 
-  // ✅ FIXED: Generate predictions with WEEKLY rotation (tasks rotate to next member each week)
-const generatePredictions = (memberList: any[], taskList: any[]) => {
-  if (memberList.length === 0 || taskList.length === 0) return;
-  
-  const memberCount = memberList.length;
-  const taskCount = taskList.length;
-  
-  // Sort tasks by points (highest first)
-  const sortedTasks = [...taskList].sort((a, b) => b.points - a.points);
-  const sortedMembers = [...memberList].sort((a, b) => a.name.localeCompare(b.name));
-  
-  const preds = [];
-  
-  // ✅ Generate predictions for the next 8 weeks
-  // Each week, tasks rotate to the next member (shift by 1)
-  for (let weekOffset = 0; weekOffset < 8; weekOffset++) {
-    const weekNumber = currentWeek + weekOffset + 1;
-    const assignments = [];
+  // Generate predictions with WEEKLY rotation (tasks rotate to next member each week)
+  const generatePredictions = (memberList: any[], taskList: any[]) => {
+    if (memberList.length === 0 || taskList.length === 0) return;
     
-    // ✅ For each member, assign a task that rotates each week
-    for (let memberIndex = 0; memberIndex < sortedMembers.length; memberIndex++) {
-      // Task index shifts by weekOffset each week
-      // This ensures tasks rotate to different members every week
-      const taskIndex = (memberIndex + weekOffset) % taskCount;
+    const memberCount = memberList.length;
+    const taskCount = taskList.length;
+    
+    // Sort tasks by points (highest first) for fair distribution
+    const sortedTasks = [...taskList].sort((a, b) => b.points - a.points);
+    const sortedMembers = [...memberList].sort((a, b) => a.name.localeCompare(b.name));
+    
+    const preds = [];
+    
+    // Generate predictions for the next 8 weeks (WEEKLY rotation - each week shifts by 1)
+    for (let weekOffset = 0; weekOffset < 8; weekOffset++) {
+      const weekNumber = currentWeek + weekOffset + 1;
+      const assignments = [];
       
-      assignments.push({
-        memberId: sortedMembers[memberIndex].id,
-        memberName: sortedMembers[memberIndex].name,
-        taskId: sortedTasks[taskIndex].id,
-        taskTitle: sortedTasks[taskIndex].title,
-        taskPoints: sortedTasks[taskIndex].points,
-        taskRank: taskIndex + 1,
-        weekNumber
+      // Rotate tasks each week - each member gets a different task every week
+      for (let i = 0; i < sortedMembers.length; i++) {
+        // Task index shifts by weekOffset each week (1 week rotation)
+        const taskIndex = (i + weekOffset) % taskCount;
+        
+        assignments.push({
+          memberId: sortedMembers[i].id,
+          memberName: sortedMembers[i].name,
+          taskId: sortedTasks[taskIndex].id,
+          taskTitle: sortedTasks[taskIndex].title,
+          taskPoints: sortedTasks[taskIndex].points,
+          taskRank: taskIndex + 1,
+          weekNumber
+        });
+      }
+      
+      // Calculate fairness score for this week
+      const pointsByMember: Record<string, number> = {};
+      assignments.forEach(a => {
+        pointsByMember[a.memberId] = (pointsByMember[a.memberId] || 0) + a.taskPoints;
+      });
+      
+      const points = Object.values(pointsByMember);
+      const maxPoints = Math.max(...points);
+      const minPoints = Math.min(...points);
+      const fairnessScore = maxPoints > 0 ? Math.round(100 - ((maxPoints - minPoints) / maxPoints) * 100) : 100;
+      
+      preds.push({
+        weekNumber,
+        assignments,
+        fairnessScore,
+        maxPoints,
+        minPoints
       });
     }
     
-    // Calculate fairness score
-    const pointsByMember: Record<string, number> = {};
-    assignments.forEach(a => {
-      pointsByMember[a.memberId] = (pointsByMember[a.memberId] || 0) + a.taskPoints;
-    });
-    
-    const points = Object.values(pointsByMember);
-    const maxPoints = Math.max(...points);
-    const minPoints = Math.min(...points);
-    const fairnessScore = maxPoints > 0 ? Math.round(100 - ((maxPoints - minPoints) / maxPoints) * 100) : 100;
-    
-    preds.push({
-      weekNumber,
-      assignments,
-      fairnessScore,
-      maxPoints,
-      minPoints
-    });
-  }
-  
-  setPredictions(preds);
-  setRotationCycle(taskCount);
-};
+    setPredictions(preds);
+    setRotationCycle(taskCount);
+  };
 
   const getTaskRankColor = (rank: number, total: number) => {
     if (rank === 1) return theme.error;
@@ -236,7 +248,7 @@ const generatePredictions = (memberList: any[], taskList: any[]) => {
 
         <View style={styles.fairnessExplanation}>
           <Text style={[styles.explanationText, { color: theme.textMuted }]}>
-            Weekly rotation • Tasks rotate to next member each week
+            ✅ Tasks rotate to the NEXT member EVERY WEEK
           </Text>
         </View>
 
@@ -303,8 +315,8 @@ const generatePredictions = (memberList: any[], taskList: any[]) => {
           />
           <Text style={[styles.noteText, { color: theme.textMuted }]}>
             {isFirst 
-              ? `✓ Tasks rotate weekly • Members get different tasks each week`
-              : `After ${rotationCycle} weeks, every member gets every task exactly once`}
+              ? `✓ Tasks move to the NEXT member EVERY WEEK`
+              : `After ${rotationCycle} weeks (full cycle), every member has held EVERY task exactly once`}
           </Text>
         </View>
       </LinearGradient>
@@ -320,6 +332,8 @@ const generatePredictions = (memberList: any[], taskList: any[]) => {
       name: a.memberName
     }));
     
+    const memberCount = membersList.length;
+    
     return (
       <LinearGradient
         colors={[theme.card, theme.bgSecondary]}
@@ -329,7 +343,7 @@ const generatePredictions = (memberList: any[], taskList: any[]) => {
       >
         <Text style={[styles.cycleTitle, { color: theme.primary }]}>🔄 Weekly Rotation Cycle</Text>
         <Text style={[styles.cycleDescription, { color: theme.textMuted }]}>
-          Tasks rotate every week • Each member gets a different task each week
+          Tasks rotate to the NEXT member EVERY WEEK • After {memberCount} weeks, each task returns to its original member
         </Text>
         
         <View style={styles.cycleGrid}>
@@ -375,7 +389,7 @@ const generatePredictions = (memberList: any[], taskList: any[]) => {
         </View>
         
         <Text style={[styles.cycleNote, { color: theme.textMuted }]}>
-          * Tasks rotate weekly • After {rotationCycle} weeks, each member completes every task exactly once
+          * Tasks rotate to the NEXT member each week • After {memberCount} weeks, every member has held every task
         </Text>
       </LinearGradient>
     );
@@ -576,31 +590,31 @@ const generatePredictions = (memberList: any[], taskList: any[]) => {
               <View style={styles.explanationPoint}>
                 <MaterialCommunityIcons name="numeric-1-circle" size={18} color={theme.primary} />
                 <Text style={[styles.explanationPointText, { color: theme.textSecondary }]}>
-                  Tasks rotate to the next member every week
+                  Tasks rotate to the NEXT member EVERY WEEK
                 </Text>
               </View>
               <View style={styles.explanationPoint}>
                 <MaterialCommunityIcons name="numeric-2-circle" size={18} color={theme.primary} />
                 <Text style={[styles.explanationPointText, { color: theme.textSecondary }]}>
-                  Each member gets a different task each week
+                  Each member gets a DIFFERENT task every week
                 </Text>
               </View>
               <View style={styles.explanationPoint}>
                 <MaterialCommunityIcons name="numeric-3-circle" size={18} color={theme.primary} />
                 <Text style={[styles.explanationPointText, { color: theme.textSecondary }]}>
-                  After {rotationCycle} weeks, every member completes every task exactly once
+                  After {rotationCycle} weeks (full cycle), every member has held EVERY task exactly once
                 </Text>
               </View>
               <View style={styles.explanationPoint}>
                 <MaterialCommunityIcons name="check-circle" size={18} color={theme.primary} />
                 <Text style={[styles.explanationPointText, { color: theme.textSecondary }]}>
-                  ✓ Perfect fairness - total points equal for all members after each full cycle
+                  ✓ Perfect fairness - each task is shared equally among all members
                 </Text>
               </View>
             </LinearGradient>
           </View>
         ) : (
-          // HISTORY VIEW - same as before
+          // HISTORY VIEW
           <View>
             {/* Current Week Info */}
             {currentWeek === selectedWeek && (

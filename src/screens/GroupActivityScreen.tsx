@@ -1,4 +1,4 @@
-// src/screens/GroupActivityScreen.tsx - UPDATED with TokenUtils
+// src/screens/GroupActivityScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -15,10 +15,12 @@ import {
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { GroupActivityService } from '../services/GroupActivityService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 export default function GroupActivityScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
   const { groupId, groupName, userRole } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -128,29 +130,29 @@ export default function GroupActivityScreen({ navigation, route }: any) {
         title: 'Members',
         value: summary.totalMembers,
         icon: 'account-group',
-        gradient: ['#f8f9fa', '#e9ecef'] as [string, string],
-        iconColor: '#495057'
+        gradient: [theme.bgSecondary, theme.bgTertiary] as [string, string],
+        iconColor: theme.textSecondary
       },
       {
         title: 'Tasks',
         value: summary.totalTasks,
         icon: 'format-list-checks',
-        gradient: ['#d3f9d8', '#b2f2bb'] as [string, string],
-        iconColor: '#2b8a3e'
+        gradient: [theme.primaryLight, theme.primaryLight] as [string, string],
+        iconColor: theme.primary
       },
       {
         title: 'Completion',
         value: `${Math.round(summary.points?.completionRate || 0)}%`,
         icon: 'percent',
-        gradient: ['#fff3bf', '#ffec99'] as [string, string],
-        iconColor: '#e67700'
+        gradient: [theme.primaryLight, theme.primaryLight] as [string, string],
+        iconColor: theme.primary
       },
       {
         title: 'Points',
         value: summary.points?.earned || 0,
         icon: 'star',
-        gradient: ['#ffec99', '#ffe066'] as [string, string],
-        iconColor: '#e67700'
+        gradient: [theme.primaryLight, theme.primaryLight] as [string, string],
+        iconColor: theme.primary
       }
     ];
 
@@ -162,13 +164,13 @@ export default function GroupActivityScreen({ navigation, route }: any) {
             colors={card.gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.statCard}
+            style={[styles.statCard, { shadowColor: theme.shadow }]}
           >
             <View style={[styles.cardIcon, { backgroundColor: 'rgba(255,255,255,0.5)' }]}>
               <MaterialCommunityIcons name={card.icon as any} size={24} color={card.iconColor} />
             </View>
-            <Text style={styles.cardValue}>{card.value}</Text>
-            <Text style={styles.cardTitle}>{card.title}</Text>
+            <Text style={[styles.cardValue, { color: theme.text }]}>{card.value}</Text>
+            <Text style={[styles.cardTitle, { color: theme.textMuted }]}>{card.title}</Text>
           </LinearGradient>
         ))}
       </View>
@@ -181,17 +183,17 @@ export default function GroupActivityScreen({ navigation, route }: any) {
 
     return (
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.section}
+        style={[styles.section, { shadowColor: theme.shadow }]}
       >
-        <Text style={styles.sectionTitle}>Current Week Progress</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Current Week Progress</Text>
         
         <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
+          <View style={[styles.progressBar, { backgroundColor: theme.bgTertiary }]}>
             <LinearGradient
-              colors={['#34c759', '#2b8a3e']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={[
@@ -200,50 +202,50 @@ export default function GroupActivityScreen({ navigation, route }: any) {
               ]} 
             />
           </View>
-          <Text style={styles.progressText}>
+          <Text style={[styles.progressText, { color: theme.textMuted }]}>
             {assignments.completed}/{assignments.total} completed
           </Text>
         </View>
 
         <View style={styles.statsRow}>
           <LinearGradient
-            colors={['#d3f9d8', '#b2f2bb']}
+            colors={[theme.primaryLight, theme.primaryLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.statBox}
           >
-            <Text style={[styles.statBoxValue, { color: '#2b8a3e' }]}>{assignments.verified}</Text>
-            <Text style={styles.statBoxLabel}>Verified</Text>
+            <Text style={[styles.statBoxValue, { color: theme.primary }]}>{assignments.verified}</Text>
+            <Text style={[styles.statBoxLabel, { color: theme.textMuted }]}>Verified</Text>
           </LinearGradient>
           
           <LinearGradient
-            colors={['#fff3bf', '#ffec99']}
+            colors={[theme.primaryLight, theme.primaryLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.statBox}
           >
-            <Text style={[styles.statBoxValue, { color: '#e67700' }]}>{assignments.pendingVerification}</Text>
-            <Text style={styles.statBoxLabel}>Pending</Text>
+            <Text style={[styles.statBoxValue, { color: theme.primary }]}>{assignments.pendingVerification}</Text>
+            <Text style={[styles.statBoxLabel, { color: theme.textMuted }]}>Pending</Text>
           </LinearGradient>
           
           <LinearGradient
-            colors={['#fff5f5', '#ffe3e3']}
+            colors={[theme.errorBg, theme.errorBg]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.statBox}
           >
-            <Text style={[styles.statBoxValue, { color: '#fa5252' }]}>{assignments.rejected}</Text>
-            <Text style={styles.statBoxLabel}>Rejected</Text>
+            <Text style={[styles.statBoxValue, { color: theme.error }]}>{assignments.rejected}</Text>
+            <Text style={[styles.statBoxLabel, { color: theme.textMuted }]}>Rejected</Text>
           </LinearGradient>
           
           <LinearGradient
-            colors={['#ffc9c9', '#ffb3b3']}
+            colors={[theme.errorBg, theme.errorBg]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.statBox}
           >
-            <Text style={[styles.statBoxValue, { color: '#dc3545' }]}>{assignments.neglected}</Text>
-            <Text style={styles.statBoxLabel}>Neglected</Text>
+            <Text style={[styles.statBoxValue, { color: theme.error }]}>{assignments.neglected}</Text>
+            <Text style={[styles.statBoxLabel, { color: theme.textMuted }]}>Neglected</Text>
           </LinearGradient>
         </View>
       </LinearGradient>
@@ -255,23 +257,23 @@ export default function GroupActivityScreen({ navigation, route }: any) {
     if (members.length === 0) return null;
 
     const getMemberGradient = (index: number): [string, string] => {
-      if (index === 0) return ['#fff3bf', '#ffec99'];
-      if (index === 1) return ['#f1f3f5', '#e9ecef'];
-      if (index === 2) return ['#f8f9fa', '#dee2e6'];
-      return ['#ffffff', '#f8f9fa'];
+      if (index === 0) return [theme.primaryLight, theme.primaryLight];
+      if (index === 1) return [theme.bgSecondary, theme.bgTertiary];
+      if (index === 2) return [theme.bgSecondary, theme.bgTertiary];
+      return [theme.card, theme.bgSecondary];
     };
 
     return (
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.section}
+        style={[styles.section, { shadowColor: theme.shadow }]}
       >
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Top Contributors</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Top Contributors</Text>
           <TouchableOpacity onPress={handleViewFullLeaderboard}>
-            <Text style={styles.viewAllText}>View All</Text>
+            <Text style={[styles.viewAllText, { color: theme.primary }]}>View All</Text>
           </TouchableOpacity>
         </View>
 
@@ -295,7 +297,8 @@ export default function GroupActivityScreen({ navigation, route }: any) {
                 end={{ x: 1, y: 1 }}
                 style={[
                   styles.memberCard,
-                  getRankStyle()
+                  getRankStyle(),
+                  { borderColor: theme.border }
                 ].filter(Boolean)}
               >
                 <View style={styles.memberRank}>
@@ -306,36 +309,36 @@ export default function GroupActivityScreen({ navigation, route }: any) {
                   ) : index === 2 ? (
                     <MaterialCommunityIcons name="trophy" size={16} color="#CD7F32" />
                   ) : (
-                    <Text style={styles.rankNumber}>{index + 1}</Text>
+                    <Text style={[styles.rankNumber, { color: theme.textMuted }]}>{index + 1}</Text>
                   )}
                 </View>
 
                 <View style={styles.memberInfo}>
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.memberAvatar}
                   >
-                    <Text style={styles.memberInitial}>
+                    <Text style={[styles.memberInitial, { color: theme.textSecondary }]}>
                       {member.fullName?.charAt(0) || '?'}
                     </Text>
                   </LinearGradient>
                   <View style={styles.memberDetails}>
-                    <Text style={styles.memberName}>{member.fullName}</Text>
-                    <Text style={styles.memberStats}>
+                    <Text style={[styles.memberName, { color: theme.text }]}>{member.fullName}</Text>
+                    <Text style={[styles.memberStats, { color: theme.textMuted }]}>
                       {member.completedAssignments || 0}/{member.totalAssignments || 0} • {member.earnedPoints || 0} pts
                     </Text>
                   </View>
                 </View>
 
                 <LinearGradient
-                  colors={['#d3f9d8', '#b2f2bb']}
+                  colors={[theme.primaryLight, theme.primaryLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.memberBadge}
                 >
-                  <Text style={styles.memberPercentage}>
+                  <Text style={[styles.memberPercentage, { color: theme.primary }]}>
                     {member.totalAssignments ? 
                       Math.round((member.completedAssignments / member.totalAssignments) * 100) : 0}%
                   </Text>
@@ -350,31 +353,31 @@ export default function GroupActivityScreen({ navigation, route }: any) {
 
   const renderHeader = () => (
     <LinearGradient
-      colors={['#ffffff', '#f8f9fa']}
+      colors={[theme.card, theme.bgSecondary]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.header}
+      style={[styles.header, { borderBottomColor: theme.border }]}
     >
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
+        <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
       </TouchableOpacity>
       <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
           {groupName} Activity
         </Text>
       </View>
       <TouchableOpacity onPress={handleViewTaskHistory} style={styles.historyButton}>
-        <MaterialCommunityIcons name="history" size={24} color="#2b8a3e" />
+        <MaterialCommunityIcons name="history" size={24} color={theme.primary} />
       </TouchableOpacity>
     </LinearGradient>
   );
 
   if (loading && !refreshing) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#495057" />
-          <Text style={styles.loadingText}>Loading activity data...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading activity data...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -382,17 +385,17 @@ export default function GroupActivityScreen({ navigation, route }: any) {
 
   if (authError) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="lock-alert" size={64} color="#fa5252" />
-          <Text style={styles.errorText}>Authentication Error</Text>
-          <Text style={styles.errorSubtext}>Please log in again</Text>
+          <MaterialCommunityIcons name="lock-alert" size={64} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>Authentication Error</Text>
+          <Text style={[styles.errorSubtext, { color: theme.textMuted }]}>Please log in again</Text>
           <TouchableOpacity 
             style={styles.retryButton}
             onPress={() => navigation.navigate('Login')}
           >
             <LinearGradient
-              colors={['#fa5252', '#e03131']}
+              colors={[theme.error, theme.error]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.retryButtonGradient}
@@ -406,28 +409,28 @@ export default function GroupActivityScreen({ navigation, route }: any) {
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.card} />
       {renderHeader()}
 
       <ScrollView
         style={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => fetchActivityData(true)} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchActivityData(true)} colors={[theme.primary]} tintColor={theme.primary} />
         }
       >
         {error ? (
           <View style={styles.errorContainer}>
-            <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
-            <Text style={styles.errorText}>{error}</Text>
+            <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
+            <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={() => fetchActivityData()}>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.retryButtonGradient}
               >
-                <Text style={[styles.retryButtonText, { color: '#495057' }]}>Retry</Text>
+                <Text style={[styles.retryButtonText, { color: theme.textSecondary }]}>Retry</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -446,7 +449,6 @@ export default function GroupActivityScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa'
   },
   header: {
     flexDirection: 'row',
@@ -455,77 +457,72 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
   },
   backButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   titleContainer: {
     flex: 1,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529'
   },
   historyButton: {
     width: 40,
     height: 40,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   loadingText: {
     marginTop: 12,
-    color: '#868e96'
   },
   content: {
     flex: 1,
-    padding: 16
+    padding: 16,
   },
   errorContainer: {
     alignItems: 'center',
     padding: 20,
-    marginTop: 40
+    marginTop: 40,
   },
   errorText: {
-    color: '#fa5252',
     textAlign: 'center',
     marginVertical: 12,
     fontSize: 16,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   errorSubtext: {
-    color: '#868e96',
     textAlign: 'center',
-    marginBottom: 20
+    marginBottom: 20,
   },
   retryButton: {
     borderRadius: 8,
     overflow: 'hidden',
-    marginTop: 8
+    marginTop: 8,
   },
   retryButtonGradient: {
     paddingHorizontal: 24,
-    paddingVertical: 12
+    paddingVertical: 12,
   },
   retryButtonText: {
     fontWeight: '600',
-    fontSize: 16
+    fontSize: 16,
   },
   cardsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24
+    marginBottom: 24,
   },
   statCard: {
     width: '48%',
@@ -533,11 +530,10 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1
+    elevation: 1,
   },
   cardIcon: {
     width: 48,
@@ -545,81 +541,73 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12
+    marginBottom: 12,
   },
   cardValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#212529',
-    marginBottom: 4
+    marginBottom: 4,
   },
   cardTitle: {
     fontSize: 14,
-    color: '#868e96'
   },
   section: {
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1
+    elevation: 1,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529'
   },
   viewAllText: {
-    color: '#495057',
-    fontWeight: '500'
+    fontWeight: '500',
   },
   progressContainer: {
-    marginBottom: 16
+    marginBottom: 16,
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#e9ecef',
     borderRadius: 4,
     overflow: 'hidden',
-    marginBottom: 8
+    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 4
+    borderRadius: 4,
   },
   progressText: {
     fontSize: 14,
-    color: '#868e96',
-    textAlign: 'right'
+    textAlign: 'right',
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8
+    gap: 8,
   },
   statBox: {
     flex: 1,
     padding: 12,
     borderRadius: 8,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   statBoxValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 4
+    marginBottom: 4,
   },
   statBoxLabel: {
     fontSize: 11,
-    color: '#868e96'
   },
   memberCard: {
     flexDirection: 'row',
@@ -628,34 +616,29 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   firstPlace: {
-    borderColor: '#ffd43b',
-    borderWidth: 2
+    borderWidth: 2,
   },
   secondPlace: {
-    borderColor: '#ced4da',
-    borderWidth: 2
+    borderWidth: 2,
   },
   thirdPlace: {
-    borderColor: '#e9ecef',
-    borderWidth: 2
+    borderWidth: 2,
   },
   memberRank: {
     width: 30,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   rankNumber: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#868e96'
   },
   memberInfo: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 8
+    marginLeft: 8,
   },
   memberAvatar: {
     width: 40,
@@ -663,34 +646,30 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12
+    marginRight: 12,
   },
   memberInitial: {
-    color: '#212529',
     fontSize: 16,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
   memberDetails: {
-    flex: 1
+    flex: 1,
   },
   memberName: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#212529',
-    marginBottom: 4
+    marginBottom: 4,
   },
   memberStats: {
     fontSize: 12,
-    color: '#868e96'
   },
   memberBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12
+    borderRadius: 12,
   },
   memberPercentage: {
     fontSize: 12,
-    color: '#2b8a3e',
-    fontWeight: '600'
-  }
+    fontWeight: '600',
+  },
 });

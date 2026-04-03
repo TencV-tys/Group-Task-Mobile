@@ -1,4 +1,4 @@
-// src/screens/TeamOverviewScreen.tsx - WITH CONSOLE LOGS FOR DEBUGGING
+// src/screens/TeamOverviewScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
@@ -16,11 +16,14 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import { GroupMembersService } from '../services/GroupMemberService';
 import { AssignmentService } from '../services/AssignmentService';
-import { TokenUtils } from '../utils/tokenUtils';
+import { TokenUtils } from '../utils/tokenUtils'; 
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { teamOverviewStyles as styles } from '../styles/teamOverview.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeTeamOverviewStyles } from '../styles/teamOverview.styles';
 
 export const TeamOverviewScreen = ({ navigation, route }: any) => {
+  const { theme, isDark } = useTheme();
+  const styles = makeTeamOverviewStyles(theme);
   const { groupId, groupName } = route.params;
   
   const [loading, setLoading] = useState(true);
@@ -57,105 +60,171 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
     useCallback(() => {
       loadTeamData();
     }, [groupId])
-  );
+  ); 
+
+  // In TeamOverviewScreen.tsx - Update loadTeamData function
 
   const loadTeamData = async () => {
-    const hasToken = await checkToken();
-    if (!hasToken) return;
+  const hasToken = await checkToken();
+  if (!hasToken) return;
 
-    setLoading(true);
-    setError(null);
+  setLoading(true);
+  setError(null);
 
-    console.log('🔍 [TeamOverview] Loading team data for group:', groupId);
+  console.log('🔍 [TeamOverview] Loading team data for group:', groupId);
 
-    try {
-      // Get all members
-      const membersResult = await GroupMembersService.getGroupMembers(groupId);
-      console.log('📦 [TeamOverview] Members result:', membersResult.success ? 'Success' : 'Failed');
+  try {
+    const membersResult = await GroupMembersService.getGroupMembers(groupId);
+    console.log('📦 [TeamOverview] Members result:', membersResult.success ? 'Success' : 'Failed');
+    
+    if (membersResult.success) {
+      const activeMembers = (membersResult.members || []).filter((m: any) => m.isActive !== false);
+      console.log(`👥 [TeamOverview] Total active members: ${activeMembers.length}`);
       
-      if (membersResult.success) {
-        const activeMembers = (membersResult.members || []).filter((m: any) => m.isActive !== false);
-        console.log(`👥 [TeamOverview] Total active members: ${activeMembers.length}`);
-        
-        // Count admins
-        const admins = activeMembers.filter((m: any) => m.role === 'ADMIN' || m.groupRole === 'ADMIN');
-        setAdminCount(admins.length);
-        console.log(`👑 [TeamOverview] Admins: ${admins.length}`);
-        
-        // Filter out admins
-        const regularMembers = activeMembers.filter((m: any) => {
-          if (m.role === 'ADMIN' || m.groupRole === 'ADMIN') {
-            return false;
-          }
-          return true;
-        });
-        
-        console.log(`👥 [TeamOverview] Regular members: ${regularMembers.length}`);
-        
-        setAllMembers(regularMembers);
-        
-        // Get stats for each regular member
-        const stats: Record<string, any> = {};
-        
-        console.log('📊 [TeamOverview] Fetching stats for each member...');
-        
-        await Promise.all(
-          regularMembers.map(async (member: any) => {
-            try {
-              console.log(`  📈 Fetching stats for: ${member.fullName} (${member.userId})`);
-              const tasksResult = await AssignmentService.getUserAssignments(member.userId, {
-                limit: 100
+      const admins = activeMembers.filter((m: any) => m.role === 'ADMIN' || m.groupRole === 'ADMIN');
+      setAdminCount(admins.length);
+      console.log(`👑 [TeamOverview] Admins: ${admins.length}`);
+      
+      const regularMembers = activeMembers.filter((m: any) => {
+        if (m.role === 'ADMIN' || m.groupRole === 'ADMIN') return false;
+        return true;
+      });
+      
+      console.log(`👥 [TeamOverview] Regular members: ${regularMembers.length}`);
+      setAllMembers(regularMembers);
+      
+      const stats: Record<string, any> = {};
+      
+      console.log('📊 [TeamOverview] Fetching stats for each member...');
+      
+      await Promise.all(
+        regularMembers.map(async (member: any) => {
+          try {
+            console.log(`  📈 Fetching stats for: ${member.fullName} (${member.userId})`);
+            
+            const tasksResult = await AssignmentService.getUserAssignments(member.userId, {
+              limit: 100
+            });
+            
+            if (tasksResult.success) {
+              // ✅ Filter out historical (deleted task) assignments before computing stats
+              const allAssignments = tasksResult.data?.assignments || [];
+              const activeAssignments = allAssignments.filter((a: any) => !a.isHistorical);
+
+              console.log(`    📋 ${member.fullName}: ${allAssignments.length} total, ${allAssignments.length - activeAssignments.length} historical (excluded), ${activeAssignments.length} active`);
+
+              const completed = activeAssignments.filter(
+                (a: any) => a.completed
+              ).length;
+
+              const verified = activeAssignments.filter(
+                (a: any) => a.verified === true
+              ).length;
+
+              const rejected = activeAssignments.filter(
+                (a: any) => a.verified === false
+              ).length;
+
+              const pendingVerification = activeAssignments.filter(
+                (a: any) => a.completed && a.verified === null
+              ).length;
+
+              const pending = activeAssignments.filter(
+                (a: any) => !a.completed && !a.expired
+              ).length;
+
+              const expired = activeAssignments.filter(
+                (a: any) => a.expired === true
+              ).length;
+
+              const totalTasks = activeAssignments.length;
+
+              const earnedPoints = activeAssignments
+                .filter((a: any) => a.verified === true)
+                .reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+
+              const totalPoints = activeAssignments
+                .reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+
+              const completionRate = totalTasks > 0
+                ? Math.round((verified / totalTasks) * 100)
+                : 0;
+
+              console.log(`    ✅ ${member.fullName}:`, {
+                totalTasks,
+                completed,
+                verified,
+                rejected,
+                pendingVerification,
+                pending,
+                expired,
+                earnedPoints,
+                totalPoints,
+                completionRate
               });
-              
-              if (tasksResult.success) {
-                const assignments = tasksResult.assignments || [];
-                const completed = assignments.filter((a: any) => a.completed);
-                const verified = completed.filter((a: any) => a.verified === true);
-                const rejected = completed.filter((a: any) => a.verified === false);
-                const pending = completed.filter((a: any) => a.verified === null);
-                
-                const totalPoints = assignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-                const earnedPoints = verified.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-                const completionRate = assignments.length > 0 
-                  ? Math.round((completed.length / assignments.length) * 100) 
-                  : 0;
-                
-                stats[member.userId] = {
-                  totalTasks: assignments.length,
-                  completed: completed.length,
-                  verified: verified.length,
-                  rejected: rejected.length,
-                  pending: pending.length,
-                  totalPoints,
-                  earnedPoints,
-                  completionRate
-                };
-                
-                console.log(`    ✅ ${member.fullName}: Points=${earnedPoints}, Completion=${completionRate}%, Tasks=${assignments.length}`);
-              } else {
-                console.log(`    ❌ Failed to get stats for ${member.fullName}`);
-              }
-            } catch (err) {
-              console.error(`    ❌ Error loading stats for member ${member.userId}:`, err);
+
+              stats[member.userId] = {
+                totalTasks,
+                completed,
+                verified,
+                rejected,
+                pending,
+                pendingVerification,
+                expired,
+                totalPoints,
+                earnedPoints,
+                completionRate
+              };
+
+            } else {
+              console.log(`    ❌ Failed to get assignments for ${member.fullName}`);
+              stats[member.userId] = {
+                totalTasks: 0,
+                completed: 0,
+                verified: 0,
+                rejected: 0,
+                pending: 0,
+                pendingVerification: 0,
+                expired: 0,
+                totalPoints: 0,
+                earnedPoints: 0,
+                completionRate: 0
+              };
             }
-          })
-        );
-        
-        setMemberStats(stats);
-        console.log('✅ [TeamOverview] Stats loaded:', Object.keys(stats).length, 'members have stats');
-      } else {
-        setError(membersResult.message || 'Failed to load team data');
-        console.log('❌ [TeamOverview] Failed to load members:', membersResult.message);
-      }
-    } catch (err: any) {
-      console.error('❌ [TeamOverview] Error loading team data:', err);
-      setError(err.message || 'Failed to load team data');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      console.log('✅ [TeamOverview] Loading complete');
+          } catch (err) {
+            console.error(`    ❌ Error loading stats for member ${member.userId}:`, err);
+            stats[member.userId] = {
+              totalTasks: 0,
+              completed: 0,
+              verified: 0,
+              rejected: 0,
+              pending: 0,
+              pendingVerification: 0,
+              expired: 0,
+              totalPoints: 0,
+              earnedPoints: 0,
+              completionRate: 0
+            };
+          }
+        })
+      );
+      
+      setMemberStats(stats);
+      console.log('✅ [TeamOverview] Stats loaded for', Object.keys(stats).length, 'members');
+
+    } else {
+      setError(membersResult.message || 'Failed to load team data');
+      console.log('❌ [TeamOverview] Failed to load members:', membersResult.message);
     }
-  };
+  } catch (err: any) {
+    console.error('❌ [TeamOverview] Error loading team data:', err);
+    setError(err.message || 'Failed to load team data');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+    console.log('✅ [TeamOverview] Loading complete');
+  }
+};
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -221,17 +290,17 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
   const renderMemberCard = ({ item, index }: { item: any; index: number }) => {
     const stats = item.stats;
     const isExpanded = expandedMember === item.userId;
-    const completionColor = stats.completionRate >= 80 ? '#2b8a3e' : 
-                           stats.completionRate >= 50 ? '#e67700' : '#fa5252';
+    const completionColor = stats.completionRate >= 80 ? theme.primary : 
+                           stats.completionRate >= 50 ? theme.primary : theme.error;
 
     return (
       <TouchableOpacity
-        style={styles.memberCard}
+        style={[styles.memberCard, { borderColor: theme.border }]}
         onPress={() => toggleMemberExpand(item.userId)}
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.cardGradient}
@@ -239,87 +308,87 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
           <View style={styles.cardHeader}>
             <View style={styles.memberInfo}>
               {item.avatarUrl ? (
-                <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
+                <Image source={{ uri: item.avatarUrl }} style={[styles.avatar, { borderColor: theme.border }]} />
               ) : (
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
-                  style={styles.avatarPlaceholder}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
+                  style={[styles.avatarPlaceholder, { borderColor: theme.border }]}
                 >
-                  <Text style={styles.avatarText}>
+                  <Text style={[styles.avatarText, { color: theme.textSecondary }]}>
                     {item.fullName?.charAt(0).toUpperCase() || 'U'}
                   </Text>
                 </LinearGradient>
               )}
               <View style={styles.memberDetails}>
                 <View style={styles.nameRow}>
-                  <Text style={styles.memberName}>{item.fullName}</Text>
-                  <Text style={styles.rankNumber}>#{index + 1}</Text>
+                  <Text style={[styles.memberName, { color: theme.text }]}>{item.fullName}</Text>
+                  <Text style={[styles.rankNumber, { color: theme.primary, backgroundColor: theme.primaryLight }]}>#{index + 1}</Text>
                   {item.inRotation === true && (
-                    <LinearGradient colors={['#d3f9d8', '#b2f2bb']} style={styles.rotationBadge}>
-                      <MaterialCommunityIcons name="sync" size={10} color="#2b8a3e" />
-                      <Text style={styles.rotationBadgeText}>In Rotation</Text>
+                    <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.rotationBadge}>
+                      <MaterialCommunityIcons name="sync" size={10} color={theme.primary} />
+                      <Text style={[styles.rotationBadgeText, { color: theme.primary }]}>In Rotation</Text>
                     </LinearGradient>
                   )}
                   {item.inRotation === false && item.role !== 'ADMIN' && (
-                    <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.inactiveBadge}>
-                      <MaterialCommunityIcons name="pause" size={10} color="#e67700" />
-                      <Text style={styles.inactiveBadgeText}>Not in Rotation</Text>
+                    <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.inactiveBadge}>
+                      <MaterialCommunityIcons name="pause" size={10} color={theme.primary} />
+                      <Text style={[styles.inactiveBadgeText, { color: theme.primary }]}>Not in Rotation</Text>
                     </LinearGradient>
                   )}
                 </View>
-                <Text style={styles.memberEmail}>{item.email}</Text>
+                <Text style={[styles.memberEmail, { color: theme.textMuted }]}>{item.email}</Text>
               </View>
             </View>
             <MaterialCommunityIcons 
               name={isExpanded ? 'chevron-up' : 'chevron-down'} 
               size={22} 
-              color="#adb5bd" 
+              color={theme.textMuted} 
             />
           </View>
 
-          <View style={styles.statsRow}>
+          <View style={[styles.statsRow, { backgroundColor: theme.bgSecondary }]}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.earnedPoints}</Text>
-              <Text style={styles.statLabel}>Points</Text>
+              <Text style={[styles.statValue, { color: theme.text }]}>{stats.earnedPoints}</Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Points</Text>
             </View>
             <View style={styles.statItem}>
               <Text style={[styles.statValue, { color: completionColor }]}>
                 {stats.completionRate}%
               </Text>
-              <Text style={styles.statLabel}>Completion</Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Completion</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.verified}/{stats.totalTasks}</Text>
-              <Text style={styles.statLabel}>Verified</Text>
+              <Text style={[styles.statValue, { color: theme.text }]}>{stats.verified}/{stats.totalTasks}</Text>
+              <Text style={[styles.statLabel, { color: theme.textMuted }]}>Verified</Text>
             </View>
           </View>
 
           {isExpanded && (
-            <View style={styles.expandedContent}>
+            <View style={[styles.expandedContent, { borderTopColor: theme.border }]}>
               <View style={styles.detailGrid}>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Total Tasks</Text>
-                  <Text style={styles.detailValue}>{stats.totalTasks}</Text>
+                <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+                  <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Total Tasks</Text>
+                  <Text style={[styles.detailValue, { color: theme.text }]}>{stats.totalTasks}</Text>
                 </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Completed</Text>
-                  <Text style={[styles.detailValue, { color: '#2b8a3e' }]}>{stats.completed}</Text>
+                <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+                  <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Completed</Text>
+                  <Text style={[styles.detailValue, { color: theme.primary }]}>{stats.completed}</Text>
                 </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Verified</Text>
-                  <Text style={[styles.detailValue, { color: '#2b8a3e' }]}>{stats.verified}</Text>
+                <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+                  <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Verified</Text>
+                  <Text style={[styles.detailValue, { color: theme.primary }]}>{stats.verified}</Text>
                 </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Pending</Text>
-                  <Text style={[styles.detailValue, { color: '#e67700' }]}>{stats.pending}</Text>
+                <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+                  <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Pending</Text>
+                  <Text style={[styles.detailValue, { color: theme.primary }]}>{stats.pending}</Text>
                 </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Rejected</Text>
-                  <Text style={[styles.detailValue, { color: '#fa5252' }]}>{stats.rejected}</Text>
+                <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+                  <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Rejected</Text>
+                  <Text style={[styles.detailValue, { color: theme.error }]}>{stats.rejected}</Text>
                 </View>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Total Points</Text>
-                  <Text style={[styles.detailValue, { color: '#e67700' }]}>{stats.totalPoints}</Text>
+                <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+                  <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Total Points</Text>
+                  <Text style={[styles.detailValue, { color: theme.primary }]}>{stats.totalPoints}</Text>
                 </View>
               </View>
 
@@ -333,12 +402,12 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
                 })}
               >
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}
+                  colors={[theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.viewButtonGradient}
                 >
-                  <MaterialCommunityIcons name="history" size={16} color="white" />
+                  <MaterialCommunityIcons name="history" size={16} color="#fff" />
                   <Text style={styles.viewButtonText}>View Detailed History</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -350,21 +419,21 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
   };
 
   const renderHeader = () => (
-    <View style={styles.header}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+    <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
       </TouchableOpacity>
       
       <View style={styles.titleContainer}>
-        <Text style={styles.title}>Team Overview</Text>
-        <Text style={styles.subtitle}>{groupName}</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Team Overview</Text>
+        <Text style={[styles.subtitle, { color: theme.textMuted }]}>{groupName}</Text>
       </View>
       
-      <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton} disabled={refreshing}>
+      <TouchableOpacity onPress={handleRefresh} style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]} disabled={refreshing}>
         {refreshing ? (
-          <ActivityIndicator size="small" color="#2b8a3e" />
+          <ActivityIndicator size="small" color={theme.primary} />
         ) : (
-          <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+          <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
         )}
       </TouchableOpacity>
     </View>
@@ -375,59 +444,59 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
     
     return (
       <View style={styles.sortBar}>
-        <Text style={styles.sortLabel}>Sort by:</Text>
+        <Text style={[styles.sortLabel, { color: theme.textMuted }]}>Sort by:</Text>
         <TouchableOpacity
-          style={[styles.sortOption, sortBy === 'points' && styles.sortOptionActive]}
+          style={[styles.sortOption, sortBy === 'points' && styles.sortOptionActive, { borderColor: theme.border }]}
           onPress={() => {
             console.log('📊 [TeamOverview] Sorting by POINTS');
             setSortBy('points');
           }}
         >
           <LinearGradient
-            colors={sortBy === 'points' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+            colors={sortBy === 'points' ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.sortOptionGradient}
           >
-            <Text style={[styles.sortOptionText, sortBy === 'points' && styles.sortOptionTextActive]}>
+            <Text style={[styles.sortOptionText, sortBy === 'points' && styles.sortOptionTextActive, { color: sortBy === 'points' ? '#fff' : theme.textSecondary }]}>
               Points
             </Text>
           </LinearGradient>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.sortOption, sortBy === 'completion' && styles.sortOptionActive]}
+          style={[styles.sortOption, sortBy === 'completion' && styles.sortOptionActive, { borderColor: theme.border }]}
           onPress={() => {
             console.log('📊 [TeamOverview] Sorting by COMPLETION');
             setSortBy('completion');
           }}
         >
           <LinearGradient
-            colors={sortBy === 'completion' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+            colors={sortBy === 'completion' ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.sortOptionGradient}
           >
-            <Text style={[styles.sortOptionText, sortBy === 'completion' && styles.sortOptionTextActive]}>
+            <Text style={[styles.sortOptionText, sortBy === 'completion' && styles.sortOptionTextActive, { color: sortBy === 'completion' ? '#fff' : theme.textSecondary }]}>
               Completion
             </Text>
           </LinearGradient>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.sortOption, sortBy === 'name' && styles.sortOptionActive]}
+          style={[styles.sortOption, sortBy === 'name' && styles.sortOptionActive, { borderColor: theme.border }]}
           onPress={() => {
             console.log('📊 [TeamOverview] Sorting by NAME');
             setSortBy('name');
           }}
         >
           <LinearGradient
-            colors={sortBy === 'name' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+            colors={sortBy === 'name' ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.sortOptionGradient}
           >
-            <Text style={[styles.sortOptionText, sortBy === 'name' && styles.sortOptionTextActive]}>
+            <Text style={[styles.sortOptionText, sortBy === 'name' && styles.sortOptionTextActive, { color: sortBy === 'name' ? '#fff' : theme.textSecondary }]}>
               Name
             </Text>
           </LinearGradient>
@@ -447,25 +516,25 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
 
     return (
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.summaryCard}
+        style={[styles.summaryCard, { borderColor: theme.border }]}
       >
         <View style={styles.summaryRow}>
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{sortedMembers.length}</Text>
-            <Text style={styles.summaryLabel}>Members</Text>
+            <Text style={[styles.summaryValue, { color: theme.primary }]}>{sortedMembers.length}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Members</Text>
           </View>
-          <View style={styles.summaryDivider} />
+          <View style={[styles.summaryDivider, { backgroundColor: theme.border }]} />
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{totalPoints}</Text>
-            <Text style={styles.summaryLabel}>Total Points</Text>
+            <Text style={[styles.summaryValue, { color: theme.primary }]}>{totalPoints}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Total Points</Text>
           </View>
-          <View style={styles.summaryDivider} />
+          <View style={[styles.summaryDivider, { backgroundColor: theme.border }]} />
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryValue}>{avgCompletion}%</Text>
-            <Text style={styles.summaryLabel}>Avg Completion</Text>
+            <Text style={[styles.summaryValue, { color: theme.primary }]}>{avgCompletion}%</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Avg Completion</Text>
           </View>
         </View>
       </LinearGradient>
@@ -477,13 +546,13 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
     
     return (
       <LinearGradient
-        colors={['#e7f5ff', '#d0ebff']}
+        colors={[theme.primaryLight, theme.primaryLight]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.adminNote}
+        style={[styles.adminNote, { borderColor: theme.primaryBorder }]}
       >
-        <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
-        <Text style={styles.adminNoteText}>
+        <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
+        <Text style={[styles.adminNoteText, { color: theme.primary }]}>
           {adminCount} admin{adminCount > 1 ? 's' : ''} are not shown here. This view shows regular members only.
         </Text>
       </LinearGradient>
@@ -492,11 +561,11 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
 
   if (loading && !refreshing) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         {renderHeader()}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading team data...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading team data...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -504,13 +573,13 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
 
   if (error) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         {renderHeader()}
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
-          <Text style={styles.errorText}>{error}</Text>
+          <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadTeamData}>
-            <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.retryButtonGradient}>
+            <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.retryButtonGradient}>
               <Text style={styles.retryButtonText}>Retry</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -522,7 +591,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
   const sortedMembers = getSortedMembers();
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {renderHeader()}
       {renderSummary()}
       {renderAdminNote()}
@@ -536,21 +605,21 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
-              style={styles.emptyIconContainer}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
+              style={[styles.emptyIconContainer, { borderColor: theme.border }]}
             >
-              <MaterialCommunityIcons name="account-group" size={40} color="#2b8a3e" />
+              <MaterialCommunityIcons name="account-group" size={40} color={theme.primary} />
             </LinearGradient>
-            <Text style={styles.emptyTitle}>No Members Found</Text>
-            <Text style={styles.emptySubtext}>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>No Members Found</Text>
+            <Text style={[styles.emptySubtext, { color: theme.textMuted }]}>
               This group doesn't have any active regular members yet
             </Text>
           </View>

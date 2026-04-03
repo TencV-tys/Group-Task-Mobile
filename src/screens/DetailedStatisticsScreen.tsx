@@ -1,4 +1,4 @@
-// src/screens/DetailedStatisticsScreen.tsx - Just add auth error handler
+// src/screens/DetailedStatisticsScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -14,19 +14,22 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext'; 
 
 const { width } = Dimensions.get('window');
 
 export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
-  const { groupId, groupName } = route.params;
+  const { theme, isDark } = useTheme();
+  const { groupId, groupName, userRole } = route.params;
+  const isAdmin = userRole === 'ADMIN';
+
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [authError, setAuthError] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'all'>('week');
 
-  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -41,7 +44,6 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     loadStatistics();
   }, [groupId]);
 
-  // ✅ ADD THIS: Auth error handler
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -61,7 +63,6 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
   }, [authError, navigation]);
 
   const loadStatistics = async () => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -73,6 +74,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     
     try {
       const result = await TaskService.getTaskStatistics(groupId);
+      console.log('statistics:',result)
       if (result.success) {
         setStats(result.statistics);
       } else {
@@ -89,17 +91,17 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
   };
 
   const getCompletionRateColor = (rate: number) => {
-    if (rate >= 80) return '#2b8a3e';
-    if (rate >= 50) return '#e67700';
-    return '#fa5252';
+    if (rate >= 80) return theme.primary;
+    if (rate >= 50) return theme.primary;
+    return theme.error;
   };
 
   if (loading) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading statistics...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading statistics...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -109,108 +111,112 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
   const userStats = stats?.userStats || {};
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Statistics</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Statistics</Text>
         <TouchableOpacity 
           onPress={loadStatistics} 
-          style={styles.refreshButton}
+          style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+          <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
         {/* Summary Cards */}
         <View style={styles.summaryGrid}>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.summaryCard}
+            style={[styles.summaryCard, { borderColor: theme.border }]}
           >
             <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
               <MaterialCommunityIcons name="format-list-checks" size={22} color="#4F46E5" />
             </View>
-            <Text style={styles.summaryNumber}>{stats?.totalTasks || 0}</Text>
-            <Text style={styles.summaryLabel}>Total Tasks</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{stats?.totalTasks || 0}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Total Tasks</Text>
           </LinearGradient>
 
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.summaryCard}
+            style={[styles.summaryCard, { borderColor: theme.border }]}
           >
-            <View style={[styles.iconContainer, { backgroundColor: '#d3f9d8' }]}>
-              <MaterialCommunityIcons name="check-circle" size={22} color="#2b8a3e" />
+            <View style={[styles.iconContainer, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="check-circle" size={22} color={theme.primary} />
             </View>
-            <Text style={styles.summaryNumber}>{currentWeek?.completedAssignments || 0}</Text>
-            <Text style={styles.summaryLabel}>Completed</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{currentWeek?.completedAssignments || 0}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Completed</Text>
           </LinearGradient>
 
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.summaryCard}
+            style={[styles.summaryCard, { borderColor: theme.border }]}
           >
-            <View style={[styles.iconContainer, { backgroundColor: '#fff3bf' }]}>
-              <MaterialCommunityIcons name="clock-outline" size={22} color="#e67700" />
+            <View style={[styles.iconContainer, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="clock-outline" size={22} color={theme.primary} />
             </View>
-            <Text style={styles.summaryNumber}>{currentWeek?.pendingAssignments || 0}</Text>
-            <Text style={styles.summaryLabel}>Pending</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{currentWeek?.pendingAssignments || 0}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Pending</Text>
           </LinearGradient>
 
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.summaryCard}
+            style={[styles.summaryCard, { borderColor: theme.border }]}
           >
-            <View style={[styles.iconContainer, { backgroundColor: '#fff5f5' }]}>
-              <MaterialCommunityIcons name="alert-circle" size={22} color="#fa5252" />
+            <View style={[styles.iconContainer, { backgroundColor: theme.errorBg }]}>
+              <MaterialCommunityIcons name="alert-circle" size={22} color={theme.error} />
             </View>
-            <Text style={styles.summaryNumber}>{stats?.overdueTasks || 0}</Text>
-            <Text style={styles.summaryLabel}>Overdue</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{stats?.overdueTasks || 0}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Overdue</Text>
           </LinearGradient>
         </View>
 
         {/* Points Overview */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Points Overview</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Points Overview</Text>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.pointsCard}
+            style={[styles.pointsCard, { borderColor: theme.border }]}
           >
             <View style={styles.pointsRow}>
-              <Text style={styles.pointsLabel}>Total Points Earned:</Text>
-              <Text style={styles.pointsValue}>{currentWeek?.completedPoints || 0}</Text>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Total Points Earned:</Text>
+              <Text style={[styles.pointsValue, { color: theme.primary }]}>{currentWeek?.completedPoints || 0}</Text>
             </View>
             <View style={styles.pointsRow}>
-              <Text style={styles.pointsLabel}>Pending Points:</Text>
-              <Text style={[styles.pointsValue, styles.pendingPoints]}>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Pending Points:</Text>
+              <Text style={[styles.pointsValue, { color: theme.primary }]}>
                 {currentWeek?.pendingPoints || 0}
               </Text>
             </View>
-            <View style={styles.progressBar}>
+            <View style={[styles.progressBar, { backgroundColor: theme.bgTertiary }]}>
               <LinearGradient
-                colors={[getCompletionRateColor(currentWeek?.completionRate || 0), getCompletionRateColor(currentWeek?.completionRate || 0) + 'dd']}
+                colors={[
+                  getCompletionRateColor(currentWeek?.completionRate || 0),
+                  getCompletionRateColor(currentWeek?.completionRate || 0) + 'dd'
+                ]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={[
-                  styles.progressFill, 
-                  { width: `${currentWeek?.completionRate || 0}%` }
-                ]} 
+                style={[styles.progressFill, { width: `${currentWeek?.completionRate || 0}%` }]} 
               />
             </View>
-            <Text style={styles.completionRate}>
+            <Text style={[styles.completionRate, { color: theme.textMuted }]}>
               {currentWeek?.completionRate || 0}% Completion Rate
             </Text>
           </LinearGradient>
@@ -218,65 +224,65 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
 
         {/* Task Distribution */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Task Distribution</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Task Distribution</Text>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.distributionCard}
+            style={[styles.distributionCard, { borderColor: theme.border }]}
           >
             <View style={styles.distributionRow}>
               <View style={styles.distributionLabel}>
                 <View style={[styles.dot, { backgroundColor: '#4F46E5' }]} />
-                <Text style={styles.distributionLabelText}>Daily Tasks</Text>
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Daily Tasks</Text>
               </View>
-              <Text style={styles.distributionNumber}>{stats?.dailyTasks || 0}</Text>
+              <Text style={[styles.distributionNumber, { color: theme.text }]}>{stats?.dailyTasks || 0}</Text>
             </View>
             <View style={styles.distributionRow}>
               <View style={styles.distributionLabel}>
-                <View style={[styles.dot, { backgroundColor: '#2b8a3e' }]} />
-                <Text style={styles.distributionLabelText}>Weekly Tasks</Text>
+                <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Weekly Tasks</Text>
               </View>
-              <Text style={styles.distributionNumber}>{stats?.weeklyTasks || 0}</Text>
+              <Text style={[styles.distributionNumber, { color: theme.text }]}>{stats?.weeklyTasks || 0}</Text>
             </View>
             <View style={styles.distributionRow}>
               <View style={styles.distributionLabel}>
-                <View style={[styles.dot, { backgroundColor: '#e67700' }]} />
-                <Text style={styles.distributionLabelText}>Recurring Tasks</Text>
+                <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Recurring Tasks</Text>
               </View>
-              <Text style={styles.distributionNumber}>{stats?.recurringTasks || 0}</Text>
+              <Text style={[styles.distributionNumber, { color: theme.text }]}>{stats?.recurringTasks || 0}</Text>
             </View>
           </LinearGradient>
         </View>
 
-        {/* User Performance */}
-        {userStats && Object.keys(userStats).length > 0 && (
+        {/* Your Performance - Members only */}
+        {!isAdmin && userStats && Object.keys(userStats).length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Performance</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Performance</Text>
             <LinearGradient
-              colors={['#ffffff', '#f8f9fa']}
+              colors={[theme.card, theme.bgSecondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.performanceCard}
+              style={[styles.performanceCard, { borderColor: theme.border }]}
             >
               <View style={styles.performanceRow}>
-                <Text style={styles.performanceLabel}>Your Assignments:</Text>
-                <Text style={styles.performanceNumber}>{userStats.totalAssignments || 0}</Text>
+                <Text style={[styles.performanceLabel, { color: theme.textSecondary }]}>Your Assignments:</Text>
+                <Text style={[styles.performanceNumber, { color: theme.text }]}>{userStats.totalAssignments || 0}</Text>
               </View>
               <View style={styles.performanceRow}>
-                <Text style={styles.performanceLabel}>Completed:</Text>
-                <Text style={[styles.performanceNumber, { color: '#2b8a3e' }]}>
+                <Text style={[styles.performanceLabel, { color: theme.textSecondary }]}>Completed:</Text>
+                <Text style={[styles.performanceNumber, { color: theme.primary }]}>
                   {userStats.completed || 0}
                 </Text>
               </View>
               <View style={styles.performanceRow}>
-                <Text style={styles.performanceLabel}>Pending:</Text>
-                <Text style={[styles.performanceNumber, { color: '#e67700' }]}>
+                <Text style={[styles.performanceLabel, { color: theme.textSecondary }]}>Pending:</Text>
+                <Text style={[styles.performanceNumber, { color: theme.primary }]}>
                   {userStats.pending || 0}
                 </Text>
               </View>
               <View style={styles.performanceRow}>
-                <Text style={styles.performanceLabel}>Your Points:</Text>
+                <Text style={[styles.performanceLabel, { color: theme.textSecondary }]}>Your Points:</Text>
                 <Text style={[styles.performanceNumber, { color: '#4F46E5' }]}>
                   {userStats.userPoints || 0}
                 </Text>
@@ -284,6 +290,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             </LinearGradient>
           </View>
         )}
+
       </ScrollView>
     </ScreenWrapper>
   );
@@ -292,7 +299,6 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   centerContainer: {
     flex: 1,
@@ -302,7 +308,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
   },
   header: {
     flexDirection: 'row',
@@ -310,19 +315,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -332,10 +333,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -344,7 +343,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
   },
   content: {
     padding: 16,
@@ -362,7 +360,6 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   iconContainer: {
     width: 44,
@@ -375,12 +372,10 @@ const styles = StyleSheet.create({
   summaryNumber: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#212529',
     marginBottom: 2,
   },
   summaryLabel: {
     fontSize: 13,
-    color: '#868e96',
   },
   section: {
     marginBottom: 24,
@@ -388,7 +383,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 12,
     paddingLeft: 4,
   },
@@ -396,7 +390,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   pointsRow: {
     flexDirection: 'row',
@@ -405,19 +398,13 @@ const styles = StyleSheet.create({
   },
   pointsLabel: {
     fontSize: 14,
-    color: '#495057',
   },
   pointsValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#2b8a3e',
-  },
-  pendingPoints: {
-    color: '#e67700',
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#e9ecef',
     borderRadius: 4,
     marginVertical: 12,
     overflow: 'hidden',
@@ -428,14 +415,12 @@ const styles = StyleSheet.create({
   },
   completionRate: {
     fontSize: 13,
-    color: '#868e96',
     textAlign: 'center',
   },
   distributionCard: {
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   distributionRow: {
     flexDirection: 'row',
@@ -450,7 +435,6 @@ const styles = StyleSheet.create({
   },
   distributionLabelText: {
     fontSize: 14,
-    color: '#495057',
   },
   dot: {
     width: 10,
@@ -460,13 +444,11 @@ const styles = StyleSheet.create({
   distributionNumber: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
   },
   performanceCard: {
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   performanceRow: {
     flexDirection: 'row',
@@ -475,11 +457,9 @@ const styles = StyleSheet.create({
   },
   performanceLabel: {
     fontSize: 14,
-    color: '#495057',
   },
   performanceNumber: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
   },
 });

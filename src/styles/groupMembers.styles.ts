@@ -1,12 +1,13 @@
-// src/styles/groupMembers.styles.ts
+// src/styles/groupMembers.styles.ts - Dark Mode Added
 import { StyleSheet, Dimensions } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-export const groupMembersStyles = StyleSheet.create({
+export const makeGroupMembersStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa'
+    backgroundColor: theme.bgSecondary
   },
   loadingContainer: {
     flex: 1,
@@ -15,7 +16,7 @@ export const groupMembersStyles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#868e96',
+    color: theme.textMuted,
     fontSize: 14
   },
   header: {
@@ -25,16 +26,16 @@ export const groupMembersStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
+    borderBottomColor: theme.border
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -43,7 +44,7 @@ export const groupMembersStyles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529'
+    color: theme.text
   },
   headerRight: {
     flexDirection: 'row',
@@ -54,10 +55,10 @@ export const groupMembersStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -66,7 +67,7 @@ export const groupMembersStyles = StyleSheet.create({
   avatarBanner: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
+    borderBottomColor: theme.border
   },
   avatarCircleContainer: {
     flexDirection: 'row',
@@ -85,16 +86,16 @@ export const groupMembersStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'white'
+    borderColor: theme.card
   },
   avatarImage: {
     backgroundColor: 'transparent',
   },
   moreAvatar: {
-    borderColor: '#e9ecef'
+    borderColor: theme.border
   },
   moreAvatarText: {
-    color: '#495057',
+    color: theme.textSecondary,
     fontWeight: '600',
     fontSize: 13
   },
@@ -106,14 +107,14 @@ export const groupMembersStyles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     width: 18,
     height: 18,
     borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#2b8a3e'
+    borderColor: theme.primary
   },
   groupInfoContainer: {
     flexDirection: 'row',
@@ -134,17 +135,17 @@ export const groupMembersStyles = StyleSheet.create({
   groupAvatarImage: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#2b8a3e'
+    borderColor: theme.primary
   },
   groupAvatarText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 24,
     fontWeight: 'bold'
   },
   uploadingAvatar: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa'
+    backgroundColor: theme.bgSecondary
   },
   editAvatarIcon: {
     position: 'absolute',
@@ -156,7 +157,7 @@ export const groupMembersStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'white'
+    borderColor: theme.card
   },
   groupTextInfo: {
     flex: 1
@@ -164,12 +165,12 @@ export const groupMembersStyles = StyleSheet.create({
   groupName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 4
   },
   groupDescription: {
     fontSize: 14,
-    color: '#868e96',
+    color: theme.textMuted,
     marginBottom: 8,
     lineHeight: 20
   },
@@ -184,7 +185,7 @@ export const groupMembersStyles = StyleSheet.create({
   },
   statText: {
     fontSize: 13,
-    color: '#495057'
+    color: theme.textSecondary
   },
   adminActions: {
     flexDirection: 'row',
@@ -194,7 +195,7 @@ export const groupMembersStyles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -207,20 +208,20 @@ export const groupMembersStyles = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: theme.border
   },
   adminButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#495057'
+    color: theme.textSecondary
   },
   editButton: {},
   shareButton: {},
   inviteSection: {
     padding: 20,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
+    borderBottomColor: theme.border
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -238,28 +239,28 @@ export const groupMembersStyles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529'
+    color: theme.text
   },
   inviteCodeCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: theme.border
   },
   inviteCode: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#212529',
+    color: theme.text,
     letterSpacing: 2
   },
   inviteInstructions: {
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
     marginBottom: 12
   },
   regenerateButton: {
@@ -274,12 +275,12 @@ export const groupMembersStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#ffd43b'
+    borderColor: theme.primaryBorder
   },
   regenerateButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#e67700'
+    color: theme.primary
   },
   warningSection: {
     flexDirection: 'row',
@@ -290,7 +291,7 @@ export const groupMembersStyles = StyleSheet.create({
     borderRadius: 12,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#ffd43b'
+    borderColor: theme.primaryBorder
   },
   warningContent: {
     flex: 1
@@ -298,12 +299,12 @@ export const groupMembersStyles = StyleSheet.create({
   warningTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#e67700',
+    color: theme.primary,
     marginBottom: 2
   },
   warningText: {
     fontSize: 13,
-    color: '#e67700'
+    color: theme.primary
   },
   membersSection: {
     padding: 20
@@ -313,7 +314,7 @@ export const groupMembersStyles = StyleSheet.create({
     padding: 30
   },
   errorText: {
-    color: '#fa5252',
+    color: theme.error,
     textAlign: 'center',
     marginVertical: 16,
     fontSize: 14
@@ -327,7 +328,7 @@ export const groupMembersStyles = StyleSheet.create({
     paddingVertical: 12
   },
   retryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
     fontSize: 14
   },
@@ -337,7 +338,7 @@ export const groupMembersStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.borderLight,
     position: 'relative'
   },
   memberInfo: {
@@ -372,7 +373,7 @@ export const groupMembersStyles = StyleSheet.create({
   memberName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529'
+    color: theme.text
   },
   adminBadge: {
     flexDirection: 'row',
@@ -385,16 +386,16 @@ export const groupMembersStyles = StyleSheet.create({
   adminBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#2b8a3e'
+    color: theme.primary
   },
   memberEmail: {
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
     marginBottom: 2
   },
   memberJoined: {
     fontSize: 11,
-    color: '#adb5bd'
+    color: theme.textPlaceholder
   },
   memberActions: {
     flexDirection: 'row',
@@ -405,25 +406,25 @@ export const groupMembersStyles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: theme.border
   },
   demoteButton: {
-    backgroundColor: '#fff5f5',
-    borderColor: '#ffc9c9'
+    backgroundColor: theme.errorBg,
+    borderColor: theme.errorBorder
   },
   removeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#fff5f5',
+    backgroundColor: theme.errorBg,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ffc9c9'
+    borderColor: theme.errorBorder
   },
   protectedBadge: {
     width: 32,
@@ -432,7 +433,7 @@ export const groupMembersStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ffd43b'
+    borderColor: theme.primaryBorder
   },
   currentUserBadge: {
     position: 'absolute',
@@ -442,12 +443,12 @@ export const groupMembersStyles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: theme.border
   },
   currentUserBadgeText: {
     fontSize: 9,
     fontWeight: '600',
-    color: '#495057'
+    color: theme.textSecondary
   },
   emptyContainer: {
     alignItems: 'center',
@@ -455,7 +456,7 @@ export const groupMembersStyles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 8
   },
   leaveButton: {
@@ -463,7 +464,7 @@ export const groupMembersStyles = StyleSheet.create({
     marginBottom: 30,
     borderRadius: 10,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -482,21 +483,22 @@ export const groupMembersStyles = StyleSheet.create({
   leaveButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#fa5252'
+    color: theme.error
   },
   disabledLeaveButtonText: {
-    color: '#adb5bd'
+    color: theme.textPlaceholder
   },
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: theme.overlay,
     justifyContent: 'flex-end'
   },
   modalContent: {
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '90%'
+    maxHeight: '90%',
+    backgroundColor: theme.card
   },
   modalHeader: {
     flexDirection: 'row',
@@ -504,18 +506,18 @@ export const groupMembersStyles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
+    borderBottomColor: theme.border
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529'
+    color: theme.text
   },
   closeButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
     justifyContent: 'center',
     alignItems: 'center'
   },
@@ -527,32 +529,32 @@ export const groupMembersStyles = StyleSheet.create({
     gap: 12,
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef'
+    borderTopColor: theme.border
   },
   modalCloseButton: {
     padding: 16,
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef'
+    borderTopColor: theme.border
   },
   modalCloseText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#495057'
+    color: theme.textSecondary
   },
   cancelButton: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: theme.border
   },
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#868e96'
+    color: theme.textMuted
   },
   saveButton: {
     flex: 1,
@@ -570,10 +572,10 @@ export const groupMembersStyles = StyleSheet.create({
   saveButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: 'white'
+    color: '#fff'
   },
   saveButtonTextDisabled: {
-    color: '#868e96'
+    color: theme.textMuted
   },
   avatarEditSection: {
     alignItems: 'center',
@@ -592,7 +594,7 @@ export const groupMembersStyles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 2,
-    borderColor: '#2b8a3e'
+    borderColor: theme.primary
   },
   editAvatarOverlay: {
     position: 'absolute',
@@ -605,7 +607,7 @@ export const groupMembersStyles = StyleSheet.create({
   },
   avatarNote: {
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 8
   },
   removeAvatarButton: {
@@ -617,7 +619,7 @@ export const groupMembersStyles = StyleSheet.create({
   },
   removeAvatarText: {
     fontSize: 13,
-    color: '#fa5252'
+    color: theme.error
   },
   inputGroup: {
     marginBottom: 20
@@ -625,13 +627,13 @@ export const groupMembersStyles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
+    color: theme.textSecondary,
     marginBottom: 8
   },
   inputGradient: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: theme.border
   },
   textAreaGradient: {
     minHeight: 80
@@ -640,7 +642,7 @@ export const groupMembersStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 15,
-    color: '#212529',
+    color: theme.text,
     backgroundColor: 'transparent'
   },
   textArea: {
@@ -649,7 +651,7 @@ export const groupMembersStyles = StyleSheet.create({
   },
   charCount: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     textAlign: 'right',
     marginTop: 4
   },
@@ -661,11 +663,11 @@ export const groupMembersStyles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: theme.border
   },
   infoText: {
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
     flex: 1,
     lineHeight: 18
   },
@@ -675,7 +677,7 @@ export const groupMembersStyles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: theme.borderLight,
     gap: 12
   },
   dangerItem: {
@@ -694,17 +696,17 @@ export const groupMembersStyles = StyleSheet.create({
   settingsTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 2
   },
   settingsDescription: {
     fontSize: 13,
-    color: '#868e96'
+    color: theme.textMuted
   },
   dangerText: {
-    color: '#fa5252'
+    color: theme.error
   },
-  // ===== NEW: Member Limit Banner Styles =====
+  // Member Limit Banner Styles
   limitBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -715,7 +717,7 @@ export const groupMembersStyles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   limitText: {
     fontSize: 13,
@@ -731,7 +733,7 @@ export const groupMembersStyles = StyleSheet.create({
   sliderLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 12,
   },
   slider: {
@@ -743,29 +745,29 @@ export const groupMembersStyles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
     alignItems: 'center',
   },
   sliderOptionActive: {
-    backgroundColor: '#2b8a3e',
-    borderColor: '#2b8a3e',
+    backgroundColor: theme.primary,
+    borderColor: theme.primary,
   },
   sliderOptionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   sliderOptionTextActive: {
-    color: 'white',
+    color: '#fff',
   },
   modalSubtitle: {
-  fontSize: 14,
-  color: '#868e96',
-  marginBottom: 20,
-  textAlign: 'center',
-},
+    fontSize: 14,
+    color: theme.textMuted,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
   sliderOptionDisabled: {
     opacity: 0.3,
   },

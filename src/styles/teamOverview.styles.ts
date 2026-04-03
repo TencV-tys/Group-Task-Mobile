@@ -1,10 +1,11 @@
-// src/styles/teamOverview.styles.ts
+// src/styles/teamOverview.styles.ts - Dark Mode Version
 import { StyleSheet } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
-export const teamOverviewStyles = StyleSheet.create({
+export const makeTeamOverviewStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -12,70 +13,61 @@ export const teamOverviewStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
-rotationBadge: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 6,
-  paddingVertical: 2,
-  borderRadius: 12,
-  gap: 4,
-},
-rankNumber: {
-  fontSize: 12,
-  fontWeight: '600',
-  color: '#2b8a3e',
-  backgroundColor: '#e8f5e9',
-  paddingHorizontal: 8,
-  paddingVertical: 2,
-  borderRadius: 12,
-  marginLeft: 8,
-},
-rotationBadgeText: {
-  fontSize: 9,
-  fontWeight: '600',
-  color: '#2b8a3e',
-},
-inactiveBadge: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 6,
-  paddingVertical: 2,
-  borderRadius: 12,
-  gap: 4,
-},
-inactiveBadgeText: {
-  fontSize: 9,
-  fontWeight: '600',
-  color: '#e67700',
-},
-adminNote: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  paddingHorizontal: 16,
-  paddingVertical: 10,
-  marginHorizontal: 16,
-  marginBottom: 12,
-  borderRadius: 8,
-  gap: 8,
-},
-adminNoteText: {
-  flex: 1,
-  fontSize: 12,
-  color: '#2b8a3e',
-},
+  rotationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    gap: 4,
+  },
+  rankNumber: {
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  rotationBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  inactiveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 12,
+    gap: 4,
+  },
+  inactiveBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+  },
+  adminNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 8,
+    gap: 8,
+  },
+  adminNoteText: {
+    flex: 1,
+    fontSize: 12,
+  },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -89,12 +81,10 @@ adminNoteText: {
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 12,
-    color: '#868e96',
     marginTop: 2,
     textAlign: 'center',
   },
@@ -102,10 +92,8 @@ adminNoteText: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -119,7 +107,6 @@ adminNoteText: {
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
   },
   errorContainer: {
     flex: 1,
@@ -128,7 +115,6 @@ adminNoteText: {
     padding: 20,
   },
   errorText: {
-    color: '#fa5252',
     textAlign: 'center',
     marginVertical: 12,
     fontSize: 16,
@@ -144,7 +130,7 @@ adminNoteText: {
     paddingVertical: 12,
   },
   retryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -153,7 +139,6 @@ adminNoteText: {
     padding: 16,
     margin: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   summaryRow: {
     flexDirection: 'row',
@@ -166,17 +151,14 @@ adminNoteText: {
   summaryValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#2b8a3e',
     marginBottom: 4,
   },
   summaryLabel: {
     fontSize: 12,
-    color: '#868e96',
   },
   summaryDivider: {
     width: 1,
     height: 30,
-    backgroundColor: '#e9ecef',
   },
   sortBar: {
     flexDirection: 'row',
@@ -187,30 +169,25 @@ adminNoteText: {
   },
   sortLabel: {
     fontSize: 13,
-    color: '#868e96',
     marginRight: 4,
   },
   sortOption: {
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   sortOptionGradient: {
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   sortOptionActive: {
-    borderColor: '#2b8a3e',
+    borderWidth: 2,
   },
   sortOptionText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#495057',
   },
-  sortOptionTextActive: {
-    color: 'white',
-  },
+  sortOptionTextActive: {},
   listContent: {
     padding: 16,
     paddingTop: 0,
@@ -220,7 +197,6 @@ adminNoteText: {
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   cardGradient: {
     padding: 16,
@@ -242,7 +218,6 @@ adminNoteText: {
     height: 44,
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#e9ecef',
   },
   avatarPlaceholder: {
     width: 44,
@@ -251,10 +226,9 @@ adminNoteText: {
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#e9ecef',
   },
   adminAvatar: {
-    borderColor: '#2b8a3e',
+    borderWidth: 2,
   },
   avatarText: {
     fontSize: 18,
@@ -272,7 +246,6 @@ adminNoteText: {
   memberName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
   },
   roleBadge: {
     flexDirection: 'row',
@@ -284,17 +257,14 @@ adminNoteText: {
   },
   roleBadgeText: {
     fontSize: 9,
-    color: '#2b8a3e',
     fontWeight: '600',
   },
   memberEmail: {
     fontSize: 12,
-    color: '#868e96',
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: '#f8f9fa',
     padding: 12,
     borderRadius: 8,
   },
@@ -304,18 +274,15 @@ adminNoteText: {
   statValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#212529',
     marginBottom: 2,
   },
   statLabel: {
     fontSize: 10,
-    color: '#868e96',
   },
   expandedContent: {
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
   },
   detailGrid: {
     flexDirection: 'row',
@@ -325,13 +292,11 @@ adminNoteText: {
   },
   detailItem: {
     width: '30%',
-    backgroundColor: '#f8f9fa',
     padding: 8,
     borderRadius: 8,
   },
   detailLabel: {
     fontSize: 10,
-    color: '#868e96',
     marginBottom: 2,
   },
   detailValue: {
@@ -350,7 +315,7 @@ adminNoteText: {
     gap: 6,
   },
   viewButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -366,17 +331,14 @@ adminNoteText: {
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#868e96',
     textAlign: 'center',
     paddingHorizontal: 32,
     lineHeight: 20,

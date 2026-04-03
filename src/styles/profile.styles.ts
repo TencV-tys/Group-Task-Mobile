@@ -1,10 +1,27 @@
-// src/styles/profile.styles.ts
+// src/styles/themeStyles.ts
 import { StyleSheet } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
-export const profileStyles = StyleSheet.create({
+// Cache styles to prevent recalculation on every render
+const styleCache = new Map<string, any>();
+
+export const createThemedStyles = <T extends StyleSheet.NamedStyles<T>>(
+  stylesFn: (theme: Theme) => T
+) => {
+  return (theme: Theme): T => {
+    const cacheKey = JSON.stringify(theme);
+    if (!styleCache.has(cacheKey)) {
+      styleCache.set(cacheKey, stylesFn(theme));
+    }
+    return styleCache.get(cacheKey);
+  };
+};
+
+// Optimized style creator with memoization
+export const makeProfileStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -12,19 +29,19 @@ export const profileStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.border,
     minHeight: 60,
-  }, 
+  },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -33,18 +50,21 @@ export const profileStyles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     textAlign: 'center',
+  },
+  headerRight: {
+    width: 36,
   },
   notificationButton: {
     position: 'relative',
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -52,25 +72,20 @@ export const profileStyles = StyleSheet.create({
   },
   notificationBadge: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    borderRadius: 12,
+    top: -4,
+    right: -4,
     minWidth: 18,
     height: 18,
+    borderRadius: 9,
+    backgroundColor: theme.error,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: 'white',
-    backgroundColor:'#2b8a3e'
+    paddingHorizontal: 5,
   },
   notificationBadgeText: {
-    color: 'white',
-    fontSize: 9,
+    color: '#fff',
+    fontSize: 10,
     fontWeight: 'bold',
-  },
-  headerRight: {
-    width: 36,
   },
   scrollContent: {
     paddingBottom: 24,
@@ -83,7 +98,7 @@ export const profileStyles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 16,
   },
   errorContainer: {
@@ -95,14 +110,14 @@ export const profileStyles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#fa5252',
+    color: theme.error,
     textAlign: 'center',
     marginVertical: 10,
     fontWeight: '600',
   },
   errorSubText: {
     fontSize: 14,
-    color: '#868e96',
+    color: theme.textMuted,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -122,20 +137,20 @@ export const profileStyles = StyleSheet.create({
   primaryButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'white',
+    color: '#fff',
   },
   profileCard: {
     margin: 16,
     padding: 20,
     borderRadius: 16,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   avatarTouchable: {
     marginBottom: 16,
@@ -153,19 +168,19 @@ export const profileStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#2b8a3e',
+    borderColor: theme.primary,
   },
   avatarImage: {
     width: 96,
     height: 96,
     borderRadius: 48,
     borderWidth: 2,
-    borderColor: '#2b8a3e',
+    borderColor: theme.primary,
   },
   avatarText: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#fff',
   },
   editIcon: {
     position: 'absolute',
@@ -177,7 +192,7 @@ export const profileStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: theme.card,
   },
   uploadingOverlay: {
     position: 'absolute',
@@ -190,27 +205,27 @@ export const profileStyles = StyleSheet.create({
   },
   uploadingText: {
     fontSize: 11,
-    color: 'white',
+    color: '#fff',
     textAlign: 'center',
     fontWeight: '600',
   },
   userName: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 2,
     textAlign: 'center',
   },
   userEmail: {
     fontSize: 14,
-    color: '#868e96',
+    color: theme.textMuted,
     marginBottom: 12,
     textAlign: 'center',
   },
   userStats: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 16,
@@ -225,13 +240,13 @@ export const profileStyles = StyleSheet.create({
   },
   statText: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     fontWeight: '500',
   },
   statDivider: {
     width: 1,
     height: 10,
-    backgroundColor: '#dee2e6',
+    backgroundColor: theme.border,
   },
   section: {
     paddingHorizontal: 16,
@@ -240,23 +255,22 @@ export const profileStyles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 8,
     paddingLeft: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   menuCard: {
-    backgroundColor: 'white',
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   menuItem: {
     flexDirection: 'row',
@@ -265,13 +279,6 @@ export const profileStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-   notificationBadgeGradient: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
   menuItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -290,19 +297,19 @@ export const profileStyles = StyleSheet.create({
   },
   menuText: {
     fontSize: 15,
-    color: '#212529',
+    color: theme.text,
   },
   menuBadgeText: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 2,
   },
   disabledText: {
-    color: '#868e96',
+    color: theme.textMuted,
   },
   divider: {
     height: 1,
-    backgroundColor: '#f1f3f5',
+    backgroundColor: theme.borderLight,
     marginLeft: 60,
   },
   feedbackStats: {
@@ -318,19 +325,19 @@ export const profileStyles = StyleSheet.create({
   },
   feedbackStatsText: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     marginLeft: 4,
   },
   infoCard: {
     borderRadius: 12,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   appInfo: {
     flexDirection: 'row',
@@ -351,16 +358,16 @@ export const profileStyles = StyleSheet.create({
   appName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 2,
   },
   appDescription: {
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   appDetails: {
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
+    borderTopColor: theme.border,
     paddingTop: 12,
   },
   detailItem: {
@@ -371,11 +378,11 @@ export const profileStyles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   detailValue: {
     fontSize: 13,
-    color: '#212529',
+    color: theme.text,
     fontWeight: '500',
   },
   logoutButton: {
@@ -384,7 +391,7 @@ export const profileStyles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#fa5252',
+    shadowColor: theme.error,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -401,7 +408,7 @@ export const profileStyles = StyleSheet.create({
     opacity: 0.5,
   },
   logoutButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

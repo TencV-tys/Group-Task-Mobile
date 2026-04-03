@@ -1,12 +1,13 @@
 // src/styles/home.styles.ts
 import { StyleSheet, Dimensions } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-export const homeStyles = StyleSheet.create({
+export const makeHomeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
   },
   bannerContainer: {
     position: 'absolute',
@@ -21,19 +22,19 @@ export const homeStyles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.border,
     zIndex: 10,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#212529',
+    color: theme.text,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 2,
   },
   headerRight: {
@@ -47,46 +48,46 @@ export const homeStyles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#fa5252',
-    borderRadius: 10,
+    top: -4,
+    right: -4,
     minWidth: 18,
     height: 18,
+    borderRadius: 9,
+    backgroundColor: theme.error,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: 'white',
+    paddingHorizontal: 5,
   },
   badgeText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 10,
     fontWeight: 'bold',
   },
   scrollContent: {
     paddingBottom: 80,
   },
-  
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 12,
     marginBottom: 24,
+    marginTop: 16,
   },
   statCard: {
     width: '30%',
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 16,
     margin: '1.5%',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
     position: 'relative',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   statIconContainer: {
     width: 48,
@@ -99,26 +100,26 @@ export const homeStyles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#868e96',
+    color: theme.textMuted,
     textAlign: 'center',
   },
   overdueBadge: {
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: '#fff5f5',
+    backgroundColor: theme.errorBg,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
   },
   overdueBadgeText: {
     fontSize: 9,
-    color: '#fa5252',
+    color: theme.error,
     fontWeight: '600',
   },
   section: {
@@ -126,7 +127,7 @@ export const homeStyles = StyleSheet.create({
     marginBottom: 24,
   },
   lastSection: {
-    marginBottom: 0, // Changed from 30 to 0 to remove extra bottom space
+    marginBottom: 0,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -137,11 +138,11 @@ export const homeStyles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#212529',
+    color: theme.text,
   },
   seeAllText: {
     fontSize: 14,
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '600',
   },
   quickActionsGrid: {
@@ -163,7 +164,7 @@ export const homeStyles = StyleSheet.create({
     gap: 6,
   },
   quickActionText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -180,7 +181,6 @@ export const homeStyles = StyleSheet.create({
     padding: 12,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
   },
   overdueTaskContent: {
     flex: 1,
@@ -188,43 +188,45 @@ export const homeStyles = StyleSheet.create({
   overdueTaskTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 2,
   },
   overdueTaskGroup: {
     fontSize: 12,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   overdueTaskDays: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#fa5252',
+    color: theme.error,
   },
   moreOverdueText: {
     textAlign: 'center',
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 8,
     fontStyle: 'italic',
   },
   groupsScroll: {
     marginHorizontal: -16,
     paddingHorizontal: 16,
-    marginBottom: 0, // Added to remove bottom margin
+    marginBottom: 0,
   },
   groupCard: {
     width: 120,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 16,
     marginRight: 12,
-    marginBottom:10,
+    marginBottom: 10,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   groupAvatar: {
     width: 64,
@@ -243,28 +245,28 @@ export const homeStyles = StyleSheet.create({
   groupAvatarText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#fff',
   },
   groupName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     textAlign: 'center',
     marginBottom: 4,
   },
   groupRoleBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius:8,
-    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    backgroundColor: theme.bgTertiary,
   },
   groupRole: {
     fontSize: 10,
-    color: '#868e96',
+    color: theme.textMuted,
     fontWeight: '500',
   },
   adminRole: {
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '600',
   },
   tasksContainer: {
@@ -273,14 +275,16 @@ export const homeStyles = StyleSheet.create({
   taskCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 12,
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   taskIcon: {
     width: 40,
@@ -296,12 +300,12 @@ export const homeStyles = StyleSheet.create({
   taskTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 2,
   },
   taskGroup: {
     fontSize: 12,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   taskRight: {
     alignItems: 'flex-end',
@@ -309,15 +313,15 @@ export const homeStyles = StyleSheet.create({
   taskPoints: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2b8a3e',
+    color: theme.primary,
     marginBottom: 2,
   },
   taskDaysLeft: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   taskDueToday: {
-    color: '#fa5252',
+    color: theme.error,
     fontWeight: '600',
   },
   taskDueTomorrow: {
@@ -330,15 +334,17 @@ export const homeStyles = StyleSheet.create({
   activityCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 12,
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
     position: 'relative',
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   activityIcon: {
     width: 40,
@@ -353,12 +359,12 @@ export const homeStyles = StyleSheet.create({
   },
   activityText: {
     fontSize: 14,
-    color: '#212529',
+    color: theme.text,
     marginBottom: 2,
   },
   activityTime: {
     fontSize: 12,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   unreadDot: {
     position: 'absolute',
@@ -367,30 +373,32 @@ export const homeStyles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#2b8a3e',
+    backgroundColor: theme.primary,
   },
   emptyState: {
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   emptyStateText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateSubtext: {
     fontSize: 14,
-    color: '#adb5bd',
+    color: theme.textPlaceholder,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -402,7 +410,7 @@ export const homeStyles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   errorContainer: {
     flex: 1,
@@ -412,7 +420,7 @@ export const homeStyles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#fa5252', 
+    color: theme.error,
     textAlign: 'center',
     marginVertical: 20,
   },
@@ -425,7 +433,7 @@ export const homeStyles = StyleSheet.create({
     paddingVertical: 14,
   },
   retryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -434,16 +442,16 @@ export const homeStyles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
+    borderTopColor: theme.border,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 12, // Added padding bottom
-    shadowColor: '#000',
+    paddingBottom: 12,
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -456,7 +464,7 @@ export const homeStyles = StyleSheet.create({
   },
   navText: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 2,
   },
   createButton: {
@@ -468,7 +476,7 @@ export const homeStyles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#2b8a3e',
+    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

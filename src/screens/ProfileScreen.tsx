@@ -1,5 +1,5 @@
-// src/screens/ProfileScreen.tsx - Animated + Consistent Design
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+// src/screens/ProfileScreen.tsx - Fixed Version
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,10 @@ import {
   RefreshControl,
   Image,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { AuthService } from '../services/AuthService';
 import { useImageUpload } from '../uploadHook/useImageUpload';
@@ -23,46 +23,39 @@ import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { TokenUtils } from '../utils/tokenUtils';
 import { API_BASE_URL } from '../config/api';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { profileStyles } from '../styles/profile.styles';
+import { useTheme } from '../context/ThemeContext';
+import { ThemeToggle } from '../components/ThemeToggle';
+import { makeProfileStyles } from '../styles/profile.styles';
 
-const { width } = Dimensions.get('window');
-
-// ─── Color Palette ────────────────────────────────────────────────────────────
-const COLORS = {
-  primary: '#2b8a3e',
-  primaryDark: '#1e6b2c',
-  primaryLight: '#d3f9d8',
-  secondary: '#f8f9fa',
-  tertiary: '#e9ecef',
-  dark: '#212529',
-  gray: '#868e96',
-  lightGray: '#adb5bd',
-  error: '#fa5252',
-  white: '#ffffff',
-  black: '#1a1a2e',
-  warning: '#e67700',
-  red: '#fa5252',
-  redDark: '#e03131',
-};
+// Memoized component for StatItem
+const StatItem = React.memo(({ icon, value }: { icon: string; value: string }) => {
+  const { theme } = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+      <MaterialCommunityIcons name={icon as any} size={14} color={theme.textMuted} />
+      <Text style={{ fontSize: 11, color: theme.textMuted, fontWeight: '500' }}>{value}</Text>
+    </View>
+  );
+});
 
 export default function ProfileScreen({ navigation }: any) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeProfileStyles(theme), [theme]);
+
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [authError, setAuthError] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
-  // ── Animation Values
-  const headerAnim = useRef(new Animated.Value(0)).current;
-  const profileCardAnim = useRef(new Animated.Value(0)).current;
-  const accountSectionAnim = useRef(new Animated.Value(0)).current;
-  const feedbackSectionAnim = useRef(new Animated.Value(0)).current;
-  const supportSectionAnim = useRef(new Animated.Value(0)).current;
-  const aboutSectionAnim = useRef(new Animated.Value(0)).current;
-  const logoutAnim = useRef(new Animated.Value(0)).current;
+  // Animation values
+  const animations = useMemo(() => ({
+    header: new Animated.Value(0),
+    profileCard: new Animated.Value(0),
+    sections: new Animated.Value(0),
+    logout: new Animated.Value(0),
+  }), []);
 
   const isMounted = useRef(true);
-  const initialLoadDone = useRef(false);
 
   const {
     loading: feedbackLoading,
@@ -80,315 +73,173 @@ export default function ProfileScreen({ navigation }: any) {
     uploadAvatarFromPicker,
     deleteAvatar
   } = useImageUpload({
-    onSuccess: async (result) => {
-      console.log('Upload success result:', result);
+    onSuccess: async () => {
       await loadUserData(true);
       Alert.alert('Success', 'Profile picture updated successfully!');
     },
-    onError: (error) => {
-      console.error('Upload error:', error);
+    onError: () => {
       Alert.alert('Error', 'Failed to update profile picture');
     }
   });
 
-  // ── Entrance Animations
+  // Animation startup
   useEffect(() => {
-    Animated.sequence([
-      Animated.timing(headerAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.timing(profileCardAnim, { toValue: 1, duration: 500, delay: 100, useNativeDriver: true }),
-      Animated.parallel([
-        Animated.timing(accountSectionAnim, { toValue: 1, duration: 400, delay: 200, useNativeDriver: true }),
-        Animated.timing(feedbackSectionAnim, { toValue: 1, duration: 400, delay: 250, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.timing(supportSectionAnim, { toValue: 1, duration: 400, delay: 300, useNativeDriver: true }),
-        Animated.timing(aboutSectionAnim, { toValue: 1, duration: 400, delay: 350, useNativeDriver: true }),
-      ]),
-      Animated.timing(logoutAnim, { toValue: 1, duration: 400, delay: 400, useNativeDriver: true }),
+    Animated.parallel([
+      Animated.timing(animations.header, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.timing(animations.profileCard, { toValue: 1, duration: 400, delay: 100, useNativeDriver: true }),
+      Animated.timing(animations.sections, { toValue: 1, duration: 400, delay: 200, useNativeDriver: true }),
+      Animated.timing(animations.logout, { toValue: 1, duration: 400, delay: 300, useNativeDriver: true }),
     ]).start();
   }, []);
 
-  // ===== REAL-TIME NOTIFICATIONS =====
-  useRealtimeNotifications({
-    onNewNotification: (notification) => {
-      if (notification.type === 'PROFILE_UPDATED' ||
-        notification.type === 'AVATAR_UPDATED') {
-        loadUserData(true);
-      }
-      loadUnreadCount();
-    },
-    showAlerts: true
-  });
-
-  const checkToken = useCallback(async (): Promise<boolean> => {
-    const hasToken = await TokenUtils.checkToken({
-      showAlert: false,
-      onAuthError: () => setAuthError(true)
-    });
-
-    setAuthError(!hasToken);
-    return hasToken;
-  }, []);
-
+  // Cleanup
   useEffect(() => {
-    const getUserId = async () => {
-      try {
-        const user = await TokenUtils.getUser();
-        if (user) {
-          setCurrentUserId(user.id);
-        }
-      } catch (error) {
-        console.error('Error getting user ID:', error);
-      }
-    };
-    getUserId();
-
     return () => {
       isMounted.current = false;
     };
   }, []);
 
-  useEffect(() => {
-    if (authError) {
-      Alert.alert(
-        'Session Expired',
-        'Please log in again',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setAuthError(false);
-              navigation.navigate('Login');
-            }
-          }
-        ]
-      );
-    }
-  }, [authError, navigation]);
-
-  const loadUserData = async (forceRefresh = false) => {
-    const hasToken = await checkToken();
-    if (!hasToken) {
-      setLoading(false);
-      setRefreshing(false);
-      return;
-    }
-
+  // Load user data
+  const loadUserData = useCallback(async (forceRefresh = false) => {
     try {
-      let userData;
-      if (forceRefresh) {
-        userData = await AuthService.fetchFreshUserData();
-      } else {
-        userData = await AuthService.getCurrentUser();
+      const hasToken = await TokenUtils.checkToken({ showAlert: false });
+      if (!hasToken) {
+        if (isMounted.current) {
+          setAuthError(true);
+          setLoading(false);
+        }
+        return;
       }
 
-      if (isMounted.current) {
-        console.log('Loaded user data:', userData);
+      const userData = forceRefresh 
+        ? await AuthService.fetchFreshUserData()
+        : await AuthService.getCurrentUser();
+
+      if (isMounted.current && userData) {
         setUser(userData);
-        await loadStats();
-        await loadUnreadCount();
+        await Promise.all([loadStats(), loadUnreadCount()]);
       }
-
     } catch (error) {
       console.error('Error loading user data:', error);
-      if (isMounted.current) {
-        Alert.alert('Error', 'Failed to load profile data');
-      }
     } finally {
       if (isMounted.current) {
         setLoading(false);
         setRefreshing(false);
       }
     }
-  };
+  }, [loadStats, loadUnreadCount]);
 
-  useEffect(() => {
-    if (!initialLoadDone.current) {
-      loadUserData();
-      initialLoadDone.current = true;
-    }
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      loadUserData(true);
-    });
-
-    return unsubscribe;
-  }, [navigation]);
-
-  const onRefresh = () => {
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadUserData(true);
-  };
+  }, [loadUserData]);
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: performLogout
-        }
-      ]
-    );
-  };
+  // Auth error handler
+  useEffect(() => {
+    if (authError) {
+      Alert.alert('Session Expired', 'Please log in again', [
+        { text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Login' }] }) }
+      ]);
+    }
+  }, [authError, navigation]);
 
-  const performLogout = async () => {
+  // Focus effect
+  useFocusEffect(
+    useCallback(() => {
+      loadUserData(true);
+    }, [loadUserData])
+  );
+
+  // Real-time notifications
+  useRealtimeNotifications({
+    onNewNotification: useCallback((notification) => {
+      if (notification.type === 'PROFILE_UPDATED' || notification.type === 'AVATAR_UPDATED') {
+        loadUserData(true);
+      }
+      loadUnreadCount();
+    }, [loadUserData, loadUnreadCount]),
+    showAlerts: true
+  });
+
+  const handleLogout = useCallback(() => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', style: 'destructive', onPress: performLogout }
+    ]);
+  }, []);
+
+  const performLogout = useCallback(async () => {
     try {
       const result = await AuthService.logout();
-
       if (result.success) {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Login' }],
-        });
-      } else {
-        Alert.alert('Error', result.message || 'Logout failed');
+        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
       }
-    } catch (error: any) {
-      console.error('Logout error:', error);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
+    } catch (error) {
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     }
-  };
+  }, [navigation]);
 
-  const handleAvatarPress = () => {
+  const handleAvatarPress = useCallback(() => {
     if (uploading) return;
+    Alert.alert('Change Profile Picture', 'How would you like to update your profile picture?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Take Photo', onPress: () => takePhotoWithCamera().then(img => img && uploadAvatarFromPicker(img)) },
+      { text: 'Choose from Gallery', onPress: () => pickImageFromGallery().then(img => img && uploadAvatarFromPicker(img)) },
+      user?.avatarUrl && { text: 'Remove Picture', style: 'destructive', onPress: handleRemoveAvatar }
+    ].filter(Boolean));
+  }, [uploading, user?.avatarUrl]);
 
-    Alert.alert(
-      'Change Profile Picture',
-      'How would you like to update your profile picture?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Take Photo', onPress: handleTakePhoto },
-        { text: 'Choose from Gallery', onPress: handleChooseFromGallery },
-        user?.avatarUrl && {
-          text: 'Remove Picture',
-          style: 'destructive',
-          onPress: handleRemoveAvatar
-        },
-      ].filter(Boolean) as any
-    );
-  };
-
-  const handleTakePhoto = async () => {
-    const image = await takePhotoWithCamera();
-    if (image) {
-      await uploadAvatarFromPicker(image);
-    }
-  };
-
-  const handleChooseFromGallery = async () => {
-    const image = await pickImageFromGallery();
-    if (image) {
-      await uploadAvatarFromPicker(image);
-    }
-  };
-
-  const handleRemoveAvatar = async () => {
-    Alert.alert(
-      'Remove Profile Picture',
-      'Are you sure you want to remove your profile picture?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            const result = await deleteAvatar();
-            if (result.success && isMounted.current) {
-              setUser((prevUser: any) => ({
-                ...prevUser,
-                avatarUrl: null
-              }));
-              Alert.alert('Success', 'Profile picture removed successfully');
-            }
+  const handleRemoveAvatar = useCallback(async () => {
+    Alert.alert('Remove Profile Picture', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          const result = await deleteAvatar();
+          if (result.success && isMounted.current) {
+            setUser((prev: any) => ({ ...prev, avatarUrl: null }));
+            Alert.alert('Success', 'Profile picture removed');
           }
         }
-      ]
-    );
-  };
+      }
+    ]);
+  }, [deleteAvatar]);
 
-  const handleAccountSettings = () => {
-    navigation.navigate('AccountSettings');
-  };
+  const navigateTo = useCallback((route: string) => {
+    navigation.navigate(route);
+  }, [navigation]);
 
-  const handleNotifications = () => {
-    navigation.navigate('Notifications');
-  };
-
-  const handleHelpSupport = () => {
-    navigation.navigate('HelpSupport');
-  };
-
-  const handlePrivacyPolicy = () => {
-    navigation.navigate('PrivacyPolicy');
-  };
-
-  const handleTermsOfService = () => {
-    navigation.navigate('TermsOfService');
-  };
-
-  const handleSendFeedback = () => {
-    navigation.navigate('Feedback');
-  };
-
-  const handleViewFeedbackHistory = () => {
-    navigation.navigate('FeedbackHistory');
-  };
-
+  // Loading state
   if (loading) {
     return (
-      <ScreenWrapper style={profileStyles.container}>
-        <View style={profileStyles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.primary} />
-          <Text style={profileStyles.loadingText}>Loading profile...</Text>
+      <ScreenWrapper style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </ScreenWrapper>
     );
   }
 
+  // Error state
   if (!user) {
     return (
-      <ScreenWrapper style={profileStyles.container}>
-        <Animated.View style={[profileStyles.header, { opacity: headerAnim }]}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={profileStyles.backButton}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.gray} />
+      <ScreenWrapper style={styles.container}>
+        <Animated.View style={[styles.header, { opacity: animations.header }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-
-          <Text style={profileStyles.headerTitle}>Profile</Text>
-
-          <View style={profileStyles.headerRight} />
+          <Text style={styles.headerTitle}>Profile</Text>
+          <View style={styles.headerRight} />
         </Animated.View>
-
-        <View style={profileStyles.errorContainer}>
-          <MaterialCommunityIcons name="account-off" size={64} color={COLORS.error} />
-          <Text style={profileStyles.errorText}>No user data found</Text>
-          <Text style={profileStyles.errorSubText}>
-            Please login again to view your profile
-          </Text>
-
-          <TouchableOpacity
-            style={profileStyles.primaryButton}
-            onPress={() => navigation.navigate('Login')}
-          >
-            <LinearGradient
-              colors={[COLORS.primary, COLORS.primaryDark]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={profileStyles.primaryButtonGradient}
-            >
-              <MaterialCommunityIcons name="login" size={18} color={COLORS.white} />
-              <Text style={profileStyles.primaryButtonText}>Go to Login</Text>
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons name="account-off" size={64} color={theme.error} />
+          <Text style={styles.errorText}>No user data found</Text>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => navigation.navigate('Login')}>
+            <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.primaryButtonGradient}>
+              <MaterialCommunityIcons name="login" size={18} color="#fff" />
+              <Text style={styles.primaryButtonText}>Go to Login</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -397,541 +248,227 @@ export default function ProfileScreen({ navigation }: any) {
   }
 
   return (
-    <ScreenWrapper style={profileStyles.container}>
-      {/* Header with Animation */}
-      <Animated.View
-        style={[
-          profileStyles.header,
-          {
-            opacity: headerAnim,
-            transform: [{
-              translateY: headerAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [-20, 0]
-              })
-            }]
-          }
-        ]}
-      >
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={profileStyles.backButton}
-        >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={COLORS.gray} />
+    <ScreenWrapper style={styles.container}>
+      {/* Header */}
+      <Animated.View style={[styles.header, { opacity: animations.header, transform: [{ translateY: animations.header.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
-
-        <Text style={profileStyles.headerTitle}>Profile</Text>
-
-        <TouchableOpacity
-          onPress={handleNotifications}
-          style={profileStyles.notificationButton}
-        >
-          <MaterialCommunityIcons name="bell-outline" size={22} color={COLORS.primary} />
-          {unreadCount > 0 && (
-            <Animated.View
-              style={[
-                profileStyles.notificationBadge,
-                {
-                  transform: [{
-                    scale: new Animated.Value(1)
-                  }]
-                }
-              ]}
-            >
-              <LinearGradient
-                colors={[COLORS.primary, COLORS.primaryDark]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={profileStyles.notificationBadgeGradient}
-              >
-                <Text style={profileStyles.notificationBadgeText}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Text>
-              </LinearGradient>
-            </Animated.View>
-          )}
+        <Text style={styles.headerTitle}>Profile</Text>
+        <TouchableOpacity onPress={() => navigateTo('Notifications')} style={styles.notificationButton}>
+          <MaterialCommunityIcons name="bell-outline" size={22} color={theme.primary} />
+           {unreadCount > 0 && (
+  <Animated.View style={styles.notificationBadge}>
+    <Text style={styles.notificationBadgeText}>
+      {unreadCount > 9 ? '9+' : unreadCount}
+    </Text>
+  </Animated.View>
+)}
         </TouchableOpacity>
       </Animated.View>
 
       <ScrollView
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[COLORS.primary]}
-            tintColor={COLORS.primary}
-            enabled={!uploading}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} tintColor={theme.primary} />}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={profileStyles.scrollContent}
+        contentContainerStyle={styles.scrollContent}
       >
-        {/* Profile Header Card with Animation */}
-        <Animated.View
-          style={[
-            {
-              opacity: profileCardAnim,
-              transform: [{
-                scale: profileCardAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.95, 1]
-                })
-              }]
-            }
-          ]}
-        >
-          <LinearGradient
-            colors={[COLORS.white, COLORS.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={profileStyles.profileCard}
-          >
-            <TouchableOpacity
-              onPress={handleAvatarPress}
-              disabled={uploading}
-              style={profileStyles.avatarTouchable}
-            >
-              <View style={profileStyles.avatarContainer}>
+        {/* Profile Card */}
+        <Animated.View style={{ opacity: animations.profileCard, transform: [{ scale: animations.profileCard.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }] }}>
+          <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.profileCard}>
+            <TouchableOpacity onPress={handleAvatarPress} disabled={uploading} style={styles.avatarTouchable}>
+              <View style={styles.avatarContainer}>
                 {uploading ? (
-                  <View style={profileStyles.avatarUploadingContainer}>
-                    <LinearGradient
-                      colors={[COLORS.secondary, COLORS.tertiary]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={profileStyles.avatarPlaceholder}
-                    >
-                      <ActivityIndicator size="large" color={COLORS.primary} />
+                  <View style={styles.avatarUploadingContainer}>
+                    <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.avatarPlaceholder}>
+                      <ActivityIndicator size="large" color={theme.primary} />
                     </LinearGradient>
-                    <LinearGradient
-                      colors={[COLORS.primary, COLORS.primaryDark]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={profileStyles.uploadingOverlay}
-                    >
-                      <Text style={profileStyles.uploadingText}>
-                        {Math.round(progress)}%
-                      </Text>
+                    <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.uploadingOverlay}>
+                      <Text style={styles.uploadingText}>{Math.round(progress)}%</Text>
                     </LinearGradient>
                   </View>
                 ) : user.avatarUrl ? (
                   <>
-                    <Image
-                      source={{ uri: user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API_BASE_URL}${user.avatarUrl}` }}
-                      style={profileStyles.avatarImage}
-                      onError={(e) => {
-                        console.log('Avatar load error:', e.nativeEvent.error);
-                        setUser({ ...user, avatarUrl: null });
-                      }}
-                    />
-                    <LinearGradient
-                      colors={[COLORS.primary, COLORS.primaryDark]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={profileStyles.editIcon}
-                    >
-                      <MaterialCommunityIcons name="camera" size={14} color={COLORS.white} />
+                    <Image source={{ uri: user.avatarUrl.startsWith('http') ? user.avatarUrl : `${API_BASE_URL}${user.avatarUrl}` }} style={styles.avatarImage} />
+                    <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.editIcon}>
+                      <MaterialCommunityIcons name="camera" size={14} color="#fff" />
                     </LinearGradient>
                   </>
                 ) : (
                   <>
-                    <LinearGradient
-                      colors={[COLORS.primary, COLORS.primaryDark]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={profileStyles.avatarPlaceholder}
-                    >
-                      <Text style={profileStyles.avatarText}>
-                        {user.fullName?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase() || 'U'}
-                      </Text>
+                    <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.avatarPlaceholder}>
+                      <Text style={styles.avatarText}>{user.fullName?.charAt(0)?.toUpperCase() || 'U'}</Text>
                     </LinearGradient>
-                    <LinearGradient
-                      colors={[COLORS.primary, COLORS.primaryDark]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={profileStyles.editIcon}
-                    >
-                      <MaterialCommunityIcons name="camera-plus" size={14} color={COLORS.white} />
+                    <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.editIcon}>
+                      <MaterialCommunityIcons name="camera-plus" size={14} color="#fff" />
                     </LinearGradient>
                   </>
                 )}
               </View>
             </TouchableOpacity>
-
-            <Text style={profileStyles.userName}>{user.fullName || 'User'}</Text>
-            <Text style={profileStyles.userEmail}>{user.email || 'No email'}</Text>
-
-            <View style={profileStyles.userStats}>
-              <View style={profileStyles.statItem}>
-                <MaterialCommunityIcons name="account" size={14} color={COLORS.gray} />
-                <Text style={profileStyles.statText}>
-                  {user.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1).toLowerCase() : 'Not set'}
-                </Text>
-              </View>
-
-              <View style={profileStyles.statDivider} />
-
-              <View style={profileStyles.statItem}>
-                <MaterialCommunityIcons name="shield-account" size={14} color={COLORS.gray} />
-                <Text style={profileStyles.statText}>{user.role || 'Member'}</Text>
-              </View>
-
+            <Text style={styles.userName}>{user.fullName || 'User'}</Text>
+            <Text style={styles.userEmail}>{user.email || 'No email'}</Text>
+            <View style={styles.userStats}>
+              <StatItem icon="account" value={user.gender ? user.gender.charAt(0).toUpperCase() + user.gender.slice(1) : 'Not set'} />
+              <View style={styles.statDivider} />
+              <StatItem icon="shield-account" value={user.role || 'Member'} />
               {user.createdAt && (
                 <>
-                  <View style={profileStyles.statDivider} />
-                  <View style={profileStyles.statItem}>
-                    <MaterialCommunityIcons name="calendar" size={14} color={COLORS.gray} />
-                    <Text style={profileStyles.statText}>
-                      Joined {new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                    </Text>
-                  </View>
+                  <View style={styles.statDivider} />
+                  <StatItem icon="calendar" value={`Joined ${new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`} />
                 </>
               )}
             </View>
           </LinearGradient>
         </Animated.View>
 
-        {/* Account Settings Section */}
-        <Animated.View
-          style={[
-            profileStyles.section,
-            {
-              opacity: accountSectionAnim,
-              transform: [{
-                translateY: accountSectionAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [30, 0]
-                })
-              }]
-            }
-          ]}
-        >
-          <Text style={profileStyles.sectionTitle}>Account Settings</Text>
+        {/* Sections */}
+        <Animated.View style={{ opacity: animations.sections }}>
+          {/* Appearance Section - Theme Toggle */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Appearance</Text>
+            <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.menuCard}>
+              <ThemeToggle /> 
+            </LinearGradient>
+          </View>
 
-          <LinearGradient
-            colors={[COLORS.white, COLORS.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={profileStyles.menuCard}
-          >
-            <TouchableOpacity
-              style={profileStyles.menuItem}
-              onPress={handleAccountSettings}
-              activeOpacity={0.7}
-              disabled={uploading}
-            >
-              <View style={profileStyles.menuItemLeft}>
-                <LinearGradient
-                  colors={[COLORS.secondary, COLORS.tertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={profileStyles.menuIcon}
-                >
-                  <MaterialCommunityIcons name="account-cog" size={18} color={COLORS.primary} />
+          {/* Account Settings */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Account Settings</Text>
+            <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.menuCard}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('AccountSettings')} disabled={uploading}>
+                <View style={styles.menuItemLeft}>
+                  <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.menuIcon}>
+                    <MaterialCommunityIcons name="account-cog" size={18} color={theme.primary} />
+                  </LinearGradient>
+                  <Text style={[styles.menuText, uploading && styles.disabledText]}>Account Settings</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.menuItem} onPress={handleAvatarPress} disabled={uploading}>
+                <View style={styles.menuItemLeft}>
+                  <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.menuIcon}>
+                    <MaterialCommunityIcons name={uploading ? "image-sync" : "image-edit"} size={18} color={theme.primary} />
+                  </LinearGradient>
+                  <Text style={[styles.menuText, uploading && styles.disabledText]}>
+                    {uploading ? 'Uploading Picture...' : 'Change Profile Picture'}
+                  </Text>
+                </View>
+                {!uploading && <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />}
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+
+          {/* Feedback Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Feedback</Text>
+            <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.menuCard}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('Feedback')} disabled={uploading || feedbackLoading}>
+                <View style={styles.menuItemLeft}>
+                  <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.menuIcon}>
+                    <MaterialCommunityIcons name="message" size={18} color="#e67700" />
+                  </LinearGradient>
+                  <View style={styles.menuTextContainer}>
+                    <Text style={[styles.menuText, (uploading || feedbackLoading) && styles.disabledText]}>Send Feedback</Text>
+                    {feedbackStats && feedbackStats.total > 0 && (
+                      <Text style={styles.menuBadgeText}>{feedbackStats.total} submitted</Text>
+                    )}
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('FeedbackHistory')} disabled={uploading || feedbackLoading}>
+                <View style={styles.menuItemLeft}>
+                  <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.menuIcon}>
+                    <MaterialCommunityIcons name="history" size={18} color={theme.primary} />
+                  </LinearGradient>
+                  <View style={styles.menuTextContainer}>
+                    <Text style={[styles.menuText, (uploading || feedbackLoading) && styles.disabledText]}>My Feedback History</Text>
+                    {feedbackStats && (
+                      <View style={styles.feedbackStats}>
+                        <View style={[styles.statusDot, { backgroundColor: '#e67700' }]} />
+                        <View style={[styles.statusDot, { backgroundColor: theme.primary }]} />
+                        <Text style={styles.feedbackStatsText}>
+                          {feedbackStats.open} open · {feedbackStats.resolved} resolved
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+
+          {/* Support Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Support & Legal</Text>
+            <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.menuCard}>
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('HelpSupport')} disabled={uploading}>
+                <View style={styles.menuItemLeft}>
+                  <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.menuIcon}>
+                    <MaterialCommunityIcons name="help-circle" size={18} color={theme.error} />
+                  </LinearGradient>
+                  <Text style={[styles.menuText, uploading && styles.disabledText]}>Help & Support</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('PrivacyPolicy')} disabled={uploading}>
+                <View style={styles.menuItemLeft}>
+                  <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.menuIcon}>
+                    <MaterialCommunityIcons name="shield" size={18} color={theme.primary} />
+                  </LinearGradient>
+                  <Text style={[styles.menuText, uploading && styles.disabledText]}>Privacy Policy</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+              <View style={styles.divider} />
+              <TouchableOpacity style={styles.menuItem} onPress={() => navigateTo('TermsOfService')} disabled={uploading}>
+                <View style={styles.menuItemLeft}>
+                  <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.menuIcon}>
+                    <MaterialCommunityIcons name="file-document" size={18} color={theme.textMuted} />
+                  </LinearGradient>
+                  <Text style={[styles.menuText, uploading && styles.disabledText]}>Terms of Service</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+            </LinearGradient>
+          </View>
+
+          {/* About Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About</Text>
+            <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.infoCard}>
+              <View style={styles.appInfo}>
+                <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.appIcon}>
+                  <MaterialCommunityIcons name="checkbox-multiple-marked-circle" size={22} color="#fff" />
                 </LinearGradient>
-                <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>Account Settings</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
-            </TouchableOpacity>
-
-            <View style={profileStyles.divider} />
-
-            <TouchableOpacity
-              style={profileStyles.menuItem}
-              onPress={handleAvatarPress}
-              activeOpacity={0.7}
-              disabled={uploading}
-            >
-              <View style={profileStyles.menuItemLeft}>
-                <LinearGradient
-                  colors={[COLORS.secondary, COLORS.tertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={profileStyles.menuIcon}
-                >
-                  <MaterialCommunityIcons
-                    name={uploading ? "image-sync" : "image-edit"}
-                    size={18}
-                    color={COLORS.primary}
-                  />
-                </LinearGradient>
-                <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>
-                  {uploading ? 'Uploading Picture...' : 'Change Profile Picture'}
-                </Text>
-              </View>
-              {!uploading && (
-                <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
-              )}
-            </TouchableOpacity>
-          </LinearGradient>
-        </Animated.View>
-
-        {/* Feedback Section */}
-        <Animated.View
-          style={[
-            profileStyles.section,
-            {
-              opacity: feedbackSectionAnim,
-              transform: [{
-                translateY: feedbackSectionAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [30, 0]
-                })
-              }]
-            }
-          ]}
-        >
-          <Text style={profileStyles.sectionTitle}>Feedback</Text>
-
-          <LinearGradient
-            colors={[COLORS.white, COLORS.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={profileStyles.menuCard}
-          >
-            <TouchableOpacity
-              style={profileStyles.menuItem}
-              onPress={handleSendFeedback}
-              activeOpacity={0.7}
-              disabled={uploading || feedbackLoading}
-            >
-              <View style={profileStyles.menuItemLeft}>
-                <LinearGradient
-                  colors={[COLORS.secondary, COLORS.tertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={profileStyles.menuIcon}
-                >
-                  <MaterialCommunityIcons name="message" size={18} color={COLORS.warning} />
-                </LinearGradient>
-                <View style={profileStyles.menuTextContainer}>
-                  <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>Send Feedback</Text>
-                  {feedbackStats && feedbackStats.total > 0 && (
-                    <Text style={profileStyles.menuBadgeText}>
-                      {feedbackStats.total} submitted
-                    </Text>
-                  )}
+                <View style={styles.appInfoText}>
+                  <Text style={styles.appName}>Group Task</Text>
+                  <Text style={styles.appDescription}>Flexible task management for any group</Text>
                 </View>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
-            </TouchableOpacity>
-
-            <View style={profileStyles.divider} />
-
-            <TouchableOpacity
-              style={profileStyles.menuItem}
-              onPress={handleViewFeedbackHistory}
-              activeOpacity={0.7}
-              disabled={uploading || feedbackLoading}
-            >
-              <View style={profileStyles.menuItemLeft}>
-                <LinearGradient
-                  colors={[COLORS.secondary, COLORS.tertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={profileStyles.menuIcon}
-                >
-                  <MaterialCommunityIcons name="history" size={18} color={COLORS.primary} />
-                </LinearGradient>
-                <View style={profileStyles.menuTextContainer}>
-                  <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>My Feedback History</Text>
-                  {feedbackStats && (
-                    <View style={profileStyles.feedbackStats}>
-                      {feedbackStats.open > 0 && (
-                        <View style={[profileStyles.statusDot, { backgroundColor: COLORS.warning }]} />
-                      )}
-                      {feedbackStats.resolved > 0 && (
-                        <View style={[profileStyles.statusDot, { backgroundColor: COLORS.primary }]} />
-                      )}
-                      <Text style={profileStyles.feedbackStatsText}>
-                        {feedbackStats.open} open · {feedbackStats.resolved} resolved
-                      </Text>
-                    </View>
-                  )}
-                </View>
+              <View style={styles.appDetails}>
+                <View style={styles.detailItem}><Text style={styles.detailLabel}>Version</Text><Text style={styles.detailValue}>1.0.0</Text></View>
+                <View style={styles.detailItem}><Text style={styles.detailLabel}>Build</Text><Text style={styles.detailValue}>2024.01</Text></View>
+                <View style={styles.detailItem}><Text style={styles.detailLabel}>Platform</Text><Text style={styles.detailValue}>React Native</Text></View>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
-            </TouchableOpacity>
-          </LinearGradient>
-        </Animated.View>
-
-        {/* Support Section */}
-        <Animated.View
-          style={[
-            profileStyles.section,
-            {
-              opacity: supportSectionAnim,
-              transform: [{
-                translateY: supportSectionAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [30, 0]
-                })
-              }]
-            }
-          ]}
-        >
-          <Text style={profileStyles.sectionTitle}>Support & Legal</Text>
-
-          <LinearGradient
-            colors={[COLORS.white, COLORS.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={profileStyles.menuCard}
-          >
-            <TouchableOpacity
-              style={profileStyles.menuItem}
-              onPress={handleHelpSupport}
-              activeOpacity={0.7}
-              disabled={uploading}
-            >
-              <View style={profileStyles.menuItemLeft}>
-                <LinearGradient
-                  colors={[COLORS.secondary, COLORS.tertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={profileStyles.menuIcon}
-                >
-                  <MaterialCommunityIcons name="help-circle" size={18} color={COLORS.error} />
-                </LinearGradient>
-                <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>Help & Support</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
-            </TouchableOpacity>
-
-            <View style={profileStyles.divider} />
-
-            <TouchableOpacity
-              style={profileStyles.menuItem}
-              onPress={handlePrivacyPolicy}
-              activeOpacity={0.7}
-              disabled={uploading}
-            >
-              <View style={profileStyles.menuItemLeft}>
-                <LinearGradient
-                  colors={[COLORS.secondary, COLORS.tertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={profileStyles.menuIcon}
-                >
-                  <MaterialCommunityIcons name="shield" size={18} color={COLORS.primary} />
-                </LinearGradient>
-                <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>Privacy Policy</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
-            </TouchableOpacity>
-
-            <View style={profileStyles.divider} />
-
-            <TouchableOpacity
-              style={profileStyles.menuItem}
-              onPress={handleTermsOfService}
-              activeOpacity={0.7}
-              disabled={uploading}
-            >
-              <View style={profileStyles.menuItemLeft}>
-                <LinearGradient
-                  colors={[COLORS.secondary, COLORS.tertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={profileStyles.menuIcon}
-                >
-                  <MaterialCommunityIcons name="file-document" size={18} color={COLORS.gray} />
-                </LinearGradient>
-                <Text style={[profileStyles.menuText, uploading && profileStyles.disabledText]}>Terms of Service</Text>
-              </View>
-              <MaterialCommunityIcons name="chevron-right" size={18} color={COLORS.lightGray} />
-            </TouchableOpacity>
-          </LinearGradient>
-        </Animated.View>
-
-        {/* About Section */}
-        <Animated.View
-          style={[
-            profileStyles.section,
-            {
-              opacity: aboutSectionAnim,
-              transform: [{
-                translateY: aboutSectionAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [30, 0]
-                })
-              }]
-            }
-          ]}
-        >
-          <Text style={profileStyles.sectionTitle}>About</Text>
-
-          <LinearGradient
-            colors={[COLORS.white, COLORS.secondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={profileStyles.infoCard}
-          >
-            <View style={profileStyles.appInfo}>
-              <LinearGradient
-                colors={[COLORS.primary, COLORS.primaryDark]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={profileStyles.appIcon}
-              >
-                <MaterialCommunityIcons name="checkbox-multiple-marked-circle" size={22} color={COLORS.white} />
-              </LinearGradient>
-              <View style={profileStyles.appInfoText}>
-                <Text style={profileStyles.appName}>Group Task</Text>
-                <Text style={profileStyles.appDescription}>Flexible task management for any group</Text>
-              </View>
-            </View>
-
-            <View style={profileStyles.appDetails}>
-              <View style={profileStyles.detailItem}>
-                <Text style={profileStyles.detailLabel}>Version</Text>
-                <Text style={profileStyles.detailValue}>1.0.0</Text>
-              </View>
-              <View style={profileStyles.detailItem}>
-                <Text style={profileStyles.detailLabel}>Build</Text>
-                <Text style={profileStyles.detailValue}>2024.01</Text>
-              </View>
-              <View style={profileStyles.detailItem}>
-                <Text style={profileStyles.detailLabel}>Platform</Text>
-                <Text style={profileStyles.detailValue}>React Native</Text>
-              </View>
-            </View>
-          </LinearGradient>
+            </LinearGradient>
+          </View>
         </Animated.View>
 
         {/* Logout Button */}
-        <Animated.View
-          style={[
-            {
-              opacity: logoutAnim,
-              transform: [{
-                scale: logoutAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.95, 1]
-                })
-              }] 
-            }
-          ]}
-        >
-          <TouchableOpacity
-            style={[profileStyles.logoutButton, uploading && profileStyles.buttonDisabled]}
-            onPress={handleLogout}
-            activeOpacity={0.7}
-            disabled={uploading}
-          >
-            <LinearGradient
-              colors={[COLORS.red, COLORS.redDark]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={profileStyles.logoutButtonGradient}
-            >
-              <MaterialCommunityIcons name="logout" size={18} color={COLORS.white} />
-              <Text style={profileStyles.logoutButtonText}>
-                {uploading ? 'Please wait...' : 'Logout'}
-              </Text>
+        <Animated.View style={{ opacity: animations.logout, transform: [{ scale: animations.logout.interpolate({ inputRange: [0, 1], outputRange: [0.95, 1] }) }] }}>
+          <TouchableOpacity style={[styles.logoutButton, uploading && styles.buttonDisabled]} onPress={handleLogout} disabled={uploading}>
+            <LinearGradient colors={[theme.error, '#e03131']} style={styles.logoutButtonGradient}>
+              <MaterialCommunityIcons name="logout" size={18} color="#fff" />
+              <Text style={styles.logoutButtonText}>{uploading ? 'Please wait...' : 'Logout'}</Text>
             </LinearGradient>
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
     </ScreenWrapper>
-  );
+  ); 
 }

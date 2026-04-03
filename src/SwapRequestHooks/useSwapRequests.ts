@@ -1,6 +1,6 @@
-// SwapRequestHooks/useSwapRequests.ts - COMPLETE FIXED VERSION
+// SwapRequestHooks/useSwapRequests.ts - FULL UPDATED VERSION (429 FIXED)
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { SwapRequestFilters, SwapRequest, SwapRequestService } from '../services/SwapRequestService';
 import * as SecureStore from 'expo-secure-store';
 import { Alert } from 'react-native';
@@ -17,31 +17,47 @@ export const useSwapRequests = () => {
   const [error, setError] = useState<string | null>(null);
   const [totalMyRequests, setTotalMyRequests] = useState(0);
   const [totalPendingForMe, setTotalPendingForMe] = useState(0);
-  const [totalPendingForAdmin, setTotalPendingForAdmin] = useState(0); 
+  const [totalPendingForAdmin, setTotalPendingForAdmin] = useState(0);
   const [authError, setAuthError] = useState(false);
 
+  // =========================
+  // Anti-spam / anti-429 refs
+  // =========================
+  const pendingForMeLoadingRef = useRef(false);
+  const lastPendingForMeLoadRef = useRef(0);
+
+  const myRequestsLoadingRef = useRef(false);
+  const lastMyRequestsLoadRef = useRef(0);
+
+  // =========================
   // Check token
+  // =========================
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
-    
+
     setAuthError(!hasToken);
     return hasToken;
   }, []);
 
+  // =========================
   // Load user ID from SecureStore on mount
+  // =========================
   useEffect(() => {
     const loadUserId = async () => {
       try {
         const user = await TokenUtils.getUser();
+
         if (user) {
           setUserId(user.id);
         } else {
           const token = await AuthService.getAccessToken();
+
           if (token) {
             const userData = await AuthService.getCurrentUser();
+
             if (userData) {
               await SecureStore.setItemAsync('user', JSON.stringify(userData));
               setUserId(userData.id);
@@ -49,13 +65,16 @@ export const useSwapRequests = () => {
           }
         }
       } catch (error) {
-        console.error('Error loading user:', error);
+        console.error('❌ Error loading user:', error);
       }
     };
+
     loadUserId();
   }, []);
 
+  // =========================
   // Show auth error alert
+  // =========================
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -66,8 +85,22 @@ export const useSwapRequests = () => {
     }
   }, [authError]);
 
+  // =========================
   // Load my swap requests
-  const loadMyRequests = useCallback(async (filters?: SwapRequestFilters) => {
+  // =========================
+  const loadMyRequests = useCallback(async (filters?: SwapRequestFilters, force = false) => {
+    const now = Date.now();
+
+    if (myRequestsLoadingRef.current) {
+      console.log('⏸️ Skipping loadMyRequests: already loading');
+      return;
+    }
+
+    if (!force && now - lastMyRequestsLoadRef.current < 3000) {
+      console.log('⏸️ Skipping loadMyRequests: called too soon');
+      return;
+    }
+
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -78,29 +111,35 @@ export const useSwapRequests = () => {
       console.log('⏸️ Cannot load my requests: No user ID');
       return;
     }
-    
+
+    myRequestsLoadingRef.current = true;
+    lastMyRequestsLoadRef.current = now;
+
     setLoading(true);
     setError(null);
     setAuthError(false);
-    
+
     try {
       console.log('📥 Loading my requests with filters:', filters);
+
       const response = await SwapRequestService.getMySwapRequests(filters);
-      
+
       if (response.success) {
         const requests = response.data?.requests || [];
         const total = response.data?.total || 0;
-        
+
         console.log(`✅ Loaded ${requests.length} requests (total: ${total})`);
         setMyRequests(requests);
         setTotalMyRequests(total);
       } else {
         console.error('❌ Failed to load requests:', response.message);
         setError(response.message || 'Failed to load swap requests');
-        
-        if (response.message?.toLowerCase().includes('token') || 
-            response.message?.toLowerCase().includes('auth') ||
-            response.message?.toLowerCase().includes('unauthorized')) {
+
+        if (
+          response.message?.toLowerCase().includes('token') ||
+          response.message?.toLowerCase().includes('auth') ||
+          response.message?.toLowerCase().includes('unauthorized')
+        ) {
           setAuthError(true);
         }
       }
@@ -108,12 +147,29 @@ export const useSwapRequests = () => {
       console.error('❌ Error in loadMyRequests:', err);
       setError(err.message || 'Failed to load swap requests');
     } finally {
+      myRequestsLoadingRef.current = false;
       setLoading(false);
     }
-  }, [userId, checkToken]); 
+  }, [userId, checkToken]);
 
-  // Load pending requests for current user (to accept/reject)
-  const loadPendingForMe = useCallback(async (groupId?: string) => {
+  // =========================
+  // Load pending requests for current user (429-safe)
+  // =========================
+  const loadPendingForMe = useCallback(async (groupId?: string, force = false) => {
+    const now = Date.now();
+
+    // Prevent duplicate requests while one is still loading
+    if (pendingForMeLoadingRef.current) {
+      console.log('⏸️ Skipping loadPendingForMe: already loading');
+      return;
+    }
+
+    // Prevent rapid repeated calls within 3 seconds
+    if (!force && now - lastPendingForMeLoadRef.current < 3000) {
+      console.log('⏸️ Skipping loadPendingForMe: called too soon');
+      return;
+    }
+
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -124,29 +180,35 @@ export const useSwapRequests = () => {
       console.log('⏸️ Cannot load pending for me: No user ID');
       return;
     }
-    
+
+    pendingForMeLoadingRef.current = true;
+    lastPendingForMeLoadRef.current = now;
+
     setLoading(true);
     setError(null);
     setAuthError(false);
-    
+
     try {
       console.log('📥 Loading pending for me with groupId:', groupId);
+
       const response = await SwapRequestService.getPendingForMe({ groupId });
-      
+
       if (response.success) {
         const requests = response.data?.requests || [];
         const total = response.data?.total || 0;
-        
+
         console.log(`✅ Loaded ${requests.length} pending requests (total: ${total})`);
         setPendingForMe(requests);
         setTotalPendingForMe(total);
       } else {
         console.error('❌ Failed to load pending requests:', response.message);
         setError(response.message || 'Failed to load pending requests');
-        
-        if (response.message?.toLowerCase().includes('token') || 
-            response.message?.toLowerCase().includes('auth') ||
-            response.message?.toLowerCase().includes('unauthorized')) {
+
+        if (
+          response.message?.toLowerCase().includes('token') ||
+          response.message?.toLowerCase().includes('auth') ||
+          response.message?.toLowerCase().includes('unauthorized')
+        ) {
           setAuthError(true);
         }
       }
@@ -154,11 +216,14 @@ export const useSwapRequests = () => {
       console.error('❌ Error in loadPendingForMe:', err);
       setError(err.message || 'Failed to load pending requests');
     } finally {
+      pendingForMeLoadingRef.current = false;
       setLoading(false);
     }
   }, [userId, checkToken]);
 
+  // =========================
   // Load pending requests for admin approval
+  // =========================
   const loadPendingForAdmin = useCallback(async (groupId: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -170,25 +235,28 @@ export const useSwapRequests = () => {
     setLoading(true);
     setError(null);
     setAuthError(false);
-    
+
     try {
       console.log('📥 Loading pending for admin approval with groupId:', groupId);
+
       const response = await SwapRequestService.getPendingForAdminApproval(groupId);
-      
+
       if (response.success) {
         const requests = response.requests || [];
         const total = response.total || 0;
-        
+
         console.log(`✅ Loaded ${requests.length} pending admin approvals (total: ${total})`);
         setPendingForAdmin(requests);
         setTotalPendingForAdmin(total);
       } else {
         console.error('❌ Failed to load pending admin approvals:', response.message);
         setError(response.message || 'Failed to load pending admin approvals');
-        
-        if (response.message?.toLowerCase().includes('token') || 
-            response.message?.toLowerCase().includes('auth') ||
-            response.message?.toLowerCase().includes('unauthorized')) {
+
+        if (
+          response.message?.toLowerCase().includes('token') ||
+          response.message?.toLowerCase().includes('auth') ||
+          response.message?.toLowerCase().includes('unauthorized')
+        ) {
           setAuthError(true);
         }
       }
@@ -200,42 +268,45 @@ export const useSwapRequests = () => {
     }
   }, [checkToken]);
 
+  // =========================
   // Admin approve swap request
+  // =========================
   const adminApproveSwapRequest = useCallback(async (requestId: string, notes?: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: 'Authentication required',
-        authError: true 
+        authError: true
       };
     }
 
     setLoading(true);
     setError(null);
     setAuthError(false);
-    
+
     try {
       console.log('✅ Admin approving swap request:', requestId);
       const response = await SwapRequestService.adminApproveSwapRequest(requestId, notes);
-      
+
       console.log('📦 Admin approve response:', response);
-      
+
       if (response.success) {
-        // Refresh pending admin approvals list
         if (currentGroupId) {
           await loadPendingForAdmin(currentGroupId);
         }
         Alert.alert('Success', response.message || 'Swap request approved successfully!');
       } else {
-        if (response.message?.toLowerCase().includes('token') || 
-            response.message?.toLowerCase().includes('auth') ||
-            response.message?.toLowerCase().includes('unauthorized')) {
+        if (
+          response.message?.toLowerCase().includes('token') ||
+          response.message?.toLowerCase().includes('auth') ||
+          response.message?.toLowerCase().includes('unauthorized')
+        ) {
           setAuthError(true);
         }
         Alert.alert('Error', response.message || 'Failed to approve swap request');
       }
-      
+
       return response;
     } catch (err: any) {
       console.error('❌ Error in adminApproveSwapRequest:', err);
@@ -247,42 +318,45 @@ export const useSwapRequests = () => {
     }
   }, [checkToken, currentGroupId, loadPendingForAdmin]);
 
+  // =========================
   // Admin reject swap request
+  // =========================
   const adminRejectSwapRequest = useCallback(async (requestId: string, reason: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: 'Authentication required',
-        authError: true 
+        authError: true
       };
     }
 
     setLoading(true);
     setError(null);
     setAuthError(false);
-    
+
     try {
       console.log('❌ Admin rejecting swap request:', requestId, 'reason:', reason);
       const response = await SwapRequestService.adminRejectSwapRequest(requestId, reason);
-      
+
       console.log('📦 Admin reject response:', response);
-      
+
       if (response.success) {
-        // Refresh pending admin approvals list
         if (currentGroupId) {
           await loadPendingForAdmin(currentGroupId);
         }
         Alert.alert('Success', response.message || 'Swap request rejected successfully!');
       } else {
-        if (response.message?.toLowerCase().includes('token') || 
-            response.message?.toLowerCase().includes('auth') ||
-            response.message?.toLowerCase().includes('unauthorized')) {
+        if (
+          response.message?.toLowerCase().includes('token') ||
+          response.message?.toLowerCase().includes('auth') ||
+          response.message?.toLowerCase().includes('unauthorized')
+        ) {
           setAuthError(true);
         }
         Alert.alert('Error', response.message || 'Failed to reject swap request');
       }
-      
+
       return response;
     } catch (err: any) {
       console.error('❌ Error in adminRejectSwapRequest:', err);
@@ -294,7 +368,9 @@ export const useSwapRequests = () => {
     }
   }, [checkToken, currentGroupId, loadPendingForAdmin]);
 
+  // =========================
   // Create swap request
+  // =========================
   const createSwapRequest = useCallback(async (data: {
     assignmentId: string;
     reason?: string;
@@ -306,44 +382,48 @@ export const useSwapRequests = () => {
   }) => {
     const hasToken = await checkToken();
     if (!hasToken) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: 'Authentication required',
-        authError: true 
+        authError: true
       };
     }
 
     setLoading(true);
     setError(null);
     setAuthError(false);
-    
+
     try {
       console.log('📝 Creating swap request with data:', data);
-      
-      const checkResult = await SwapRequestService.checkCanSwap(data.assignmentId, data.scope, data.selectedDay);
-      
+
+      const checkResult = await SwapRequestService.checkCanSwap(
+        data.assignmentId,
+        data.scope,
+        data.selectedDay
+      );
+
       if (!checkResult.success) {
-        return { 
-          success: false, 
-          message: checkResult.message || 'Cannot request swap for this assignment' 
+        return {
+          success: false,
+          message: checkResult.message || 'Cannot request swap for this assignment'
         };
       }
-      
+
       if (checkResult.canSwap === false) {
-        return { 
-          success: false, 
-          message: checkResult.reason || 'Cannot request swap for this assignment' 
+        return {
+          success: false,
+          message: checkResult.reason || 'Cannot request swap for this assignment'
         };
       }
-      
+
       const response = await SwapRequestService.createSwapRequest(data);
-      
+
       console.log('📦 Create swap request response:', response);
-      
+
       if (response.success) {
-        await loadMyRequests();
-        await loadPendingForMe();
-        
+        await loadMyRequests(undefined, true);
+        await loadPendingForMe(undefined, true);
+
         if (response.requiresAdminApproval === true) {
           Alert.alert(
             '⏳ Awaiting Admin Approval',
@@ -354,14 +434,16 @@ export const useSwapRequests = () => {
           Alert.alert('Success', response.message || 'Swap request created successfully!');
         }
       } else {
-        if (response.message?.toLowerCase().includes('token') || 
-            response.message?.toLowerCase().includes('auth') ||
-            response.message?.toLowerCase().includes('unauthorized')) {
+        if (
+          response.message?.toLowerCase().includes('token') ||
+          response.message?.toLowerCase().includes('auth') ||
+          response.message?.toLowerCase().includes('unauthorized')
+        ) {
           setAuthError(true);
         }
         Alert.alert('Error', response.message || 'Failed to create swap request');
       }
-      
+
       return response;
     } catch (err: any) {
       console.error('❌ Error in createSwapRequest:', err);
@@ -373,43 +455,43 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
+  // =========================
   // Accept swap request
+  // =========================
   const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () => void) => {
     const hasToken = await checkToken();
     if (!hasToken) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: 'Authentication required',
-        authError: true 
+        authError: true
       };
     }
 
     setLoading(true);
     setError(null);
     setAuthError(false);
-    
+
     try {
       console.log('✅ Accepting swap request:', requestId);
       const response = await SwapRequestService.acceptSwapRequest(requestId);
-      
+
       console.log('📦 Accept response:', response);
-      
+
       if (response.success) {
-        await loadMyRequests();
-        await loadPendingForMe();
-        
+        await loadMyRequests(undefined, true);
+        await loadPendingForMe(undefined, true);
+
         if (onSuccess) {
           onSuccess();
         }
-        
-        // Get data from response - handle both response.data and direct properties
+
         const scope = response.data?.scope || response.scope;
         const selectedDay = response.data?.selectedDay || response.selectedDay;
         const transferredCount = response.data?.transferredCount || response.transferredCount;
-        
+
         let successMessage = response.message || 'Swap request accepted successfully!';
-        
-        // Override with more specific message if we have details
+
         if (scope === 'day') {
           if (transferredCount && transferredCount > 1) {
             successMessage = `Swap accepted! You've taken over ${transferredCount} assignments for ${selectedDay}.`;
@@ -419,17 +501,19 @@ export const useSwapRequests = () => {
         } else if (scope === 'week') {
           successMessage = 'Swap accepted! The entire week\'s assignment has been transferred to you.';
         }
-        
+
         Alert.alert('Success', successMessage);
       } else {
-        if (response.message?.toLowerCase().includes('token') || 
-            response.message?.toLowerCase().includes('auth') ||
-            response.message?.toLowerCase().includes('unauthorized')) {
+        if (
+          response.message?.toLowerCase().includes('token') ||
+          response.message?.toLowerCase().includes('auth') ||
+          response.message?.toLowerCase().includes('unauthorized')
+        ) {
           setAuthError(true);
         }
         Alert.alert('Error', response.message || 'Failed to accept swap request');
       }
-      
+
       return response;
     } catch (err: any) {
       console.error('❌ Error in acceptSwapRequest:', err);
@@ -441,40 +525,44 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
+  // =========================
   // Reject swap request
+  // =========================
   const rejectSwapRequest = useCallback(async (requestId: string, reason?: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: 'Authentication required',
-        authError: true 
+        authError: true
       };
     }
 
     setLoading(true);
     setError(null);
     setAuthError(false);
-    
+
     try {
       console.log('❌ Rejecting swap request:', requestId, 'reason:', reason);
       const response = await SwapRequestService.rejectSwapRequest(requestId, reason);
-      
+
       console.log('📦 Reject response:', response);
-      
+
       if (response.success) {
-        await loadMyRequests();
-        await loadPendingForMe();
+        await loadMyRequests(undefined, true);
+        await loadPendingForMe(undefined, true);
         Alert.alert('Success', response.message || 'Swap request rejected successfully.');
       } else {
-        if (response.message?.toLowerCase().includes('token') || 
-            response.message?.toLowerCase().includes('auth') ||
-            response.message?.toLowerCase().includes('unauthorized')) {
+        if (
+          response.message?.toLowerCase().includes('token') ||
+          response.message?.toLowerCase().includes('auth') ||
+          response.message?.toLowerCase().includes('unauthorized')
+        ) {
           setAuthError(true);
         }
         Alert.alert('Error', response.message || 'Failed to reject swap request');
       }
-      
+
       return response;
     } catch (err: any) {
       console.error('❌ Error in rejectSwapRequest:', err);
@@ -486,40 +574,44 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
+  // =========================
   // Cancel swap request
+  // =========================
   const cancelSwapRequest = useCallback(async (requestId: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         message: 'Authentication required',
-        authError: true 
+        authError: true
       };
     }
 
     setLoading(true);
     setError(null);
     setAuthError(false);
-    
+
     try {
       console.log('✖️ Cancelling swap request:', requestId);
       const response = await SwapRequestService.cancelSwapRequest(requestId);
-      
+
       console.log('📦 Cancel response:', response);
-      
+
       if (response.success) {
-        await loadMyRequests();
-        await loadPendingForMe();
+        await loadMyRequests(undefined, true);
+        await loadPendingForMe(undefined, true);
         Alert.alert('Success', response.message || 'Swap request cancelled successfully.');
       } else {
-        if (response.message?.toLowerCase().includes('token') || 
-            response.message?.toLowerCase().includes('auth') ||
-            response.message?.toLowerCase().includes('unauthorized')) {
+        if (
+          response.message?.toLowerCase().includes('token') ||
+          response.message?.toLowerCase().includes('auth') ||
+          response.message?.toLowerCase().includes('unauthorized')
+        ) {
           setAuthError(true);
         }
         Alert.alert('Error', response.message || 'Failed to cancel swap request');
       }
-      
+
       return response;
     } catch (err: any) {
       console.error('❌ Error in cancelSwapRequest:', err);
@@ -531,26 +623,34 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
+  // =========================
   // Check if user has pending requests for an assignment
+  // =========================
   const hasPendingRequest = useCallback((assignmentId: string) => {
     return myRequests.some(
       request => request.assignmentId === assignmentId && request.status === 'PENDING'
     );
   }, [myRequests]);
 
+  // =========================
   // Get pending request for an assignment
+  // =========================
   const getPendingRequestForAssignment = useCallback((assignmentId: string) => {
     return myRequests.find(
       request => request.assignmentId === assignmentId && request.status === 'PENDING'
     );
   }, [myRequests]);
 
+  // =========================
   // Get swap description
+  // =========================
   const getSwapDescription = useCallback((swapRequest: SwapRequest) => {
     return SwapRequestService.getSwapDescription(swapRequest);
   }, []);
 
+  // =========================
   // Refresh all data
+  // =========================
   const refreshAll = useCallback(async (groupId?: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -558,13 +658,16 @@ export const useSwapRequests = () => {
     }
 
     console.log('🔄 Refreshing all swap data');
+
     await Promise.all([
-      loadMyRequests(),
-      loadPendingForMe(groupId)
+      loadMyRequests(undefined, true),
+      loadPendingForMe(groupId, true)
     ]);
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
+  // =========================
   // Get admin approval status for a request
+  // =========================
   const getAdminApprovalStatus = useCallback((swapRequest: SwapRequest) => {
     return SwapRequestService.getAdminApprovalStatus(swapRequest);
   }, []);

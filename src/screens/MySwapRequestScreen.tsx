@@ -1,4 +1,4 @@
-// src/screens/MySwapRequestsScreen.tsx - Dark Mode Added
+// src/screens/MySwapRequestsScreen.tsx - Clean Version (remove the bottom styles)
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -14,7 +14,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import { useNavigation } from '@react-navigation/native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { SwapRequestService } from '../services/SwapRequestService';

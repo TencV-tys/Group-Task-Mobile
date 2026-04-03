@@ -1,4 +1,4 @@
-// src/screens/FeedbackHistoryScreen.tsx - UPDATED with IN_PROGRESS filter
+// src/screens/FeedbackHistoryScreen.tsx - Dark Mode Added
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -15,7 +15,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFeedback } from '../feedbackHook/useFeedback';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
+
 export default function FeedbackHistoryScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
   const [filter, setFilterState] = useState<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | null>(route.params?.filter || null);
   
   const {
@@ -31,14 +34,14 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
   } = useFeedback();
 
   useEffect(() => {
-  if (authError) {
-    Alert.alert(
-      'Session Expired',
-      'Please log in again',
-      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-    );
-  }
-}, [authError]);
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+      );
+    }
+  }, [authError]);
 
   useEffect(() => {
     loadStats();
@@ -53,42 +56,42 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
   }, [filter]);
 
   const handleFilterPress = () => {
-  Alert.alert(
-    'Filter Feedback',
-    'Select filter option',
-    [
-      { 
-        text: 'All', 
-        onPress: () => {
-          setFilterState(null);
-          setFilter(null);
-        }
-      },
-      { 
-        text: 'Open', 
-        onPress: () => {
-          setFilterState('OPEN');
-          setFilter('OPEN');
-        }
-      },
-      { 
-        text: 'In Progress', 
-        onPress: () => {
-          setFilterState('IN_PROGRESS');
-          setFilter('IN_PROGRESS');
-        }
-      },
-      { 
-        text: 'Resolved', 
-        onPress: () => {
-          setFilterState('RESOLVED');
-          setFilter('RESOLVED');
-        }
-      },
-      { text: 'Cancel', style: 'cancel' }
-    ]
-  );
-};
+    Alert.alert(
+      'Filter Feedback',
+      'Select filter option',
+      [
+        { 
+          text: 'All', 
+          onPress: () => {
+            setFilterState(null);
+            setFilter(null);
+          }
+        },
+        { 
+          text: 'Open', 
+          onPress: () => {
+            setFilterState('OPEN');
+            setFilter('OPEN');
+          }
+        },
+        { 
+          text: 'In Progress', 
+          onPress: () => {
+            setFilterState('IN_PROGRESS');
+            setFilter('IN_PROGRESS');
+          }
+        },
+        { 
+          text: 'Resolved', 
+          onPress: () => {
+            setFilterState('RESOLVED');
+            setFilter('RESOLVED');
+          }
+        },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
 
   const handleDelete = (feedbackId: string) => {
     Alert.alert(
@@ -121,7 +124,6 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
     }
   };
 
-  // Update stats to include IN_PROGRESS if available
   const getStatCount = (status: string) => {
     if (!stats) return 0;
     
@@ -133,29 +135,29 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
   };
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>{getHeaderTitle()}</Text>
-          <Text style={styles.subtitle}>History</Text>
+          <Text style={[styles.title, { color: theme.text }]}>{getHeaderTitle()}</Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>History</Text>
         </View>
         
         <View style={styles.headerRight}>
           {/* Filter Button */}
           <TouchableOpacity 
             onPress={handleFilterPress}
-            style={[styles.iconButton, filter && styles.activeFilterButton]}
+            style={[styles.iconButton, filter && styles.activeFilterButton, { borderColor: filter ? theme.primary : theme.border }]}
           >
             <LinearGradient
-              colors={filter ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+              colors={filter ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.iconButtonGradient}
@@ -163,7 +165,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
               <MaterialCommunityIcons 
                 name="filter" 
                 size={18} 
-                color={filter ? '#2b8a3e' : '#495057'} 
+                color={filter ? theme.primary : theme.textSecondary} 
               />
             </LinearGradient>
           </TouchableOpacity>
@@ -172,18 +174,18 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           <TouchableOpacity 
             onPress={() => loadFeedback(1, filter)}
             disabled={loading}
-            style={styles.iconButton}
+            style={[styles.iconButton, { borderColor: theme.border }]}
           >
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.iconButtonGradient}
             >
               {loading ? (
-                <ActivityIndicator size="small" color="#2b8a3e" />
+                <ActivityIndicator size="small" color={theme.primary} />
               ) : (
-                <MaterialCommunityIcons name="refresh" size={18} color="#2b8a3e" />
+                <MaterialCommunityIcons name="refresh" size={18} color={theme.primary} />
               )}
             </LinearGradient>
           </TouchableOpacity>
@@ -193,29 +195,29 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
       {/* Stats Summary - Updated to show IN_PROGRESS */}
       {stats && (
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.statsRow}
+          style={[styles.statsRow, { borderBottomColor: theme.border }]}
         >
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{stats.total || 0}</Text>
-            <Text style={styles.statLabel}>Total</Text>
+            <Text style={[styles.statValue, { color: theme.text }]}>{stats.total || 0}</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Total</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#e67700' }]}>{stats.open || 0}</Text>
-            <Text style={styles.statLabel}>Open</Text>
+            <Text style={[styles.statValue, { color: theme.primary }]}>{stats.open || 0}</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Open</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#2b8a3e' }]}>{stats.inProgress || 0}</Text>
-            <Text style={styles.statLabel}>In Progress</Text>
+            <Text style={[styles.statValue, { color: theme.primary }]}>{stats.inProgress || 0}</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>In Progress</Text>
           </View>
-          <View style={styles.statDivider} />
+          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: '#2b8a3e' }]}>{stats.resolved || 0}</Text>
-            <Text style={styles.statLabel}>Resolved</Text>
+            <Text style={[styles.statValue, { color: theme.primary }]}>{stats.resolved || 0}</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Resolved</Text>
           </View>
         </LinearGradient>
       )}
@@ -225,8 +227,8 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           <RefreshControl 
             refreshing={loading} 
             onRefresh={() => loadFeedback(1, filter)}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         contentContainerStyle={styles.content}
@@ -235,15 +237,15 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
         {feedbackList.length === 0 ? (
           <View style={styles.emptyState}>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.emptyIconContainer}
+              style={[styles.emptyIconContainer, { borderColor: theme.border }]}
             >
-              <MaterialCommunityIcons name="message-text-outline" size={48} color="#2b8a3e" />
+              <MaterialCommunityIcons name="message-text-outline" size={48} color={theme.primary} />
             </LinearGradient>
-            <Text style={styles.emptyStateText}>No feedback yet</Text>
-            <Text style={styles.emptyStateSubtext}>
+            <Text style={[styles.emptyStateText, { color: theme.textMuted }]}>No feedback yet</Text>
+            <Text style={[styles.emptyStateSubtext, { color: theme.textPlaceholder }]}>
               {filter 
                 ? `No ${filter === 'IN_PROGRESS' ? 'in progress' : filter.toLowerCase()} feedback found` 
                 : 'Your submitted feedback will appear here'}
@@ -253,12 +255,12 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
               onPress={() => navigation.navigate('Feedback')}
             >
               <LinearGradient
-                colors={['#2b8a3e', '#1e6b2c']}
+                colors={[theme.primary, theme.primaryDark]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.submitButtonGradient}
               >
-                <MaterialCommunityIcons name="plus" size={16} color="white" />
+                <MaterialCommunityIcons name="plus" size={16} color="#fff" />
                 <Text style={styles.submitButtonText}>Submit Feedback</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -267,19 +269,19 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           feedbackList.map((item) => (
             <LinearGradient
               key={item.id}
-              colors={['#ffffff', '#f8f9fa']}
+              colors={[theme.card, theme.bgSecondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.feedbackCard}
+              style={[styles.feedbackCard, { borderColor: theme.border }]}
             >
               {/* Header */}
               <View style={styles.cardHeader}>
                 <View style={styles.typeContainer}>
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.typeIcon}
+                    style={[styles.typeIcon, { borderColor: theme.border }]}
                   >
                     <MaterialCommunityIcons 
                       name={getFeedbackIcon(item.type) as any} 
@@ -287,7 +289,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                       color={getFeedbackColor(item.type)} 
                     />
                   </LinearGradient>
-                  <Text style={styles.typeText}>{item.type.replace(/_/g, ' ')}</Text>
+                  <Text style={[styles.typeText, { color: theme.text }]}>{item.type.replace(/_/g, ' ')}</Text>
                 </View>
                 <LinearGradient
                   colors={[getStatusColor(item.status), getStatusColor(item.status) + 'dd']}
@@ -306,7 +308,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                 onPress={() => navigation.navigate('FeedbackDetails', { feedbackId: item.id })}
                 activeOpacity={0.7}
               >
-                <Text style={styles.message} numberOfLines={2}>
+                <Text style={[styles.message, { color: theme.textSecondary }]} numberOfLines={2}>
                   {item.message}
                 </Text>
               </TouchableOpacity>
@@ -316,15 +318,15 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                 <View style={styles.footerLeft}>
                   {item.category && (
                     <LinearGradient
-                      colors={['#f8f9fa', '#e9ecef']}
+                      colors={[theme.bgSecondary, theme.bgTertiary]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
-                      style={styles.categoryTag}
+                      style={[styles.categoryTag, { borderColor: theme.border }]}
                     >
-                      <Text style={styles.categoryText}>{item.category}</Text>
+                      <Text style={[styles.categoryText, { color: theme.textSecondary }]}>{item.category}</Text>
                     </LinearGradient>
                   )}
-                  <Text style={styles.date}>
+                  <Text style={[styles.date, { color: theme.textPlaceholder }]}>
                     {new Date(item.createdAt).toLocaleDateString()}
                   </Text>
                 </View>
@@ -340,12 +342,12 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                       style={styles.actionButton}
                     >
                       <LinearGradient
-                        colors={['#f8f9fa', '#e9ecef']}
+                        colors={[theme.bgSecondary, theme.bgTertiary]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
-                        style={styles.actionButtonGradient}
+                        style={[styles.actionButtonGradient, { borderColor: theme.border }]}
                       >
-                        <MaterialCommunityIcons name="pencil" size={14} color="#2b8a3e" />
+                        <MaterialCommunityIcons name="pencil" size={14} color={theme.primary} />
                       </LinearGradient>
                     </TouchableOpacity>
                   )}
@@ -356,12 +358,12 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                     style={styles.actionButton}
                   >
                     <LinearGradient
-                      colors={['#fff5f5', '#ffe3e3']}
+                      colors={[theme.errorBg, theme.errorBg]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
-                      style={[styles.actionButtonGradient, styles.deleteButtonGradient]}
+                      style={[styles.actionButtonGradient, styles.deleteButtonGradient, { borderColor: theme.errorBorder }]}
                     >
-                      <MaterialCommunityIcons name="delete" size={14} color="#fa5252" />
+                      <MaterialCommunityIcons name="delete" size={14} color={theme.error} />
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
@@ -414,7 +416,6 @@ const getStatusColor = (status: string) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   header: {
     flexDirection: 'row',
@@ -422,19 +423,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -447,11 +444,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
   },
   subtitle: {
     fontSize: 11,
-    color: '#868e96',
     marginTop: 2,
   },
   headerRight: {
@@ -463,7 +458,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   iconButtonGradient: {
     width: 36,
@@ -472,7 +466,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeFilterButton: {
-    borderColor: '#2b8a3e',
+    borderWidth: 2,
   },
   statsRow: {
     flexDirection: 'row',
@@ -481,7 +475,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
   },
   statItem: {
     alignItems: 'center',
@@ -489,17 +482,14 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#212529',
   },
   statLabel: {
     fontSize: 10,
-    color: '#868e96',
     marginTop: 2,
   },
   statDivider: {
     width: 1,
     height: 24,
-    backgroundColor: '#e9ecef',
   },
   content: {
     padding: 16,
@@ -518,17 +508,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   emptyStateText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#868e96',
     marginTop: 8,
   },
   emptyStateSubtext: {
     fontSize: 13,
-    color: '#adb5bd',
     textAlign: 'center',
     marginTop: 4,
     marginBottom: 20,
@@ -547,7 +534,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   submitButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 13,
     fontWeight: '600',
   },
@@ -556,7 +543,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -576,12 +562,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   typeText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#212529',
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -590,12 +574,11 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 10,
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
   },
   message: {
     fontSize: 14,
-    color: '#495057',
     lineHeight: 20,
     marginBottom: 12,
   },
@@ -616,15 +599,12 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   categoryText: {
     fontSize: 10,
-    color: '#495057',
   },
   date: {
     fontSize: 10,
-    color: '#adb5bd',
   },
   actions: {
     flexDirection: 'row',
@@ -641,9 +621,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   deleteButtonGradient: {
-    borderColor: '#ffc9c9',
+    borderWidth: 1,
   },
 });

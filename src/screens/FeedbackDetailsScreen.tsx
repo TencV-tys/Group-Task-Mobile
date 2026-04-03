@@ -1,4 +1,4 @@
-// src/screens/FeedbackDetailsScreen.tsx - FIXED with proper picker height and colors
+// src/screens/FeedbackDetailsScreen.tsx - Dark Mode Added
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -18,6 +18,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { useFeedback } from '../feedbackHook/useFeedback';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 const FEEDBACK_TYPES = [
   { label: 'Bug Report', value: 'BUG' },
@@ -40,6 +41,7 @@ const CATEGORIES = [
 ];
 
 export default function FeedbackDetailsScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
   const { feedbackId } = route.params;
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editType, setEditType] = useState('');
@@ -67,14 +69,15 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
   }, [feedbackId]);
 
   useEffect(() => {
-  if (authError) {
-    Alert.alert(
-      'Session Expired',
-      'Please log in again',
-      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-    );
-  }
-}, [authError]);
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+      );
+    }
+  }, [authError]);
+
   // Initialize edit form when feedback loads
   useEffect(() => {
     if (selectedFeedback) {
@@ -132,7 +135,6 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
     setUpdating(false);
     if (result.success) {
       setEditModalVisible(false);
-      // Show loading while refreshing
       setLocalLoading(true);
       await loadFeedbackDetails(feedbackId);
       setLocalLoading(false);
@@ -142,10 +144,10 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
   // Show loading state
   if (loading || localLoading) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>
             {localLoading ? 'Updating feedback...' : 'Loading feedback...'}
           </Text>
         </View>
@@ -155,23 +157,23 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
 
   if (!selectedFeedback) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Feedback Details</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Feedback Details</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={64} color="#fa5252" />
-          <Text style={styles.errorText}>Feedback not found</Text>
+          <MaterialCommunityIcons name="alert-circle" size={64} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.textMuted }]}>Feedback not found</Text>
           <TouchableOpacity 
             style={styles.retryButton}
             onPress={() => loadFeedbackDetails(feedbackId)}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.retryButtonGradient}
@@ -187,34 +189,34 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
   const canEdit = selectedFeedback.status !== 'RESOLVED' && selectedFeedback.status !== 'CLOSED';
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Feedback Details</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Feedback Details</Text>
         <View style={styles.headerRight}>
           {canEdit && (
             <TouchableOpacity onPress={handleEdit} style={styles.iconButton}>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.iconButtonGradient}
+                style={[styles.iconButtonGradient, { borderColor: theme.border }]}
               >
-                <MaterialCommunityIcons name="pencil" size={18} color="#2b8a3e" />
+                <MaterialCommunityIcons name="pencil" size={18} color={theme.primary} />
               </LinearGradient>
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={handleDelete} style={styles.iconButton}>
             <LinearGradient
-              colors={['#fff5f5', '#ffe3e3']}
+              colors={[theme.errorBg, theme.errorBg]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.iconButtonGradient, styles.deleteButtonGradient]}
+              style={[styles.iconButtonGradient, styles.deleteButtonGradient, { borderColor: theme.errorBorder }]}
             >
-              <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
+              <MaterialCommunityIcons name="delete" size={18} color={theme.error} />
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -223,83 +225,83 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Status Card */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.statusCard}
+          style={[styles.statusCard, { borderColor: theme.border }]}
         >
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedFeedback.status) }]}>
             <Text style={styles.statusText}>{selectedFeedback.status}</Text>
           </View>
-          <Text style={styles.dateText}>
+          <Text style={[styles.dateText, { color: theme.textMuted }]}>
             {new Date(selectedFeedback.createdAt).toLocaleDateString()}
           </Text>
         </LinearGradient>
 
         {/* Type Card */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.detailCard}
+          style={[styles.detailCard, { borderColor: theme.border }]}
         >
           <View style={styles.detailHeader}>
-            <View style={[styles.detailIcon, { backgroundColor: '#f1f3f5' }]}>
+            <View style={[styles.detailIcon, { backgroundColor: theme.bgTertiary }]}>
               <MaterialCommunityIcons 
                 name={getFeedbackIcon(selectedFeedback.type) as any} 
                 size={20} 
                 color={getFeedbackColor(selectedFeedback.type)} 
               />
             </View>
-            <Text style={styles.detailTitle}>Feedback Type</Text>
+            <Text style={[styles.detailTitle, { color: theme.text }]}>Feedback Type</Text>
           </View>
-          <Text style={styles.typeText}>{selectedFeedback.type.replace('_', ' ')}</Text>
+          <Text style={[styles.typeText, { color: theme.primary }]}>{selectedFeedback.type.replace('_', ' ')}</Text>
           {selectedFeedback.category && (
-            <View style={styles.categoryTag}>
-              <Text style={styles.categoryText}>{selectedFeedback.category}</Text>
+            <View style={[styles.categoryTag, { backgroundColor: theme.bgTertiary }]}>
+              <Text style={[styles.categoryText, { color: theme.textSecondary }]}>{selectedFeedback.category}</Text>
             </View>
           )}
         </LinearGradient>
 
         {/* Message Card */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.detailCard}
+          style={[styles.detailCard, { borderColor: theme.border }]}
         >
           <View style={styles.detailHeader}>
-            <View style={[styles.detailIcon, { backgroundColor: '#f1f3f5' }]}>
-              <MaterialCommunityIcons name="message" size={20} color="#2b8a3e" />
+            <View style={[styles.detailIcon, { backgroundColor: theme.bgTertiary }]}>
+              <MaterialCommunityIcons name="message" size={20} color={theme.primary} />
             </View>
-            <Text style={styles.detailTitle}>Your Message</Text>
+            <Text style={[styles.detailTitle, { color: theme.text }]}>Your Message</Text>
             {canEdit && (
-              <TouchableOpacity onPress={handleEdit} style={styles.editMessageButton}>
-                <MaterialCommunityIcons name="pencil" size={16} color="#2b8a3e" />
-                <Text style={styles.editMessageText}>Edit</Text>
+              <TouchableOpacity onPress={handleEdit} style={[styles.editMessageButton, { backgroundColor: theme.bgTertiary }]}>
+                <MaterialCommunityIcons name="pencil" size={16} color={theme.primary} />
+                <Text style={[styles.editMessageText, { color: theme.primary }]}>Edit</Text>
               </TouchableOpacity>
             )}
           </View>
-          <Text style={styles.messageText}>{selectedFeedback.message}</Text>
+          <Text style={[styles.messageText, { color: theme.textSecondary }]}>{selectedFeedback.message}</Text>
         </LinearGradient>
 
         {/* Timeline */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.timelineCard}
+          style={[styles.timelineCard, { borderColor: theme.border }]}
         >
-          <Text style={styles.timelineTitle}>Timeline</Text>
+          <Text style={[styles.timelineTitle, { color: theme.text }]}>Timeline</Text>
           
           <View style={styles.timelineItem}>
             <View style={styles.timelineLeft}>
-              <View style={[styles.timelineDot, { backgroundColor: '#2b8a3e' }]} />
-              <View style={styles.timelineLine} />
+              <View style={[styles.timelineDot, { backgroundColor: theme.primary }]} />
+              <View style={[styles.timelineLine, { backgroundColor: theme.border }]} />
             </View>
             <View style={styles.timelineRight}>
-              <Text style={styles.timelineEvent}>Feedback Submitted</Text>
-              <Text style={styles.timelineDate}>
+              <Text style={[styles.timelineEvent, { color: theme.text }]}>Feedback Submitted</Text>
+              <Text style={[styles.timelineDate, { color: theme.textMuted }]}>
                 {new Date(selectedFeedback.createdAt).toLocaleString()}
               </Text>
             </View>
@@ -308,11 +310,11 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
           {selectedFeedback.updatedAt !== selectedFeedback.createdAt && (
             <View style={styles.timelineItem}>
               <View style={styles.timelineLeft}>
-                <View style={[styles.timelineDot, { backgroundColor: '#495057' }]} />
+                <View style={[styles.timelineDot, { backgroundColor: theme.textMuted }]} />
               </View>
               <View style={styles.timelineRight}>
-                <Text style={styles.timelineEvent}>Last Updated</Text>
-                <Text style={styles.timelineDate}>
+                <Text style={[styles.timelineEvent, { color: theme.text }]}>Last Updated</Text>
+                <Text style={[styles.timelineDate, { color: theme.textMuted }]}>
                   {new Date(selectedFeedback.updatedAt).toLocaleString()}
                 </Text>
               </View>
@@ -325,8 +327,8 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
                 <View style={[styles.timelineDot, { backgroundColor: getStatusColor(selectedFeedback.status) }]} />
               </View>
               <View style={styles.timelineRight}>
-                <Text style={styles.timelineEvent}>Status Updated</Text>
-                <Text style={styles.timelineDate}>
+                <Text style={[styles.timelineEvent, { color: theme.text }]}>Status Updated</Text>
+                <Text style={[styles.timelineDate, { color: theme.textMuted }]}>
                   Changed to {selectedFeedback.status}
                 </Text>
               </View>
@@ -337,13 +339,13 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
         {/* Edit Note for Resolved/Closed */}
         {!canEdit && (
           <LinearGradient
-            colors={['#f1f3f5', '#e9ecef']}
+            colors={[theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.infoBox}
+            style={[styles.infoBox, { borderColor: theme.border }]}
           >
-            <MaterialCommunityIcons name="information-outline" size={18} color="#868e96" />
-            <Text style={styles.infoText}>
+            <MaterialCommunityIcons name="information-outline" size={18} color={theme.textMuted} />
+            <Text style={[styles.infoText, { color: theme.textMuted }]}>
               This feedback is {selectedFeedback.status.toLowerCase()} and cannot be edited.
             </Text>
           </LinearGradient>
@@ -357,34 +359,34 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
         transparent={true}
         onRequestClose={() => setEditModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Feedback</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.closeButton}>
-                <MaterialCommunityIcons name="close" size={22} color="#868e96" />
+        <View style={[styles.modalOverlay, { backgroundColor: theme.overlay }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Edit Feedback</Text>
+              <TouchableOpacity onPress={() => setEditModalVisible(false)} style={[styles.closeButton, { backgroundColor: theme.bgTertiary }]}>
+                <MaterialCommunityIcons name="close" size={22} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
 
             <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
               {/* Type Picker - FIXED */}
               <View style={styles.modalField}>
-                <Text style={styles.modalLabel}>Feedback Type *</Text>
-                <View style={styles.pickerWrapper}>
+                <Text style={[styles.modalLabel, { color: theme.textMuted }]}>Feedback Type *</Text>
+                <View style={[styles.pickerWrapper, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
                   <Picker
                     selectedValue={editType}
                     onValueChange={setEditType}
                     style={styles.picker}
                     enabled={!updating}
-                    dropdownIconColor="#2b8a3e"
-                    itemStyle={styles.pickerItem}
+                    dropdownIconColor={theme.primary}
+                    itemStyle={[styles.pickerItem, { color: theme.text }]}
                   >
                     {FEEDBACK_TYPES.map(option => (
                       <Picker.Item 
                         key={option.value} 
                         label={option.label} 
                         value={option.value}
-                        color="#212529"
+                        color={theme.text}
                       />
                     ))}
                   </Picker>
@@ -393,22 +395,22 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
 
               {/* Category Picker - FIXED */}
               <View style={styles.modalField}>
-                <Text style={styles.modalLabel}>Category (Optional)</Text>
-                <View style={styles.pickerWrapper}>
+                <Text style={[styles.modalLabel, { color: theme.textMuted }]}>Category (Optional)</Text>
+                <View style={[styles.pickerWrapper, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
                   <Picker
                     selectedValue={editCategory}
                     onValueChange={setEditCategory}
                     style={styles.picker}
                     enabled={!updating}
-                    dropdownIconColor="#2b8a3e"
-                    itemStyle={styles.pickerItem}
+                    dropdownIconColor={theme.primary}
+                    itemStyle={[styles.pickerItem, { color: theme.text }]}
                   >
                     {CATEGORIES.map(option => (
                       <Picker.Item 
                         key={option.value} 
                         label={option.label} 
                         value={option.value}
-                        color="#212529"
+                        color={theme.text}
                       />
                     ))}
                   </Picker>
@@ -420,15 +422,15 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
 
               {/* Message Input */}
               <View style={styles.modalField}>
-                <Text style={styles.modalLabel}>Your Feedback *</Text>
+                <Text style={[styles.modalLabel, { color: theme.textMuted }]}>Your Feedback *</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.modalInputWrapper}
+                  style={[styles.modalInputWrapper, { borderColor: theme.border }]}
                 >
                   <TextInput
-                    style={styles.modalInput}
+                    style={[styles.modalInput, { color: theme.text, backgroundColor: theme.bgSecondary }]}
                     multiline
                     numberOfLines={8}
                     value={editMessage}
@@ -436,25 +438,26 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
                     textAlignVertical="top"
                     editable={!updating}
                     placeholder="Enter your feedback..."
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
+                    selectionColor={theme.primary}
                   />
                 </LinearGradient>
               </View>
             </ScrollView>
 
-            <View style={styles.modalFooter}>
+            <View style={[styles.modalFooter, { borderTopColor: theme.border }]}>
               <TouchableOpacity
                 style={styles.modalCancelButton}
                 onPress={() => setEditModalVisible(false)}
                 disabled={updating}
               >
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.modalCancelGradient}
                 >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
+                  <Text style={[styles.modalCancelText, { color: theme.textSecondary }]}>Cancel</Text>
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -464,13 +467,13 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
                 disabled={updating}
               >
                 <LinearGradient
-                  colors={updating ? ['#f8f9fa', '#e9ecef'] : ['#2b8a3e', '#1e6b2c']}
+                  colors={updating ? [theme.bgSecondary, theme.bgTertiary] : [theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.modalSaveGradient}
                 >
                   {updating ? (
-                    <ActivityIndicator size="small" color="#495057" />
+                    <ActivityIndicator size="small" color={theme.textMuted} />
                   ) : (
                     <Text style={styles.modalSaveText}>Save Changes</Text>
                   )}
@@ -524,7 +527,6 @@ const getStatusColor = (status: string) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   header: {
     flexDirection: 'row',
@@ -532,19 +534,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -553,7 +551,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
   },
   headerRight: {
     flexDirection: 'row',
@@ -570,10 +567,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   deleteButtonGradient: {
-    borderColor: '#ffc9c9',
+    borderWidth: 1,
   },
   content: {
     padding: 16,
@@ -587,7 +583,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
   },
   errorContainer: {
     flex: 1,
@@ -597,7 +592,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#868e96',
     marginTop: 16,
     marginBottom: 16,
   },
@@ -610,7 +604,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   retryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -622,7 +616,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -630,20 +623,18 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   statusText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 13,
     fontWeight: '600',
   },
   dateText: {
     fontSize: 13,
-    color: '#868e96',
   },
   detailCard: {
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   detailIcon: {
     width: 32,
@@ -661,7 +652,6 @@ const styles = StyleSheet.create({
   detailTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
     flex: 1,
   },
   editMessageButton: {
@@ -670,34 +660,28 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    backgroundColor: '#f1f3f5',
     borderRadius: 16,
   },
   editMessageText: {
     fontSize: 12,
-    color: '#2b8a3e',
     fontWeight: '500',
   },
   typeText: {
     fontSize: 16,
-    color: '#2b8a3e',
     fontWeight: '600',
     marginBottom: 8,
   },
   categoryTag: {
     alignSelf: 'flex-start',
-    backgroundColor: '#f1f3f5',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
   },
   categoryText: {
     fontSize: 11,
-    color: '#495057',
   },
   messageText: {
     fontSize: 14,
-    color: '#495057',
     lineHeight: 22,
   },
   timelineCard: {
@@ -705,12 +689,10 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   timelineTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 16,
   },
   timelineItem: {
@@ -730,7 +712,6 @@ const styles = StyleSheet.create({
   timelineLine: {
     width: 2,
     flex: 1,
-    backgroundColor: '#e9ecef',
     marginTop: 4,
   },
   timelineRight: {
@@ -740,12 +721,10 @@ const styles = StyleSheet.create({
   timelineEvent: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#212529',
     marginBottom: 2,
   },
   timelineDate: {
     fontSize: 12,
-    color: '#868e96',
     marginBottom: 2,
   },
   infoBox: {
@@ -756,21 +735,17 @@ const styles = StyleSheet.create({
     padding: 16,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   infoText: {
     flex: 1,
     fontSize: 13,
-    color: '#868e96',
   },
   // Modal Styles - FIXED
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
@@ -782,18 +757,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
   },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f1f3f5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -806,14 +778,11 @@ const styles = StyleSheet.create({
   modalLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#adb5bd',
     marginBottom: 8,
     marginLeft: 4,
   },
   pickerWrapper: {
-    backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#e9ecef',
     borderRadius: 8,
     overflow: 'hidden',
     minHeight: 55,
@@ -822,17 +791,14 @@ const styles = StyleSheet.create({
   picker: {
     height: Platform.OS === 'ios' ? 180 : 55,
     width: '100%',
-    color: '#212529',
     marginLeft: Platform.OS === 'android' ? -8 : 0,
   },
   pickerItem: {
     fontSize: 16,
     height: 120,
-    color: '#212529',
   },
   modalInputWrapper: {
     borderWidth: 1,
-    borderColor: '#e9ecef',
     borderRadius: 8,
     overflow: 'hidden',
   },
@@ -843,8 +809,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     minHeight: 150,
     textAlignVertical: 'top',
-    color: '#212529',
-    backgroundColor: '#f8f9fa',
     lineHeight: 20,
   },
   modalFooter: {
@@ -852,7 +816,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
     gap: 12,
   },
   modalCancelButton: {
@@ -867,7 +830,6 @@ const styles = StyleSheet.create({
   modalCancelText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
   },
   modalSaveButton: {
     flex: 1,
@@ -884,6 +846,6 @@ const styles = StyleSheet.create({
   modalSaveText: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'white',
+    color: '#fff',
   },
 });

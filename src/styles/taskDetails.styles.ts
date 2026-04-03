@@ -1,10 +1,11 @@
-// src/styles/taskDetails.styles.ts
+// src/styles/taskDetails.styles.ts - Dark Mode Version
 import { StyleSheet } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
-export const taskDetailsStyles = StyleSheet.create({
+export const makeTaskDetailsStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa'
+    backgroundColor: theme.bgSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -12,54 +13,55 @@ export const taskDetailsStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.border,
     minHeight: 60,
   },
-warningBanner: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  padding: 12,
-  marginHorizontal: 16,
-  marginTop: 12,
-  marginBottom: 4,
-  borderRadius: 12,
-  gap: 10,
-  borderWidth: 1,
-  borderColor: '#ffec99',
-},
-warningContent: {
-  flex: 1,
-},
-warningTitle: {
-  fontSize: 13,
-  fontWeight: '600',
-  color: '#e67700',
-  marginBottom: 2,
-},
-warningText: {
-  fontSize: 12,
-  color: '#495057',
-  lineHeight: 16,
-},
-editButtonDisabled: {
-  opacity: 0.5,
-},
-deleteButtonDisabled: {
-  opacity: 0.5,
-},
-deleteButtonTextDisabled: {
-  color: '#adb5bd',
-},
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 12,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryLight,
+  },
+  warningContent: {
+    flex: 1,
+  },
+  warningTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.primary,
+    marginBottom: 2,
+  },
+  warningText: {
+    fontSize: 12,
+    color: theme.textSecondary,
+    lineHeight: 16,
+  },
+  editButtonDisabled: {
+    opacity: 0.5,
+  },
+  deleteButtonDisabled: {
+    opacity: 0.5,
+  },
+  deleteButtonTextDisabled: {
+    color: theme.textPlaceholder,
+  },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -69,53 +71,53 @@ deleteButtonTextDisabled: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8
+    paddingHorizontal: 8,
   },
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
-    textAlign: 'center'
+    color: theme.text,
+    textAlign: 'center',
   },
   editButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
   headerSpacer: {
-    width: 36
-  }, 
+    width: 36,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 80
+    paddingBottom: 80,
   },
   loadingText: {
     marginTop: 12,
-    color: '#868e96',
-    fontSize: 14
+    color: theme.textMuted,
+    fontSize: 14,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20
+    padding: 20,
   },
   errorText: {
-    color: '#fa5252',
+    color: theme.error,
     textAlign: 'center',
     marginBottom: 16,
     fontSize: 16,
-    marginTop: 12
+    marginTop: 12,
   },
   retryButton: {
     borderRadius: 8,
@@ -126,37 +128,38 @@ deleteButtonTextDisabled: {
     paddingVertical: 12,
   },
   retryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
-    fontSize: 16
+    fontSize: 16,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20
+    padding: 20,
   },
   emptyText: {
     fontSize: 16,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 16,
-    textAlign: 'center'
+    textAlign: 'center',
   },
   content: {
     flex: 1,
-    padding: 16
+    padding: 16,
   },
   card: {
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.card,
   },
   taskHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20
+    marginBottom: 20,
   },
   taskIcon: {
     width: 44,
@@ -166,16 +169,17 @@ deleteButtonTextDisabled: {
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: '#b2f2bb',
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryLight,
   },
   taskTitleContainer: {
-    flex: 1
+    flex: 1,
   },
   taskTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#212529',
-    marginBottom: 6
+    color: theme.text,
+    marginBottom: 6,
   },
   pointsBadge: {
     flexDirection: 'row',
@@ -185,21 +189,22 @@ deleteButtonTextDisabled: {
     borderRadius: 12,
     alignSelf: 'flex-start',
     gap: 4,
+    backgroundColor: theme.primaryLight,
   },
   pointsText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#e67700',
-    marginLeft: 4
+    color: theme.primary,
+    marginLeft: 4,
   },
   section: {
-    marginBottom: 24
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 12
+    marginBottom: 12,
   },
   sectionIcon: {
     width: 28,
@@ -207,63 +212,65 @@ deleteButtonTextDisabled: {
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.bgSecondary,
   },
   sectionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529'
+    color: theme.text,
   },
   description: {
     fontSize: 14,
-    color: '#868e96',
-    lineHeight: 20
+    color: theme.textMuted,
+    lineHeight: 20,
   },
   detailsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 24
+    marginBottom: 24,
   },
   detailItem: {
-    width: '48%'
+    width: '48%',
   },
   detailLabel: {
     fontSize: 11,
-    color: '#868e96',
-    marginBottom: 2
+    color: theme.textMuted,
+    marginBottom: 2,
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#212529'
+    color: theme.text,
   },
   weekInfoCard: {
     padding: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    gap: 8
+    borderColor: theme.border,
+    gap: 8,
+    backgroundColor: theme.bgSecondary,
   },
   weekInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8
+    gap: 8,
   },
   weekInfoLabel: {
     fontSize: 13,
-    color: '#868e96',
-    width: 45
+    color: theme.textMuted,
+    width: 45,
   },
   weekInfoValue: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#212529',
-    flex: 1
+    color: theme.text,
+    flex: 1,
   },
   daysContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6
+    gap: 6,
   },
   dayChip: {
     flexDirection: 'row',
@@ -273,115 +280,121 @@ deleteButtonTextDisabled: {
     borderRadius: 16,
     gap: 4,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   todayDayChip: {
-    borderColor: '#2b8a3e',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryLight,
   },
   dayText: {
     fontSize: 12,
-    color: '#495057',
-    fontWeight: '500'
+    color: theme.textSecondary,
+    fontWeight: '500',
   },
   todayDayText: {
-    color: '#2b8a3e',
-    fontWeight: '700'
+    color: theme.primary,
+    fontWeight: '700',
   },
   todayDayLabel: {
     fontSize: 9,
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '600',
-    backgroundColor: '#fff',
+    backgroundColor: theme.card,
     paddingHorizontal: 3,
     paddingVertical: 1,
     borderRadius: 6,
-    marginLeft: 2
+    marginLeft: 2,
   },
   timeSlotsContainer: {
-    gap: 8
+    gap: 8,
   },
   timeSlotCard: {
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   currentTimeSlotCard: {
-    borderColor: '#b2f2bb',
+    borderColor: theme.primaryBorder,
     borderWidth: 2,
+    backgroundColor: theme.primaryLight,
   },
   timeSlotHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 4
+    marginBottom: 4,
   },
   timeSlotTime: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#212529',
-    flex: 1
+    color: theme.text,
+    flex: 1,
   },
   currentTimeSlotTime: {
-    color: '#2b8a3e',
-    fontWeight: '600'
+    color: theme.primary,
+    fontWeight: '600',
   },
   slotPointsBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
+    backgroundColor: theme.primaryLight,
   },
   slotPointsText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#e67700'
+    color: theme.primary,
   },
   timeSlotLabel: {
     fontSize: 12,
-    color: '#868e96',
+    color: theme.textMuted,
     marginLeft: 26,
-    marginBottom: 2
+    marginBottom: 2,
   },
   activeSlotIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#d3f9d8',
+    backgroundColor: theme.primaryLight,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
     alignSelf: 'flex-start',
     gap: 4,
-    marginTop: 4
+    marginTop: 4,
   },
   activeSlotText: {
     fontSize: 11,
-    color: '#2b8a3e',
-    fontWeight: '500'
+    color: theme.primary,
+    fontWeight: '500',
   },
   timeSlotNote: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     fontStyle: 'italic',
-    marginTop: 6
+    marginTop: 6,
   },
   assignmentCard: {
     borderRadius: 10,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   assignmentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 12
+    marginBottom: 12,
   },
   assignmentInfo: {
-    flex: 1
+    flex: 1,
   },
   assignmentDate: {
     fontSize: 13,
-    color: '#495057'
+    color: theme.textSecondary,
   },
   submissionStatusCard: {
     borderRadius: 10,
@@ -434,7 +447,7 @@ deleteButtonTextDisabled: {
   urgentTimerBadge: {},
   urgentMessage: {
     fontSize: 11,
-    color: '#fa5252',
+    color: theme.error,
     fontWeight: '600',
     marginTop: 4,
     marginLeft: 4,
@@ -451,42 +464,44 @@ deleteButtonTextDisabled: {
     borderRadius: 16,
     alignSelf: 'flex-start',
     gap: 4,
+    backgroundColor: theme.primaryLight,
   },
   waitingText: {
     fontSize: 12,
-    color: '#e67700',
+    color: theme.primary,
     fontWeight: '600',
   },
   notAssignedCard: {
     borderRadius: 10,
     padding: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
     alignItems: 'center',
-    gap: 10
+    gap: 10,
+    backgroundColor: theme.bgSecondary,
   },
   notAssignedText: {
     fontSize: 14,
-    color: '#868e96',
-    textAlign: 'center'
+    color: theme.textMuted,
+    textAlign: 'center',
   },
   notAssignedSubtext: {
     fontSize: 12,
-    color: '#adb5bd',
+    color: theme.textPlaceholder,
     textAlign: 'center',
-    marginTop: 4
+    marginTop: 4,
   },
   submissionHistoryCard: {
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    position: 'relative'
+    borderColor: theme.border,
+    position: 'relative',
   },
   todaySubmissionCard: {
-    borderColor: '#2b8a3e',
+    borderColor: theme.primary,
     borderWidth: 2,
   },
   todayBadge: {
@@ -499,47 +514,48 @@ deleteButtonTextDisabled: {
     paddingVertical: 2,
     borderRadius: 12,
     gap: 4,
-    zIndex: 1
+    zIndex: 1,
+    backgroundColor: theme.error,
   },
   todayBadgeText: {
     color: '#fff',
     fontSize: 9,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   submissionHistoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 6
+    marginBottom: 6,
   },
   statusIconSmall: {
     width: 28,
     height: 28,
     borderRadius: 14,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   submissionHistoryInfo: {
-    flex: 1
+    flex: 1,
   },
   submissionHistoryStatus: {
     fontSize: 14,
     fontWeight: '600',
-    marginBottom: 2
+    marginBottom: 2,
   },
   submissionHistoryDate: {
     fontSize: 11,
-    color: '#868e96'
+    color: theme.textMuted,
   },
   todayText: {
-    color: '#fa5252',
-    fontWeight: '600'
+    color: theme.error,
+    fontWeight: '600',
   },
   submittedDate: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     marginBottom: 6,
-    marginLeft: 38
+    marginLeft: 38,
   },
   submissionHistoryMeta: {
     flexDirection: 'row',
@@ -555,11 +571,12 @@ deleteButtonTextDisabled: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
-    gap: 4
+    gap: 4,
+    backgroundColor: theme.primaryLight,
   },
   hasPhotoTextSmall: {
     fontSize: 10,
-    color: '#2b8a3e'
+    color: theme.primary,
   },
   hasNotesBadgeSmall: {
     flexDirection: 'row',
@@ -567,17 +584,18 @@ deleteButtonTextDisabled: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
-    gap: 4
+    gap: 4,
+    backgroundColor: theme.primaryLight,
   },
   hasNotesTextSmall: {
     fontSize: 10,
-    color: '#e67700'
+    color: theme.primary,
   },
   pointsEarned: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#e67700',
-    marginLeft: 'auto'
+    color: theme.primary,
+    marginLeft: 'auto',
   },
   adminFeedbackPreview: {
     flexDirection: 'row',
@@ -586,25 +604,26 @@ deleteButtonTextDisabled: {
     borderRadius: 6,
     marginTop: 6,
     marginLeft: 38,
-    gap: 4
+    gap: 4,
+    backgroundColor: theme.errorBg,
   },
   adminFeedbackPreviewText: {
     fontSize: 10,
-    color: '#fa5252',
+    color: theme.error,
     flex: 1,
-    fontStyle: 'italic'
+    fontStyle: 'italic',
   },
   upcomingCard: {
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    position: 'relative'
+    borderColor: theme.border,
+    position: 'relative',
   },
   todayUpcomingCard: {
-    borderColor: '#e67700',
+    borderColor: theme.primary,
     borderWidth: 2,
   },
   upcomingTodayBadge: {
@@ -614,24 +633,25 @@ deleteButtonTextDisabled: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
-    zIndex: 1
+    zIndex: 1,
+    backgroundColor: theme.primary,
   },
   upcomingTodayBadgeText: {
     color: '#fff',
     fontSize: 8,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   upcomingCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6
+    marginBottom: 6,
   },
   upcomingUserInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    flex: 1
+    flex: 1,
   },
   upcomingAvatar: {
     width: 28,
@@ -640,25 +660,26 @@ deleteButtonTextDisabled: {
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   upcomingAvatarText: {
-    color: '#495057',
+    color: theme.textSecondary,
     fontSize: 12,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
   upcomingUserDetails: {
-    flex: 1
+    flex: 1,
   },
   upcomingUserName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#212529',
-    marginBottom: 1
+    color: theme.text,
+    marginBottom: 1,
   },
   upcomingTaskName: {
     fontSize: 11,
-    color: '#868e96'
+    color: theme.textMuted,
   },
   upcomingStatusBadge: {
     flexDirection: 'row',
@@ -666,24 +687,24 @@ deleteButtonTextDisabled: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
-    gap: 4
+    gap: 4,
   },
   upcomingStatusText: {
     fontSize: 9,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   upcomingDetails: {
     gap: 4,
-    marginLeft: 34
+    marginLeft: 34,
   },
   upcomingDetailRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4
+    gap: 4,
   },
   upcomingDetailText: {
     fontSize: 11,
-    color: '#868e96'
+    color: theme.textMuted,
   },
   adminInfoBox: {
     flexDirection: 'row',
@@ -693,59 +714,62 @@ deleteButtonTextDisabled: {
     marginBottom: 16,
     gap: 10,
     borderWidth: 1,
-    borderColor: '#b2f2bb',
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryLight,
   },
   adminInfoContent: {
-    flex: 1
+    flex: 1,
   },
   adminInfoTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2b8a3e',
-    marginBottom: 2
+    color: theme.primary,
+    marginBottom: 2,
   },
   adminInfoText: {
     fontSize: 12,
-    color: '#2b8a3e',
-    lineHeight: 16
+    color: theme.primary,
+    lineHeight: 16,
   },
   assigneeInfo: {
     padding: 12,
     borderRadius: 10,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   assigneeLabel: {
     fontSize: 11,
-    color: '#868e96',
-    marginBottom: 2
+    color: theme.textMuted,
+    marginBottom: 2,
   },
   assigneeValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#212529'
+    color: theme.text,
   },
   rotationInfo: {
     padding: 12,
     borderRadius: 10,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef'
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   rotationLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#495057',
-    marginBottom: 8
+    color: theme.textSecondary,
+    marginBottom: 8,
   },
   rotationMembersList: {
-    gap: 6
+    gap: 6,
   },
   rotationMemberItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10
+    gap: 10,
   },
   rotationMemberAvatar: {
     width: 28,
@@ -754,43 +778,46 @@ deleteButtonTextDisabled: {
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   currentAssigneeAvatar: {
-    borderColor: '#2b8a3e',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryLight,
   },
   rotationMemberInitial: {
     fontSize: 12,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
+    color: theme.textSecondary,
   },
   rotationMemberName: {
     fontSize: 13,
-    color: '#495057'
+    color: theme.textSecondary,
   },
   currentAssigneeName: {
     fontWeight: '600',
-    color: '#2b8a3e'
+    color: theme.primary,
   },
   assignmentsContainer: {
-    gap: 8
+    gap: 8,
   },
   assignmentsSubtitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#495057',
-    marginBottom: 4
+    color: theme.textSecondary,
+    marginBottom: 4,
   },
   adminAssignmentCard: {
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 10,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
     marginBottom: 6,
-    position: 'relative'
+    position: 'relative',
   },
   todayAdminCard: {
-    borderColor: '#2b8a3e',
+    borderColor: theme.primary,
     borderWidth: 2,
   },
   todayAdminBadge: {
@@ -803,24 +830,25 @@ deleteButtonTextDisabled: {
     paddingVertical: 2,
     borderRadius: 10,
     gap: 3,
-    zIndex: 1
+    zIndex: 1,
+    backgroundColor: theme.error,
   },
   todayAdminBadgeText: {
     color: '#fff',
     fontSize: 8,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   adminAssignmentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6
+    marginBottom: 6,
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    flex: 1
+    flex: 1,
   },
   userAvatar: {
     width: 32,
@@ -830,7 +858,8 @@ deleteButtonTextDisabled: {
     alignItems: 'center',
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   avatarImage: {
     width: 30,
@@ -838,25 +867,25 @@ deleteButtonTextDisabled: {
     borderRadius: 15,
   },
   userAvatarText: {
-    color: '#495057',
+    color: theme.textSecondary,
     fontSize: 12,
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
   userDetails: {
-    flex: 1
+    flex: 1,
   },
   userName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#212529'
+    color: theme.text,
   },
   assignmentDateSmall: {
     fontSize: 11,
-    color: '#868e96'
+    color: theme.textMuted,
   },
   todaySmallText: {
-    color: '#fa5252',
-    fontWeight: '600'
+    color: theme.error,
+    fontWeight: '600',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -866,23 +895,23 @@ deleteButtonTextDisabled: {
     borderRadius: 10,
     gap: 4,
     maxWidth: 80,
-    flexShrink: 1
+    flexShrink: 1,
   },
   statusText: {
     fontSize: 9,
     fontWeight: '600',
-    flexShrink: 1
+    flexShrink: 1,
   },
   adminAssignmentDetails: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 4,
-    flexWrap: 'wrap'
+    flexWrap: 'wrap',
   },
   completedText: {
     fontSize: 11,
-    color: '#868e96'
+    color: theme.textMuted,
   },
   hasPhotoBadge: {
     flexDirection: 'row',
@@ -890,11 +919,12 @@ deleteButtonTextDisabled: {
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 8,
-    gap: 2
+    gap: 2,
+    backgroundColor: theme.primaryLight,
   },
   hasPhotoText: {
     fontSize: 8,
-    color: '#2b8a3e'
+    color: theme.primary,
   },
   hasNotesBadge: {
     flexDirection: 'row',
@@ -902,35 +932,37 @@ deleteButtonTextDisabled: {
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 8,
-    gap: 2
+    gap: 2,
+    backgroundColor: theme.primaryLight,
   },
   hasNotesText: {
     fontSize: 8,
-    color: '#e67700'
+    color: theme.primary,
   },
   adminNotesPreview: {
     padding: 6,
     borderRadius: 6,
     marginTop: 6,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   adminNotesPreviewText: {
     fontSize: 10,
-    color: '#868e96',
-    fontStyle: 'italic'
+    color: theme.textMuted,
+    fontStyle: 'italic',
   },
   moreAssignments: {
     fontSize: 12,
-    color: '#868e96',
+    color: theme.textMuted,
     textAlign: 'center',
     marginTop: 4,
-    fontStyle: 'italic'
+    fontStyle: 'italic',
   },
   noAssignments: {
     fontSize: 12,
-    color: '#868e96',
-    fontStyle: 'italic'
+    color: theme.textMuted,
+    fontStyle: 'italic',
   },
   memberInfoBox: {
     flexDirection: 'row',
@@ -940,12 +972,13 @@ deleteButtonTextDisabled: {
     marginTop: 16,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   memberInfoText: {
     fontSize: 12,
-    color: '#868e96',
-    flex: 1
+    color: theme.textMuted,
+    flex: 1,
   },
   deleteButton: {
     borderRadius: 10,
@@ -959,12 +992,13 @@ deleteButtonTextDisabled: {
     gap: 6,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
+    borderColor: theme.errorBorder,
+    backgroundColor: theme.errorBg,
   },
   deleteButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fa5252'
+    color: theme.error,
   },
   todayAssignmentBadge: {
     flexDirection: 'row',
@@ -972,17 +1006,17 @@ deleteButtonTextDisabled: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
-    gap: 4
+    gap: 4,
   },
   todayAssignmentBadgeText: {
     color: '#fff',
     fontSize: 10,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   todayAssignmentTitle: {
-    color: '#fa5252',
+    color: theme.error,
     fontSize: 15,
-    fontWeight: '600'
+    fontWeight: '600',
   },
   completedInfoCard: {
     flexDirection: 'row',
@@ -992,20 +1026,21 @@ deleteButtonTextDisabled: {
     gap: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#b2f2bb',
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryLight,
   },
   completedInfoText: {
-    flex: 1
+    flex: 1,
   },
   completedTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2b8a3e',
-    marginBottom: 1
+    color: theme.primary,
+    marginBottom: 1,
   },
   completedDate: {
     fontSize: 11,
-    color: '#2b8a3e'
+    color: theme.primary,
   },
   viewDetailsIndicator: {
     flexDirection: 'row',
@@ -1014,30 +1049,30 @@ deleteButtonTextDisabled: {
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
-    gap: 4
+    borderTopColor: theme.border,
+    gap: 4,
   },
   viewDetailsText: {
     fontSize: 11,
-    color: '#495057'
+    color: theme.textSecondary,
   },
   todayAssignmentCard: {
     borderWidth: 2,
-    borderColor: '#fa5252',
+    borderColor: theme.error,
   },
   overdueBadge: {
-    backgroundColor: '#fa5252',
+    backgroundColor: theme.error,
   },
   completedBadge: {
-    backgroundColor: '#2b8a3e',
+    backgroundColor: theme.primary,
   },
   overdueCard: {
     borderWidth: 2,
-    borderColor: '#fa5252',
+    borderColor: theme.error,
   },
   completedCard: {
     borderWidth: 2,
-    borderColor: '#2b8a3e',
+    borderColor: theme.primary,
   },
   overdueInfoCard: {
     flexDirection: 'row',
@@ -1047,7 +1082,8 @@ deleteButtonTextDisabled: {
     gap: 10,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ffc9c9',
+    borderColor: theme.errorBorder,
+    backgroundColor: theme.errorBg,
   },
   overdueInfoText: {
     flex: 1,
@@ -1055,101 +1091,103 @@ deleteButtonTextDisabled: {
   overdueTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#fa5252',
+    color: theme.error,
     marginBottom: 1,
   },
   overdueDate: {
     fontSize: 11,
-    color: '#fa5252',
+    color: theme.error,
   },
   neglectedText: {
     fontSize: 10,
-    color: '#fa5252',
+    color: theme.error,
     fontStyle: 'italic',
     marginTop: 2,
   },
   lateText: {
     fontSize: 10,
-    color: '#e67700',
+    color: theme.primary,
     fontStyle: 'italic',
     marginTop: 2,
   },
-progressContainer: {
-  marginBottom: 16,
-  paddingHorizontal: 4,
-},
-progressBar: {
-  height: 6,
-  backgroundColor: '#e9ecef',
-  borderRadius: 3,
-  overflow: 'hidden',
-  marginBottom: 4,
-},
-progressFill: {
-  height: '100%',
-  backgroundColor: '#2b8a3e',
-  borderRadius: 3,
-},
-progressText: {
-  fontSize: 11,
-  color: '#868e96',
-  textAlign: 'center',
-},
-timeSlotItem: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  paddingVertical: 12,
-  paddingHorizontal: 16,
-  borderBottomWidth: 1,
-  borderBottomColor: '#e9ecef',
-},
-completedTimeSlotItem: {
-  backgroundColor: '#f8f9fa',
-},
-submittableTimeSlotItem: {
-  backgroundColor: '#fff9e6',
-},
-timeSlotIconContainer: {
-  width: 32,
-  marginRight: 12,
-},
-timeSlotInfo: {
-  flex: 1,
-},
-timeSlotTitle: {
-  fontSize: 14,
-  fontWeight: '500',
-  color: '#212529',
-  marginBottom: 2,
-},
-timeSlotPoints: {
-  fontSize: 12,
-  color: '#868e96',
-},
-completedBadgeText: {
-  fontSize: 11,
-  color: '#2b8a3e',
-  fontWeight: '500',
-},
-availableBadge: {
-  paddingHorizontal: 8,
-  paddingVertical: 4,
-  borderRadius: 12,
-},
-availableBadgeText: {
-  fontSize: 11,
-  color: '#e67700',
-  fontWeight: '500',
-},
-pendingBadge: {
-  paddingHorizontal: 8,
-  paddingVertical: 4,
-  borderRadius: 12,
-},
-pendingBadgeText: {
-  fontSize: 11,
-  color: '#868e96',
-  fontWeight: '500',
-},
+  progressContainer: {
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: theme.bgTertiary,
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginBottom: 4,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.primary,
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 11,
+    color: theme.textMuted,
+    textAlign: 'center',
+  },
+  timeSlotItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  completedTimeSlotItem: {
+    backgroundColor: theme.bgSecondary,
+  },
+  submittableTimeSlotItem: {
+    backgroundColor: theme.primaryLight,
+  },
+  timeSlotIconContainer: {
+    width: 32,
+    marginRight: 12,
+  },
+  timeSlotInfo: {
+    flex: 1,
+  },
+  timeSlotTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.text,
+    marginBottom: 2,
+  },
+  timeSlotPoints: {
+    fontSize: 12,
+    color: theme.textMuted,
+  },
+  completedBadgeText: {
+    fontSize: 11,
+    color: theme.primary,
+    fontWeight: '500',
+  },
+  availableBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: theme.primaryLight,
+  },
+  availableBadgeText: {
+    fontSize: 11,
+    color: theme.primary,
+    fontWeight: '500',
+  },
+  pendingBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: theme.bgTertiary,
+  },
+  pendingBadgeText: {
+    fontSize: 11,
+    color: theme.textMuted,
+    fontWeight: '500',
+  },
 });

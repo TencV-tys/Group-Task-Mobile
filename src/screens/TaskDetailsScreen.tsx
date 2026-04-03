@@ -1,6 +1,5 @@
-// src/screens/TaskDetailsScreen.tsx - UPDATED with edit restriction for assigned tasks
-
-import React, { useState, useEffect } from 'react';
+// src/screens/TaskDetailsScreen.tsx - FULLY FIXED WITH DARK MODE
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,9 +19,13 @@ import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper'; 
-import { taskDetailsStyles as styles } from '../styles/taskDetails.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeTaskDetailsStyles } from '../styles/taskDetails.styles';
 
 export default function TaskDetailsScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
+  const styles = useMemo(() => makeTaskDetailsStyles(theme), [theme]);
+  
   const { taskId, groupId, userRole } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [task, setTask] = useState<any>(null);
@@ -126,8 +129,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   }, [assignmentEvents.assignmentVerified]);
 
- 
-
   useEffect(() => {
     if (task?.userAssignment && !task.userAssignment.completed) {
       const timer = startCountdownTimer();
@@ -177,7 +178,8 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       setLoading(false);
     }
   };
- useEffect(() => {
+  
+  useEffect(() => {
     if (assignmentEvents.assignmentUpdated && 
         assignmentEvents.assignmentUpdated.assignmentId === task?.userAssignment?.id) {
       console.log('🔄 Current assignment updated (swap), refreshing...');
@@ -222,15 +224,11 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
 
   const processTaskData = (taskData: any) => {
     if (taskData.timeSlots && taskData.timeSlots.length > 0) {
-      console.log('📅 Before sorting time slots:', taskData.timeSlots.map((s: any) => s.startTime));
-      
       taskData.timeSlots.sort((a: any, b: any) => {
         const timeA = convertTimeToMinutes(a.startTime);
         const timeB = convertTimeToMinutes(b.startTime);
         return timeA - timeB;
       });
-      
-      console.log('📅 After sorting time slots:', taskData.timeSlots.map((s: any) => s.startTime));
     }
     
     if (taskData.selectedDays && taskData.selectedDays.length > 0) {
@@ -415,9 +413,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       case 'available':
         return {
           label: '✓ AVAILABLE',
-          color: '#2b8a3e',
-          bgColor: '#d3f9d8',
-          borderColor: '#b2f2bb',
+          color: theme.primary,
+          bgColor: theme.primaryLight,
+          borderColor: theme.primaryBorder,
           icon: 'check-circle',
           description: 'You can submit your completion now',
           buttonText: 'Complete Assignment',
@@ -426,9 +424,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       case 'waiting':
         return {
           label: '⏳ WAITING',
-          color: '#e67700',
-          bgColor: '#fff3bf',
-          borderColor: '#ffec99',
+          color: theme.primary,
+          bgColor: theme.primaryLight,
+          borderColor: theme.primaryBorder,
           icon: 'clock',
           description: timeLeft && timeLeft > 0 
             ? `Opens in ${formatTimeLeft(timeLeft)}` 
@@ -439,9 +437,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       case 'expired':
         return {
           label: '❌ EXPIRED',
-          color: '#fa5252',
-          bgColor: '#fff5f5',
-          borderColor: '#ffc9c9',
+          color: theme.error,
+          bgColor: theme.errorBg,
+          borderColor: theme.errorBorder,
           icon: 'timer-off',
           description: 'The 30-minute submission window has expired',
           buttonText: 'Expired',
@@ -450,9 +448,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       case 'wrong_day':
         return {
           label: '📅 NOT DUE',
-          color: '#868e96',
-          bgColor: '#f8f9fa',
-          borderColor: '#e9ecef',
+          color: theme.textMuted,
+          bgColor: theme.bgSecondary,
+          borderColor: theme.border,
           icon: 'calendar',
           description: task?.userAssignment 
             ? `Due on ${new Date(task.userAssignment.dueDate).toLocaleDateString()}`
@@ -463,9 +461,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       case 'completed':
         return {
           label: '✓ COMPLETED',
-          color: '#2b8a3e',
-          bgColor: '#d3f9d8',
-          borderColor: '#b2f2bb',
+          color: theme.primary,
+          bgColor: theme.primaryLight,
+          borderColor: theme.primaryBorder,
           icon: 'check-circle',
           description: 'Already submitted',
           buttonText: 'Completed',
@@ -474,9 +472,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       default:
         return {
           label: '⏳ CHECKING',
-          color: '#868e96',
-          bgColor: '#f8f9fa',
-          borderColor: '#e9ecef',
+          color: theme.textMuted,
+          bgColor: theme.bgSecondary,
+          borderColor: theme.border,
           icon: 'clock',
           description: 'Checking status...',
           buttonText: 'Checking',
@@ -493,14 +491,14 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       if (today === dueDate) {
         return { 
           status: 'not_completed',
-          color: '#fa5252',
+          color: theme.error,
           icon: 'alert-circle',
           text: 'Not Completed'
         };
       } else {
         return { 
           status: 'pending',
-          color: '#e67700',
+          color: theme.primary,
           icon: 'clock-outline',
           text: 'Pending'
         };
@@ -509,21 +507,21 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     
     if (assignment.verified === true) return { 
       status: 'verified', 
-      color: '#2b8a3e', 
+      color: theme.primary, 
       icon: 'check-circle',
       text: 'Verified'
     };
     
     if (assignment.verified === false) return { 
       status: 'rejected', 
-      color: '#fa5252', 
+      color: theme.error, 
       icon: 'close-circle',
       text: 'Rejected'
     };
     
     return { 
       status: 'pending_verification', 
-      color: '#e67700', 
+      color: theme.primary, 
       icon: 'clock-check',
       text: 'Pending Verification'
     };
@@ -537,11 +535,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
 
   const handleBack = () => navigation.goBack();
   
-  // ✅ FIXED: Check if task is assigned before allowing edit
+  // Check if task is assigned before allowing edit
   const isTaskAssigned = () => {
-    // Check if task has a current assignee
     if (task?.currentAssignee) return true;
-    // Check if there are any assignments for current week
     if (task?.assignments?.some((a: any) => a.rotationWeek === task.group?.currentRotationWeek)) return true;
     return false;
   };
@@ -549,7 +545,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const handleEdit = () => {
     if (!task) return;
     
-    // ✅ Prevent editing if task is already assigned
     if (isTaskAssigned()) {
       Alert.alert(
         'Cannot Edit Task',
@@ -621,39 +616,37 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     });
   };
 
-const handleViewAssignmentDetails = (assignment?: any) => {
-  const assignmentId = assignment?.id || task?.userAssignment?.id;
-  if (!assignmentId) return;
+  const handleViewAssignmentDetails = (assignment?: any) => {
+    const assignmentId = assignment?.id || task?.userAssignment?.id;
+    if (!assignmentId) return;
 
-  // If no assignment passed, it's the current user's own assignment — always allow
-  if (!assignment) {
+    if (!assignment) {
+      navigation.navigate('AssignmentDetails', {
+        assignmentId,
+        isAdmin: isAdmin,
+        onVerified: fetchTaskDetails
+      });
+      return;
+    }
+
+    const isOwner = assignment.userId === currentUserId;
+    const isCompleted = assignment.completed === true;
+
+    if (!isAdmin && !isOwner && !isCompleted) {
+      Alert.alert(
+        'Access Restricted',
+        'You can only view your own pending assignments.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     navigation.navigate('AssignmentDetails', {
       assignmentId,
       isAdmin: isAdmin,
       onVerified: fetchTaskDetails
     });
-    return;
-  }
-
-  // ✅ Block members from tapping other people's pending assignments
-  const isOwner = assignment.userId === currentUserId;
-  const isCompleted = assignment.completed === true;
-
-  if (!isAdmin && !isOwner && !isCompleted) {
-    Alert.alert(
-      'Access Restricted',
-      'You can only view your own pending assignments.',
-      [{ text: 'OK' }]
-    );
-    return;
-  }
-
-  navigation.navigate('AssignmentDetails', {
-    assignmentId,
-    isAdmin: isAdmin,
-    onVerified: fetchTaskDetails
-  });
-};
+  };
 
   const renderHeader = () => {
     const assigned = isTaskAssigned();
@@ -661,7 +654,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
     return (
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
         <View style={styles.titleContainer}>
           <Text style={styles.title} numberOfLines={1}>Task Details</Text>
@@ -675,7 +668,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
             <MaterialCommunityIcons 
               name="pencil" 
               size={20} 
-              color={assigned ? "#adb5bd" : "#495057"} 
+              color={assigned ? theme.textPlaceholder : theme.textMuted} 
             />
           </TouchableOpacity>
         )}
@@ -683,19 +676,19 @@ const handleViewAssignmentDetails = (assignment?: any) => {
     );
   };
 
-  // ✅ Add a warning banner for assigned tasks
+  // Add a warning banner for assigned tasks
   const renderAssignedWarning = () => {
     if (!isAdmin) return null;
     if (!isTaskAssigned()) return null;
     
     return (
       <LinearGradient
-        colors={['#fff3bf', '#ffec99']}
+        colors={[theme.primaryLight, theme.primaryLight]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.warningBanner}
       >
-        <MaterialCommunityIcons name="alert" size={20} color="#e67700" />
+        <MaterialCommunityIcons name="alert" size={20} color={theme.primary} />
         <View style={styles.warningContent}>
           <Text style={styles.warningTitle}>Task is Assigned</Text>
           <Text style={styles.warningText}>
@@ -709,20 +702,20 @@ const handleViewAssignmentDetails = (assignment?: any) => {
   const renderWeekInfo = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.sectionIcon}>
-          <MaterialCommunityIcons name="calendar-week" size={16} color="#495057" />
+        <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.sectionIcon}>
+          <MaterialCommunityIcons name="calendar-week" size={16} color={theme.textSecondary} />
         </LinearGradient>
         <Text style={styles.sectionTitle}>Current Week</Text>
       </View>
-      <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.weekInfoCard}>
+      <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.weekInfoCard}>
         <View style={styles.weekInfoRow}>
-          <MaterialCommunityIcons name="counter" size={16} color="#868e96" />
+          <MaterialCommunityIcons name="counter" size={16} color={theme.textMuted} />
           <Text style={styles.weekInfoLabel}>Week:</Text>
           <Text style={styles.weekInfoValue}>{task.group?.currentRotationWeek || 1}</Text>
         </View>
         {task.group?.weekStart && task.group?.weekEnd && (
           <View style={styles.weekInfoRow}>
-            <MaterialCommunityIcons name="calendar-range" size={16} color="#868e96" />
+            <MaterialCommunityIcons name="calendar-range" size={16} color={theme.textMuted} />
             <Text style={styles.weekInfoLabel}>Dates:</Text>
             <Text style={styles.weekInfoValue}>
               {new Date(task.group.weekStart).toLocaleDateString()} - {new Date(task.group.weekEnd).toLocaleDateString()}
@@ -738,8 +731,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
       return (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Assignment</Text>
-          <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.notAssignedCard}>
-            <MaterialCommunityIcons name="account-question" size={24} color="#868e96" />
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.notAssignedCard}>
+            <MaterialCommunityIcons name="account-question" size={24} color={theme.textMuted} />
             <Text style={styles.notAssignedText}>Not assigned to you this week</Text>
           </LinearGradient>
         </View>
@@ -756,8 +749,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
       return (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Assignment</Text>
-          <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.notAssignedCard}>
-            <MaterialCommunityIcons name="calendar" size={24} color="#868e96" />
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.notAssignedCard}>
+            <MaterialCommunityIcons name="calendar" size={24} color={theme.textMuted} />
             <Text style={styles.notAssignedText}>No assignment due today</Text>
             {nextAssignment ? (
               <Text style={styles.notAssignedSubtext}>
@@ -786,8 +779,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
           <Text style={styles.sectionTitle}>Today's Assignment</Text>
           <LinearGradient
             colors={
-              todayAssignment.completed ? ['#2b8a3e', '#1e6b2c'] :
-              isOverdue ? ['#fa5252', '#e03131'] : ['#fa5252', '#e03131']
+              todayAssignment.completed ? [theme.primary, theme.primaryDark] :
+              isOverdue ? [theme.error, theme.error] : [theme.error, theme.error]
             }
             style={styles.todayAssignmentBadge}
           >
@@ -808,8 +801,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
         
         <LinearGradient
           colors={
-            todayAssignment.completed ? ['#f0f9f0', '#e8f5e9'] :
-            isOverdue ? ['#fff5f5', '#ffe3e3'] : ['#fff5f5', '#ffe3e3']
+            todayAssignment.completed ? [theme.primaryLight, theme.primaryLight] :
+            isOverdue ? [theme.errorBg, theme.errorBg] : [theme.errorBg, theme.errorBg]
           }
           style={[
             styles.assignmentCard, 
@@ -826,8 +819,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
               } 
               size={24} 
               color={
-                todayAssignment.completed ? "#2b8a3e" :
-                isOverdue ? "#fa5252" : "#fa5252"
+                todayAssignment.completed ? theme.primary :
+                isOverdue ? theme.error : theme.error
               } 
             />
             <View style={styles.assignmentInfo}>
@@ -861,12 +854,12 @@ const handleViewAssignmentDetails = (assignment?: any) => {
               {submissionStatus === 'available' && timeLeft !== null && (
                 <View style={styles.timerContainer}>
                   <LinearGradient
-                    colors={timeLeft < 300 ? ['#ffc9c9', '#ffb3b3'] : ['#d3f9d8', '#b2f2bb']}
+                    colors={timeLeft < 300 ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]}
                     style={[styles.timerBadge, timeLeft < 300 && styles.urgentTimerBadge]}
                   >
                     <MaterialCommunityIcons name={timeLeft < 300 ? "timer-alert" : "timer"} size={16} 
-                      color={timeLeft < 300 ? "#fa5252" : "#2b8a3e"} />
-                    <Text style={[styles.timerText, { color: timeLeft < 300 ? "#fa5252" : "#2b8a3e" }]}>
+                      color={timeLeft < 300 ? theme.error : theme.primary} />
+                    <Text style={[styles.timerText, { color: timeLeft < 300 ? theme.error : theme.primary }]}>
                       {formatTimeLeft(timeLeft)} remaining
                     </Text>
                   </LinearGradient>
@@ -878,8 +871,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
               
               {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
                 <View style={styles.waitingContainer}>
-                  <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.waitingBadge}>
-                    <MaterialCommunityIcons name="clock-start" size={16} color="#e67700" />
+                  <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.waitingBadge}>
+                    <MaterialCommunityIcons name="clock-start" size={16} color={theme.primary} />
                     <Text style={styles.waitingText}>Opens in {formatTimeLeft(timeLeft)}</Text>
                   </LinearGradient>
                 </View>
@@ -888,8 +881,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
           )}
 
           {isOverdue && !todayAssignment.completed && (
-            <LinearGradient colors={['#fff5f5', '#ffe3e3']} style={styles.overdueInfoCard}>
-              <MaterialCommunityIcons name="alert-circle" size={20} color="#fa5252" />
+            <LinearGradient colors={[theme.errorBg, theme.errorBg]} style={styles.overdueInfoCard}>
+              <MaterialCommunityIcons name="alert-circle" size={20} color={theme.error} />
               <View style={styles.overdueInfoText}>
                 <Text style={styles.overdueTitle}>Overdue</Text>
                 <Text style={styles.overdueDate}>
@@ -903,8 +896,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
           )}
           
           {todayAssignment.completed && (
-            <LinearGradient colors={['#d3f9d8', '#b2f2bb']} style={styles.completedInfoCard}>
-              <MaterialCommunityIcons name="check-circle" size={20} color="#2b8a3e" />
+            <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.completedInfoCard}>
+              <MaterialCommunityIcons name="check-circle" size={20} color={theme.primary} />
               <View style={styles.completedInfoText}>
                 <Text style={styles.completedTitle}>Already Completed</Text>
                 <Text style={styles.completedDate}>
@@ -919,7 +912,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
           
           <View style={styles.viewDetailsIndicator}>
             <Text style={styles.viewDetailsText}>Tap to view full details</Text>
-            <MaterialCommunityIcons name="chevron-right" size={16} color="#495057" />
+            <MaterialCommunityIcons name="chevron-right" size={16} color={theme.textMuted} />
           </View>
         </LinearGradient>
       </TouchableOpacity>
@@ -931,8 +924,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
       return (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Submissions This Week</Text>
-          <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.notAssignedCard}>
-            <MaterialCommunityIcons name="clipboard-text" size={24} color="#868e96" />
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.notAssignedCard}>
+            <MaterialCommunityIcons name="clipboard-text" size={24} color={theme.textMuted} />
             <Text style={styles.notAssignedText}>No submissions yet this week</Text>
           </LinearGradient>
         </View>
@@ -968,7 +961,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
               activeOpacity={0.7}
             >
               {dueToday && (
-                <LinearGradient colors={['#fa5252', '#e03131']} style={styles.todayBadge}>
+                <LinearGradient colors={[theme.error, theme.error]} style={styles.todayBadge}>
                   <MaterialCommunityIcons name="clock-alert" size={12} color="#fff" />
                   <Text style={styles.todayBadgeText}>Due Today</Text>
                 </LinearGradient>
@@ -996,14 +989,14 @@ const handleViewAssignmentDetails = (assignment?: any) => {
 
               <View style={styles.submissionHistoryMeta}>
                 {submission.photoUrl && (
-                  <LinearGradient colors={['#e7f5ff', '#d0ebff']} style={styles.hasPhotoBadgeSmall}>
-                    <MaterialCommunityIcons name="image" size={12} color="#2b8a3e" />
+                  <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.hasPhotoBadgeSmall}>
+                    <MaterialCommunityIcons name="image" size={12} color={theme.primary} />
                     <Text style={styles.hasPhotoTextSmall}>Photo</Text>
                   </LinearGradient>
                 )}
                 {submission.notes && (
-                  <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.hasNotesBadgeSmall}>
-                    <MaterialCommunityIcons name="note-text" size={12} color="#e67700" />
+                  <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.hasNotesBadgeSmall}>
+                    <MaterialCommunityIcons name="note-text" size={12} color={theme.primary} />
                     <Text style={styles.hasNotesTextSmall}>Notes</Text>
                   </LinearGradient>
                 )}
@@ -1011,8 +1004,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
               </View>
 
               {submission.adminNotes && status.status === 'rejected' && (
-                <LinearGradient colors={['#fff5f5', '#ffe3e3']} style={styles.adminFeedbackPreview}>
-                  <MaterialCommunityIcons name="message-alert" size={12} color="#fa5252" />
+                <LinearGradient colors={[theme.errorBg, theme.errorBg]} style={styles.adminFeedbackPreview}>
+                  <MaterialCommunityIcons name="message-alert" size={12} color={theme.error} />
                   <Text style={styles.adminFeedbackPreviewText} numberOfLines={1}>{submission.adminNotes}</Text>
                 </LinearGradient>
               )}
@@ -1029,8 +1022,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
     return (
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.sectionIcon}>
-            <MaterialCommunityIcons name="calendar-clock" size={16} color="#e67700" />
+          <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.sectionIcon}>
+            <MaterialCommunityIcons name="calendar-clock" size={16} color={theme.primary} />
           </LinearGradient>
           <Text style={styles.sectionTitle}>Others' Tasks This Week</Text>
         </View>
@@ -1046,13 +1039,13 @@ const handleViewAssignmentDetails = (assignment?: any) => {
               activeOpacity={0.7}
             >
               {dueToday && (
-                <LinearGradient colors={['#e67700', '#cc5f00']} style={styles.upcomingTodayBadge}>
+                <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.upcomingTodayBadge}>
                   <Text style={styles.upcomingTodayBadgeText}>Today</Text>
                 </LinearGradient>
               )}
               <View style={styles.upcomingCardHeader}>
                 <View style={styles.upcomingUserInfo}>
-                  <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.upcomingAvatar}>
+                  <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.upcomingAvatar}>
                     <Text style={styles.upcomingAvatarText}>
                       {assignment.user?.fullName?.charAt(0) || '?'}
                     </Text>
@@ -1069,14 +1062,14 @@ const handleViewAssignmentDetails = (assignment?: any) => {
               </View>
               <View style={styles.upcomingDetails}>
                 <View style={styles.upcomingDetailRow}>
-                  <MaterialCommunityIcons name="calendar" size={12} color="#868e96" />
+                  <MaterialCommunityIcons name="calendar" size={12} color={theme.textMuted} />
                   <Text style={styles.upcomingDetailText}>
                     Due: {new Date(assignment.dueDate).toLocaleDateString()}
                     {assignment.timeSlot && ` at ${assignment.timeSlot.startTime}`}
                   </Text>
                 </View>
                 <View style={styles.upcomingDetailRow}>
-                  <MaterialCommunityIcons name="star" size={12} color="#e67700" />
+                  <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
                   <Text style={styles.upcomingDetailText}>{assignment.points} points</Text>
                 </View>
               </View>
@@ -1090,14 +1083,14 @@ const handleViewAssignmentDetails = (assignment?: any) => {
   const renderAdminView = () => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
-        <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.sectionIcon}>
-          <MaterialCommunityIcons name="shield-account" size={16} color="#495057" />
+        <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.sectionIcon}>
+          <MaterialCommunityIcons name="shield-account" size={16} color={theme.textSecondary} />
         </LinearGradient>
         <Text style={styles.sectionTitle}>Admin View</Text>
       </View>
       
-      <LinearGradient colors={['#e7f5ff', '#d0ebff']} style={styles.adminInfoBox}>
-        <MaterialCommunityIcons name="shield-account" size={18} color="#2b8a3e" />
+      <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.adminInfoBox}>
+        <MaterialCommunityIcons name="shield-account" size={18} color={theme.primary} />
         <View style={styles.adminInfoContent}>
           <Text style={styles.adminInfoTitle}>Admin Information</Text>
           <Text style={styles.adminInfoText}>
@@ -1107,7 +1100,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
       </LinearGradient>
 
       {task.currentAssignee && (
-        <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.assigneeInfo}>
+        <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.assigneeInfo}>
           <Text style={styles.assigneeLabel}>Current Assignee:</Text>
           <Text style={styles.assigneeValue}>
             {task.assignments?.[0]?.user?.fullName || 'Unknown'} (Week {task.group?.currentRotationWeek || 1})
@@ -1116,13 +1109,13 @@ const handleViewAssignmentDetails = (assignment?: any) => {
       )}
 
       {task.rotationMembers && Array.isArray(task.rotationMembers) && (
-        <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.rotationInfo}>
+        <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.rotationInfo}>
           <Text style={styles.rotationLabel}>Rotation Members:</Text>
           <View style={styles.rotationMembersList}>
             {task.rotationMembers.map((member: any, index: number) => (
               <View key={member.userId} style={styles.rotationMemberItem}>
                 <LinearGradient
-                  colors={member.userId === task.currentAssignee ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                  colors={member.userId === task.currentAssignee ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                   style={[
                     styles.rotationMemberAvatar,
                     member.userId === task.currentAssignee && styles.currentAssigneeAvatar
@@ -1130,7 +1123,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
                 >
                   <Text style={[
                     styles.rotationMemberInitial,
-                    { color: member.userId === task.currentAssignee ? 'white' : '#495057' }
+                    { color: member.userId === task.currentAssignee ? '#fff' : theme.textSecondary }
                   ]}>
                     {member.fullName?.charAt(0) || '?'}
                   </Text>
@@ -1166,7 +1159,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
                   activeOpacity={0.7}
                 >
                   {dueToday && (
-                    <LinearGradient colors={['#fa5252', '#e03131']} style={styles.todayAdminBadge}>
+                    <LinearGradient colors={[theme.error, theme.error]} style={styles.todayAdminBadge}>
                       <MaterialCommunityIcons name="clock-alert" size={10} color="#fff" />
                       <Text style={styles.todayAdminBadgeText}>Due Today</Text>
                     </LinearGradient>
@@ -1174,7 +1167,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
                   
                   <View style={styles.adminAssignmentHeader}>
                     <View style={styles.userInfo}>
-                      <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.userAvatar}>
+                      <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.userAvatar}>
                         {assignment.user?.avatarUrl ? (
                           <Image source={{ uri: assignment.user.avatarUrl }} style={styles.avatarImage} />
                         ) : (
@@ -1204,14 +1197,14 @@ const handleViewAssignmentDetails = (assignment?: any) => {
                         Submitted: {new Date(assignment.completedAt).toLocaleDateString()}
                       </Text>
                       {assignment.photoUrl && (
-                        <LinearGradient colors={['#e7f5ff', '#d0ebff']} style={styles.hasPhotoBadge}>
-                          <MaterialCommunityIcons name="image" size={8} color="#2b8a3e" />
+                        <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.hasPhotoBadge}>
+                          <MaterialCommunityIcons name="image" size={8} color={theme.primary} />
                           <Text style={styles.hasPhotoText}>Photo</Text>
                         </LinearGradient>
                       )}
                       {assignment.notes && (
-                        <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.hasNotesBadge}>
-                          <MaterialCommunityIcons name="note-text" size={8} color="#e67700" />
+                        <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.hasNotesBadge}>
+                          <MaterialCommunityIcons name="note-text" size={8} color={theme.primary} />
                           <Text style={styles.hasNotesText}>Notes</Text>
                         </LinearGradient>
                       )}
@@ -1219,7 +1212,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
                   )}
                   
                   {assignment.adminNotes && (
-                    <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.adminNotesPreview}>
+                    <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.adminNotesPreview}>
                       <Text style={styles.adminNotesPreviewText} numberOfLines={1}>{assignment.adminNotes}</Text>
                     </LinearGradient>
                   )}
@@ -1243,7 +1236,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
       <ScreenWrapper style={styles.container}>
         {renderHeader()}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Loading task details...</Text>
         </View>
       </ScreenWrapper>
@@ -1255,10 +1248,10 @@ const handleViewAssignmentDetails = (assignment?: any) => {
       <ScreenWrapper style={styles.container}>
         {renderHeader()}
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
+          <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={fetchTaskDetails}>
-            <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.retryButtonGradient}>
+            <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.retryButtonGradient}>
               <Text style={styles.retryButtonText}>Retry</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -1272,7 +1265,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
       <ScreenWrapper style={styles.container}>
         {renderHeader()}
         <View style={styles.emptyContainer}>
-          <MaterialCommunityIcons name="file-question" size={64} color="#dee2e6" />
+          <MaterialCommunityIcons name="file-question" size={64} color={theme.border} />
           <Text style={styles.emptyText}>Task not found</Text>
         </View>
       </ScreenWrapper>
@@ -1281,21 +1274,20 @@ const handleViewAssignmentDetails = (assignment?: any) => {
 
   return (
     <ScreenWrapper style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.card} />
       {renderHeader()}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* ✅ Show warning banner if task is assigned */}
         {renderAssignedWarning()}
         
-        <LinearGradient colors={['#ffffff', '#f8f9fa']} style={styles.card}>
+        <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.card}>
           <View style={styles.taskHeader}>
-            <LinearGradient colors={['#e7f5ff', '#d0ebff']} style={styles.taskIcon}>
-              <MaterialCommunityIcons name="format-list-checks" size={24} color="#2b8a3e" />
+            <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.taskIcon}>
+              <MaterialCommunityIcons name="format-list-checks" size={24} color={theme.primary} />
             </LinearGradient>
             <View style={styles.taskTitleContainer}>
               <Text style={styles.taskTitle}>{task.title}</Text>
-              <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.pointsBadge}>
-                <MaterialCommunityIcons name="star" size={14} color="#e67700" />
+              <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pointsBadge}>
+                <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
                 <Text style={styles.pointsText}>{task.points} points</Text>
               </LinearGradient>
             </View>
@@ -1338,11 +1330,11 @@ const handleViewAssignmentDetails = (assignment?: any) => {
                   return (
                     <LinearGradient
                       key={index}
-                      colors={isToday ? ['#d3f9d8', '#b2f2bb'] : ['#e7f5ff', '#d0ebff']}
+                      colors={isToday ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight]}
                       style={[styles.dayChip, isToday && styles.todayDayChip]}
                     >
                       <MaterialCommunityIcons name={isToday ? "clock-alert" : "calendar"} size={12} 
-                        color={isToday ? "#2b8a3e" : "#495057"} />
+                        color={isToday ? theme.primary : theme.textSecondary} />
                       <Text style={[styles.dayText, isToday && styles.todayDayText]}>{day}</Text>
                       {isToday && <Text style={styles.todayDayLabel}>Today</Text>}
                     </LinearGradient>
@@ -1364,17 +1356,17 @@ const handleViewAssignmentDetails = (assignment?: any) => {
                   return (
                     <LinearGradient
                       key={index}
-                      colors={isCurrent ? ['#e7f5ff', '#d0ebff'] : ['#f8f9fa', '#e9ecef']}
+                      colors={isCurrent ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
                       style={[styles.timeSlotCard, isCurrent && styles.currentTimeSlotCard]}
                     >
                       <View style={styles.timeSlotHeader}>
                         <MaterialCommunityIcons name={isCurrent ? "clock-check" : "clock"} size={18} 
-                          color={isCurrent ? "#2b8a3e" : "#495057"} />
+                          color={isCurrent ? theme.primary : theme.textSecondary} />
                         <Text style={[styles.timeSlotTime, isCurrent && styles.currentTimeSlotTime]}>
                           {slot.startTime} - {slot.endTime}
                         </Text>
                         {slot.points !== undefined && slot.points > 0 && (
-                          <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.slotPointsBadge}>
+                          <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.slotPointsBadge}>
                             <Text style={styles.slotPointsText}>{slot.points} pts</Text>
                           </LinearGradient>
                         )}
@@ -1382,7 +1374,7 @@ const handleViewAssignmentDetails = (assignment?: any) => {
                       {slot.label && <Text style={styles.timeSlotLabel}>{slot.label}</Text>}
                       {isCurrent && isSubmittable && (
                         <View style={styles.activeSlotIndicator}>
-                          <MaterialCommunityIcons name="check-circle" size={12} color="#2b8a3e" />
+                          <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
                           <Text style={styles.activeSlotText}>Active - Can Submit</Text>
                         </View>
                       )}
@@ -1402,8 +1394,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
               onPress={handleDelete}
               disabled={isTaskAssigned()}
             >
-              <LinearGradient colors={isTaskAssigned() ? ['#f8f9fa', '#e9ecef'] : ['#fff5f5', '#ffe3e3']} style={styles.deleteButtonGradient}>
-                <MaterialCommunityIcons name="delete" size={18} color={isTaskAssigned() ? "#adb5bd" : "#fa5252"} />
+              <LinearGradient colors={isTaskAssigned() ? [theme.bgSecondary, theme.bgTertiary] : [theme.errorBg, theme.errorBg]} style={styles.deleteButtonGradient}>
+                <MaterialCommunityIcons name="delete" size={18} color={isTaskAssigned() ? theme.textPlaceholder : theme.error} />
                 <Text style={[styles.deleteButtonText, isTaskAssigned() && styles.deleteButtonTextDisabled]}>
                   Delete Task
                 </Text>
@@ -1412,8 +1404,8 @@ const handleViewAssignmentDetails = (assignment?: any) => {
           )}
 
           {!isAdmin && (
-            <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.memberInfoBox}>
-              <MaterialCommunityIcons name="information" size={18} color="#868e96" />
+            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.memberInfoBox}>
+              <MaterialCommunityIcons name="information" size={18} color={theme.textMuted} />
               <Text style={styles.memberInfoText}>
                 Only group administrators can edit or delete tasks.
               </Text>
@@ -1423,4 +1415,4 @@ const handleViewAssignmentDetails = (assignment?: any) => {
       </ScrollView>
     </ScreenWrapper>
   );
-} 
+}

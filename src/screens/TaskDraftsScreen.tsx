@@ -1,4 +1,4 @@
-// screens/TaskDraftsScreen.tsx - FIXED
+// screens/TaskDraftsScreen.tsx - Dark Mode Added
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -16,8 +16,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { TaskDraftService, TaskDraft } from '../services/TaskDraftService';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 export default function TaskDraftsScreen({ navigation, route }: any) {
+  const { theme } = useTheme();
   const { groupId, groupName } = route.params || {};
   const [drafts, setDrafts] = useState<TaskDraft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,14 +36,12 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
       console.log('📋 Loaded drafts:', draftsList.length);
       setDrafts(draftsList);
       
-      // ✅ If no drafts and we're in a group, navigate to CreateTask screen
       if (draftsList.length === 0 && groupId) {
         console.log('🚀 No drafts found, redirecting to CreateTask screen');
         navigation.replace('CreateTask', {
           groupId,
           groupName,
           onTaskCreated: () => {
-            // After task is created, go back to GroupTasks
             navigation.navigate('GroupTasks', { groupId, groupName, userRole: 'ADMIN' });
           }
         });
@@ -94,20 +94,20 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
       onPress={() => handleCreateFromDraft(item)}
     >
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.draftCard}
+        style={[styles.draftCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
       >
         <View style={styles.draftHeader}>
           <View style={styles.draftTitleContainer}>
-            <MaterialCommunityIcons name="file-document-outline" size={20} color="#2b8a3e" />
-            <Text style={styles.draftTitle} numberOfLines={1}>
+            <MaterialCommunityIcons name="file-document-outline" size={20} color={theme.primary} />
+            <Text style={[styles.draftTitle, { color: theme.text }]} numberOfLines={1}>
               {item.title}
             </Text>
           </View>
-          <View style={styles.draftBadge}>
-            <Text style={styles.draftBadgeText}>
+          <View style={[styles.draftBadge, { backgroundColor: theme.primaryLight }]}>
+            <Text style={[styles.draftBadgeText, { color: theme.primary }]}>
               {item.executionFrequency === 'DAILY' ? 'Daily' : 'Weekly'}
             </Text>
           </View>
@@ -115,14 +115,14 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
 
         <View style={styles.draftDetails}>
           <View style={styles.draftDetail}>
-            <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-            <Text style={styles.draftDetailText}>{item.points} pts</Text>
+            <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+            <Text style={[styles.draftDetailText, { color: theme.textSecondary }]}>{item.points} pts</Text>
           </View>
           
           {item.selectedDays && item.selectedDays.length > 0 && (
             <View style={styles.draftDetail}>
-              <MaterialCommunityIcons name="calendar" size={14} color="#868e96" />
-              <Text style={styles.draftDetailText}>
+              <MaterialCommunityIcons name="calendar" size={14} color={theme.textMuted} />
+              <Text style={[styles.draftDetailText, { color: theme.textSecondary }]}>
                 {item.selectedDays.slice(0, 3).join(', ')}
                 {item.selectedDays.length > 3 && ` +${item.selectedDays.length - 3}`}
               </Text>
@@ -130,55 +130,53 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
           )}
 
           <View style={styles.draftDetail}>
-            <MaterialCommunityIcons name="clock-outline" size={14} color="#868e96" />
-            <Text style={styles.draftDetailText}>
+            <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+            <Text style={[styles.draftDetailText, { color: theme.textSecondary }]}>
               {item.timeSlots.length} time slot{item.timeSlots.length !== 1 ? 's' : ''}
             </Text>
           </View>
         </View>
 
-        <View style={styles.draftFooter}>
-          <Text style={styles.draftDate}>
+        <View style={[styles.draftFooter, { borderTopColor: theme.border }]}>
+          <Text style={[styles.draftDate, { color: theme.textMuted }]}>
             Last updated: {new Date(item.updatedAt).toLocaleDateString()}
           </Text>
           <TouchableOpacity
-            style={styles.deleteButton}
+            style={[styles.deleteButton, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}
             onPress={(e) => {
               e.stopPropagation();
               handleDeleteDraft(item.id);
             }}
           >
-            <MaterialCommunityIcons name="delete" size={18} color="#fa5252" />
+            <MaterialCommunityIcons name="delete" size={18} color={theme.error} />
           </TouchableOpacity>
         </View>
       </LinearGradient>
     </TouchableOpacity>
   );
 
-  // ✅ Show loading screen while checking drafts
   if (loading) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Checking drafts...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Checking drafts...</Text>
         </View>
       </ScreenWrapper>
     );
   }
 
-  // This will only show if there are drafts (since we redirect when no drafts)
   return (
-    <ScreenWrapper style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>
           {groupId ? `${groupName} Drafts` : 'My Drafts'}
         </Text>
-        <TouchableOpacity onPress={() => loadDrafts()} style={styles.refreshButton}>
-          <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+        <TouchableOpacity onPress={() => loadDrafts()} style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
         </TouchableOpacity>
       </View>
 
@@ -193,7 +191,8 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
               setRefreshing(true);
               loadDrafts();
             }}
-            colors={['#2b8a3e']}
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         contentContainerStyle={styles.listContainer}
@@ -205,7 +204,6 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   header: {
     flexDirection: 'row',
@@ -213,18 +211,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -233,7 +227,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     flex: 1,
     textAlign: 'center',
   },
@@ -241,10 +234,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -258,7 +249,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
   },
   listContainer: {
     padding: 16,
@@ -268,8 +258,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -290,18 +278,15 @@ const styles = StyleSheet.create({
   draftTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     flex: 1,
   },
   draftBadge: {
-    backgroundColor: '#e7f5ff',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   draftBadgeText: {
     fontSize: 10,
-    color: '#2b8a3e',
     fontWeight: '500',
   },
   draftDetails: {
@@ -317,28 +302,23 @@ const styles = StyleSheet.create({
   },
   draftDetailText: {
     fontSize: 13,
-    color: '#495057',
   },
   draftFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
     paddingTop: 12,
   },
   draftDate: {
     fontSize: 11,
-    color: '#868e96',
   },
   deleteButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
 });

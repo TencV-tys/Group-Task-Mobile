@@ -1,4 +1,4 @@
-// src/components/TimeSlotModal.tsx - COMPLETE FIXED VERSION
+// src/components/TimeSlotModal.tsx - Dark Mode Added
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -21,6 +21,7 @@ import {
   MINUTE_OPTIONS,
   PERIOD_OPTIONS
 } from '../utils/timeUtils';
+import { useTheme } from '../context/ThemeContext';
 
 const LABEL_OPTIONS = [
   { value: 'Morning', icon: 'weather-sunset-up', color: '#fab005' },
@@ -60,6 +61,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   usedPoints,
   maxPointsPerSlot = 10
 }) => {
+  const { theme } = useTheme();
+  
   const [currentStep, setCurrentStep] = useState<'time' | 'details'>('time');
   const [startTime, setStartTime] = useState({
     hour: '8',
@@ -115,33 +118,26 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     }
   };
 
-  // ✅ FIXED: Auto-update end time when start time changes (for new slots only)
   useEffect(() => {
-    // Only auto-update if:
-    // 1. Not editing an existing slot
-    // 2. User hasn't manually changed the end time
-    // 3. We're in the time step
     if (!editingSlot && !isManualEndTimeChange && currentStep === 'time') {
       const newEndTime = getDefaultEndTime(startTime.hour, startTime.minute, startTime.period);
       setEndTime(newEndTime);
     }
   }, [startTime, editingSlot, currentStep, isManualEndTimeChange]);
 
-  // Reset manual flag when modal opens or when switching to time step
   useEffect(() => {
     if (currentStep === 'time') {
       setIsManualEndTimeChange(false);
     }
   }, [currentStep]);
 
-  // Initialize modal based on context
   useEffect(() => {
     if (editingSlot) {
       const start12 = convertTo12Hour(editingSlot.startTime);
       const end12 = convertTo12Hour(editingSlot.endTime);
       setStartTime(start12);
       setEndTime(end12);
-      setIsManualEndTimeChange(true); // Editing existing slot, don't auto-update
+      setIsManualEndTimeChange(true);
       
       if (editingSlot.label) {
         const predefinedLabel = LABEL_OPTIONS.find(opt => opt.value === editingSlot.label);
@@ -159,7 +155,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
       
       setPoints(editingSlot.points || '');
     } else if (initialTime) {
-      // Use auto-detected initial time from CreateTaskScreen
       setStartTime(initialTime.startTime);
       setEndTime(initialTime.endTime);
       setIsManualEndTimeChange(false);
@@ -167,7 +162,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
       setCustomLabel('');
       setPoints('');
     } else {
-      // First slot - default 8:00 AM to 9:00 AM
       setStartTime({ hour: '8', minute: '00', period: 'AM' });
       setEndTime({ hour: '9', minute: '00', period: 'AM' });
       setIsManualEndTimeChange(false);
@@ -244,7 +238,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     return newTotalPoints > totalTaskPoints;
   };
 
-  // Handle manual end time change
   const handleEndTimeChange = (newEndTime: { hour: string; minute: string; period: string }) => {
     setIsManualEndTimeChange(true);
     setEndTime(newEndTime);
@@ -252,8 +245,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
 
   const renderLabelOptions = () => (
     <View style={styles.labelOptionsContainer}>
-      <Text style={styles.inputLabel}>
-        <MaterialCommunityIcons name="tag-outline" size={14} color="#495057" /> Label (Optional)
+      <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+        <MaterialCommunityIcons name="tag-outline" size={14} color={theme.textMuted} /> Label (Optional)
       </Text>
       
       <View style={styles.labelGrid}>
@@ -269,7 +262,7 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
             <LinearGradient
               colors={label === option.value 
                 ? [option.color, option.color] 
-                : ['#f8f9fa', '#e9ecef']}
+                : [theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.labelOptionGradient}
@@ -277,11 +270,12 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
               <MaterialCommunityIcons 
                 name={option.icon as any} 
                 size={18} 
-                color={label === option.value ? 'white' : '#495057'} 
+                color={label === option.value ? 'white' : theme.textSecondary} 
               />
               <Text style={[
                 styles.labelOptionText,
-                label === option.value && styles.labelOptionTextActive
+                label === option.value && styles.labelOptionTextActive,
+                { color: label === option.value ? '#fff' : theme.textSecondary }
               ]}>
                 {option.value}
               </Text>
@@ -292,20 +286,21 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
 
       {label === 'Other' && (
         <View style={styles.customLabelContainer}>
-          <Text style={styles.customLabelHint}>Enter custom label:</Text>
+          <Text style={[styles.customLabelHint, { color: theme.textMuted }]}>Enter custom label:</Text>
           <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
+            colors={[theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.inputGradient}
+            style={[styles.inputGradient, { borderColor: theme.border }]}
           >
             <TextInput
-              style={styles.input}
+              style={[styles.input, { color: theme.text }]}
               placeholder="e.g., Night, Weekend, etc."
-              placeholderTextColor="#adb5bd"
+              placeholderTextColor={theme.textPlaceholder}
               value={customLabel}
               onChangeText={setCustomLabel}
               maxLength={20}
+              selectionColor={theme.primary}
             />
           </LinearGradient>
         </View>
@@ -319,23 +314,23 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     title: string,
     isStartTime: boolean = true
   ) => (
-    <View style={styles.timePickerContainer}>
-      <Text style={styles.timePickerTitle}>{title}</Text>
+    <View style={[styles.timePickerContainer, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+      <Text style={[styles.timePickerTitle, { color: theme.textSecondary }]}>{title}</Text>
       
       <View style={styles.timeRow}>
         <View style={styles.timeColumn}>
-          <Text style={styles.timeLabel}>Hour</Text>
+          <Text style={[styles.timeLabel, { color: theme.textMuted }]}>Hour</Text>
           <View style={styles.numberGrid}>
             {HOUR_OPTIONS.map((hour) => (
               <TouchableOpacity
                 key={`hour-${hour}`}
                 style={[
                   styles.numberButton,
-                  time.hour === hour && styles.numberButtonActive
+                  time.hour === hour && styles.numberButtonActive,
+                  { borderColor: theme.border }
                 ]}
                 onPress={() => {
                   setTime({ ...time, hour });
-                  // If this is start time and not editing, auto-update end time
                   if (isStartTime && !editingSlot && currentStep === 'time') {
                     const newEndTime = getDefaultEndTime(hour, time.minute, time.period);
                     setEndTime(newEndTime);
@@ -344,14 +339,15 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                 }}
               >
                 <LinearGradient
-                  colors={time.hour === hour ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                  colors={time.hour === hour ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.numberButtonGradient}
                 >
                   <Text style={[
                     styles.numberText,
-                    time.hour === hour && styles.numberTextActive
+                    time.hour === hour && styles.numberTextActive,
+                    { color: time.hour === hour ? '#fff' : theme.textSecondary }
                   ]}>
                     {hour}
                   </Text>
@@ -362,7 +358,7 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
         </View>
         
         <View style={styles.timeColumn}>
-          <Text style={styles.timeLabel}>Minute</Text>
+          <Text style={[styles.timeLabel, { color: theme.textMuted }]}>Minute</Text>
           <View style={styles.numberGrid}>
             {MINUTE_OPTIONS.map((minute) => (
               <TouchableOpacity
@@ -370,11 +366,11 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                 style={[
                   styles.numberButton,
                   styles.minuteButton,
-                  time.minute === minute && styles.numberButtonActive
+                  time.minute === minute && styles.numberButtonActive,
+                  { borderColor: theme.border }
                 ]}
                 onPress={() => {
                   setTime({ ...time, minute });
-                  // If this is start time and not editing, auto-update end time
                   if (isStartTime && !editingSlot && currentStep === 'time') {
                     const newEndTime = getDefaultEndTime(time.hour, minute, time.period);
                     setEndTime(newEndTime);
@@ -383,14 +379,15 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                 }}
               >
                 <LinearGradient
-                  colors={time.minute === minute ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                  colors={time.minute === minute ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.numberButtonGradient}
                 >
                   <Text style={[
                     styles.numberText,
-                    time.minute === minute && styles.numberTextActive
+                    time.minute === minute && styles.numberTextActive,
+                    { color: time.minute === minute ? '#fff' : theme.textSecondary }
                   ]}>
                     {minute}
                   </Text>
@@ -401,18 +398,18 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
         </View>
         
         <View style={styles.timeColumn}>
-          <Text style={styles.timeLabel}>AM/PM</Text>
+          <Text style={[styles.timeLabel, { color: theme.textMuted }]}>AM/PM</Text>
           <View style={styles.periodContainer}>
             {PERIOD_OPTIONS.map((period) => (
               <TouchableOpacity
                 key={`period-${period}`}
                 style={[
                   styles.periodButton,
-                  time.period === period && styles.periodButtonActive
+                  time.period === period && styles.periodButtonActive,
+                  { borderColor: theme.border }
                 ]}
                 onPress={() => {
                   setTime({ ...time, period });
-                  // If this is start time and not editing, auto-update end time
                   if (isStartTime && !editingSlot && currentStep === 'time') {
                     const newEndTime = getDefaultEndTime(time.hour, time.minute, period);
                     setEndTime(newEndTime);
@@ -421,14 +418,15 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                 }}
               >
                 <LinearGradient
-                  colors={time.period === period ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                  colors={time.period === period ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.periodButtonGradient}
                 >
                   <Text style={[
                     styles.periodText,
-                    time.period === period && styles.periodTextActive
+                    time.period === period && styles.periodTextActive,
+                    { color: time.period === period ? '#fff' : theme.textSecondary }
                   ]}>
                     {period}
                   </Text>
@@ -439,8 +437,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
         </View>
       </View>
       
-      <View style={styles.timeDisplay}>
-        <Text style={styles.timeDisplayText}>
+      <View style={[styles.timeDisplay, { backgroundColor: theme.primaryLight }]}>
+        <Text style={[styles.timeDisplayText, { color: theme.primary }]}>
           {time.hour}:{time.minute} {time.period}
         </Text>
       </View>
@@ -448,12 +446,12 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   );
 
   const renderTimeStep = () => (
-    <View style={styles.stepContainer}>
+    <View style={[styles.stepContainer, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
       <View style={styles.stepIndicator}>
-        <View style={[styles.stepDot, styles.stepDotActive]} />
-        <View style={styles.stepLine} />
-        <View style={styles.stepDot} />
-        <Text style={styles.stepText}>Step 1 of 2: Set Time</Text>
+        <View style={[styles.stepDot, styles.stepDotActive, { backgroundColor: theme.primary }]} />
+        <View style={[styles.stepLine, { backgroundColor: theme.border }]} />
+        <View style={[styles.stepDot, { backgroundColor: theme.border }]} />
+        <Text style={[styles.stepText, { color: theme.textMuted }]}>Step 1 of 2: Set Time</Text>
       </View>
       
       <View style={styles.timePickersContainer}>
@@ -461,7 +459,7 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
         {renderTimePicker(endTime, handleEndTimeChange, 'End Time', false)}
       </View>
       
-      <Text style={styles.autoUpdateNote}>
+      <Text style={[styles.autoUpdateNote, { color: theme.primary }]}>
         ⏰ End time automatically adjusts to 1 hour after start time
       </Text>
     </View>
@@ -475,22 +473,22 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
       : usedPoints + pointsNum > totalTaskPoints;
     
     return (
-      <View style={styles.stepContainer}>
+      <View style={[styles.stepContainer, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
         <View style={styles.stepIndicator}>
-          <View style={styles.stepDot} />
-          <View style={[styles.stepLine, styles.stepLineActive]} />
-          <View style={[styles.stepDot, styles.stepDotActive]} />
-          <Text style={styles.stepText}>Step 2 of 2: Add Details</Text>
+          <View style={[styles.stepDot, { backgroundColor: theme.border }]} />
+          <View style={[styles.stepLine, styles.stepLineActive, { backgroundColor: theme.primary }]} />
+          <View style={[styles.stepDot, styles.stepDotActive, { backgroundColor: theme.primary }]} />
+          <Text style={[styles.stepText, { color: theme.textMuted }]}>Step 2 of 2: Add Details</Text>
         </View>
         
         <LinearGradient
-          colors={['#f8f9fa', '#e9ecef']}
+          colors={[theme.bgSecondary, theme.bgTertiary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.timeSummary}
+          style={[styles.timeSummary, { borderColor: theme.border }]}
         >
-          <MaterialCommunityIcons name="clock-outline" size={18} color="#495057" />
-          <Text style={styles.timeSummaryText}>
+          <MaterialCommunityIcons name="clock-outline" size={18} color={theme.textMuted} />
+          <Text style={[styles.timeSummaryText, { color: theme.text }]}>
             {convertTo12Hour(convertTo24Hour(startTime.hour, startTime.minute, startTime.period)).hour}:
             {convertTo12Hour(convertTo24Hour(startTime.hour, startTime.minute, startTime.period)).minute} 
             {convertTo12Hour(convertTo24Hour(startTime.hour, startTime.minute, startTime.period)).period}
@@ -505,17 +503,18 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
         
         <View style={styles.inputGroup}>
           <View style={styles.pointsHeader}>
-            <Text style={styles.inputLabel}>
-              <MaterialCommunityIcons name="star-outline" size={14} color="#495057" /> Points (0-{maxPointsPerSlot})
+            <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>
+              <MaterialCommunityIcons name="star-outline" size={14} color={theme.textMuted} /> Points (0-{maxPointsPerSlot})
             </Text>
             <LinearGradient
-              colors={availablePoints > 0 ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+              colors={availablePoints > 0 ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.availablePointsBadge}
             >
               <Text style={[
                 styles.availablePoints,
+                { color: availablePoints > 0 ? theme.primary : theme.error },
                 availablePoints <= 0 && styles.availablePointsZero
               ]}>
                 Available: {availablePoints} pts
@@ -525,15 +524,15 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
           
           <View style={styles.pointsInputContainer}>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.pointsInputGradient}
+              style={[styles.pointsInputGradient, { borderColor: theme.border }]}
             >
               <TextInput
-                style={styles.pointsInput}
+                style={[styles.pointsInput, { color: theme.text }]}
                 placeholder="0"
-                placeholderTextColor="#adb5bd"
+                placeholderTextColor={theme.textPlaceholder}
                 value={points}
                 onChangeText={(text) => {
                   const num = text.replace(/[^0-9]/g, '');
@@ -543,12 +542,13 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                 }}
                 keyboardType="number-pad"
                 maxLength={2}
+                selectionColor={theme.primary}
               />
             </LinearGradient>
-            <Text style={styles.pointsLabel}>pts</Text>
+            <Text style={[styles.pointsLabel, { color: theme.textMuted }]}>pts</Text>
           </View>
           
-          <Text style={styles.quickSelectLabel}>Quick select:</Text>
+          <Text style={[styles.quickSelectLabel, { color: theme.textMuted }]}>Quick select:</Text>
           <View style={styles.pointsGrid}>
             {Array.from({ length: maxPointsPerSlot + 1 }, (_, i) => i).map((num) => {
               const wouldExceedThisNum = editingSlot
@@ -561,7 +561,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                   style={[
                     styles.pointsButton,
                     points === num.toString() && styles.pointsButtonActive,
-                    wouldExceedThisNum && styles.pointsButtonDisabled
+                    wouldExceedThisNum && styles.pointsButtonDisabled,
+                    { borderColor: theme.border }
                   ]}
                   onPress={() => setPoints(num.toString())}
                   disabled={wouldExceedThisNum}
@@ -569,10 +570,10 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                   <LinearGradient
                     colors={
                       points === num.toString() 
-                        ? ['#2b8a3e', '#1e6b2c']
+                        ? [theme.primary, theme.primaryDark]
                         : wouldExceedThisNum 
-                          ? ['#f1f3f5', '#e9ecef']
-                          : ['#f8f9fa', '#e9ecef']
+                          ? [theme.bgTertiary, theme.bgTertiary]
+                          : [theme.bgSecondary, theme.bgTertiary]
                     }
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
@@ -581,7 +582,8 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                     <Text style={[
                       styles.pointsButtonText,
                       points === num.toString() && styles.pointsButtonTextActive,
-                      wouldExceedThisNum && styles.pointsButtonTextDisabled
+                      wouldExceedThisNum && styles.pointsButtonTextDisabled,
+                      { color: points === num.toString() ? '#fff' : wouldExceedThisNum ? theme.textPlaceholder : theme.textSecondary }
                     ]}>
                       {num}
                     </Text>
@@ -591,23 +593,23 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
             })}
           </View>
           
-          <View style={styles.pointsSummary}>
+          <View style={[styles.pointsSummary, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
             <View style={styles.pointsSummaryRow}>
-              <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-              <Text style={styles.pointsSummaryText}>
-                Task Total: <Text style={styles.pointsHighlight}>{totalTaskPoints}</Text>
+              <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+              <Text style={[styles.pointsSummaryText, { color: theme.textSecondary }]}>
+                Task Total: <Text style={[styles.pointsHighlight, { color: theme.primary }]}>{totalTaskPoints}</Text>
               </Text>
             </View>
             <View style={styles.pointsSummaryRow}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color="#495057" />
-              <Text style={styles.pointsSummaryText}>
-                Used in other slots: <Text style={styles.pointsHighlight}>{usedPoints}</Text>
+              <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+              <Text style={[styles.pointsSummaryText, { color: theme.textSecondary }]}>
+                Used in other slots: <Text style={[styles.pointsHighlight, { color: theme.primary }]}>{usedPoints}</Text>
               </Text>
             </View>
             <View style={styles.pointsSummaryRow}>
-              <MaterialCommunityIcons name="star-outline" size={14} color="#495057" />
-              <Text style={styles.pointsSummaryText}>
-                This slot: <Text style={styles.pointsHighlight}>{pointsNum}</Text>
+              <MaterialCommunityIcons name="star-outline" size={14} color={theme.textMuted} />
+              <Text style={[styles.pointsSummaryText, { color: theme.textSecondary }]}>
+                This slot: <Text style={[styles.pointsHighlight, { color: theme.primary }]}>{pointsNum}</Text>
               </Text>
             </View>
             <View style={[
@@ -617,15 +619,16 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
               <MaterialCommunityIcons 
                 name={wouldExceed ? "alert-circle" : "calculator"} 
                 size={14} 
-                color={wouldExceed ? "#fa5252" : "#495057"} 
+                color={wouldExceed ? theme.error : theme.textMuted} 
               />
               <Text style={[
                 styles.pointsSummaryText,
-                wouldExceed && styles.errorText
+                wouldExceed && { color: theme.error },
+                { color: theme.textSecondary }
               ]}>
                 Total after: <Text style={[
                   styles.pointsHighlight,
-                  wouldExceed && styles.errorText
+                  wouldExceed && { color: theme.error }
                 ]}>
                   {editingSlot
                     ? (usedPoints - parseInt(editingSlot.points || '0', 10)) + pointsNum
@@ -638,13 +641,13 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
           
           {wouldExceed && pointsNum > 0 && (
             <LinearGradient
-              colors={['#fff5f5', '#ffe3e3']}
+              colors={[theme.errorBg, theme.errorBg]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.warningBox}
+              style={[styles.warningBox, { borderColor: theme.errorBorder }]}
             >
-              <MaterialCommunityIcons name="alert-circle" size={18} color="#fa5252" />
-              <Text style={styles.warningText}>
+              <MaterialCommunityIcons name="alert-circle" size={18} color={theme.error} />
+              <Text style={[styles.warningText, { color: theme.error }]}>
                 ⚠️ Exceeds by {
                   editingSlot
                     ? (usedPoints - parseInt(editingSlot.points || '0', 10)) + pointsNum - totalTaskPoints
@@ -665,13 +668,13 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <View style={[styles.modalOverlay, { backgroundColor: theme.overlay }]}>
         <KeyboardAvoidingView
           style={styles.keyboardView}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border, backgroundColor: theme.card }]}>
               <TouchableOpacity
                 onPress={() => {
                   if (currentStep === 'details') {
@@ -680,16 +683,16 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                     onClose();
                   }
                 }}
-                style={styles.backButton}
+                style={[styles.backButton, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}
               >
                 <MaterialCommunityIcons 
                   name={currentStep === 'details' ? 'chevron-left' : 'close'} 
                   size={24} 
-                  color="#495057" 
+                  color={theme.textMuted} 
                 />
               </TouchableOpacity>
               
-              <Text style={styles.modalTitle}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
                 {editingSlot ? 'Edit Time Slot' : 'Add Time Slot'}
               </Text>
               
@@ -697,21 +700,21 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
             </View>
 
             <ScrollView 
-              style={styles.modalBody} 
+              style={[styles.modalBody, { backgroundColor: theme.bgSecondary }]} 
               showsVerticalScrollIndicator={true}
               keyboardShouldPersistTaps="handled"
             >
               {currentStep === 'time' ? renderTimeStep() : renderDetailsStep()}
               
               {error ? (
-                <View style={styles.errorBox}>
-                  <MaterialCommunityIcons name="alert-circle" size={20} color="#fa5252" />
-                  <Text style={styles.errorText}>{error}</Text>
+                <View style={[styles.errorBox, { backgroundColor: theme.errorBg, borderColor: theme.errorBorder }]}>
+                  <MaterialCommunityIcons name="alert-circle" size={20} color={theme.error} />
+                  <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
                 </View>
               ) : null}
             </ScrollView>
 
-            <View style={styles.modalFooter}>
+            <View style={[styles.modalFooter, { borderTopColor: theme.border, backgroundColor: theme.card }]}>
               {currentStep === 'time' ? (
                 <TouchableOpacity
                   style={styles.nextButton}
@@ -719,30 +722,30 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                   activeOpacity={0.8}
                 >
                   <LinearGradient
-                    colors={['#2b8a3e', '#1e6b2c']}
+                    colors={[theme.primary, theme.primaryDark]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.nextButtonGradient}
                   >
                     <Text style={styles.nextButtonText}>NEXT</Text>
-                    <MaterialCommunityIcons name="arrow-right" size={20} color="white" />
+                    <MaterialCommunityIcons name="arrow-right" size={20} color="#fff" />
                   </LinearGradient>
                 </TouchableOpacity>
               ) : (
                 <View style={styles.detailsActions}>
                   <TouchableOpacity
-                    style={styles.backActionButton}
+                    style={[styles.backActionButton, { borderColor: theme.border }]}
                     onPress={() => setCurrentStep('time')}
                     activeOpacity={0.8}
                   >
                     <LinearGradient
-                      colors={['#f8f9fa', '#e9ecef']}
+                      colors={[theme.bgSecondary, theme.bgTertiary]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.backActionButtonGradient}
                     >
-                      <MaterialCommunityIcons name="arrow-left" size={20} color="#495057" />
-                      <Text style={styles.backActionButtonText}>BACK</Text>
+                      <MaterialCommunityIcons name="arrow-left" size={20} color={theme.textSecondary} />
+                      <Text style={[styles.backActionButtonText, { color: theme.textSecondary }]}>BACK</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                   
@@ -756,21 +759,22 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
                     activeOpacity={0.8}
                   >
                     <LinearGradient
-                      colors={checkIfWouldExceed() ? ['#f8f9fa', '#e9ecef'] : ['#2b8a3e', '#1e6b2c']}
+                      colors={checkIfWouldExceed() ? [theme.bgSecondary, theme.bgTertiary] : [theme.primary, theme.primaryDark]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.saveButtonGradient}
                     >
                       <Text style={[
                         styles.saveButtonText,
-                        checkIfWouldExceed() && styles.saveButtonTextDisabled
+                        checkIfWouldExceed() && styles.saveButtonTextDisabled,
+                        { color: checkIfWouldExceed() ? theme.textMuted : '#fff' }
                       ]}>
                         {editingSlot ? 'UPDATE' : 'ADD'}
                       </Text>
                       <MaterialCommunityIcons 
                         name="check" 
                         size={20} 
-                        color={checkIfWouldExceed() ? "#868e96" : "white"} 
+                        color={checkIfWouldExceed() ? theme.textMuted : "#fff"} 
                       />
                     </LinearGradient>
                   </TouchableOpacity>
@@ -784,11 +788,9 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
   );
 };
 
-// Styles remain the same as your existing styles...
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'flex-end'
   },
   keyboardView: {
@@ -796,7 +798,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '95%',
@@ -809,8 +810,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },
@@ -818,16 +817,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#212529',
     textAlign: 'center',
     flex: 1
   },
@@ -837,22 +833,17 @@ const styles = StyleSheet.create({
   modalBody: {
     padding: 20,
     maxHeight: 600,
-    backgroundColor: '#f8f9fa',
   },
   modalFooter: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
-    backgroundColor: 'white',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
   },
   stepContainer: {
     marginBottom: 20,
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -868,23 +859,16 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#dee2e6'
   },
-  stepDotActive: {
-    backgroundColor: '#2b8a3e'
-  },
+  stepDotActive: {},
   stepLine: {
     flex: 1,
     height: 2,
-    backgroundColor: '#dee2e6',
     marginHorizontal: 6
   },
-  stepLineActive: {
-    backgroundColor: '#2b8a3e'
-  },
+  stepLineActive: {},
   stepText: {
     fontSize: 12,
-    color: '#868e96',
     marginLeft: 8,
     fontWeight: '500',
   },
@@ -892,16 +876,13 @@ const styles = StyleSheet.create({
     gap: 16
   },
   timePickerContainer: {
-    backgroundColor: '#f8f9fa',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   timePickerTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#495057',
     marginBottom: 16
   },
   timeRow: {
@@ -915,7 +896,6 @@ const styles = StyleSheet.create({
   timeLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#868e96',
     marginBottom: 6,
     textAlign: 'center'
   },
@@ -931,14 +911,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   minuteButton: {
     width: 48,
   },
-  numberButtonActive: {
-    borderColor: '#2b8a3e',
-  },
+  numberButtonActive: {},
   numberButtonGradient: {
     width: '100%',
     height: '100%',
@@ -948,11 +925,8 @@ const styles = StyleSheet.create({
   numberText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#495057'
   },
-  numberTextActive: {
-    color: 'white'
-  },
+  numberTextActive: {},
   periodContainer: {
     gap: 4
   },
@@ -961,11 +935,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
-  periodButtonActive: {
-    borderColor: '#2b8a3e',
-  },
+  periodButtonActive: {},
   periodButtonGradient: {
     flex: 1,
     justifyContent: 'center',
@@ -975,25 +946,19 @@ const styles = StyleSheet.create({
   periodText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#495057'
   },
-  periodTextActive: {
-    color: 'white'
-  },
+  periodTextActive: {},
   timeDisplay: {
     paddingVertical: 10,
-    backgroundColor: '#e7f5ff',
     borderRadius: 8,
     alignItems: 'center'
   },
   timeDisplayText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2b8a3e'
   },
   autoUpdateNote: {
     fontSize: 11,
-    color: '#2b8a3e',
     textAlign: 'center',
     marginTop: 8,
     fontStyle: 'italic',
@@ -1006,12 +971,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   timeSummaryText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#212529',
     flex: 1,
   },
   inputGroup: {
@@ -1020,19 +983,16 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#495057',
     marginBottom: 6,
   },
   inputGradient: {
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   input: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#212529',
     backgroundColor: 'transparent',
   },
   pointsHeader: {
@@ -1048,12 +1008,9 @@ const styles = StyleSheet.create({
   },
   availablePoints: {
     fontSize: 11,
-    color: '#2b8a3e',
     fontWeight: '500'
   },
-  availablePointsZero: {
-    color: '#fa5252',
-  },
+  availablePointsZero: {},
   pointsInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1064,25 +1021,21 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   pointsInput: {
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     backgroundColor: 'transparent',
     textAlign: 'center'
   },
   pointsLabel: {
     fontSize: 13,
-    color: '#868e96',
     width: 30,
   },
   quickSelectLabel: {
     fontSize: 11,
-    color: '#868e96',
     marginBottom: 6
   },
   pointsGrid: {
@@ -1097,14 +1050,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
-  pointsButtonActive: {
-    borderColor: '#2b8a3e',
-  },
+  pointsButtonActive: {},
   pointsButtonDisabled: {
     opacity: 0.5,
-    borderColor: '#dee2e6',
   },
   pointsButtonGradient: {
     width: '100%',
@@ -1115,20 +1064,13 @@ const styles = StyleSheet.create({
   pointsButtonText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#495057'
   },
-  pointsButtonTextActive: {
-    color: 'white'
-  },
-  pointsButtonTextDisabled: {
-    color: '#adb5bd',
-  },
+  pointsButtonTextActive: {},
+  pointsButtonTextDisabled: {},
   pointsSummary: {
-    backgroundColor: '#f8f9fa',
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
     gap: 6,
   },
   pointsSummaryRow: {
@@ -1137,23 +1079,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   pointsSummaryRowError: {
-    backgroundColor: '#fff5f5',
     borderRadius: 6,
     padding: 4,
   },
   pointsSummaryText: {
     fontSize: 12,
-    color: '#495057',
   },
   pointsHighlight: {
     fontWeight: '600',
-    color: '#2b8a3e',
-  },
-  helperText: {
-    fontSize: 11,
-    color: '#868e96',
-    marginTop: 4,
-    fontStyle: 'italic'
   },
   warningBox: {
     flexDirection: 'row',
@@ -1163,13 +1096,10 @@ const styles = StyleSheet.create({
     padding: 10,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
-    backgroundColor: '#fff5f5',
   },
   warningText: {
     flex: 1,
     fontSize: 12,
-    color: '#fa5252',
     fontWeight: '500',
   },
   errorBox: {
@@ -1179,14 +1109,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
-    backgroundColor: '#fff5f5',
     marginTop: 10,
   },
   errorText: {
     flex: 1,
     fontSize: 13,
-    color: '#fa5252',
     fontWeight: '500',
   },
   nextButton: {
@@ -1194,7 +1121,6 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -1211,7 +1137,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 18,
     fontWeight: '700',
-    color: 'white',
+    color: '#fff',
     letterSpacing: 1,
   },
   detailsActions: {
@@ -1224,7 +1150,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   backActionButtonGradient: {
     flexDirection: 'row',
@@ -1237,14 +1162,12 @@ const styles = StyleSheet.create({
   backActionButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#495057',
   },
   saveButton: {
     flex: 1,
     height: 56,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -1261,11 +1184,8 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: 'white',
   },
-  saveButtonTextDisabled: {
-    color: '#868e96',
-  },
+  saveButtonTextDisabled: {},
   saveButtonDisabled: {
     opacity: 0.7,
   },
@@ -1285,11 +1205,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: 'transparent',
   },
-  labelOptionActive: {
-    borderColor: '#2b8a3e',
-  },
+  labelOptionActive: {},
   labelOptionGradient: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1301,17 +1219,13 @@ const styles = StyleSheet.create({
   labelOptionText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#495057',
   },
-  labelOptionTextActive: {
-    color: 'white',
-  },
+  labelOptionTextActive: {},
   customLabelContainer: {
     marginTop: 8,
   },
   customLabelHint: {
     fontSize: 12,
-    color: '#868e96',
     marginBottom: 4,
   },
 });

@@ -1,12 +1,13 @@
-// src/styles/rotationSchedule.styles.ts
+// src/styles/rotationSchedule.styles.ts - Dark Mode Version
 import { StyleSheet, Dimensions } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-export const rotationScheduleStyles = StyleSheet.create({
+export const makeRotationScheduleStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -14,19 +15,15 @@ export const rotationScheduleStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -41,12 +38,10 @@ export const rotationScheduleStyles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 12,
-    color: '#868e96',
     marginTop: 2,
     textAlign: 'center',
   },
@@ -54,10 +49,8 @@ export const rotationScheduleStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -74,7 +67,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#868e96',
     fontSize: 14,
   },
   errorContainer: {
@@ -85,14 +77,12 @@ export const rotationScheduleStyles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#fa5252',
     textAlign: 'center',
     marginVertical: 10,
     fontWeight: '600',
   },
   errorSubText: {
     fontSize: 14,
-    color: '#868e96',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -105,7 +95,7 @@ export const rotationScheduleStyles = StyleSheet.create({
     paddingVertical: 12,
   },
   retryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -122,7 +112,6 @@ export const rotationScheduleStyles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
     minWidth: 60,
   },
   weekTabGradient: {
@@ -133,16 +122,13 @@ export const rotationScheduleStyles = StyleSheet.create({
     position: 'relative',
   },
   weekTabSelected: {
-    borderColor: '#2b8a3e',
+    borderWidth: 2,
   },
   weekTabText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#495057',
   },
-  weekTabTextSelected: {
-    color: 'white',
-  },
+  weekTabTextSelected: {},
   currentIndicator: {
     position: 'absolute',
     top: -2,
@@ -159,7 +145,7 @@ export const rotationScheduleStyles = StyleSheet.create({
     alignItems: 'center',
   },
   taskIndicatorText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 8,
     fontWeight: 'bold',
   },
@@ -170,7 +156,6 @@ export const rotationScheduleStyles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   toggleButton: {
     flex: 1,
@@ -182,14 +167,10 @@ export const rotationScheduleStyles = StyleSheet.create({
   toggleText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#495057',
   },
-  toggleTextActive: {
-    color: 'white',
-  },
+  toggleTextActive: {},
   toggleActive: {
     borderWidth: 1,
-    borderColor: '#2b8a3e',
   },
   predictionsContainer: {
     paddingHorizontal: 16,
@@ -197,7 +178,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   predictionsTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 12,
     marginTop: 8,
   },
@@ -206,10 +186,8 @@ export const rotationScheduleStyles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   nextWeekCard: {
-    borderColor: '#2b8a3e',
     borderWidth: 2,
   },
   predictionHeader: {
@@ -226,7 +204,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   predictionWeek: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#212529',
   },
   currentBadge: {
     paddingHorizontal: 8,
@@ -234,7 +211,7 @@ export const rotationScheduleStyles = StyleSheet.create({
     borderRadius: 12,
   },
   currentBadgeText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 9,
     fontWeight: '700',
   },
@@ -252,7 +229,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   },
   explanationText: {
     fontSize: 11,
-    color: '#868e96',
     fontStyle: 'italic',
   },
   assignmentsList: {
@@ -276,16 +252,15 @@ export const rotationScheduleStyles = StyleSheet.create({
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
   },
   memberInitial: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#495057',
   },
   memberName: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#212529',
     flex: 1,
   },
   taskContainer: {
@@ -317,7 +292,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   pointsText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#e67700',
   },
   fairnessNote: {
     flexDirection: 'row',
@@ -325,11 +299,9 @@ export const rotationScheduleStyles = StyleSheet.create({
     gap: 6,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
   },
   noteText: {
     fontSize: 11,
-    color: '#868e96',
     flex: 1,
   },
   cycleCard: {
@@ -337,17 +309,14 @@ export const rotationScheduleStyles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   cycleTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#2b8a3e',
     marginBottom: 4,
   },
   cycleDescription: {
     fontSize: 12,
-    color: '#868e96',
     marginBottom: 16,
   },
   cycleGrid: {
@@ -362,7 +331,6 @@ export const rotationScheduleStyles = StyleSheet.create({
     flex: 1,
     fontSize: 10,
     fontWeight: '600',
-    color: '#868e96',
     textAlign: 'center',
   },
   cycleRow: {
@@ -375,7 +343,6 @@ export const rotationScheduleStyles = StyleSheet.create({
     width: 60,
     fontSize: 11,
     fontWeight: '500',
-    color: '#212529',
   },
   cycleCell: {
     flex: 1,
@@ -393,7 +360,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   },
   cycleNote: {
     fontSize: 10,
-    color: '#868e96',
     fontStyle: 'italic',
   },
   explanationCard: {
@@ -401,12 +367,10 @@ export const rotationScheduleStyles = StyleSheet.create({
     padding: 16,
     marginVertical: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   explanationTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: '#212529',
     marginBottom: 12,
   },
   explanationPoint: {
@@ -418,7 +382,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   explanationPointText: {
     flex: 1,
     fontSize: 13,
-    color: '#495057',
   },
   currentWeekBanner: {
     flexDirection: 'row',
@@ -428,13 +391,11 @@ export const rotationScheduleStyles = StyleSheet.create({
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#b2f2bb',
     gap: 8,
   },
   currentWeekText: {
     flex: 1,
     fontSize: 13,
-    color: '#2b8a3e',
   },
   statsCard: {
     marginHorizontal: 16,
@@ -442,12 +403,10 @@ export const rotationScheduleStyles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   statsTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 12,
   },
   statsGrid: {
@@ -460,18 +419,15 @@ export const rotationScheduleStyles = StyleSheet.create({
     minWidth: '45%',
     alignItems: 'center',
     paddingVertical: 10,
-    backgroundColor: '#f8f9fa',
     borderRadius: 8,
   },
   statNumber: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2b8a3e',
     marginBottom: 2,
   },
   statLabel: {
     fontSize: 11,
-    color: '#868e96',
   },
   distributionCard: {
     marginHorizontal: 16,
@@ -479,12 +435,10 @@ export const rotationScheduleStyles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   distributionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 16,
   },
   distributionGrid: {
@@ -497,7 +451,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   },
   dayLabel: {
     fontSize: 10,
-    color: '#868e96',
     marginBottom: 8,
   },
   dayBarContainer: {
@@ -512,7 +465,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   dayCount: {
     fontSize: 9,
     fontWeight: '600',
-    color: '#495057',
   },
   tasksSection: {
     marginTop: 16,
@@ -527,7 +479,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
   },
   taskCountBadge: {
     paddingHorizontal: 8,
@@ -536,14 +487,12 @@ export const rotationScheduleStyles = StyleSheet.create({
   },
   taskCount: {
     fontSize: 12,
-    color: '#495057',
     fontWeight: '600',
   },
   taskCard: {
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
     marginHorizontal: 16,
     marginBottom: 8,
   },
@@ -551,7 +500,7 @@ export const rotationScheduleStyles = StyleSheet.create({
     padding: 14,
   },
   currentWeekTask: {
-    borderColor: '#b2f2bb',
+    borderWidth: 2,
   },
   taskHeader: {
     flexDirection: 'row',
@@ -588,7 +537,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   },
   assigneeText: {
     fontSize: 13,
-    color: '#868e96',
     flex: 1,
   },
   timeContainer: {
@@ -598,7 +546,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   },
   timeText: {
     fontSize: 11,
-    color: '#868e96',
   },
   categoryContainer: {
     flexDirection: 'row',
@@ -608,7 +555,6 @@ export const rotationScheduleStyles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 11,
-    color: '#868e96',
   },
   emptyTasks: {
     alignItems: 'center',
@@ -617,14 +563,12 @@ export const rotationScheduleStyles = StyleSheet.create({
   },
   emptyTasksText: {
     fontSize: 15,
-    color: '#868e96',
     marginTop: 12,
     marginBottom: 4,
     fontWeight: '600',
   },
   emptyTasksSubtext: {
     fontSize: 13,
-    color: '#adb5bd',
     textAlign: 'center',
   },
 });

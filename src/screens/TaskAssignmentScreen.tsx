@@ -1,4 +1,4 @@
-// src/screens/TaskAssignmentScreen.tsx - WITH DISABLED CHANGE BUTTON FOR ASSIGNED MEMBERS
+// src/screens/TaskAssignmentScreen.tsx - Dark Mode Added
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -18,8 +18,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTaskAssignment } from '../taskHook/useTaskAssignment';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 export default function TaskAssignmentScreen({ navigation, route }: any) {
+  const { theme } = useTheme();
   const { groupId, groupName, userRole } = route.params || {};
   
   const {
@@ -137,209 +139,208 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     );
   };
 
-  // src/screens/TaskAssignmentScreen.tsx - UPDATED with navigation to TaskDetails
+  const renderTask = ({ item }: any) => {
+    const currentAssignee = membersInRotation.find(m => m.userId === item.currentAssignee);
+    const isRecurring = item.isRecurring;
+    const hasTimeSlots = item.timeSlots && item.timeSlots.length > 0;
+    const taskAssigned = isTaskAssigned(item);
 
-const renderTask = ({ item }: any) => {
-  const currentAssignee = membersInRotation.find(m => m.userId === item.currentAssignee);
-  const isRecurring = item.isRecurring;
-  const hasTimeSlots = item.timeSlots && item.timeSlots.length > 0;
-  const taskAssigned = isTaskAssigned(item);
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={() => {
-        console.log('👆 Navigating to TaskDetails:', item.id);
-        navigation.navigate('TaskDetails', {
-          taskId: item.id,
-          groupId: groupId,
-          userRole: userRole
-        });
-      }}
-    >
-      <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.taskCard}
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => {
+          console.log('👆 Navigating to TaskDetails:', item.id);
+          navigation.navigate('TaskDetails', {
+            taskId: item.id,
+            groupId: groupId,
+            userRole: userRole
+          });
+        }}
       >
-        <View style={styles.taskHeader}>
-          <View style={styles.taskTitleContainer}>
-            <Text style={styles.taskTitle} numberOfLines={2}>
-              {item.title}
-            </Text>
-            {isRecurring && (
-              <LinearGradient
-                colors={['#e7f5ff', '#d0ebff']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.recurringBadge}
-              >
-                <MaterialCommunityIcons name="repeat" size={12} color="#2b8a3e" />
-                <Text style={styles.recurringText}>Recurring</Text>
-              </LinearGradient>
-            )}
+        <LinearGradient
+          colors={[theme.card, theme.bgSecondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.taskCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
+        >
+          <View style={styles.taskHeader}>
+            <View style={styles.taskTitleContainer}>
+              <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
+                {item.title}
+              </Text>
+              {isRecurring && (
+                <LinearGradient
+                  colors={[theme.primaryLight, theme.primaryLight]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.recurringBadge}
+                >
+                  <MaterialCommunityIcons name="repeat" size={12} color={theme.primary} />
+                  <Text style={[styles.recurringText, { color: theme.primary }]}>Recurring</Text>
+                </LinearGradient>
+              )}
+            </View>
+            <LinearGradient
+              colors={[theme.primaryLight, theme.primaryLight]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.pointsBadge}
+            >
+              <Text style={[styles.pointsText, { color: theme.primary }]}>{item.points} pts</Text>
+            </LinearGradient>
           </View>
-          <LinearGradient
-            colors={['#fff3bf', '#ffec99']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.pointsBadge}
-          >
-            <Text style={styles.pointsText}>{item.points} pts</Text>
-          </LinearGradient>
-        </View>
 
-        {item.description && (
-          <Text style={styles.taskDescription} numberOfLines={2}>
-            {item.description}
-          </Text>
-        )}
-
-        <View style={styles.taskDetails}>
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="calendar-clock" size={14} color="#868e96" />
-            <Text style={styles.detailText}>
-              {item.executionFrequency === 'DAILY' ? 'Daily' : 'Weekly'}
-              {item.selectedDays?.length > 0 && ` (${item.selectedDays.join(', ')})`}
+          {item.description && (
+            <Text style={[styles.taskDescription, { color: theme.textMuted }]} numberOfLines={2}>
+              {item.description}
             </Text>
-          </View>
-          
-          {hasTimeSlots && (
+          )}
+
+          <View style={styles.taskDetails}>
             <View style={styles.detailRow}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color="#868e96" />
-              <Text style={styles.detailText}>
-                {item.timeSlots.length} time slot{item.timeSlots.length > 1 ? 's' : ''}
+              <MaterialCommunityIcons name="calendar-clock" size={14} color={theme.textMuted} />
+              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+                {item.executionFrequency === 'DAILY' ? 'Daily' : 'Weekly'}
+                {item.selectedDays?.length > 0 && ` (${item.selectedDays.join(', ')})`}
               </Text>
             </View>
-          )}
-        </View>
-
-        <View style={styles.assignmentSection}>
-          <Text style={styles.sectionLabel}>Assigned to:</Text>
-          <View style={styles.assigneeRow}>
-            {currentAssignee ? (
-              <View style={styles.currentAssignee}>
-                <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.assigneeAvatar}
-                >
-                  <Text style={styles.assigneeInitial}>
-                    {currentAssignee.fullName?.charAt(0) || '?'}
-                  </Text>
-                </LinearGradient>
-                <View style={styles.assigneeInfo}>
-                  <Text style={styles.assigneeName}>
-                    {currentAssignee.fullName}
-                  </Text>
-                  <View style={styles.assigneeMeta}>
-                    {currentAssignee.rotationOrder && (
-                      <LinearGradient
-                        colors={['#f8f9fa', '#e9ecef']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.rotationBadge}
-                      >
-                        <Text style={styles.rotationOrder}>
-                          #{currentAssignee.rotationOrder}
-                        </Text>
-                      </LinearGradient>
-                    )}
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.unassignedContainer}>
-                <MaterialCommunityIcons name="account-question" size={20} color="#adb5bd" />
-                <Text style={styles.unassignedText}>Not assigned</Text>
-              </View>
-            )}
             
-            {userRole === 'ADMIN' && (
-              <TouchableOpacity
-                style={[
-                  styles.changeButton,
-                  taskAssigned && styles.changeButtonDisabled
-                ]}
-                onPress={() => !taskAssigned && handleOpenAssigneeModal(item)}
-                activeOpacity={taskAssigned ? 0.5 : 0.8}
-                disabled={taskAssigned}
-              >
-                <LinearGradient
-                  colors={taskAssigned ? ['#e9ecef', '#dee2e6'] : ['#2b8a3e', '#1e6b2c']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.changeButtonGradient}
-                >
-                  <MaterialCommunityIcons 
-                    name={taskAssigned ? "check" : "account-switch"} 
-                    size={14} 
-                    color={taskAssigned ? "#868e96" : "white"} 
-                  />
-                  <Text style={[
-                    styles.changeButtonText,
-                    taskAssigned && styles.changeButtonTextDisabled
-                  ]}>
-                    {taskAssigned ? "Assigned" : "Change"}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
+            {hasTimeSlots && (
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+                <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+                  {item.timeSlots.length} time slot{item.timeSlots.length > 1 ? 's' : ''}
+                </Text>
+              </View>
             )}
           </View>
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-};
+
+          <View style={[styles.assignmentSection, { borderTopColor: theme.border }]}>
+            <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>Assigned to:</Text>
+            <View style={styles.assigneeRow}>
+              {currentAssignee ? (
+                <View style={styles.currentAssignee}>
+                  <LinearGradient
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.assigneeAvatar, { borderColor: theme.border }]}
+                  >
+                    <Text style={[styles.assigneeInitial, { color: theme.textSecondary }]}>
+                      {currentAssignee.fullName?.charAt(0) || '?'}
+                    </Text>
+                  </LinearGradient>
+                  <View style={styles.assigneeInfo}>
+                    <Text style={[styles.assigneeName, { color: theme.text }]}>
+                      {currentAssignee.fullName}
+                    </Text>
+                    <View style={styles.assigneeMeta}>
+                      {currentAssignee.rotationOrder && (
+                        <LinearGradient
+                          colors={[theme.bgSecondary, theme.bgTertiary]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.rotationBadge}
+                        >
+                          <Text style={[styles.rotationOrder, { color: theme.textSecondary }]}>
+                            #{currentAssignee.rotationOrder}
+                          </Text>
+                        </LinearGradient>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.unassignedContainer}>
+                  <MaterialCommunityIcons name="account-question" size={20} color={theme.textPlaceholder} />
+                  <Text style={[styles.unassignedText, { color: theme.textPlaceholder }]}>Not assigned</Text>
+                </View>
+              )}
+              
+              {userRole === 'ADMIN' && (
+                <TouchableOpacity
+                  style={[
+                    styles.changeButton,
+                    taskAssigned && styles.changeButtonDisabled
+                  ]}
+                  onPress={() => !taskAssigned && handleOpenAssigneeModal(item)}
+                  activeOpacity={taskAssigned ? 0.5 : 0.8}
+                  disabled={taskAssigned}
+                >
+                  <LinearGradient
+                    colors={taskAssigned ? [theme.bgTertiary, theme.bgTertiary] : [theme.primary, theme.primaryDark]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.changeButtonGradient}
+                  >
+                    <MaterialCommunityIcons 
+                      name={taskAssigned ? "check" : "account-switch"} 
+                      size={14} 
+                      color={taskAssigned ? theme.textMuted : "#fff"} 
+                    />
+                    <Text style={[
+                      styles.changeButtonText,
+                      taskAssigned && styles.changeButtonTextDisabled,
+                      { color: taskAssigned ? theme.textMuted : "#fff" }
+                    ]}>
+                      {taskAssigned ? "Assigned" : "Change"}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading && !refreshing) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading assignments...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading assignments...</Text>
         </View>
       </ScreenWrapper>
     );
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        style={styles.header}
+        style={[styles.header, { borderBottomColor: theme.border }]}
       >
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={20} color="#495057" />
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          <MaterialCommunityIcons name="arrow-left" size={20} color={theme.textMuted} />
         </TouchableOpacity>
         
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>
             {groupName || 'Task Assignments'}
           </Text>
           <View style={styles.headerStats}>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.headerStat}
             >
-              <MaterialCommunityIcons name="format-list-checks" size={12} color="#495057" />
-              <Text style={styles.headerStatText}>{tasks.length} tasks</Text>
+              <MaterialCommunityIcons name="format-list-checks" size={12} color={theme.textMuted} />
+              <Text style={[styles.headerStatText, { color: theme.textSecondary }]}>{tasks.length} tasks</Text>
             </LinearGradient>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.headerStat}
             >
-              <MaterialCommunityIcons name="account-group" size={12} color="#495057" />
-              <Text style={styles.headerStatText}>{membersInRotation.length} members in rotation</Text>
+              <MaterialCommunityIcons name="account-group" size={12} color={theme.textMuted} />
+              <Text style={[styles.headerStatText, { color: theme.textSecondary }]}>{membersInRotation.length} members in rotation</Text>
             </LinearGradient>
           </View>
         </View>
@@ -347,26 +348,26 @@ const renderTask = ({ item }: any) => {
         <TouchableOpacity 
           onPress={() => loadData(true)}
           disabled={refreshing}
-          style={styles.refreshButton}
+          style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
           {refreshing ? (
-            <ActivityIndicator size="small" color="#2b8a3e" />
+            <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+            <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
           )}
         </TouchableOpacity>
       </LinearGradient>
 
       {error ? (
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
-          <Text style={styles.errorText}>{error}</Text>
+          <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={() => loadData()}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.retryButtonGradient}
@@ -384,16 +385,16 @@ const renderTask = ({ item }: any) => {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => loadData(true)}
-              colors={['#2b8a3e']}
-              tintColor="#2b8a3e"
+              colors={[theme.primary]}
+              tintColor={theme.primary}
             />
           }
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons name="clipboard" size={48} color="#dee2e6" />
-              <Text style={styles.emptyText}>No tasks found</Text>
-              <Text style={styles.emptySubtext}>
+              <MaterialCommunityIcons name="clipboard" size={48} color={theme.border} />
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>No tasks found</Text>
+              <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
                 Create tasks in the Tasks screen first
               </Text>
             </View>
@@ -408,46 +409,46 @@ const renderTask = ({ item }: any) => {
         transparent={true}
         onRequestClose={() => !isReassigning && setShowAssigneeModal(false)}
       >
-        <View style={styles.modalContainer}>
+        <View style={[styles.modalContainer, { backgroundColor: theme.overlay }]}>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.modalContent}
           >
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle} numberOfLines={1}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]} numberOfLines={1}>
                 {selectedTask?.title}
               </Text>
               <TouchableOpacity  
                 onPress={() => !isReassigning && setShowAssigneeModal(false)}
                 disabled={isReassigning}
-                style={styles.closeButton} 
+                style={[styles.closeButton, { backgroundColor: theme.bgSecondary }]} 
               >
-                <MaterialCommunityIcons name="close" size={18} color="#868e96" />
+                <MaterialCommunityIcons name="close" size={18} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.modalSubtitle}>
+              <Text style={[styles.modalSubtitle, { color: theme.textMuted }]}>
                 Select a member to assign this task for this week:
               </Text>
               
               {/* Assignment Rules Info */}
               <LinearGradient
-                colors={['#e7f5ff', '#d0ebff']}
+                colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.infoBox}
+                style={[styles.infoBox, { borderColor: theme.primaryBorder }]}
               >
-                <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
-                <Text style={styles.infoText}>
+                <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
+                <Text style={[styles.infoText, { color: theme.primary }]}>
                   Each member can only be assigned to one task per week
                 </Text>
               </LinearGradient>
 
               {/* Available Members Section - ONLY members in rotation */}
-              <Text style={styles.sectionHeader}>Available Members</Text>
+              <Text style={[styles.sectionHeader, { color: theme.text, borderBottomColor: theme.border }]}>Available Members</Text>
               
               {(() => {
                 const assignedMemberIds = getAssignedMembersForWeek();
@@ -457,12 +458,12 @@ const renderTask = ({ item }: any) => {
                 
                 if (availableMembers.length === 0) {
                   return (
-                    <View style={styles.emptyMembers}>
-                      <MaterialCommunityIcons name="account-group" size={48} color="#dee2e6" />
-                      <Text style={styles.emptyMembersText}>
+                    <View style={[styles.emptyMembers, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                      <MaterialCommunityIcons name="account-group" size={48} color={theme.border} />
+                      <Text style={[styles.emptyMembersText, { color: theme.textMuted }]}>
                         No available members in rotation
                       </Text>
-                      <Text style={styles.emptyMembersSubtext}>
+                      <Text style={[styles.emptyMembersSubtext, { color: theme.textPlaceholder }]}>
                         All members are already assigned or there are no members in rotation
                       </Text>
                     </View>
@@ -478,6 +479,7 @@ const renderTask = ({ item }: any) => {
                       style={[
                         styles.memberOption,
                         isCurrentAssignee && styles.currentAssigneeOption,
+                        { backgroundColor: theme.bgSecondary, borderColor: theme.border }
                       ]}
                       onPress={() => {
                         if (!isCurrentAssignee && !isReassigning) {
@@ -489,38 +491,40 @@ const renderTask = ({ item }: any) => {
                     >
                       <View style={styles.memberInfo}>
                         <LinearGradient
-                          colors={['#f8f9fa', '#e9ecef']}
+                          colors={[theme.bgSecondary, theme.bgTertiary]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                           style={[
                             styles.memberAvatar,
-                            isCurrentAssignee && styles.currentAssigneeAvatar
+                            isCurrentAssignee && styles.currentAssigneeAvatar,
+                            { borderColor: theme.border }
                           ]}
                         >
-                          <Text style={styles.memberInitial}>
+                          <Text style={[styles.memberInitial, { color: theme.textSecondary }]}>
                             {member.fullName?.charAt(0) || '?'}
                           </Text>
                         </LinearGradient>
                         <View style={styles.memberDetails}>
                           <Text style={[
                             styles.memberName,
-                            isCurrentAssignee && styles.currentAssigneeText
+                            isCurrentAssignee && styles.currentAssigneeText,
+                            { color: isCurrentAssignee ? theme.primary : theme.text }
                           ]}>
                             {member.fullName}
                             {isCurrentAssignee && ' (Current)'}
                           </Text>
                           <View style={styles.memberMeta}>
-                            <Text style={styles.memberRole}>
+                            <Text style={[styles.memberRole, { color: theme.textMuted }]}>
                               Member
                             </Text>
                             {member.rotationOrder && (
                               <LinearGradient
-                                colors={['#f8f9fa', '#e9ecef']}
+                                colors={[theme.bgSecondary, theme.bgTertiary]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={styles.memberOrderBadge}
                               >
-                                <Text style={styles.memberOrder}>
+                                <Text style={[styles.memberOrder, { color: theme.textSecondary }]}>
                                   #{member.rotationOrder}
                                 </Text>
                               </LinearGradient>
@@ -530,16 +534,16 @@ const renderTask = ({ item }: any) => {
                       </View>
                       {isCurrentAssignee ? (
                         <LinearGradient
-                          colors={['#d3f9d8', '#b2f2bb']}
+                          colors={[theme.primaryLight, theme.primaryLight]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                           style={styles.currentBadge}
                         >
-                          <MaterialCommunityIcons name="check-circle" size={14} color="#2b8a3e" />
-                          <Text style={styles.currentBadgeText}>Current</Text>
+                          <MaterialCommunityIcons name="check-circle" size={14} color={theme.primary} />
+                          <Text style={[styles.currentBadgeText, { color: theme.primary }]}>Current</Text>
                         </LinearGradient>
                       ) : (
-                        <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                        <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
                       )}
                     </TouchableOpacity>
                   );
@@ -558,7 +562,7 @@ const renderTask = ({ item }: any) => {
                 
                 return (
                   <>
-                    <Text style={styles.sectionHeader}>Already Assigned</Text>
+                    <Text style={[styles.sectionHeader, { color: theme.text, borderBottomColor: theme.border }]}>Already Assigned</Text>
                     {assignedMembers.map(member => {
                       const assignedTask = tasks.find((task: any) => 
                         task.currentAssignee === member.userId
@@ -567,29 +571,29 @@ const renderTask = ({ item }: any) => {
                       return (
                         <View
                           key={member.userId}
-                          style={[styles.memberOption, styles.disabledOption]}
+                          style={[styles.memberOption, styles.disabledOption, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}
                         >
                           <View style={styles.memberInfo}>
                             <LinearGradient
-                              colors={['#f8f9fa', '#e9ecef']}
+                              colors={[theme.bgSecondary, theme.bgTertiary]}
                               start={{ x: 0, y: 0 }}
                               end={{ x: 1, y: 1 }}
-                              style={[styles.memberAvatar, styles.disabledAvatar]}
+                              style={[styles.memberAvatar, styles.disabledAvatar, { borderColor: theme.border }]}
                             >
-                              <Text style={[styles.memberInitial, styles.disabledInitial]}>
+                              <Text style={[styles.memberInitial, styles.disabledInitial, { color: theme.textPlaceholder }]}>
                                 {member.fullName?.charAt(0) || '?'}
                               </Text>
                             </LinearGradient>
                             <View style={styles.memberDetails}>
-                              <Text style={[styles.memberName, styles.disabledText]}>
+                              <Text style={[styles.memberName, styles.disabledText, { color: theme.textPlaceholder }]}>
                                 {member.fullName}
                               </Text>
                               <View style={styles.memberMeta}>
-                                <Text style={[styles.memberRole, styles.disabledText]}>
+                                <Text style={[styles.memberRole, styles.disabledText, { color: theme.textPlaceholder }]}>
                                   Member
                                 </Text>
                                 {assignedTask && (
-                                  <Text style={[styles.memberOrder, styles.disabledText]}>
+                                  <Text style={[styles.memberOrder, styles.disabledText, { color: theme.textPlaceholder }]}>
                                     {assignedTask.title}
                                   </Text>
                                 )}
@@ -597,13 +601,13 @@ const renderTask = ({ item }: any) => {
                             </View>
                           </View>
                           <LinearGradient
-                            colors={['#fff5f5', '#ffe3e3']}
+                            colors={[theme.errorBg, theme.errorBg]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={styles.assignedBadge}
                           >
-                            <MaterialCommunityIcons name="clock" size={14} color="#fa5252" />
-                            <Text style={styles.assignedText}>Busy</Text>
+                            <MaterialCommunityIcons name="clock" size={14} color={theme.error} />
+                            <Text style={[styles.assignedText, { color: theme.error }]}>Busy</Text>
                           </LinearGradient>
                         </View>
                       );
@@ -613,16 +617,16 @@ const renderTask = ({ item }: any) => {
               })()}
             </ScrollView>
 
-            <View style={styles.modalFooter}>
+            <View style={[styles.modalFooter, { borderTopColor: theme.border }]}>
               <TouchableOpacity
-                style={[styles.cancelButton, isReassigning && styles.disabledButton]}
+                style={[styles.cancelButton, isReassigning && styles.disabledButton, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}
                 onPress={() => !isReassigning && setShowAssigneeModal(false)}
                 disabled={isReassigning}
               >
                 {isReassigning ? (
-                  <ActivityIndicator size="small" color="#2b8a3e" />
+                  <ActivityIndicator size="small" color={theme.primary} />
                 ) : (
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={[styles.cancelButtonText, { color: theme.textMuted }]}>Cancel</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -633,11 +637,10 @@ const renderTask = ({ item }: any) => {
   );
 }
 
-// Updated styles
+// Updated styles - keep all original style properties
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#f8f9fa' 
   },
   loadingContainer: { 
     flex: 1, 
@@ -646,7 +649,6 @@ const styles = StyleSheet.create({
   },
   loadingText: { 
     marginTop: 12, 
-    color: '#868e96', 
     fontSize: 14 
   },
   header: {
@@ -656,16 +658,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -679,7 +678,6 @@ const styles = StyleSheet.create({
   headerTitle: { 
     fontSize: 16, 
     fontWeight: '600', 
-    color: '#212529',
     textAlign: 'center',
     marginBottom: 4
   },
@@ -697,17 +695,14 @@ const styles = StyleSheet.create({
   },
   headerStatText: {
     fontSize: 11,
-    color: '#495057',
     fontWeight: '500',
   },
   refreshButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -720,7 +715,6 @@ const styles = StyleSheet.create({
     padding: 20
   },
   errorText: {
-    color: '#fa5252',
     textAlign: 'center',
     marginVertical: 16,
     fontSize: 16
@@ -745,13 +739,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   taskHeader: {
     flexDirection: 'row',
@@ -766,7 +758,6 @@ const styles = StyleSheet.create({
   taskTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 4
   },
   recurringBadge: {
@@ -780,7 +771,6 @@ const styles = StyleSheet.create({
   },
   recurringText: {
     fontSize: 11,
-    color: '#2b8a3e',
     fontWeight: '500'
   },
   pointsBadge: {
@@ -791,11 +781,9 @@ const styles = StyleSheet.create({
   pointsText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#e67700'
   },
   taskDescription: {
     fontSize: 14,
-    color: '#868e96',
     marginBottom: 12,
     lineHeight: 20
   },
@@ -810,17 +798,14 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 13,
-    color: '#495057'
   },
   assignmentSection: {
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
     paddingTop: 12
   },
   sectionLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#868e96',
     marginBottom: 8
   },
   assigneeRow: {
@@ -841,12 +826,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   assigneeInitial: {
     fontWeight: 'bold',
     fontSize: 14,
-    color: '#495057'
   },
   assigneeInfo: {
     flex: 1
@@ -854,7 +837,6 @@ const styles = StyleSheet.create({
   assigneeName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#212529',
     marginBottom: 2
   },
   assigneeMeta: {
@@ -869,7 +851,6 @@ const styles = StyleSheet.create({
   },
   rotationOrder: {
     fontSize: 10,
-    color: '#495057',
     fontWeight: '500'
   },
   unassignedContainer: {
@@ -880,7 +861,6 @@ const styles = StyleSheet.create({
   },
   unassignedText: {
     fontSize: 14,
-    color: '#adb5bd',
     fontStyle: 'italic'
   },
   changeButton: {
@@ -899,32 +879,26 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   changeButtonText: {
-    color: 'white',
     fontWeight: '600',
     fontSize: 12
   },
-  changeButtonTextDisabled: {
-    color: '#868e96'
-  },
+  changeButtonTextDisabled: {},
   emptyContainer: {
     alignItems: 'center',
     padding: 40
   },
   emptyText: {
     fontSize: 16,
-    color: '#868e96',
     marginTop: 12,
     marginBottom: 4,
     fontWeight: '600'
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#adb5bd',
     textAlign: 'center'
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end'
   },
   modalContent: {
@@ -938,12 +912,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     flex: 1,
     marginRight: 12
   },
@@ -951,13 +923,11 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center'
   },
   modalSubtitle: {
     fontSize: 14,
-    color: '#868e96',
     marginBottom: 12,
     lineHeight: 20
   },
@@ -967,7 +937,6 @@ const styles = StyleSheet.create({
   modalFooter: {
     padding: 20,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef'
   },
   infoBox: {
     flexDirection: 'row',
@@ -977,42 +946,34 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#b2f2bb'
   },
   infoText: {
     fontSize: 13,
-    color: '#2b8a3e',
     flex: 1
   },
   sectionHeader: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
     marginTop: 16,
     marginBottom: 12,
     paddingBottom: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
   },
   emptyMembers: {
     alignItems: 'center',
     padding: 30,
-    backgroundColor: '#f8f9fa',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
     marginVertical: 16
   },
   emptyMembersText: {
     fontSize: 15,
-    color: '#868e96',
     marginTop: 12,
     marginBottom: 4,
     fontWeight: '500'
   },
   emptyMembersSubtext: {
     fontSize: 13,
-    color: '#adb5bd',
     textAlign: 'center'
   },
   memberOption: {
@@ -1022,19 +983,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: '#f8f9fa',
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   currentAssigneeOption: {
-    backgroundColor: '#f1f3f5',
-    borderColor: '#2b8a3e',
-    borderWidth: 1,
+    borderWidth: 2,
   },
   disabledOption: {
     opacity: 0.6,
-    backgroundColor: '#f8f9fa'
   },
   memberInfo: {
     flexDirection: 'row',
@@ -1049,10 +1005,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   currentAssigneeAvatar: {
-    borderColor: '#2b8a3e',
     borderWidth: 2,
   },
   disabledAvatar: {
@@ -1061,27 +1015,20 @@ const styles = StyleSheet.create({
   memberInitial: {
     fontWeight: 'bold',
     fontSize: 16,
-    color: '#495057'
   },
-  disabledInitial: {
-    color: '#adb5bd'
-  },
+  disabledInitial: {},
   memberDetails: {
     flex: 1
   },
   memberName: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#212529',
     marginBottom: 2
   },
   currentAssigneeText: {
-    color: '#2b8a3e',
     fontWeight: '600'
   },
-  disabledText: {
-    color: '#adb5bd'
-  },
+  disabledText: {},
   memberMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1089,7 +1036,6 @@ const styles = StyleSheet.create({
   },
   memberRole: {
     fontSize: 12,
-    color: '#868e96'
   },
   memberOrderBadge: {
     paddingHorizontal: 6,
@@ -1098,7 +1044,6 @@ const styles = StyleSheet.create({
   },
   memberOrder: {
     fontSize: 10,
-    color: '#495057',
     fontWeight: '500'
   },
   currentBadge: {
@@ -1111,7 +1056,6 @@ const styles = StyleSheet.create({
   },
   currentBadgeText: {
     fontSize: 11,
-    color: '#2b8a3e',
     fontWeight: '600'
   },
   assignedBadge: {
@@ -1124,16 +1068,13 @@ const styles = StyleSheet.create({
   },
   assignedText: {
     fontSize: 11,
-    color: '#fa5252',
     fontWeight: '600'
   },
   cancelButton: {
-    backgroundColor: '#f8f9fa',
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   disabledButton: {
     opacity: 0.5  
@@ -1141,6 +1082,5 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#868e96'
   }
 });

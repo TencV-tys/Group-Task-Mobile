@@ -1,4 +1,5 @@
-// src/screens/RotationScheduleScreen.tsx - REFACTORED with separated styles
+// src/screens/RotationScheduleScreen.tsx - FIXED for weekly rotation (NO new theme properties)
+
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -14,9 +15,13 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRotationSchedule } from '../taskHook/useRotationSchedule';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { rotationScheduleStyles as styles } from '../styles/rotationSchedule.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeRotationScheduleStyles } from '../styles/rotationSchedule.styles';
 
 export default function RotationScheduleScreen({ route, navigation }: any) {
+  const { theme, isDark } = useTheme();
+  const styles = makeRotationScheduleStyles(theme);
+  
   const { groupId, groupName, userRole } = route.params;
   const [authError, setAuthError] = useState(false);
   
@@ -44,7 +49,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
   const [tasks, setTasks] = useState<any[]>([]);
   const [predictions, setPredictions] = useState<any[]>([]);
   const [showPredictions, setShowPredictions] = useState(true);
-  const [rotationCycle, setRotationCycle] = useState<number>(6);
+  const [rotationCycle, setRotationCycle] = useState<number>(0);
 
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
@@ -52,7 +57,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
       Alert.alert(
         'Session Expired',
         'Please log in again',
-        [
+        [ 
           { 
             text: 'OK', 
             onPress: () => {
@@ -105,65 +110,72 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     }
   }, [selectedWeekData]);
 
-  const generatePredictions = (memberList: any[], taskList: any[]) => {
-    if (memberList.length === 0 || taskList.length === 0) return;
+  // ✅ FIXED: Generate predictions with WEEKLY rotation (tasks rotate to next member each week)
+const generatePredictions = (memberList: any[], taskList: any[]) => {
+  if (memberList.length === 0 || taskList.length === 0) return;
+  
+  const memberCount = memberList.length;
+  const taskCount = taskList.length;
+  
+  // Sort tasks by points (highest first)
+  const sortedTasks = [...taskList].sort((a, b) => b.points - a.points);
+  const sortedMembers = [...memberList].sort((a, b) => a.name.localeCompare(b.name));
+  
+  const preds = [];
+  
+  // ✅ Generate predictions for the next 8 weeks
+  // Each week, tasks rotate to the next member (shift by 1)
+  for (let weekOffset = 0; weekOffset < 8; weekOffset++) {
+    const weekNumber = currentWeek + weekOffset + 1;
+    const assignments = [];
     
-    const memberCount = memberList.length;
-    const taskCount = taskList.length;
-    
-    const sortedTasks = [...taskList].sort((a, b) => b.points - a.points);
-    const sortedMembers = [...memberList].sort((a, b) => a.name.localeCompare(b.name));
-    
-    const preds = [];
-    
-    for (let weekOffset = 0; weekOffset < 8; weekOffset++) {
-      const weekNumber = currentWeek + weekOffset + 1;
-      const assignments = [];
+    // ✅ For each member, assign a task that rotates each week
+    for (let memberIndex = 0; memberIndex < sortedMembers.length; memberIndex++) {
+      // Task index shifts by weekOffset each week
+      // This ensures tasks rotate to different members every week
+      const taskIndex = (memberIndex + weekOffset) % taskCount;
       
-      for (let i = 0; i < sortedMembers.length; i++) {
-        const memberIndex = i;
-        const taskIndex = (memberIndex + weekOffset) % taskCount;
-        
-        assignments.push({
-          memberId: sortedMembers[memberIndex].id,
-          memberName: sortedMembers[memberIndex].name,
-          taskId: sortedTasks[taskIndex].id,
-          taskTitle: sortedTasks[taskIndex].title,
-          taskPoints: sortedTasks[taskIndex].points,
-          taskRank: taskIndex + 1,
-          weekNumber
-        });
-      }
-      
-      const pointsByMember: Record<string, number> = {};
-      assignments.forEach(a => {
-        pointsByMember[a.memberId] = (pointsByMember[a.memberId] || 0) + a.taskPoints;
-      });
-      
-      const points = Object.values(pointsByMember);
-      const maxPoints = Math.max(...points);
-      const minPoints = Math.min(...points);
-      const fairnessScore = Math.round(100 - ((maxPoints - minPoints) / maxPoints) * 100);
-      
-      preds.push({
-        weekNumber,
-        assignments,
-        fairnessScore,
-        maxPoints,
-        minPoints
+      assignments.push({
+        memberId: sortedMembers[memberIndex].id,
+        memberName: sortedMembers[memberIndex].name,
+        taskId: sortedTasks[taskIndex].id,
+        taskTitle: sortedTasks[taskIndex].title,
+        taskPoints: sortedTasks[taskIndex].points,
+        taskRank: taskIndex + 1,
+        weekNumber
       });
     }
     
-    setPredictions(preds);
-    setRotationCycle(taskCount);
-  };
+    // Calculate fairness score
+    const pointsByMember: Record<string, number> = {};
+    assignments.forEach(a => {
+      pointsByMember[a.memberId] = (pointsByMember[a.memberId] || 0) + a.taskPoints;
+    });
+    
+    const points = Object.values(pointsByMember);
+    const maxPoints = Math.max(...points);
+    const minPoints = Math.min(...points);
+    const fairnessScore = maxPoints > 0 ? Math.round(100 - ((maxPoints - minPoints) / maxPoints) * 100) : 100;
+    
+    preds.push({
+      weekNumber,
+      assignments,
+      fairnessScore,
+      maxPoints,
+      minPoints
+    });
+  }
+  
+  setPredictions(preds);
+  setRotationCycle(taskCount);
+};
 
   const getTaskRankColor = (rank: number, total: number) => {
-    if (rank === 1) return '#fa5252';
-    if (rank === total) return '#2b8a3e';
-    if (rank <= Math.ceil(total / 3)) return '#e67700';
-    if (rank >= total - Math.floor(total / 3)) return '#2b8a3e';
-    return '#495057';
+    if (rank === 1) return theme.error;
+    if (rank === total) return theme.primary;
+    if (rank <= Math.ceil(total / 3)) return theme.primary;
+    if (rank >= total - Math.floor(total / 3)) return theme.primary;
+    return theme.textSecondary;
   };
 
   const getTaskRankIcon = (rank: number, total: number) => {
@@ -185,19 +197,19 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     return (
       <LinearGradient
         key={prediction.weekNumber}
-        colors={isFirst ? ['#e7f5ff', '#d0ebff'] : ['#ffffff', '#f8f9fa']}
+        colors={isFirst ? [theme.primaryLight, theme.primaryLight] : [theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.predictionCard, isFirst && styles.nextWeekCard]}
+        style={[styles.predictionCard, isFirst && styles.nextWeekCard, { borderColor: theme.border }]}
       >
         <View style={styles.predictionHeader}>
           <View style={styles.weekTitleContainer}>
-            <Text style={styles.predictionWeek}>
+            <Text style={[styles.predictionWeek, { color: theme.text }]}>
               {isFirst ? '🔮 NEXT WEEK' : `Week ${prediction.weekNumber}`}
             </Text>
             {isFirst && (
               <LinearGradient
-                colors={['#2b8a3e', '#1e6b2c']}
+                colors={[theme.primary, theme.primaryDark]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.currentBadge}
@@ -211,11 +223,11 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             <MaterialCommunityIcons 
               name={prediction.fairnessScore > 80 ? 'check-circle' : 'alert'} 
               size={14} 
-              color={prediction.fairnessScore > 80 ? '#2b8a3e' : '#e67700'} 
+              color={prediction.fairnessScore > 80 ? theme.primary : theme.primary} 
             />
             <Text style={[
               styles.fairnessText,
-              { color: prediction.fairnessScore > 80 ? '#2b8a3e' : '#e67700' }
+              { color: prediction.fairnessScore > 80 ? theme.primary : theme.primary }
             ]}>
               Fairness: {prediction.fairnessScore}%
             </Text>
@@ -223,8 +235,8 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         </View>
 
         <View style={styles.fairnessExplanation}>
-          <Text style={styles.explanationText}>
-            Lowest points member gets highest task • Rotates every {rotationCycle} weeks
+          <Text style={[styles.explanationText, { color: theme.textMuted }]}>
+            Weekly rotation • Tasks rotate to next member each week
           </Text>
         </View>
 
@@ -237,21 +249,21 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
               <View key={`${assignment.memberId}-${assignment.taskId}`} style={styles.assignmentRow}>
                 <View style={styles.memberContainer}>
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.memberAvatar}
+                    style={[styles.memberAvatar, { borderColor: theme.border }]}
                   >
-                    <Text style={styles.memberInitial}>
+                    <Text style={[styles.memberInitial, { color: theme.textSecondary }]}>
                       {assignment.memberName?.charAt(0) || '?'}
                     </Text>
                   </LinearGradient>
-                  <Text style={styles.memberName} numberOfLines={1}>
+                  <Text style={[styles.memberName, { color: theme.text }]} numberOfLines={1}>
                     {assignment.memberName}
                   </Text>
                 </View>
 
-                <MaterialCommunityIcons name="arrow-right" size={16} color="#adb5bd" />
+                <MaterialCommunityIcons name="arrow-right" size={16} color={theme.textMuted} />
 
                 <View style={styles.taskContainer}>
                   <LinearGradient
@@ -270,12 +282,12 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
                     </Text>
                   </LinearGradient>
                   <LinearGradient
-                    colors={['#fff3bf', '#ffec99']}
+                    colors={[theme.primaryLight, theme.primaryLight]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.pointsBadge}
                   >
-                    <Text style={styles.pointsText}>{assignment.taskPoints} pts</Text>
+                    <Text style={[styles.pointsText, { color: theme.primary }]}>{assignment.taskPoints} pts</Text>
                   </LinearGradient>
                 </View>
               </View>
@@ -283,16 +295,16 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
           })}
         </View>
 
-        <View style={styles.fairnessNote}>
+        <View style={[styles.fairnessNote, { borderTopColor: theme.border }]}>
           <MaterialCommunityIcons 
             name="information" 
             size={14} 
-            color="#868e96" 
+            color={theme.textMuted} 
           />
-          <Text style={styles.noteText}>
+          <Text style={[styles.noteText, { color: theme.textMuted }]}>
             {isFirst 
-              ? `✓ Member with lowest points gets highest task (${prediction.assignments.find((a: any) => a.taskRank === 1)?.memberName})`
-              : `Cycle repeats every ${rotationCycle} weeks for perfect fairness`}
+              ? `✓ Tasks rotate weekly • Members get different tasks each week`
+              : `After ${rotationCycle} weeks, every member gets every task exactly once`}
           </Text>
         </View>
       </LinearGradient>
@@ -310,28 +322,28 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     
     return (
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.cycleCard}
+        style={[styles.cycleCard, { borderColor: theme.border }]}
       >
-        <Text style={styles.cycleTitle}>🔄 {rotationCycle}-Week Rotation Cycle</Text>
-        <Text style={styles.cycleDescription}>
-          Every member gets each task exactly once every {rotationCycle} weeks
+        <Text style={[styles.cycleTitle, { color: theme.primary }]}>🔄 Weekly Rotation Cycle</Text>
+        <Text style={[styles.cycleDescription, { color: theme.textMuted }]}>
+          Tasks rotate every week • Each member gets a different task each week
         </Text>
         
         <View style={styles.cycleGrid}>
           <View style={styles.cycleHeader}>
-            <Text style={styles.cycleHeaderText}>Member</Text>
-            <Text style={styles.cycleHeaderText}>Week 1</Text>
-            <Text style={styles.cycleHeaderText}>Week 2</Text>
-            <Text style={styles.cycleHeaderText}>Week 3</Text>
-            <Text style={styles.cycleHeaderText}>Week 4</Text>
+            <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Member</Text>
+            <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 1</Text>
+            <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 2</Text>
+            <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 3</Text>
+            <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 4</Text>
           </View>
           
           {membersList.slice(0, 4).map((member: any, idx: number) => (
             <View key={member.id} style={styles.cycleRow}>
-              <Text style={styles.cycleMemberName} numberOfLines={1}>
+              <Text style={[styles.cycleMemberName, { color: theme.text }]} numberOfLines={1}>
                 {member.name.split(' ')[0]}
               </Text>
               {[0, 1, 2, 3].map(weekOffset => {
@@ -362,8 +374,8 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
           ))}
         </View>
         
-        <Text style={styles.cycleNote}>
-          * #1 = Highest points • #{rotationCycle} = Lowest points
+        <Text style={[styles.cycleNote, { color: theme.textMuted }]}>
+          * Tasks rotate weekly • After {rotationCycle} weeks, each member completes every task exactly once
         </Text>
       </LinearGradient>
     );
@@ -382,29 +394,31 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         style={[
           styles.weekTab,
           isSelected && styles.weekTabSelected,
+          { borderColor: theme.border }
         ]}
         onPress={() => setSelectedWeek(week.weekNumber)}
       >
         <LinearGradient
-          colors={isSelected ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+          colors={isSelected ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.weekTabGradient}
         >
           <Text style={[
             styles.weekTabText,
-            isSelected && styles.weekTabTextSelected
+            isSelected && styles.weekTabTextSelected,
+            { color: isSelected ? '#fff' : theme.textSecondary }
           ]}>
             W{week.weekNumber}
           </Text>
           {isCurrentWeek && (
             <View style={styles.currentIndicator}>
-              <MaterialCommunityIcons name="circle-small" size={8} color="#2b8a3e" />
+              <MaterialCommunityIcons name="circle-small" size={8} color={theme.primary} />
             </View>
           )}
           {hasTasks && (
             <LinearGradient
-              colors={['#fa5252', '#e03131']}
+              colors={[theme.error, theme.error]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.taskIndicator}
@@ -419,10 +433,10 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
 
   if (loading && !refreshing) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading rotation schedule...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading rotation schedule...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -430,17 +444,17 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
 
   if (error && isEmpty) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="calendar-remove" size={64} color="#fa5252" />
-          <Text style={styles.errorText}>Failed to Load Schedule</Text>
-          <Text style={styles.errorSubText}>{error}</Text>
+          <MaterialCommunityIcons name="calendar-remove" size={64} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>Failed to Load Schedule</Text>
+          <Text style={[styles.errorSubText, { color: theme.textMuted }]}>{error}</Text>
           <TouchableOpacity 
             style={styles.retryButton}
             onPress={loadRotationSchedule}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.retryButtonGradient}
@@ -454,30 +468,30 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>Rotation Schedule</Text>
-          <Text style={styles.subtitle}>{groupName}</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Rotation Schedule</Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>{groupName}</Text>
         </View>
         
         <TouchableOpacity 
           onPress={refresh}
           disabled={refreshing}
-          style={styles.refreshButton}
+          style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
           {refreshing ? (
-            <ActivityIndicator size="small" color="#2b8a3e" />
+            <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+            <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
           )}
         </TouchableOpacity>
       </View>
@@ -487,8 +501,8 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={refresh}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -507,18 +521,18 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         )}
 
         {/* Toggle between History and Predictions */}
-        <View style={styles.toggleContainer}>
+        <View style={[styles.toggleContainer, { borderColor: theme.border }]}>
           <TouchableOpacity
             style={[styles.toggleButton, !showPredictions && styles.toggleActive]}
             onPress={() => setShowPredictions(false)}
           >
             <LinearGradient
-              colors={!showPredictions ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+              colors={!showPredictions ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.toggleGradient}
             >
-              <Text style={[styles.toggleText, !showPredictions && styles.toggleTextActive]}>
+              <Text style={[styles.toggleText, !showPredictions && styles.toggleTextActive, { color: !showPredictions ? '#fff' : theme.textSecondary }]}>
                 📜 History
               </Text>
             </LinearGradient>
@@ -529,12 +543,12 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             onPress={() => setShowPredictions(true)}
           >
             <LinearGradient
-              colors={showPredictions ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+              colors={showPredictions ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.toggleGradient}
             >
-              <Text style={[styles.toggleText, showPredictions && styles.toggleTextActive]}>
+              <Text style={[styles.toggleText, showPredictions && styles.toggleTextActive, { color: showPredictions ? '#fff' : theme.textSecondary }]}>
                 🔮 Predictions
               </Text>
             </LinearGradient>
@@ -548,56 +562,56 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             {renderCycleSummary()}
             
             {/* Next Weeks Predictions */}
-            <Text style={styles.predictionsTitle}>📅 Upcoming Weeks</Text>
+            <Text style={[styles.predictionsTitle, { color: theme.text }]}>📅 Upcoming Weeks</Text>
             {predictions.slice(0, 4).map((pred, idx) => renderPredictionWeek(pred, idx))}
             
             {/* Algorithm Explanation */}
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.explanationCard}
+              style={[styles.explanationCard, { borderColor: theme.border }]}
             >
-              <Text style={styles.explanationTitle}>⚖️ How Fairness Works</Text>
+              <Text style={[styles.explanationTitle, { color: theme.text }]}>⚖️ How Weekly Rotation Works</Text>
               <View style={styles.explanationPoint}>
-                <MaterialCommunityIcons name="numeric-1-circle" size={18} color="#2b8a3e" />
-                <Text style={styles.explanationPointText}>
-                  Tasks are ranked by points (Highest #1 to Lowest #{rotationCycle})
+                <MaterialCommunityIcons name="numeric-1-circle" size={18} color={theme.primary} />
+                <Text style={[styles.explanationPointText, { color: theme.textSecondary }]}>
+                  Tasks rotate to the next member every week
                 </Text>
               </View>
               <View style={styles.explanationPoint}>
-                <MaterialCommunityIcons name="numeric-2-circle" size={18} color="#2b8a3e" />
-                <Text style={styles.explanationPointText}>
-                  Members rotate through tasks in a cycle
+                <MaterialCommunityIcons name="numeric-2-circle" size={18} color={theme.primary} />
+                <Text style={[styles.explanationPointText, { color: theme.textSecondary }]}>
+                  Each member gets a different task each week
                 </Text>
               </View>
               <View style={styles.explanationPoint}>
-                <MaterialCommunityIcons name="numeric-3-circle" size={18} color="#2b8a3e" />
-                <Text style={styles.explanationPointText}>
-                  Over {rotationCycle} weeks, EVERY member gets EVERY task exactly once
+                <MaterialCommunityIcons name="numeric-3-circle" size={18} color={theme.primary} />
+                <Text style={[styles.explanationPointText, { color: theme.textSecondary }]}>
+                  After {rotationCycle} weeks, every member completes every task exactly once
                 </Text>
               </View>
               <View style={styles.explanationPoint}>
-                <MaterialCommunityIcons name="check-circle" size={18} color="#2b8a3e" />
-                <Text style={styles.explanationPointText}>
-                  ✓ Perfect fairness - total points equal for all members after {rotationCycle} weeks
+                <MaterialCommunityIcons name="check-circle" size={18} color={theme.primary} />
+                <Text style={[styles.explanationPointText, { color: theme.textSecondary }]}>
+                  ✓ Perfect fairness - total points equal for all members after each full cycle
                 </Text>
               </View>
             </LinearGradient>
           </View>
         ) : (
-          // HISTORY VIEW
+          // HISTORY VIEW - same as before
           <View>
             {/* Current Week Info */}
             {currentWeek === selectedWeek && (
               <LinearGradient
-                colors={['#e7f5ff', '#d0ebff']}
+                colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.currentWeekBanner}
+                style={[styles.currentWeekBanner, { borderColor: theme.primaryBorder }]}
               >
-                <MaterialCommunityIcons name="information" size={18} color="#2b8a3e" />
-                <Text style={styles.currentWeekText}>
+                <MaterialCommunityIcons name="information" size={18} color={theme.primary} />
+                <Text style={[styles.currentWeekText, { color: theme.primary }]}>
                   Current week • Tasks are active and can be completed
                 </Text>
               </LinearGradient>
@@ -606,32 +620,32 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             {/* Statistics */}
             {selectedWeekData && selectedWeekData.tasks.length > 0 && (
               <LinearGradient
-                colors={['#ffffff', '#f8f9fa']}
+                colors={[theme.card, theme.bgSecondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.statsCard}
+                style={[styles.statsCard, { borderColor: theme.border }]}
               >
-                <Text style={styles.statsTitle}>Week {selectedWeek} Statistics</Text>
+                <Text style={[styles.statsTitle, { color: theme.text }]}>Week {selectedWeek} Statistics</Text>
                 <View style={styles.statsGrid}>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{selectedWeekData.tasks.length}</Text>
-                    <Text style={styles.statLabel}>Tasks</Text>
+                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary }]}>
+                    <Text style={[styles.statNumber, { color: theme.primary }]}>{selectedWeekData.tasks.length}</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Tasks</Text>
                   </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>
+                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary }]}>
+                    <Text style={[styles.statNumber, { color: theme.primary }]}>
                       {selectedWeekData.tasks.reduce((sum: number, t: any) => sum + (t.points || 0), 0)}
                     </Text>
-                    <Text style={styles.statLabel}>Total Points</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Total Points</Text>
                   </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>
+                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary }]}>
+                    <Text style={[styles.statNumber, { color: theme.primary }]}>
                       {selectedWeekData.tasks.filter((t: any) => t.assigneeName && t.assigneeName !== 'Unassigned').length}
                     </Text>
-                    <Text style={styles.statLabel}>Assigned</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Assigned</Text>
                   </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{calculateFairnessScore()}/100</Text>
-                    <Text style={styles.statLabel}>Fairness</Text>
+                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary }]}>
+                    <Text style={[styles.statNumber, { color: theme.primary }]}>{calculateFairnessScore()}/100</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Fairness</Text>
                   </View>
                 </View>
               </LinearGradient>
@@ -640,28 +654,28 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             {/* Day Distribution */}
             {selectedWeekData && selectedWeekData.tasks.length > 0 && (
               <LinearGradient
-                colors={['#ffffff', '#f8f9fa']}
+                colors={[theme.card, theme.bgSecondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.distributionCard}
+                style={[styles.distributionCard, { borderColor: theme.border }]}
               >
-                <Text style={styles.distributionTitle}>Tasks by Day</Text>
+                <Text style={[styles.distributionTitle, { color: theme.text }]}>Tasks by Day</Text>
                 <View style={styles.distributionGrid}>
                   {Object.entries(getTaskDistributionByDay()).map(([day, count]: [string, any]) => (
                     <View key={day} style={styles.dayColumn}>
-                      <Text style={styles.dayLabel}>{day.substring(0, 3)}</Text>
+                      <Text style={[styles.dayLabel, { color: theme.textMuted }]}>{day.substring(0, 3)}</Text>
                       <View style={styles.dayBarContainer}>
                         <View 
                           style={[
                             styles.dayBar,
                             { 
                               height: (count / Math.max(...Object.values(getTaskDistributionByDay()), 1)) * 40,
-                              backgroundColor: count > 0 ? '#2b8a3e' : '#e9ecef'
+                              backgroundColor: count > 0 ? theme.primary : theme.bgTertiary
                             }
                           ]} 
                         />
                       </View>
-                      <Text style={styles.dayCount}>{count}</Text>
+                      <Text style={[styles.dayCount, { color: theme.textSecondary }]}>{count}</Text>
                     </View>
                   ))}
                 </View>
@@ -671,16 +685,16 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             {/* Tasks List */}
             <View style={styles.tasksSection}>
               <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   Week {selectedWeek} Tasks
                 </Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.taskCountBadge}
                 >
-                  <Text style={styles.taskCount}>
+                  <Text style={[styles.taskCount, { color: theme.textSecondary }]}>
                     {getSelectedWeekTasks().length}
                   </Text>
                 </LinearGradient>
@@ -700,7 +714,8 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
                       key={`${item.taskId}-${item.week}-${index}`}
                       style={[
                         styles.taskCard,
-                        isCurrentWeek && styles.currentWeekTask
+                        isCurrentWeek && styles.currentWeekTask,
+                        { borderColor: theme.border }
                       ]}
                       onPress={() => navigation.navigate('TaskDetails', { 
                         taskId: item.taskId, 
@@ -710,7 +725,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
                       activeOpacity={0.7}
                     >
                       <LinearGradient
-                        colors={isCurrentWeek ? ['#e7f5ff', '#d0ebff'] : ['#ffffff', '#f8f9fa']}
+                        colors={isCurrentWeek ? [theme.primaryLight, theme.primaryLight] : [theme.card, theme.bgSecondary]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.taskGradient}
@@ -727,24 +742,24 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
                                 #{rank}
                               </Text>
                             </LinearGradient>
-                            <Text style={styles.taskTitle} numberOfLines={2}>
+                            <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
                               {item.taskTitle}
                             </Text>
                           </View>
                           <LinearGradient
-                            colors={['#fff3bf', '#ffec99']}
+                            colors={[theme.primaryLight, theme.primaryLight]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={styles.pointsBadge}
                           >
-                            <Text style={styles.pointsText}>{taskPoints} pts</Text>
+                            <Text style={[styles.pointsText, { color: theme.primary }]}>{taskPoints} pts</Text>
                           </LinearGradient>
                         </View>
                         
                         <View style={styles.taskDetails}>
                           <View style={styles.assigneeContainer}>
-                            <MaterialCommunityIcons name="account" size={14} color="#868e96" />
-                            <Text style={styles.assigneeText} numberOfLines={1}>
+                            <MaterialCommunityIcons name="account" size={14} color={theme.textMuted} />
+                            <Text style={[styles.assigneeText, { color: theme.textMuted }]} numberOfLines={1}>
                               {item.assigneeName || 'Unassigned'}
                             </Text>
                           </View>
@@ -752,8 +767,8 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
                           <View style={styles.timeContainer}>
                             {item.dayOfWeek && (
                               <>
-                                <MaterialCommunityIcons name="calendar" size={12} color="#868e96" />
-                                <Text style={styles.timeText}>
+                                <MaterialCommunityIcons name="calendar" size={12} color={theme.textMuted} />
+                                <Text style={[styles.timeText, { color: theme.textMuted }]}>
                                   {item.dayOfWeek}
                                   {item.scheduledTime ? ` • ${item.scheduledTime}` : ''}
                                 </Text>
@@ -764,8 +779,8 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
                         
                         {item.category && (
                           <View style={styles.categoryContainer}>
-                            <MaterialCommunityIcons name="tag" size={10} color="#868e96" />
-                            <Text style={styles.categoryText}>{item.category}</Text>
+                            <MaterialCommunityIcons name="tag" size={10} color={theme.textMuted} />
+                            <Text style={[styles.categoryText, { color: theme.textMuted }]}>{item.category}</Text>
                           </View>
                         )}
                       </LinearGradient>
@@ -774,9 +789,9 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
                 })
               ) : (
                 <View style={styles.emptyTasks}>
-                  <MaterialCommunityIcons name="calendar-blank" size={48} color="#dee2e6" />
-                  <Text style={styles.emptyTasksText}>No tasks scheduled</Text>
-                  <Text style={styles.emptyTasksSubtext}>
+                  <MaterialCommunityIcons name="calendar-blank" size={48} color={theme.border} />
+                  <Text style={[styles.emptyTasksText, { color: theme.textMuted }]}>No tasks scheduled</Text>
+                  <Text style={[styles.emptyTasksSubtext, { color: theme.textPlaceholder }]}>
                     {selectedWeek === currentWeek 
                       ? "Tasks will appear here once they're assigned"
                       : "No tasks were scheduled for this week"}

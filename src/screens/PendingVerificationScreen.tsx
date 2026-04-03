@@ -1,4 +1,4 @@
-// src/screens/PendingVerificationsScreen.tsx - UPDATED with deleted task handling
+// src/screens/PendingVerificationsScreen.tsx - Dark Mode Added
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   Alert,
@@ -18,8 +17,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AssignmentService } from '../services/AssignmentService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 export default function PendingVerificationsScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
   const { groupId, groupName, userRole } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -123,7 +124,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
         }
         
         const processed = assignments.map((assignment: any) => {
-          // ✅ Check if task is deleted (taskId is null and taskTitle is from historical)
           const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
           const taskTitle = assignment.task?.title || assignment.taskTitle || 'Unknown Task';
           const isDeletedTask = assignment.isHistorical === true || (isTaskDeleted && assignment.taskTitle);
@@ -145,7 +145,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
             notes: assignment.notes,
             adminNotes: assignment.adminNotes,
             timeSlot: assignment.timeSlot,
-            isTaskDeleted: isDeletedTask  // ✅ Add flag for deleted tasks
+            isTaskDeleted: isDeletedTask
           };
         });
         
@@ -162,7 +162,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     }
   };
 
-  // ✅ UPDATED: Handle click with check for deleted task
   const handleViewSubmission = (assignment: any) => {
     if (assignment.isTaskDeleted) {
       Alert.alert(
@@ -183,7 +182,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     });
   };
 
-  // ✅ UPDATED: Quick approve with check for deleted task
   const handleQuickApprove = async (assignment: any) => {
     if (assignment.isTaskDeleted) {
       Alert.alert(
@@ -233,7 +231,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     );
   };
 
-  // ✅ UPDATED: Quick reject with check for deleted task
   const handleQuickReject = async (assignment: any) => {
     if (assignment.isTaskDeleted) {
       Alert.alert(
@@ -302,46 +299,50 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     
     return (
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.statsBar}
+        style={[styles.statsBar, { borderBottomColor: theme.border }]}
       >
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{stats.pendingVerification || 0}</Text>
-          <Text style={styles.statLabel}>Pending</Text>
+          <Text style={[styles.statNumber, { color: theme.text }]}>{stats.pendingVerification || 0}</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Pending</Text>
         </View>
-        <View style={styles.statDivider} />
+        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{stats.verifiedAssignments || 0}</Text>
-          <Text style={styles.statLabel}>Verified</Text>
+          <Text style={[styles.statNumber, { color: theme.text }]}>{stats.verifiedAssignments || 0}</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Verified</Text>
         </View>
-        <View style={styles.statDivider} />
+        <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{stats.rejectedAssignments || 0}</Text>
-          <Text style={styles.statLabel}>Rejected</Text>
+          <Text style={[styles.statNumber, { color: theme.text }]}>{stats.rejectedAssignments || 0}</Text>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Rejected</Text>
         </View>
       </LinearGradient>
     );
   };
 
   const renderFilterTabs = () => (
-    <View style={styles.filterContainer}>
+    <View style={[styles.filterContainer, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
       <TouchableOpacity
-        style={[styles.filterTab, filter === 'pending' && styles.activeFilterTab]}
+        style={[
+          styles.filterTab,
+          filter === 'pending' && styles.activeFilterTab,
+          { backgroundColor: theme.bgSecondary }
+        ]}
         onPress={() => setFilter('pending')}
       >
         <MaterialCommunityIcons 
           name="clock-check" 
           size={16} 
-          color={filter === 'pending' ? '#2b8a3e' : '#868e96'} 
+          color={filter === 'pending' ? theme.primary : theme.textMuted} 
         />
-        <Text style={[styles.filterText, filter === 'pending' && styles.activeFilterText]}>
+        <Text style={[styles.filterText, filter === 'pending' && styles.activeFilterText, { color: filter === 'pending' ? theme.primary : theme.textMuted }]}>
           Pending
         </Text>
         {filter === 'pending' && stats?.pendingVerification > 0 && (
           <LinearGradient
-            colors={['#2b8a3e', '#1e6b2c']}
+            colors={[theme.primary, theme.primaryDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.badge}
@@ -352,36 +353,43 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
       </TouchableOpacity>
       
       <TouchableOpacity
-        style={[styles.filterTab, filter === 'verified' && styles.activeFilterTab]}
+        style={[
+          styles.filterTab,
+          filter === 'verified' && styles.activeFilterTab,
+          { backgroundColor: theme.bgSecondary }
+        ]}
         onPress={() => setFilter('verified')}
       >
         <MaterialCommunityIcons 
           name="check-circle" 
           size={16} 
-          color={filter === 'verified' ? '#2b8a3e' : '#868e96'} 
+          color={filter === 'verified' ? theme.primary : theme.textMuted} 
         />
-        <Text style={[styles.filterText, filter === 'verified' && styles.activeFilterText]}>
+        <Text style={[styles.filterText, filter === 'verified' && styles.activeFilterText, { color: filter === 'verified' ? theme.primary : theme.textMuted }]}>
           Verified
         </Text>
       </TouchableOpacity>
       
       <TouchableOpacity
-        style={[styles.filterTab, filter === 'rejected' && styles.activeFilterTab]}
+        style={[
+          styles.filterTab,
+          filter === 'rejected' && styles.activeFilterTab,
+          { backgroundColor: theme.bgSecondary }
+        ]}
         onPress={() => setFilter('rejected')}
       >
         <MaterialCommunityIcons 
           name="close-circle" 
           size={16} 
-          color={filter === 'rejected' ? '#fa5252' : '#868e96'} 
+          color={filter === 'rejected' ? theme.error : theme.textMuted} 
         />
-        <Text style={[styles.filterText, filter === 'rejected' && styles.activeFilterText]}>
+        <Text style={[styles.filterText, filter === 'rejected' && styles.activeFilterText, { color: filter === 'rejected' ? theme.error : theme.textMuted }]}>
           Rejected
         </Text>
       </TouchableOpacity>
     </View>
   );
 
-  // ✅ UPDATED: Render submission item with deleted task styling
   const renderSubmissionItem = ({ item }: any) => {
     const isPending = filter === 'pending';
     const isSubmitted = item.completed === true && item.verified === null;
@@ -391,7 +399,8 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
       <TouchableOpacity
         style={[
           styles.submissionCard,
-          isDeletedTask && styles.deletedTaskCard  // ✅ Different style for deleted tasks
+          isDeletedTask && styles.deletedTaskCard,
+          { backgroundColor: theme.card, shadowColor: theme.shadow }
         ]}
         onPress={() => handleViewSubmission(item)}
         activeOpacity={isDeletedTask ? 0.8 : 0.7}
@@ -399,24 +408,24 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
         <View style={styles.cardHeader}>
           <View style={styles.userInfo}>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.avatar}
+              style={[styles.avatar, { borderColor: theme.border }]}
             >
               {item.userAvatar ? (
                 <Image source={{ uri: item.userAvatar }} style={styles.avatarImage} />
               ) : (
-                <Text style={styles.avatarText}>
+                <Text style={[styles.avatarText, { color: theme.textSecondary }]}>
                   {item.userName?.charAt(0) || 'U'}
                 </Text>
               )}
             </LinearGradient>
             <View style={styles.userDetails}>
-              <Text style={styles.userName} numberOfLines={1}>
+              <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
                 {item.userName}
               </Text>
-              <Text style={styles.submissionTime}>
+              <Text style={[styles.submissionTime, { color: theme.textMuted }]}>
                 {item.submittedAt 
                   ? `Submitted ${formatTimeAgo(item.submittedAt)}`
                   : 'Not submitted yet'}
@@ -426,130 +435,130 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           
           {isDeletedTask && (
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.deletedBadge}
             >
-              <MaterialCommunityIcons name="delete" size={12} color="#fa5252" />
-              <Text style={styles.deletedBadgeText}>Deleted</Text>
+              <MaterialCommunityIcons name="delete" size={12} color={theme.error} />
+              <Text style={[styles.deletedBadgeText, { color: theme.error }]}>Deleted</Text>
             </LinearGradient>
           )}
           
           {!isDeletedTask && isPending && item.completed === true && item.verified === null && (
             <LinearGradient
-              colors={['#d3f9d8', '#b2f2bb']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.pendingBadge}
             >
-              <MaterialCommunityIcons name="clock" size={12} color="#2b8a3e" />
-              <Text style={styles.pendingBadgeText}>Pending</Text>
+              <MaterialCommunityIcons name="clock" size={12} color={theme.primary} />
+              <Text style={[styles.pendingBadgeText, { color: theme.primary }]}>Pending</Text>
             </LinearGradient>
           )}
           {!isDeletedTask && filter === 'verified' && (
             <LinearGradient
-              colors={['#d3f9d8', '#b2f2bb']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.verifiedBadge}
             >
-              <MaterialCommunityIcons name="check-circle" size={12} color="#2b8a3e" />
-              <Text style={styles.verifiedBadgeText}>Verified</Text>
+              <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
+              <Text style={[styles.verifiedBadgeText, { color: theme.primary }]}>Verified</Text>
             </LinearGradient>
           )}
           {!isDeletedTask && filter === 'rejected' && (
             <LinearGradient
-              colors={['#fff5f5', '#ffe3e3']}
+              colors={[theme.errorBg, theme.errorBg]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.rejectedBadge}
             >
-              <MaterialCommunityIcons name="close-circle" size={12} color="#fa5252" />
-              <Text style={styles.rejectedBadgeText}>Rejected</Text>
+              <MaterialCommunityIcons name="close-circle" size={12} color={theme.error} />
+              <Text style={[styles.rejectedBadgeText, { color: theme.error }]}>Rejected</Text>
             </LinearGradient>
           )}
         </View>
 
         <LinearGradient
-          colors={isDeletedTask ? ['#f8f9fa', '#e9ecef'] : ['#f8f9fa', '#e9ecef']}
+          colors={isDeletedTask ? [theme.bgSecondary, theme.bgTertiary] : [theme.bgSecondary, theme.bgTertiary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.taskInfo, isDeletedTask && styles.deletedTaskInfo]}
+          style={[styles.taskInfo, isDeletedTask && styles.deletedTaskInfo, { borderColor: theme.border }]}
         >
           <MaterialCommunityIcons 
             name={isDeletedTask ? "delete" : "format-list-checks"} 
             size={16} 
-            color={isDeletedTask ? "#fa5252" : "#495057"} 
+            color={isDeletedTask ? theme.error : theme.textSecondary} 
           />
-          <Text style={[styles.taskTitle, isDeletedTask && styles.deletedTaskTitle]} numberOfLines={2}>
+          <Text style={[styles.taskTitle, isDeletedTask && styles.deletedTaskTitle, { color: isDeletedTask ? theme.textMuted : theme.text }]} numberOfLines={2}>
             {item.taskTitle}
           </Text>
         </LinearGradient>
 
         <View style={styles.detailsRow}>
-          <View style={styles.detailItem}>
-            <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-            <Text style={styles.detailText}>{item.taskPoints} pts</Text>
+          <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+            <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+            <Text style={[styles.detailText, { color: theme.textSecondary }]}>{item.taskPoints} pts</Text>
           </View>
           
           {item.dueDate && (
-            <View style={styles.detailItem}>
-              <MaterialCommunityIcons name="calendar" size={14} color="#868e96" />
-              <Text style={styles.detailText}>
+            <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+              <MaterialCommunityIcons name="calendar" size={14} color={theme.textMuted} />
+              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
                 {item.dueDate.toLocaleDateString()}
               </Text>
             </View>
           )}
 
           {item.timeSlot && (
-            <View style={styles.detailItem}>
-              <MaterialCommunityIcons name="clock" size={14} color="#868e96" />
-              <Text style={styles.detailText}>
+            <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+              <MaterialCommunityIcons name="clock" size={14} color={theme.textMuted} />
+              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
                 {item.timeSlot.startTime} - {item.timeSlot.endTime}
               </Text>
             </View>
           )}
         </View>
 
-        <View style={styles.evidenceRow}>
+        <View style={[styles.evidenceRow, { borderTopColor: theme.borderLight }]}>
           {item.photoUrl ? (
             <LinearGradient
-              colors={['#e7f5ff', '#d0ebff']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.hasPhotoBadge}
             >
-              <MaterialCommunityIcons name="image" size={14} color="#2b8a3e" />
-              <Text style={styles.hasPhotoText}>Photo</Text>
+              <MaterialCommunityIcons name="image" size={14} color={theme.primary} />
+              <Text style={[styles.hasPhotoText, { color: theme.primary }]}>Photo</Text>
             </LinearGradient>
           ) : (
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.noPhotoBadge}
             >
-              <MaterialCommunityIcons name="image-off" size={14} color="#868e96" />
-              <Text style={styles.noPhotoText}>No Photo</Text>
+              <MaterialCommunityIcons name="image-off" size={14} color={theme.textMuted} />
+              <Text style={[styles.noPhotoText, { color: theme.textMuted }]}>No Photo</Text>
             </LinearGradient>
           )}
           
           {item.notes ? (
             <LinearGradient
-              colors={['#fff3bf', '#ffec99']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.hasNotesBadge}
             >
-              <MaterialCommunityIcons name="note-text" size={14} color="#e67700" />
-              <Text style={styles.hasNotesText}>Notes</Text>
+              <MaterialCommunityIcons name="note-text" size={14} color={theme.primary} />
+              <Text style={[styles.hasNotesText, { color: theme.primary }]}>Notes</Text>
             </LinearGradient>
           ) : null}
         </View>
 
         {isPending && isSubmitted && !isDeletedTask && (
-          <View style={styles.quickActions}>
+          <View style={[styles.quickActions, { borderTopColor: theme.borderLight }]}>
             <TouchableOpacity
               style={styles.quickRejectButton}
               onPress={(e) => {
@@ -558,13 +567,13 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               }}
             >
               <LinearGradient
-                colors={['#fff5f5', '#ffe3e3']}
+                colors={[theme.errorBg, theme.errorBg]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.quickActionGradient}
               >
-                <MaterialCommunityIcons name="close" size={14} color="#fa5252" />
-                <Text style={styles.quickRejectText}>Reject</Text>
+                <MaterialCommunityIcons name="close" size={14} color={theme.error} />
+                <Text style={[styles.quickRejectText, { color: theme.error }]}>Reject</Text>
               </LinearGradient>
             </TouchableOpacity>
             
@@ -576,13 +585,13 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               }}
             >
               <LinearGradient
-                colors={['#d3f9d8', '#b2f2bb']}
+                colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.quickActionGradient}
               >
-                <MaterialCommunityIcons name="check" size={14} color="#2b8a3e" />
-                <Text style={styles.quickApproveText}>Approve</Text>
+                <MaterialCommunityIcons name="check" size={14} color={theme.primary} />
+                <Text style={[styles.quickApproveText, { color: theme.primary }]}>Approve</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -590,13 +599,13 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
         {isDeletedTask && (
           <LinearGradient
-            colors={['#fff5f5', '#ffe3e3']}
+            colors={[theme.errorBg, theme.errorBg]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.deletedWarning}
+            style={[styles.deletedWarning, { borderColor: theme.errorBorder }]}
           >
-            <MaterialCommunityIcons name="alert-circle" size={14} color="#fa5252" />
-            <Text style={styles.deletedWarningText}>
+            <MaterialCommunityIcons name="alert-circle" size={14} color={theme.error} />
+            <Text style={[styles.deletedWarningText, { color: theme.error }]}>
               This task has been deleted. Cannot verify this submission.
             </Text>
           </LinearGradient>
@@ -604,13 +613,13 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
         {item.adminNotes && (
           <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
+            colors={[theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.adminNotesPreview}
+            style={[styles.adminNotesPreview, { borderColor: theme.border }]}
           >
-            <MaterialCommunityIcons name="message-text" size={14} color="#868e96" />
-            <Text style={styles.adminNotesText} numberOfLines={1}>
+            <MaterialCommunityIcons name="message-text" size={14} color={theme.textMuted} />
+            <Text style={[styles.adminNotesText, { color: theme.textMuted }]} numberOfLines={1}>
               {item.adminNotes}
             </Text>
           </LinearGradient>
@@ -621,36 +630,36 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
   const renderHeader = () => (
     <LinearGradient
-      colors={['#ffffff', '#f8f9fa']}
+      colors={[theme.card, theme.bgSecondary]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
-      style={styles.header}
+      style={[styles.header, { borderBottomColor: theme.border }]}
     >
       <TouchableOpacity 
         onPress={() => navigation.goBack()} 
-        style={styles.backButton}
+        style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
       >
-        <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
       </TouchableOpacity>
       
       <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
           Review Submissions
         </Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.subtitle, { color: theme.textMuted }]}>
           {groupName || 'Group'}
         </Text>
       </View>
       
       <TouchableOpacity 
-        style={styles.refreshButton}
+        style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         onPress={() => {
           fetchSubmissions();
           fetchStats();
         }}
       >
-        <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+        <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
       </TouchableOpacity>
     </LinearGradient>
   );
@@ -660,27 +669,27 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.card} />
       {renderHeader()}
       {renderStatsBar()}
       {renderFilterTabs()}
       
       {loading && !refreshing ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading submissions...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading submissions...</Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
-          <Text style={styles.errorText}>{error}</Text>
+          <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
             onPress={() => fetchSubmissions()}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.retryButtonGradient}
@@ -701,8 +710,8 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
                 fetchSubmissions(true);
                 fetchStats();
               }}
-              colors={['#2b8a3e']}
-              tintColor="#2b8a3e"
+              colors={[theme.primary]}
+              tintColor={theme.primary}
             />
           }
           ListEmptyComponent={
@@ -714,14 +723,14 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
                   'close-circle-outline'
                 } 
                 size={64} 
-                color="#dee2e6" 
+                color={theme.border} 
               />
-              <Text style={styles.emptyText}>
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
                 {filter === 'pending' ? 'No pending submissions' : 
                  filter === 'verified' ? 'No verified submissions' : 
                  'No rejected submissions'}
               </Text>
-              <Text style={styles.emptySubtext}>
+              <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
                 {filter === 'pending' 
                   ? 'When members submit assignments, they will appear here'
                   : 'No submissions in this category'}
@@ -735,11 +744,10 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   );
 }
 
-// ✅ ADD NEW STYLES
+// Styles remain the same - only colors are applied inline
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa'
   },
   header: {
     flexDirection: 'row',
@@ -748,17 +756,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 56,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -773,12 +778,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     textAlign: 'center'
   },
   subtitle: {
     fontSize: 12,
-    color: '#868e96',
     marginTop: 2,
     textAlign: 'center'
   },
@@ -786,10 +789,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -800,7 +801,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     justifyContent: 'space-around'
   },
   statItem: {
@@ -809,24 +809,19 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#212529',
     marginBottom: 4
   },
   statLabel: {
     fontSize: 12,
-    color: '#868e96'
   },
   statDivider: {
     width: 1,
-    backgroundColor: '#e9ecef'
   },
   filterContainer: {
     flexDirection: 'row',
-    backgroundColor: 'white',
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     gap: 8,
   },
   filterTab: {
@@ -835,24 +830,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f8f9fa',
     gap: 6,
     flex: 1,
     justifyContent: 'center',
   },
   activeFilterTab: {
-    backgroundColor: '#e8f5e9',
     borderWidth: 1,
-    borderColor: '#2b8a3e',
   },
   filterText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#868e96'
   },
-  activeFilterText: {
-    color: '#2b8a3e'
-  },
+  activeFilterText: {},
   badge: {
     borderRadius: 12,
     paddingHorizontal: 6,
@@ -871,7 +860,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#868e96',
     fontSize: 14
   },
   errorContainer: {
@@ -881,7 +869,6 @@ const styles = StyleSheet.create({
     padding: 20
   },
   errorText: {
-    color: '#fa5252',
     textAlign: 'center',
     marginBottom: 16,
     fontSize: 16,
@@ -911,7 +898,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#868e96',
     marginBottom: 8,
     marginTop: 16,
     textAlign: 'center',
@@ -919,31 +905,23 @@ const styles = StyleSheet.create({
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#adb5bd',
     textAlign: 'center',
     lineHeight: 20
   },
   submissionCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
-  // ✅ NEW STYLES FOR DELETED TASKS
   deletedTaskCard: {
-    backgroundColor: '#f8f9fa',
     opacity: 0.8,
   },
-  deletedTaskInfo: {
-    backgroundColor: '#f8f9fa',
-  },
+  deletedTaskInfo: {},
   deletedTaskTitle: {
-    color: '#868e96',
     textDecorationLine: 'line-through',
   },
   deletedBadge: {
@@ -956,7 +934,6 @@ const styles = StyleSheet.create({
   },
   deletedBadgeText: {
     fontSize: 11,
-    color: '#fa5252',
     fontWeight: '600',
   },
   deletedWarning: {
@@ -967,12 +944,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
   },
   deletedWarningText: {
     flex: 1,
     fontSize: 12,
-    color: '#fa5252',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -993,7 +968,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   avatarImage: {
     width: 38,
@@ -1001,7 +975,6 @@ const styles = StyleSheet.create({
     borderRadius: 19,
   },
   avatarText: {
-    color: '#495057',
     fontSize: 16,
     fontWeight: '600'
   },
@@ -1011,12 +984,10 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 2
   },
   submissionTime: {
     fontSize: 12,
-    color: '#868e96'
   },
   pendingBadge: {
     flexDirection: 'row',
@@ -1028,7 +999,6 @@ const styles = StyleSheet.create({
   },
   pendingBadgeText: {
     fontSize: 11,
-    color: '#2b8a3e',
     fontWeight: '600'
   },
   verifiedBadge: {
@@ -1041,7 +1011,6 @@ const styles = StyleSheet.create({
   },
   verifiedBadgeText: {
     fontSize: 11,
-    color: '#2b8a3e',
     fontWeight: '600'
   },
   rejectedBadge: {
@@ -1054,7 +1023,6 @@ const styles = StyleSheet.create({
   },
   rejectedBadgeText: {
     fontSize: 11,
-    color: '#fa5252',
     fontWeight: '600'
   },
   taskInfo: {
@@ -1065,12 +1033,10 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   taskTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#212529',
     flex: 1,
     lineHeight: 20
   },
@@ -1084,14 +1050,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#f8f9fa',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   detailText: {
     fontSize: 12,
-    color: '#495057'
   },
   evidenceRow: {
     flexDirection: 'row',
@@ -1099,7 +1063,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#f1f3f5'
   },
   hasPhotoBadge: {
     flexDirection: 'row',
@@ -1111,7 +1074,6 @@ const styles = StyleSheet.create({
   },
   hasPhotoText: {
     fontSize: 11,
-    color: '#2b8a3e',
     fontWeight: '500'
   },
   noPhotoBadge: {
@@ -1124,7 +1086,6 @@ const styles = StyleSheet.create({
   },
   noPhotoText: {
     fontSize: 11,
-    color: '#868e96',
     fontWeight: '500'
   },
   hasNotesBadge: {
@@ -1137,7 +1098,6 @@ const styles = StyleSheet.create({
   },
   hasNotesText: {
     fontSize: 11,
-    color: '#e67700',
     fontWeight: '500'
   },
   quickActions: {
@@ -1147,7 +1107,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f1f3f5'
   },
   quickRejectButton: {
     borderRadius: 8,
@@ -1167,12 +1126,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   quickRejectText: {
-    color: '#fa5252',
     fontSize: 13,
     fontWeight: '600'
   },
   quickApproveText: {
-    color: '#2b8a3e',
     fontSize: 13,
     fontWeight: '600'
   },
@@ -1184,11 +1141,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 6,
     borderWidth: 1,
-    borderColor: '#e9ecef'
   },
   adminNotesText: {
     fontSize: 12,
-    color: '#868e96',
     flex: 1,
     fontStyle: 'italic'
   }

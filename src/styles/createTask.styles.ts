@@ -1,10 +1,11 @@
-// src/styles/createTask.styles.ts
+// src/styles/createTask.styles.ts - Dark Mode Version
 import { StyleSheet } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
-export const createTaskStyles = StyleSheet.create({
+export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
   },
 
   // ─── Header ───────────────────────────────────────────────────────────────
@@ -14,19 +15,19 @@ export const createTaskStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.border,
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -35,7 +36,7 @@ export const createTaskStyles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     flex: 1,
     textAlign: 'center',
   },
@@ -57,7 +58,7 @@ export const createTaskStyles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#b2f2bb',
+    borderColor: theme.primaryBorder,
   },
   groupInfoContent: {
     flexDirection: 'row',
@@ -67,16 +68,16 @@ export const createTaskStyles = StyleSheet.create({
   },
   groupLabel: {
     fontSize: 12,
-    color: '#2b8a3e',
+    color: theme.primary,
   },
   groupName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
   },
   groupNote: {
     fontSize: 12,
-    color: '#495057',
+    color: theme.textSecondary,
     fontStyle: 'italic',
     marginLeft: 24,
   },
@@ -85,14 +86,14 @@ export const createTaskStyles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#ffec99',
+    borderColor: theme.primaryBorder,
   },
   infoContainer: {
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#b2f2bb',
+    borderColor: theme.primaryBorder,
   },
   warningContent: {
     flexDirection: 'row',
@@ -105,23 +106,23 @@ export const createTaskStyles = StyleSheet.create({
   warningTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#e67700',
+    color: theme.primary,
     marginBottom: 2,
   },
   warningMessage: {
     fontSize: 13,
-    color: '#e67700',
+    color: theme.primary,
     lineHeight: 18,
   },
   infoTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#2b8a3e',
+    color: theme.primary,
     marginBottom: 2,
   },
   infoMessage: {
     fontSize: 13,
-    color: '#2b8a3e',
+    color: theme.primary,
     lineHeight: 18,
   },
 
@@ -131,12 +132,12 @@ export const createTaskStyles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 20,
   },
   inputGroup: {
@@ -145,7 +146,7 @@ export const createTaskStyles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
+    color: theme.textSecondary,
     marginBottom: 6,
   },
   labelContainer: {
@@ -159,16 +160,16 @@ export const createTaskStyles = StyleSheet.create({
   inputGradient: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   inputErrorGradient: {
-    borderColor: '#fa5252',
+    borderColor: theme.error,
   },
   input: {
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#212529',
+    color: theme.text,
     backgroundColor: 'transparent',
   },
   textArea: {
@@ -182,12 +183,12 @@ export const createTaskStyles = StyleSheet.create({
   },
   helperText: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 4,
     marginLeft: 2,
   },
   errorText: {
-    color: '#fa5252',
+    color: theme.error,
     fontSize: 12,
     marginTop: 2,
   },
@@ -200,7 +201,7 @@ export const createTaskStyles = StyleSheet.create({
   },
   pointsLimitText: {
     fontSize: 11,
-    color: '#fa5252',
+    color: theme.error,
     fontWeight: '600',
   },
   pointsInputContainer: {
@@ -212,20 +213,20 @@ export const createTaskStyles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   pointsInput: {
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     backgroundColor: 'transparent',
     textAlign: 'center',
   },
   pointsLabel: {
     fontSize: 14,
-    color: '#495057',
+    color: theme.textSecondary,
     width: 50,
   },
   pointsUsageContainer: {
@@ -235,12 +236,12 @@ export const createTaskStyles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     overflow: 'hidden',
-    backgroundColor: '#e9ecef',
+    backgroundColor: theme.bgTertiary,
     marginBottom: 8,
   },
   pointsUsageFill: {
     height: '100%',
-    backgroundColor: '#2b8a3e',
+    backgroundColor: theme.primary,
     borderRadius: 4,
   },
   pointsUsageInfo: {
@@ -250,20 +251,20 @@ export const createTaskStyles = StyleSheet.create({
   },
   pointsUsageText: {
     fontSize: 12,
-    color: '#495057',
+    color: theme.textSecondary,
   },
   pointsUsageFull: {
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '600',
   },
   pointsRemainingText: {
     fontSize: 12,
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '500',
   },
   pointsFullText: {
     fontSize: 12,
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '600',
   },
 
@@ -277,10 +278,10 @@ export const createTaskStyles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   categoryChipActive: {
-    borderColor: '#2b8a3e',
+    borderColor: theme.primary,
   },
   categoryChipGradient: {
     flexDirection: 'row',
@@ -293,10 +294,10 @@ export const createTaskStyles = StyleSheet.create({
   categoryChipText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   categoryChipTextActive: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
   },
 
@@ -310,22 +311,22 @@ export const createTaskStyles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   frequencyButtonGradient: {
     paddingVertical: 12,
     alignItems: 'center',
   },
   frequencyButtonActive: {
-    borderColor: '#2b8a3e',
+    borderColor: theme.primary,
   },
   frequencyButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   frequencyButtonTextActive: {
-    color: 'white',
+    color: '#fff',
   },
 
   // ─── Time Slots ───────────────────────────────────────────────────────────
@@ -341,7 +342,7 @@ export const createTaskStyles = StyleSheet.create({
   },
   timeSlotsSubtitle: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 2,
   },
   addTimeSlotButton: {
@@ -361,30 +362,30 @@ export const createTaskStyles = StyleSheet.create({
   addTimeSlotText: {
     fontSize: 13,
     fontWeight: '600',
-    color: 'white',
+    color: '#fff',
   },
   addTimeSlotTextDisabled: {
-    color: '#868e96',
+    color: theme.textMuted,
   },
   emptyTimeSlots: {
     alignItems: 'center',
     paddingVertical: 30,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
     borderStyle: 'dashed',
   },
   emptyTimeSlotsText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 12,
     marginBottom: 4,
   },
   emptyTimeSlotsSubtext: {
     fontSize: 12,
-    color: '#adb5bd',
+    color: theme.textPlaceholder,
     textAlign: 'center',
   },
   timeSlotsList: {
@@ -397,10 +398,10 @@ export const createTaskStyles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   timeSlotItemError: {
-    borderColor: '#fa5252',
+    borderColor: theme.error,
   },
   timeSlotInfo: {
     flex: 1,
@@ -415,11 +416,11 @@ export const createTaskStyles = StyleSheet.create({
   timeSlotTime: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
   },
   timeSlotLabel: {
     fontSize: 12,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   pointsBadge: {
     paddingHorizontal: 8,
@@ -429,10 +430,10 @@ export const createTaskStyles = StyleSheet.create({
   pointsBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2b8a3e',
+    color: theme.primary,
   },
   pointsBadgeErrorText: {
-    color: '#fa5252',
+    color: theme.error,
   },
   timeSlotActions: {
     flexDirection: 'row',
@@ -442,11 +443,11 @@ export const createTaskStyles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   limitWarning: {
     flexDirection: 'row',
@@ -456,12 +457,12 @@ export const createTaskStyles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
+    borderColor: theme.errorBorder,
   },
   limitWarningText: {
     flex: 1,
     fontSize: 12,
-    color: '#fa5252',
+    color: theme.error,
   },
 
   // ─── Days ─────────────────────────────────────────────────────────────────
@@ -476,7 +477,7 @@ export const createTaskStyles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   dayButtonGradient: {
     flex: 1,
@@ -484,15 +485,15 @@ export const createTaskStyles = StyleSheet.create({
     alignItems: 'center',
   },
   dayButtonActive: {
-    borderColor: '#2b8a3e',
+    borderColor: theme.primary,
   },
   dayButtonText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   dayButtonTextActive: {
-    color: 'white',
+    color: '#fff',
   },
 
   // ─── Toggle ───────────────────────────────────────────────────────────────
@@ -505,19 +506,19 @@ export const createTaskStyles = StyleSheet.create({
     width: 48,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#e9ecef',
+    backgroundColor: theme.bgTertiary,
     padding: 2,
     justifyContent: 'center',
   },
   toggleSwitchActive: {
-    backgroundColor: '#2b8a3e',
+    backgroundColor: theme.primary,
   },
   toggleCircle: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'white',
-    shadowColor: '#000',
+    backgroundColor: '#fff',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -536,7 +537,7 @@ export const createTaskStyles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
+    borderColor: theme.errorBorder,
   },
 
   // ─── Action Buttons ───────────────────────────────────────────────────────
@@ -550,7 +551,7 @@ export const createTaskStyles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   cancelButtonGradient: {
     flexDirection: 'row',
@@ -561,14 +562,14 @@ export const createTaskStyles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   draftButton: {
     flex: 1,
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#6c757d',
+    borderColor: theme.textMuted,
   },
   draftButtonGradient: {
     flexDirection: 'row',
@@ -580,7 +581,7 @@ export const createTaskStyles = StyleSheet.create({
   draftButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'white',
+    color: '#fff',
   },
   submitButton: {
     flex: 1,
@@ -597,10 +598,10 @@ export const createTaskStyles = StyleSheet.create({
   submitButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'white',
+    color: '#fff',
   },
   submitButtonTextDisabled: {
-    color: '#868e96',
+    color: theme.textMuted,
   },
   buttonDisabled: {
     opacity: 0.7,
@@ -612,7 +613,7 @@ export const createTaskStyles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   infoList: {
     gap: 6,
@@ -624,7 +625,7 @@ export const createTaskStyles = StyleSheet.create({
   },
   infoText: {
     fontSize: 13,
-    color: '#495057',
+    color: theme.textSecondary,
     lineHeight: 18,
     flex: 1,
   },
@@ -637,7 +638,7 @@ export const createTaskStyles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmModalContainer: {
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 16,
     padding: 20,
     width: '80%',
@@ -646,13 +647,13 @@ export const createTaskStyles = StyleSheet.create({
   confirmModalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 12,
     textAlign: 'center',
   },
   confirmModalMessage: {
     fontSize: 14,
-    color: '#495057',
+    color: theme.textSecondary,
     marginBottom: 20,
     textAlign: 'center',
     lineHeight: 20,
@@ -668,17 +669,15 @@ export const createTaskStyles = StyleSheet.create({
     alignItems: 'center',
   },
   confirmModalCancelButton: {
-    backgroundColor: '#e9ecef',
+    backgroundColor: theme.bgTertiary,
   },
-  confirmModalConfirmButton: {
-    // background set by LinearGradient
-  },
+  confirmModalConfirmButton: {},
   confirmModalButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   confirmModalConfirmButtonText: {
-    color: 'white',
+    color: '#fff',
   },
 });

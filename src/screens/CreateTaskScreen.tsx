@@ -1,4 +1,4 @@
-// src/screens/CreateTaskScreen.tsx
+// src/screens/CreateTaskScreen.tsx - Dark Mode Added
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
@@ -16,7 +16,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-import { createTaskStyles as styles } from '../styles/createTask.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeCreateTaskStyles } from '../styles/createTask.styles';
 import { useCreateTask } from '../taskHook/useCreateTask';
 import { useRotationStatus } from '../hooks/useRotationStatus';
 import { TimeSlotModal } from '../components/TimeSlotModal';
@@ -85,6 +86,9 @@ const DEFAULT_FORM: FormState = {
 // ─── Screen ─────────────────────────────────────────────────────────────────
 
 export default function CreateTaskScreen({ navigation, route }: any) {
+  const { theme } = useTheme();
+  const styles = makeCreateTaskStyles(theme);
+  
   const { groupId, groupName, draftData, isEditingDraft, createFromDraft } = route.params || {};
   const { loading, error, success, createTask, reset, authError } = useCreateTask();
   const { status, checkStatus, getTaskRecommendation } = useRotationStatus(groupId);
@@ -407,7 +411,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>
           {currentDraftId ? 'Edit Draft' : 'Create Task'}
@@ -430,13 +434,13 @@ export default function CreateTaskScreen({ navigation, route }: any) {
             {/* Group Banner */}
             {groupName && (
               <LinearGradient
-                colors={['#e7f5ff', '#d0ebff']}
+                colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.groupInfo}
               >
                 <View style={styles.groupInfoContent}>
-                  <MaterialCommunityIcons name="account-group" size={16} color="#2b8a3e" />
+                  <MaterialCommunityIcons name="account-group" size={16} color={theme.primary} />
                   <View>
                     <Text style={styles.groupLabel}>Group:</Text>
                     <Text style={styles.groupName}>{groupName}</Text>
@@ -451,13 +455,13 @@ export default function CreateTaskScreen({ navigation, route }: any) {
             {/* Rotation Warning */}
             {status && !status.hasEnoughTasks && status.totalTasks > 0 && (
               <LinearGradient
-                colors={['#fff3bf', '#ffec99']}
+                colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.warningContainer}
               >
                 <View style={styles.warningContent}>
-                  <MaterialCommunityIcons name="alert" size={20} color="#e67700" />
+                  <MaterialCommunityIcons name="alert" size={20} color={theme.primary} />
                   <View style={styles.warningTextContainer}>
                     <Text style={styles.warningTitle}>Rotation Warning</Text>
                     <Text style={styles.warningMessage}>{recommendation?.message}</Text>
@@ -469,13 +473,13 @@ export default function CreateTaskScreen({ navigation, route }: any) {
             {/* No Tasks Info */}
             {status && status.totalTasks === 0 && (
               <LinearGradient
-                colors={['#e7f5ff', '#d0ebff']}
+                colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.infoContainer}
               >
                 <View style={styles.warningContent}>
-                  <MaterialCommunityIcons name="information" size={20} color="#2b8a3e" />
+                  <MaterialCommunityIcons name="information" size={20} color={theme.primary} />
                   <View style={styles.warningTextContainer}>
                     <Text style={styles.infoTitle}>No Tasks Yet</Text>
                     <Text style={styles.infoMessage}>
@@ -488,7 +492,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
             {/* ── Form ── */}
             <LinearGradient
-              colors={['#ffffff', '#f8f9fa']}
+              colors={[theme.card, theme.bgSecondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.formSection}
@@ -499,7 +503,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Title *</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.inputGradient}
@@ -507,11 +511,12 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   <TextInput
                     style={styles.input}
                     placeholder="What needs to be done?"
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
                     value={form.title}
                     onChangeText={t => updateForm({ title: t })}
                     maxLength={100}
                     editable={!loading}
+                    selectionColor={theme.primary}
                   />
                 </LinearGradient>
                 <Text style={styles.helperText}>{form.title.length}/100 characters</Text>
@@ -521,7 +526,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Description</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={[styles.inputGradient, styles.textAreaGradient]}
@@ -529,7 +534,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   <TextInput
                     style={[styles.input, styles.textArea]}
                     placeholder="Add more details about this task..."
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
                     value={form.description}
                     onChangeText={t => updateForm({ description: t })}
                     multiline
@@ -537,6 +542,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     textAlignVertical="top"
                     maxLength={500}
                     editable={!loading}
+                    selectionColor={theme.primary}
                   />
                 </LinearGradient>
                 <Text style={styles.helperText}>{form.description.length}/500 characters</Text>
@@ -547,7 +553,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 <View style={styles.labelContainer}>
                   <Text style={styles.label}>Total Task Points *</Text>
                   <LinearGradient
-                    colors={['#fff5f5', '#ffe3e3']}
+                    colors={[theme.errorBg, theme.errorBg]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.pointsLimitBadge}
@@ -557,7 +563,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 </View>
                 <View style={styles.pointsInputContainer}>
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={[
@@ -570,9 +576,10 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                       value={form.points}
                       onChangeText={handlePointsChange}
                       placeholder="1-10"
-                      placeholderTextColor="#adb5bd"
+                      placeholderTextColor={theme.textPlaceholder}
                       keyboardType="number-pad"
                       maxLength={2}
+                      selectionColor={theme.primary}
                     />
                   </LinearGradient>
                   <Text style={styles.pointsLabel}>points</Text>
@@ -586,7 +593,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               {/* Points Usage Bar */}
               <View style={styles.pointsUsageContainer}>
                 <LinearGradient
-                  colors={remainingPoints > 0 ? ['#d3f9d8', '#b2f2bb'] : ['#fff5f5', '#ffe3e3']}
+                  colors={remainingPoints > 0 ? [theme.primaryLight, theme.primaryLight] : [theme.errorBg, theme.errorBg]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.pointsUsageBar}
@@ -626,7 +633,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                         disabled={loading}
                       >
                         <LinearGradient
-                          colors={isActive ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                          colors={isActive ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                           style={styles.categoryChipGradient}
@@ -634,7 +641,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                           <MaterialCommunityIcons
                             name={icon as any}
                             size={16}
-                            color={isActive ? 'white' : '#495057'}
+                            color={isActive ? '#fff' : theme.textSecondary}
                           />
                           <Text
                             style={[
@@ -666,7 +673,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                         disabled={loading}
                       >
                         <LinearGradient
-                          colors={isActive ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                          colors={isActive ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                           style={styles.frequencyButtonGradient}
@@ -706,7 +713,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     disabled={!canAddMoreSlots || loading}
                   >
                     <LinearGradient
-                      colors={canAddMoreSlots ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                      colors={canAddMoreSlots ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.addTimeSlotGradient}
@@ -714,7 +721,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                       <MaterialCommunityIcons
                         name="plus"
                         size={16}
-                        color={canAddMoreSlots ? 'white' : '#868e96'}
+                        color={canAddMoreSlots ? '#fff' : theme.textMuted}
                       />
                       <Text
                         style={[
@@ -730,7 +737,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
                 {form.timeSlots.length === 0 ? (
                   <View style={styles.emptyTimeSlots}>
-                    <MaterialCommunityIcons name="clock-outline" size={40} color="#dee2e6" />
+                    <MaterialCommunityIcons name="clock-outline" size={40} color={theme.border} />
                     <Text style={styles.emptyTimeSlotsText}>No time slots added yet</Text>
                     <Text style={styles.emptyTimeSlotsSubtext}>
                       Tap "Add" to create time slots with points
@@ -744,7 +751,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                       return (
                         <LinearGradient
                           key={index}
-                          colors={exceeds ? ['#fff5f5', '#ffe3e3'] : ['#f8f9fa', '#e9ecef']}
+                          colors={exceeds ? [theme.errorBg, theme.errorBg] : [theme.bgSecondary, theme.bgTertiary]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                           style={[styles.timeSlotItem, exceeds && styles.timeSlotItemError]}
@@ -758,7 +765,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                               {slot.points && slotPts > 0 && (
                                 <LinearGradient
                                   colors={
-                                    exceeds ? ['#fff5f5', '#ffe3e3'] : ['#d3f9d8', '#b2f2bb']
+                                    exceeds ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]
                                   }
                                   start={{ x: 0, y: 0 }}
                                   end={{ x: 1, y: 1 }}
@@ -785,14 +792,14 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                               onPress={() => handleEditTimeSlot(index)}
                               disabled={loading}
                             >
-                              <MaterialCommunityIcons name="pencil" size={16} color="#495057" />
+                              <MaterialCommunityIcons name="pencil" size={16} color={theme.textSecondary} />
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.timeSlotActionButton}
                               onPress={() => handleRemoveTimeSlot(index)}
                               disabled={loading}
                             >
-                              <MaterialCommunityIcons name="delete" size={16} color="#fa5252" />
+                              <MaterialCommunityIcons name="delete" size={16} color={theme.error} />
                             </TouchableOpacity>
                           </View>
                         </LinearGradient>
@@ -803,12 +810,12 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
                 {!canAddMoreSlots && totalPoints > 0 && form.timeSlots.length > 0 && (
                   <LinearGradient
-                    colors={['#fff5f5', '#ffe3e3']}
+                    colors={[theme.errorBg, theme.errorBg]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.limitWarning}
                   >
-                    <MaterialCommunityIcons name="alert-circle" size={16} color="#fa5252" />
+                    <MaterialCommunityIcons name="alert-circle" size={16} color={theme.error} />
                     <Text style={styles.limitWarningText}>
                       All {totalPoints} points allocated. Adjust total or remove slots.
                     </Text>
@@ -831,7 +838,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                           disabled={loading}
                         >
                           <LinearGradient
-                            colors={isActive ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                            colors={isActive ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
                             style={styles.dayButtonGradient}
@@ -878,12 +885,12 @@ export default function CreateTaskScreen({ navigation, route }: any) {
             {/* Error */}
             {error && (
               <LinearGradient
-                colors={['#fff5f5', '#ffe3e3']}
+                colors={[theme.errorBg, theme.errorBg]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.errorBox}
               >
-                <MaterialCommunityIcons name="alert-circle" size={18} color="#fa5252" />
+                <MaterialCommunityIcons name="alert-circle" size={18} color={theme.error} />
                 <Text style={styles.errorText}>⚠️ {error}</Text>
               </LinearGradient>
             )}
@@ -897,7 +904,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 disabled={loading}
               >
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.cancelButtonGradient}
@@ -916,16 +923,16 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 disabled={isDraftDisabled() || isSavingDraft}
               >
                 <LinearGradient
-                  colors={['#6c757d', '#495057']}
+                  colors={[theme.textSecondary, theme.textMuted]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.draftButtonGradient}
                 >
                   {isSavingDraft ? (
-                    <ActivityIndicator color="white" size="small" />
+                    <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <>
-                      <MaterialCommunityIcons name="content-save" size={16} color="white" />
+                      <MaterialCommunityIcons name="content-save" size={16} color="#fff" />
                       <Text style={styles.draftButtonText}>
                         {currentDraftId ? 'Update' : 'Draft'}
                       </Text>
@@ -941,14 +948,14 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 disabled={isSubmitDisabled()}
               >
                 <LinearGradient
-                  colors={isSubmitDisabled() ? ['#f8f9fa', '#e9ecef'] : ['#2b8a3e', '#1e6b2c']}
+                  colors={isSubmitDisabled() ? [theme.bgSecondary, theme.bgTertiary] : [theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.submitButtonGradient}
                 >
                   {loading ? (
                     <ActivityIndicator
-                      color={isSubmitDisabled() ? '#495057' : 'white'}
+                      color={isSubmitDisabled() ? theme.textMuted : '#fff'}
                       size="small"
                     />
                   ) : (
@@ -956,7 +963,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                       <MaterialCommunityIcons
                         name="plus-circle"
                         size={16}
-                        color={isSubmitDisabled() ? '#868e96' : 'white'}
+                        color={isSubmitDisabled() ? theme.textMuted : '#fff'}
                       />
                       <Text
                         style={[
@@ -974,7 +981,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
             {/* Info Box */}
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.infoBox}
@@ -989,7 +996,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   'End time must be after start time',
                 ].map(rule => (
                   <View key={rule} style={styles.infoItem}>
-                    <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
+                    <MaterialCommunityIcons name="circle-small" size={16} color={theme.primary} />
                     <Text style={styles.infoText}>{rule}</Text>
                   </View>
                 ))}

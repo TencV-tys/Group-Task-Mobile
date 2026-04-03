@@ -1,4 +1,4 @@
-
+// src/components/SettingsModal.tsx - SIMPLE WORKING VERSION
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View,
@@ -16,6 +16,7 @@ import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { TokenUtils } from '../utils/tokenUtils';
+import { useTheme } from '../context/ThemeContext';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -38,6 +39,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onNavigateToAssignment,
   onRefreshTasks,
 }) => {
+  const { theme } = useTheme();
+  
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
   const [groupStats, setGroupStats] = useState<any>(null);
@@ -144,9 +147,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           if (earliestDate) {
             setFirstTaskDate(earliestDate);
             
-            // ✅ Calculate week based on first task creation (not calendar)
             const firstTaskDate = earliestDate as Date;
-            const weekDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             
             const weekStart = new Date(firstTaskDate);
             weekStart.setHours(0, 0, 0, 0);
@@ -158,7 +159,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             setWeekStartDate(weekStart);
             setWeekEndDate(weekEnd);
             
-            // ✅ Check week swap availability based on task creation
             checkWeekSwapAvailability(firstTaskDate);
           }
         }
@@ -173,24 +173,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // ✅ FIXED: Check week swap availability based on FIRST TASK CREATION DATE
   const checkWeekSwapAvailability = (firstTaskDate: Date) => {
     const now = new Date();
     const taskCreatedDate = new Date(firstTaskDate);
     
-    // Calculate hours since task was created
     const hoursSinceTaskCreated = (now.getTime() - taskCreatedDate.getTime()) / (1000 * 60 * 60);
     const isWithinFirst24Hours = hoursSinceTaskCreated >= 0 && hoursSinceTaskCreated <= 24;
     
     const taskCreatedDayName = taskCreatedDate.toLocaleDateString('en-US', { weekday: 'long' });
-    const taskCreatedDateStr = taskCreatedDate.toLocaleDateString();
-    
-    console.log(`📅 Week swap check:`, {
-      taskCreatedDate: taskCreatedDate.toISOString(),
-      taskCreatedDay: taskCreatedDayName,
-      hoursSinceTaskCreated,
-      now: now.toISOString()
-    });
     
     if (!isWithinFirst24Hours) { 
       setCanSwapWeek(false);
@@ -244,7 +234,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       return;
     }
 
-    // ✅ Include task creation date in navigation params
     navigation.navigate('CreateSwapRequest', {
       assignmentId: firstTask.assignment.id,
       groupId,
@@ -255,7 +244,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       executionFrequency: firstTask.executionFrequency,
       timeSlots: firstTask.timeSlots || [],
       scope: 'week',
-      taskCreatedAt: firstTask.createdAt || new Date().toISOString() // 👈 Pass task creation date
+      taskCreatedAt: firstTask.createdAt || new Date().toISOString()
     });
     onClose();
   };
@@ -309,7 +298,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     onClose();
   };
 
-  // ===== UPDATED: Changed from MemberContributions to TeamOverview =====
   const handleTeamOverview = async () => {
     const hasToken = await checkToken();
     if (!hasToken) return;
@@ -332,10 +320,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   const getLeaderboardGradientColors = (index: number): [string, string] => {
-    if (index === 0) return ['#fff3bf', '#ffec99']; // Gold
-    if (index === 1) return ['#f1f3f5', '#e9ecef']; // Silver
-    if (index === 2) return ['#f8f9fa', '#dee2e6']; // Bronze
-    return ['#f8f9fa', '#e9ecef']; // Default
+    if (index === 0) return [theme.primaryLight, theme.primaryLight];
+    if (index === 1) return [theme.bgSecondary, theme.bgTertiary];
+    if (index === 2) return [theme.bgSecondary, theme.bgTertiary];
+    return [theme.bgSecondary, theme.bgTertiary];
   };
 
   const renderLeaderboardItem = (item: any, index: number) => {
@@ -375,22 +363,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </Text>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName} numberOfLines={1}>
+            <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
               {item.userName}
             </Text>
-            <Text style={styles.userStats}>
+            <Text style={[styles.userStats, { color: theme.textMuted }]}>
               {item.assignments?.length || 0} tasks • {item.totalPoints} pts
             </Text>
           </View>
         </View>
         
         <LinearGradient
-          colors={['#d3f9d8', '#b2f2bb']}
+          colors={[theme.primaryLight, theme.primaryLight]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.pointsBadge}
         >
-          <Text style={styles.pointsText}>{item.totalPoints}</Text>
+          <Text style={[styles.pointsText, { color: theme.primary }]}>{item.totalPoints}</Text>
         </LinearGradient>
       </LinearGradient>
     );
@@ -420,28 +408,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       transparent={true}
       onRequestClose={onClose}
     >
-      <View style={styles.modalContainer}>
+      <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.modalContent}
+          style={[styles.modalContent, { backgroundColor: theme.card }]}
         >
           {/* Header */}
-          <View style={styles.modalHeader}>
+          <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
             <View style={styles.headerLeft}>
               <LinearGradient
-                colors={['#2b8a3e', '#1e6b2c']}
+                colors={[theme.primary, theme.primaryDark]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.headerIcon}
               >
                 <MaterialCommunityIcons name="cog" size={20} color="white" />
               </LinearGradient>
-              <Text style={styles.modalTitle}>{groupName}</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>{groupName}</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <MaterialCommunityIcons name="close" size={20} color="#868e96" />
+            <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: theme.bgTertiary }]}>
+              <MaterialCommunityIcons name="close" size={20} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -450,22 +438,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.sectionIcon}
                 >
-                  <MaterialCommunityIcons name="calendar-sync" size={16} color="#2b8a3e" />
+                  <MaterialCommunityIcons name="calendar-sync" size={16} color={theme.primary} />
                 </LinearGradient>
-                <Text style={styles.sectionTitle}>Rotation</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Rotation</Text>
               </View>
               
-              <View style={styles.rotationCard}>
+              <View style={[styles.rotationCard, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
                 <View>
-                  <Text style={styles.rotationLabel}>Current Week</Text>
-                  <Text style={styles.rotationValue}>Week {rotationWeek}</Text>
+                  <Text style={[styles.rotationLabel, { color: theme.textMuted }]}>Current Week</Text>
+                  <Text style={[styles.rotationValue, { color: theme.text }]}>Week {rotationWeek}</Text>
                   {weekStartDate && weekEndDate && (
-                    <Text style={styles.rotationDate}>
+                    <Text style={[styles.rotationDate, { color: theme.textMuted }]}>
                       {weekStartDate.toLocaleDateString()} - {weekEndDate.toLocaleDateString()}
                     </Text>
                   )}
@@ -474,10 +462,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
               <TouchableOpacity onPress={handleViewRotationSchedule} style={styles.menuItem}>
                 <View style={styles.menuItemLeft}>
-                  <MaterialCommunityIcons name="calendar-clock" size={18} color="#2b8a3e" />
-                  <Text style={styles.menuItemText}>Rotation Schedule</Text>
+                  <MaterialCommunityIcons name="calendar-clock" size={18} color={theme.primary} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Rotation Schedule</Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
 
@@ -486,22 +474,26 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.sectionIcon}
                   >
-                    <MaterialCommunityIcons name="swap-horizontal" size={16} color="#2b8a3e" />
+                    <MaterialCommunityIcons name="swap-horizontal" size={16} color={theme.primary} />
                   </LinearGradient>
-                  <Text style={styles.sectionTitle}>Week Swap</Text>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Week Swap</Text>
                 </View>
 
                 {loadingMyTasks ? (
-                  <ActivityIndicator size="small" color="#2b8a3e" style={styles.loader} />
+                  <ActivityIndicator size="small" color={theme.primary} style={styles.loader} />
                 ) : (
-                  <View style={[styles.swapCard, !canSwapWeek && styles.swapCardDisabled]}>
+                  <View style={[
+                    styles.swapCard, 
+                    { backgroundColor: theme.bgSecondary, borderColor: canSwapWeek ? theme.primary : theme.border },
+                    !canSwapWeek && styles.swapCardDisabled
+                  ]}>
                     <View style={styles.swapInfo}>
-                      <Text style={styles.swapDescription}>
+                      <Text style={[styles.swapDescription, { color: theme.text }]}>
                         Swap your week {rotationWeek} tasks
                       </Text>
                       
@@ -509,20 +501,20 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                         <MaterialCommunityIcons 
                           name={canSwapWeek ? "check-circle" : "clock-alert"} 
                           size={14} 
-                          color={canSwapWeek ? "#2b8a3e" : "#fa5252"} 
+                          color={canSwapWeek ? theme.primary : theme.error} 
                         />
                         <Text style={[
                           styles.weekAvailabilityText,
-                          canSwapWeek ? styles.availableText : styles.unavailableText
+                          { color: canSwapWeek ? theme.primary : theme.error }
                         ]}>
                           {canSwapWeek ? getHoursLeftText() : weekSwapReason}
                         </Text>
                       </View>
 
                       {canSwapWeek && (
-                        <View style={styles.taskCountBadge}>
-                          <MaterialCommunityIcons name="clipboard-text" size={12} color="#2b8a3e" />
-                          <Text style={styles.taskCountText}>
+                        <View style={[styles.taskCountBadge, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                          <MaterialCommunityIcons name="clipboard-text" size={12} color={theme.primary} />
+                          <Text style={[styles.taskCountText, { color: theme.primary }]}>
                             {incompleteCount} incomplete
                           </Text>
                         </View>
@@ -556,14 +548,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.sectionIcon}
                   >
-                    <MaterialCommunityIcons name="swap-horizontal" size={16} color="#2b8a3e" />
+                    <MaterialCommunityIcons name="swap-horizontal" size={16} color={theme.primary} />
                   </LinearGradient>
-                  <Text style={styles.sectionTitle}>Swap History</Text>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Swap History</Text>
                 </View>
 
                 <TouchableOpacity 
@@ -571,13 +563,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   style={styles.menuItem}
                 >
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="history" size={18} color="#2b8a3e" />
-                    <Text style={styles.menuItemText}>View All Swaps</Text>
+                    <MaterialCommunityIcons name="history" size={18} color={theme.primary} />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>View All Swaps</Text>
                   </View>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                  <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
                 </TouchableOpacity>
 
-                <Text style={styles.swapHistoryNote}>
+                <Text style={[styles.swapHistoryNote, { color: theme.textMuted }]}>
                   See all swap requests in this group, including pending, accepted, and rejected swaps.
                 </Text>
               </View>
@@ -587,22 +579,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.sectionIcon}
                 >
-                  <MaterialCommunityIcons name="history" size={16} color="#2b8a3e" />
+                  <MaterialCommunityIcons name="history" size={16} color={theme.primary} />
                 </LinearGradient>
-                <Text style={styles.sectionTitle}>History</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
               </View>
 
               <TouchableOpacity onPress={handleTaskCompletionHistory} style={styles.menuItem}>
                 <View style={styles.menuItemLeft}>
-                  <MaterialCommunityIcons name="clipboard-list" size={18} color="#2b8a3e" />
-                  <Text style={styles.menuItemText}>Task Completion History</Text>
+                  <MaterialCommunityIcons name="clipboard-list" size={18} color={theme.primary} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Task Completion History</Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
 
@@ -611,56 +603,55 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.sectionIcon}
                   >
-                    <MaterialCommunityIcons name="shield-account" size={16} color="#2b8a3e" />
+                    <MaterialCommunityIcons name="shield-account" size={16} color={theme.primary} />
                   </LinearGradient>
-                  <Text style={styles.sectionTitle}>Admin</Text>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Admin</Text>
                 </View>
 
                 <TouchableOpacity onPress={handleViewAssignment} style={styles.menuItem}>
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="account-switch" size={18} color="#2b8a3e" />
-                    <Text style={styles.menuItemText}>Manage Assignments</Text>
+                    <MaterialCommunityIcons name="account-switch" size={18} color={theme.primary} />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>Manage Assignments</Text>
                   </View>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                  <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={handleGroupSettings} style={styles.menuItem}>
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="cog" size={18} color="#2b8a3e" />
-                    <Text style={styles.menuItemText}>Group Settings</Text>
+                    <MaterialCommunityIcons name="cog" size={18} color={theme.primary} />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>Group Settings</Text>
                   </View>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                  <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={handleGroupActivity} style={styles.menuItem}>
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="chart-timeline-variant" size={18} color="#2b8a3e" />
-                    <Text style={styles.menuItemText}>Group Activity</Text>
+                    <MaterialCommunityIcons name="chart-timeline-variant" size={18} color={theme.primary} />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>Group Activity</Text>
                   </View>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                  <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
                 </TouchableOpacity>
 
-                {/* ===== UPDATED: Changed from MemberContributions to TeamOverview ===== */}
                 <TouchableOpacity onPress={handleTeamOverview} style={styles.menuItem}>
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="account-group" size={18} color="#2b8a3e" />
-                    <Text style={styles.menuItemText}>Team Overview</Text>
+                    <MaterialCommunityIcons name="account-group" size={18} color={theme.primary} />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>Team Overview</Text>
                   </View>
-                  <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                  <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
                 </TouchableOpacity>
 
                 <TouchableOpacity onPress={handleReviewSubmissions} style={[styles.menuItem, styles.reviewItem]}>
                   <View style={styles.menuItemLeft}>
-                    <MaterialCommunityIcons name="clipboard-check" size={18} color="#fa5252" />
-                    <Text style={styles.menuItemText}>Review Submissions</Text>
+                    <MaterialCommunityIcons name="clipboard-check" size={18} color={theme.error} />
+                    <Text style={[styles.menuItemText, { color: theme.text }]}>Review Submissions</Text>
                   </View>
                   <LinearGradient
-                    colors={['#fa5252', '#e03131']}
+                    colors={[theme.error, theme.error]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.pendingBadge}
@@ -675,47 +666,47 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.sectionIcon}
                 >
-                  <MaterialCommunityIcons name="chart-bar" size={16} color="#2b8a3e" />
+                  <MaterialCommunityIcons name="chart-bar" size={16} color={theme.primary} />
                 </LinearGradient>
-                <Text style={styles.sectionTitle}>Stats</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Stats</Text>
               </View>
 
               {loadingStats ? (
-                <ActivityIndicator size="small" color="#2b8a3e" style={styles.loader} />
+                <ActivityIndicator size="small" color={theme.primary} style={styles.loader} />
               ) : groupStats ? (
                 <View style={styles.statsGrid}>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{groupStats.totalTasks || 0}</Text>
-                    <Text style={styles.statLabel}>Tasks</Text>
+                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.totalTasks || 0}</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Tasks</Text>
                   </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{groupStats.currentWeek?.totalAssignments || 0}</Text>
-                    <Text style={styles.statLabel}>This Week</Text>
+                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.currentWeek?.totalAssignments || 0}</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>This Week</Text>
                   </View>
-                  <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{groupStats.recurringTasks || 0}</Text>
-                    <Text style={styles.statLabel}>Recurring</Text>
+                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.recurringTasks || 0}</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Recurring</Text>
                   </View>
-                  <View style={[styles.statItem, styles.pointsStat]}>
-                    <Text style={styles.statNumber}>{groupStats.currentWeek?.completedPoints || 0}</Text>
-                    <Text style={styles.statLabel}>Points</Text>
+                  <View style={[styles.statItem, styles.pointsStat, { backgroundColor: theme.primaryLight, borderColor: theme.primaryBorder }]}>
+                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.currentWeek?.completedPoints || 0}</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Points</Text>
                   </View>
                 </View>
               ) : (
-                <Text style={styles.noDataText}>No stats available</Text>
+                <Text style={[styles.noDataText, { color: theme.textPlaceholder }]}>No stats available</Text>
               )}
 
               <TouchableOpacity onPress={handleTaskStatistics} style={styles.menuItem}>
                 <View style={styles.menuItemLeft}>
-                  <MaterialCommunityIcons name="chart-box" size={18} color="#2b8a3e" />
-                  <Text style={styles.menuItemText}>Detailed Statistics</Text>
+                  <MaterialCommunityIcons name="chart-box" size={18} color={theme.primary} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Detailed Statistics</Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
 
@@ -723,51 +714,51 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.sectionIcon}
                 >
-                  <MaterialCommunityIcons name="podium" size={16} color="#2b8a3e" />
+                  <MaterialCommunityIcons name="podium" size={16} color={theme.primary} />
                 </LinearGradient>
-                <Text style={styles.sectionTitle}>Leaderboard</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Leaderboard</Text>
               </View>
 
               {loadingLeaderboard ? (
-                <ActivityIndicator size="small" color="#2b8a3e" style={styles.loader} />
+                <ActivityIndicator size="small" color={theme.primary} style={styles.loader} />
               ) : leaderboard.length > 0 ? (
                 <View style={styles.leaderboardContainer}>
                   {leaderboard.slice(0, 5).map(renderLeaderboardItem)}
                 </View>
               ) : (
-                <Text style={styles.noDataText}>No data yet</Text>
+                <Text style={[styles.noDataText, { color: theme.textPlaceholder }]}>No data yet</Text>
               )}
 
               <TouchableOpacity onPress={handleViewFullLeaderboard} style={styles.menuItem}>
                 <View style={styles.menuItemLeft}>
-                  <MaterialCommunityIcons name="trophy" size={18} color="#2b8a3e" />
-                  <Text style={styles.menuItemText}>Full Leaderboard</Text>
+                  <MaterialCommunityIcons name="trophy" size={18} color={theme.primary} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Full Leaderboard</Text>
                 </View>
-                <MaterialCommunityIcons name="chevron-right" size={18} color="#adb5bd" />
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
           </ScrollView>
 
           {/* Footer */}
           <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
+            colors={[theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.modalFooter}
+            style={[styles.modalFooter, { borderTopColor: theme.border }]}
           >
-            <Text style={styles.footerText}>ID: {groupId.substring(0, 8)}...</Text>
+            <Text style={[styles.footerText, { color: theme.textMuted }]}>ID: {groupId.substring(0, 8)}...</Text>
             <LinearGradient
-              colors={isAdmin ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+              colors={isAdmin ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.roleBadge}
             >
-              <Text style={[styles.footerRole, isAdmin && styles.adminRole]}>
+              <Text style={[styles.footerRole, { color: isAdmin ? theme.primary : theme.textSecondary }]}>
                 {isAdmin ? 'Admin' : 'Member'}
               </Text>
             </LinearGradient>
@@ -781,13 +772,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end'
+    justifyContent: 'flex-end',
   },
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%'
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -795,7 +785,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef'
   },
   headerLeft: {
     flexDirection: 'row',
@@ -812,13 +801,11 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529',
   },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f1f3f5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -831,11 +818,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef'
   },
   footerText: {
     fontSize: 12,
-    color: '#868e96',
   },
   roleBadge: {
     paddingHorizontal: 12,
@@ -844,12 +829,7 @@ const styles = StyleSheet.create({
   },
   footerRole: {
     fontSize: 12,
-    color: '#495057',
     fontWeight: '500',
-  },
-  adminRole: {
-    color: '#2b8a3e',
-    fontWeight: '600',
   },
   section: {
     marginBottom: 24,
@@ -870,7 +850,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -890,7 +869,6 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     fontSize: 15,
-    color: '#212529',
     fontWeight: '500',
   },
   reviewItem: {
@@ -900,38 +878,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
+    borderWidth: 1,
   },
   rotationLabel: {
     fontSize: 13,
-    color: '#868e96',
     marginBottom: 2,
   },
   rotationValue: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529',
   },
   rotationDate: {
     fontSize: 11,
-    color: '#868e96',
     marginTop: 4,
   },
   swapCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f8f9fa',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#2b8a3e',
   },
   swapCardDisabled: {
-    borderColor: '#e9ecef',
     opacity: 0.7,
   },
   swapInfo: {
@@ -940,7 +912,6 @@ const styles = StyleSheet.create({
   },
   swapDescription: {
     fontSize: 14,
-    color: '#212529',
     marginBottom: 8,
     fontWeight: '500',
   },
@@ -955,25 +926,18 @@ const styles = StyleSheet.create({
     flex: 1,
     fontWeight: '500',
   },
-  availableText: {
-    color: '#2b8a3e',
-  },
-  unavailableText: {
-    color: '#fa5252',
-  },
   taskCountBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
     alignSelf: 'flex-start',
     gap: 4,
+    borderWidth: 1,
   },
   taskCountText: {
     fontSize: 11,
-    color: '#2b8a3e',
     fontWeight: '600',
   },
   swapActionButton: {
@@ -1003,27 +967,24 @@ const styles = StyleSheet.create({
   statItem: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#f8f9fa',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
+    borderWidth: 1,
   },
   pointsStat: {
-    backgroundColor: '#d3f9d8',
+    borderWidth: 1,
   },
   statNumber: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#212529',
     marginBottom: 2,
   },
   statLabel: {
     fontSize: 11,
-    color: '#868e96',
   },
   noDataText: {
     fontSize: 13,
-    color: '#adb5bd',
     textAlign: 'center',
     paddingVertical: 16,
     fontStyle: 'italic',
@@ -1089,12 +1050,10 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 1,
   },
   userStats: {
     fontSize: 11,
-    color: '#868e96',
   },
   pointsBadge: {
     paddingHorizontal: 8,
@@ -1102,7 +1061,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   pointsText: {
-    color: '#2b8a3e',
     fontWeight: 'bold',
     fontSize: 11,
   },
@@ -1118,10 +1076,9 @@ const styles = StyleSheet.create({
   },
   swapHistoryNote: {
     fontSize: 12,
-    color: '#868e96',
     marginTop: 8,
     marginBottom: 4,
-    paddingHorizontal: 4, 
+    paddingHorizontal: 4,
     fontStyle: 'italic',
   },
-}); 
+});

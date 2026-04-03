@@ -1,6 +1,5 @@
-// src/screens/AdminDashboardScreen.tsx - FIXED to use hook's totalPendingForAdmin
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+// src/screens/AdminDashboardScreen.tsx - Dark Mode Added
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,10 +25,14 @@ import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { SettingsModal } from '../components/SettingsModal';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { adminDashboardStyles as styles } from '../styles/adminDashboard.styles';
-import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests'; // ✅ Import the hook
+import { useTheme } from '../context/ThemeContext';
+import { makeAdminDashboardStyles } from '../styles/adminDashboard.styles';
+import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 
 export const AdminDashboardScreen = ({ navigation, route }: any) => {
+  const { theme, isDark } = useTheme();
+  const styles = useMemo(() => makeAdminDashboardStyles(theme), [theme]);
+  
   const { groupId, groupName } = route.params;
   
   const [loading, setLoading] = useState(true);
@@ -48,7 +51,6 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
   
   const { status, checkStatus, authError: rotationAuthError } = useRotationStatus(groupId);
   
-  // ✅ Use the swap requests hook to get the actual pending count
   const { 
     totalPendingForAdmin, 
     loadPendingForAdmin,
@@ -259,13 +261,11 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
           setMembers(dashboardResult.data.members);
           setRecentActivity(dashboardResult.data.recentActivity || []);
           
-          // ✅ Also refresh pending approvals
           await loadPendingForAdmin(groupId);
           
           initialLoadDone.current = true;
         }
       } else {
-        // Fallback to individual calls
         console.log('Falling back to individual API calls...');
         
         const statsResult = await TaskService.getTaskStatistics(groupId);
@@ -283,7 +283,6 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
           setRecentActivity(activityResult.data || []);
         }
         
-        // ✅ Refresh pending approvals
         await loadPendingForAdmin(groupId);
       }
 
@@ -323,7 +322,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
     title, 
     value, 
     icon, 
-    color = '#2b8a3e', 
+    color = theme.primary, 
     subtitle,
     onPress,
     navigateTo,
@@ -369,7 +368,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
           <MaterialCommunityIcons 
             name="chevron-right" 
             size={16} 
-            color="#adb5bd" 
+            color={theme.textMuted} 
             style={{ position: 'absolute', bottom: 12, right: 12 }}
           />
         )}
@@ -399,7 +398,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
       activeOpacity={0.7}
     >
       <LinearGradient
-        colors={member.inRotation ? ['#ffffff', '#f8f9fa'] : ['#f8f9fa', '#e9ecef']}
+        colors={member.inRotation ? [theme.card, theme.bgSecondary] : [theme.bgSecondary, theme.bgTertiary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.memberCard}
@@ -409,7 +408,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             <Image source={{ uri: member.avatarUrl }} style={styles.memberAvatarImage} />
           ) : (
             <LinearGradient
-              colors={member.role === 'ADMIN' ? ['#2b8a3e', '#1e6b2c'] : ['#495057', '#343a40']}
+              colors={member.role === 'ADMIN' ? [theme.primary, theme.primaryDark] : [theme.textSecondary, theme.textMuted]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.memberAvatar}
@@ -424,7 +423,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             <Text style={styles.memberName}>{member.fullName}</Text>
             <View style={styles.memberBadges}>
               <LinearGradient
-                colors={member.role === 'ADMIN' ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+                colors={member.role === 'ADMIN' ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.roleBadge}
@@ -440,29 +439,29 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
               {member.role !== 'ADMIN' && (
                 member.inRotation ? (
                   <LinearGradient
-                    colors={['#d3f9d8', '#b2f2bb']}
+                    colors={[theme.primaryLight, theme.primaryLight]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.rotationBadge}
                   >
-                    <MaterialCommunityIcons name="sync" size={12} color="#2b8a3e" />
+                    <MaterialCommunityIcons name="sync" size={12} color={theme.primary} />
                     <Text style={styles.rotationBadgeText}>In Rotation</Text>
                   </LinearGradient>
                 ) : (
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.rotationBadge}
                   >
-                    <MaterialCommunityIcons name="sync-off" size={12} color="#868e96" />
+                    <MaterialCommunityIcons name="sync-off" size={12} color={theme.textMuted} />
                     <Text style={styles.rotationBadgeTextOff}>No Rotation</Text>
                   </LinearGradient>
                 )
               )}
             </View>
           </View>
-          <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+          <MaterialCommunityIcons name="chevron-right" size={20} color={theme.textMuted} />
         </View>
       </LinearGradient>
     </TouchableOpacity>
@@ -481,17 +480,17 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
 
     const getColor = (type: string) => {
       switch(type) {
-        case 'TASK_COMPLETED': return '#2b8a3e';
-        case 'TASK_VERIFIED': return '#2b8a3e';
-        case 'TASK_CREATED': return '#2b8a3e';
-        case 'SUBMISSION_PENDING': return '#e67700';
-        default: return '#495057';
+        case 'TASK_COMPLETED': return theme.primary;
+        case 'TASK_VERIFIED': return theme.primary;
+        case 'TASK_CREATED': return theme.primary;
+        case 'SUBMISSION_PENDING': return theme.primary;
+        default: return theme.textSecondary;
       }
     };
 
     return (
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.activityItem}
@@ -519,13 +518,13 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
       <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Admin Dashboard</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Loading dashboard...</Text>
         </View>
       </ScreenWrapper>
@@ -537,17 +536,17 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
       <ScreenWrapper style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Admin Dashboard</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={styles.centerContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
+          <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => loadDashboardData()}>
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.retryButtonGradient}
@@ -563,25 +562,24 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
   const admins = members.filter(m => m.role === 'ADMIN');
   const membersInRotation = members.filter(m => m.role !== 'ADMIN' && m.isActive);
 
-  // ✅ Log the actual pending count from the hook
   console.log(`🎯 Rendering dashboard with totalPendingForAdmin: ${totalPendingForAdmin}`);
 
   return (
     <ScreenWrapper style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
         
         <Text style={styles.headerTitle}>{groupName}</Text>
         
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-            <MaterialCommunityIcons name="refresh" size={22} color="#2b8a3e" />
+            <MaterialCommunityIcons name="refresh" size={22} color={theme.primary} />
           </TouchableOpacity>
           
           <TouchableOpacity onPress={handleSettingsPress} style={styles.settingsButton}>
-            <MaterialCommunityIcons name="cog" size={22} color="#2b8a3e" />
+            <MaterialCommunityIcons name="cog" size={22} color={theme.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -592,15 +590,15 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         contentContainerStyle={styles.scrollContent}
       >
         {/* Welcome Section */}
         <LinearGradient
-          colors={['#2b8a3e', '#1e6b2c']}
+          colors={[theme.primary, theme.primaryDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.welcomeCard}
@@ -621,7 +619,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             activeOpacity={0.7}
           >
             <LinearGradient
-              colors={rotationStatus.hasEnoughTasks ? ['#d3f9d8', '#b2f2bb'] : ['#fff3bf', '#ffec99']}
+              colors={rotationStatus.hasEnoughTasks ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.rotationCard}
@@ -630,11 +628,11 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
                 <MaterialCommunityIcons
                   name={rotationStatus.hasEnoughTasks ? "check-circle" : "alert"}
                   size={24}
-                  color={rotationStatus.hasEnoughTasks ? "#2b8a3e" : "#e67700"}
+                  color={rotationStatus.hasEnoughTasks ? theme.primary : theme.primary}
                 />
                 <Text style={[
                   styles.rotationTitle,
-                  { color: rotationStatus.hasEnoughTasks ? "#2b8a3e" : "#e67700" }
+                  { color: rotationStatus.hasEnoughTasks ? theme.primary : theme.primary }
                 ]}>
                   Rotation Status
                 </Text>
@@ -661,7 +659,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
               <MaterialCommunityIcons 
                 name="chevron-right" 
                 size={20} 
-                color="#adb5bd" 
+                color={theme.textMuted} 
                 style={{ position: 'absolute', bottom: 16, right: 16 }}
               />
             </LinearGradient>
@@ -675,7 +673,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             title="Total Members"
             value={members.length}
             icon="account-group"
-            color="#2b8a3e"
+            color={theme.primary}
             navigateTo="GroupMembers"
             navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
@@ -683,7 +681,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             title="Active Members"
             value={members.filter(m => m.isActive).length}
             icon="account-check"
-            color="#2b8a3e"
+            color={theme.primary}
             navigateTo="GroupMembers"
             navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
@@ -691,7 +689,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             title="In Rotation"
             value={membersInRotation.length}
             icon="sync"
-            color="#2b8a3e"
+            color={theme.primary}
             navigateTo="RotationSchedule"
             navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
@@ -699,7 +697,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             title="Admins"
             value={admins.length}
             icon="shield-account"
-            color="#2b8a3e"
+            color={theme.primary}
             navigateTo="GroupMembers"
             navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
@@ -707,140 +705,137 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             title="Neglected Tasks"
             value={stats?.neglectedCount || 0}
             icon="timer-off"
-            color="#fa5252"
+            color={theme.error}
             navigateTo="NeglectedTasks"
             navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
         </View>
 
-       {/* Task Stats - 2x4 Grid (8 cards) - NO badge on Swap Approvals card */}
-{stats && (
-  <>
-    <Text style={styles.sectionTitle}>Task Statistics</Text>
-    <View style={styles.statsGrid}>
-      {/* Row 1 */}
-      <StatCard
-        title="Total Tasks"
-        value={stats.totalTasks || 0}
-        icon="format-list-checks"
-        color="#2b8a3e"
-        navigateTo="GroupTasks"
-        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-      />
-      <StatCard
-        title="Recurring"
-        value={stats.recurringTasks || 0}
-        icon="repeat"
-        color="#2b8a3e"
-        navigateTo="RotationSchedule"
-        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-      />
-      <StatCard
-        title="This Week"
-        value={stats.currentWeek?.totalAssignments || 0}
-        icon="calendar-week"
-        color="#2b8a3e"
-        navigateTo="TaskCompletionHistory"
-        navigationParams={{ groupId, groupName, userRole: 'ADMIN', week: stats.currentWeek?.weekNumber }}
-      />
-      <StatCard
-        title="Completed"
-        value={stats.currentWeek?.completedAssignments || 0}
-        icon="check-circle"
-        color="#2b8a3e"
-        subtitle={`${stats.currentWeek?.completedPoints || 0} pts`}
-        navigateTo="TaskCompletionHistory"
-        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-      />
-      
-      {/* Row 2 */}
-      <StatCard
-        title="Pending"
-        value={stats.currentWeek?.pendingAssignments || 0}
-        icon="clock-outline"
-        color="#e67700"
-        navigateTo="TaskCompletionHistory"
-        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-      />
-      <StatCard
-        title="Team Overview"
-        value={members.length}
-        icon="account-group"
-        color="#2b8a3e"
-        navigateTo="TeamOverview"
-        navigationParams={{ groupId, groupName }}
-      />
-      <StatCard
-        title="Swap Approvals"
-        value={totalPendingForAdmin}
-        icon="swap-horizontal"
-        color="#e67700"
-        navigateTo="AdminSwapApprovals"
-        navigationParams={{ groupId, groupName }}
-        // ✅ NO badge here - removed the badge prop
-      />
-      <StatCard
-        title="Completion Rate"
-        value={`${stats.currentWeek?.totalAssignments > 0
-          ? Math.round((stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100)
-          : 0}%`}
-        icon="percent"
-        color="#2b8a3e"
-        navigateTo="TaskCompletionHistory"
-        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-      />
-    </View>
+        {/* Task Stats - 2x4 Grid (8 cards) */}
+        {stats && (
+          <>
+            <Text style={styles.sectionTitle}>Task Statistics</Text>
+            <View style={styles.statsGrid}>
+              <StatCard
+                title="Total Tasks"
+                value={stats.totalTasks || 0}
+                icon="format-list-checks"
+                color={theme.primary}
+                navigateTo="GroupTasks"
+                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+              />
+              <StatCard
+                title="Recurring"
+                value={stats.recurringTasks || 0}
+                icon="repeat"
+                color={theme.primary}
+                navigateTo="RotationSchedule"
+                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+              />
+              <StatCard
+                title="This Week"
+                value={stats.currentWeek?.totalAssignments || 0}
+                icon="calendar-week"
+                color={theme.primary}
+                navigateTo="TaskCompletionHistory"
+                navigationParams={{ groupId, groupName, userRole: 'ADMIN', week: stats.currentWeek?.weekNumber }}
+              />
+              <StatCard
+                title="Completed"
+                value={stats.currentWeek?.completedAssignments || 0}
+                icon="check-circle"
+                color={theme.primary}
+                subtitle={`${stats.currentWeek?.completedPoints || 0} pts`}
+                navigateTo="TaskCompletionHistory"
+                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+              />
+              
+              <StatCard
+                title="Pending"
+                value={stats.currentWeek?.pendingAssignments || 0}
+                icon="clock-outline"
+                color={theme.primary}
+                navigateTo="TaskCompletionHistory"
+                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+              />
+              <StatCard
+                title="Team Overview"
+                value={members.length}
+                icon="account-group"
+                color={theme.primary}
+                navigateTo="TeamOverview"
+                navigationParams={{ groupId, groupName }}
+              />
+              <StatCard
+                title="Swap Approvals"
+                value={totalPendingForAdmin}
+                icon="swap-horizontal"
+                color={theme.primary}
+                navigateTo="AdminSwapApprovals"
+                navigationParams={{ groupId, groupName }}
+              />
+              <StatCard
+                title="Completion Rate"
+                value={`${stats.currentWeek?.totalAssignments > 0
+                  ? Math.round((stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100)
+                  : 0}%`}
+                icon="percent"
+                color={theme.primary}
+                navigateTo="TaskCompletionHistory"
+                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+              />
+            </View>
 
-    {/* Completion Progress */}
-    <TouchableOpacity
-      onPress={() => navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole: 'ADMIN' })}
-      activeOpacity={0.7}
-    >
-      <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.progressCard}
-      >
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>Weekly Completion</Text>
-          <Text style={styles.progressPercentage}>
-            {stats.currentWeek?.totalAssignments > 0
-              ? Math.round((stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100)
-              : 0}%
-          </Text>
-        </View>
-        <View style={styles.progressBarContainer}>
-          <View
-            style={[
-              styles.progressBar,
-              {
-                width: `${stats.currentWeek?.totalAssignments > 0
-                  ? (stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100
-                  : 0}%`,
-                backgroundColor: '#2b8a3e'
-              }
-            ]}
-          />
-        </View>
-        <View style={styles.progressStats}>
-          <Text style={styles.progressStatsText}>
-            {stats.currentWeek?.completedAssignments || 0} of {stats.currentWeek?.totalAssignments || 0} tasks
-          </Text>
-          <Text style={styles.progressStatsText}>
-            {stats.currentWeek?.completedPoints || 0} pts earned
-          </Text>
-        </View>
-        <MaterialCommunityIcons 
-          name="chevron-right" 
-          size={20} 
-          color="#adb5bd" 
-          style={{ position: 'absolute', bottom: 16, right: 16 }}
-        />
-      </LinearGradient>
-    </TouchableOpacity>
-  </>
-)}
+            {/* Completion Progress */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole: 'ADMIN' })}
+              activeOpacity={0.7}
+            >
+              <LinearGradient
+                colors={[theme.card, theme.bgSecondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.progressCard}
+              >
+                <View style={styles.progressHeader}>
+                  <Text style={styles.progressTitle}>Weekly Completion</Text>
+                  <Text style={styles.progressPercentage}>
+                    {stats.currentWeek?.totalAssignments > 0
+                      ? Math.round((stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100)
+                      : 0}%
+                  </Text>
+                </View>
+                <View style={styles.progressBarContainer}>
+                  <View
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: `${stats.currentWeek?.totalAssignments > 0
+                          ? (stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100
+                          : 0}%`,
+                        backgroundColor: theme.primary
+                      }
+                    ]}
+                  />
+                </View>
+                <View style={styles.progressStats}>
+                  <Text style={styles.progressStatsText}>
+                    {stats.currentWeek?.completedAssignments || 0} of {stats.currentWeek?.totalAssignments || 0} tasks
+                  </Text>
+                  <Text style={styles.progressStatsText}>
+                    {stats.currentWeek?.completedPoints || 0} pts earned
+                  </Text>
+                </View>
+                <MaterialCommunityIcons 
+                  name="chevron-right" 
+                  size={20} 
+                  color={theme.textMuted} 
+                  style={{ position: 'absolute', bottom: 16, right: 16 }}
+                />
+              </LinearGradient>
+            </TouchableOpacity>
+          </>
+        )}
 
         {/* Recent Activity */}
         {recentActivity.length > 0 && (
@@ -866,7 +861,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             onPress={() => navigation.navigate('CreateTask', { groupId, groupName })}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.actionGradient}
@@ -881,7 +876,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             onPress={() => navigation.navigate('TaskAssignment', { groupId, groupName, userRole: 'ADMIN' })}
           >
             <LinearGradient
-              colors={['#495057', '#343a40']}
+              colors={[theme.textSecondary, theme.textMuted]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.actionGradient}
@@ -896,7 +891,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             onPress={() => navigation.navigate('GroupMembers', { groupId, groupName, userRole: 'ADMIN' })}
           >
             <LinearGradient
-              colors={['#495057', '#343a40']}
+              colors={[theme.textSecondary, theme.textMuted]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.actionGradient}
@@ -911,7 +906,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             onPress={() => navigation.navigate('RotationSchedule', { groupId, groupName, userRole: 'ADMIN' })}
           >
             <LinearGradient
-              colors={['#495057', '#343a40']}
+              colors={[theme.textSecondary, theme.textMuted]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.actionGradient}
@@ -927,14 +922,14 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             onPress={() => navigation.navigate('AdminSwapApprovals', { groupId, groupName })}
           >
             <LinearGradient
-              colors={['#e67700', '#cc5c00']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.actionGradient}
             >
               <MaterialCommunityIcons name="swap-horizontal" size={24} color="white" />
               <Text style={styles.actionText}>Swap Approvals</Text>
-              {totalPendingForAdmin > 0 && ( // ✅ Use hook's value
+              {totalPendingForAdmin > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{totalPendingForAdmin}</Text>
                 </View>

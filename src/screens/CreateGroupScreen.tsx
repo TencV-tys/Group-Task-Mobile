@@ -1,50 +1,50 @@
-// src/screens/CreateGroupScreen.tsx - UPDATED with clean, user-friendly UI
-import React, { useState, useEffect } from 'react';
+// src/screens/CreateGroupScreen.tsx - Upgraded with Dark Mode & Performance
+import React, { useState, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
   TextInput, 
   TouchableOpacity, 
-  StyleSheet,
-
   Alert, 
   ActivityIndicator,
   ScrollView,
   KeyboardAvoidingView,
-  Platform
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCreateGroup } from '../groupHook/useCreateGroup';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
+import { makeCreateGroupStyles } from '../styles/createGroup.styles';
+
 export default function CreateGroupScreen({ navigation }: any) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeCreateGroupStyles(theme), [theme]);
+  
   const [groupName, setGroupName] = useState(''); 
   const [description, setDescription] = useState('');
   
-  const { loading, message, success, createGroup, reset } = useCreateGroup();
+  const { loading, message, success, createGroup, reset, authError } = useCreateGroup();
 
-  const { authError } = useCreateGroup();
+  // Auth error handler
+  React.useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+      );
+    }
+  }, [authError, navigation]);
 
-useEffect(() => {
-  if (authError) {
-    Alert.alert(
-      'Session Expired',
-      'Please log in again',
-      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-    );
-  }
-}, [authError]);
-
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
     if (!groupName.trim()) {
       Alert.alert('Error', 'Please enter a group name');
       return;
     }
     
-    console.log('Creating group:', groupName);
-    
     const processedDescription = description && description.trim() ? description.trim() : undefined;
-    
     const result = await createGroup(groupName.trim(), processedDescription);
     
     if (result.success) {
@@ -64,12 +64,14 @@ useEffect(() => {
     } else {
       Alert.alert('Error', result.message || 'Failed to create group');
     }
-  };
-  
-  const handleCancel = () => {
+  }, [groupName, description, createGroup, reset, navigation]);
+
+  const handleCancel = useCallback(() => {
     reset();
     navigation.goBack();
-  };
+  }, [reset, navigation]);
+
+  const isFormValid = groupName.trim().length > 0;
 
   return (
     <ScreenWrapper style={styles.container}>
@@ -78,7 +80,7 @@ useEffect(() => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.bg, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ flex: 1 }}
@@ -94,18 +96,19 @@ useEffect(() => {
                 onPress={handleCancel}
                 disabled={loading}
                 style={styles.backButton}
+                activeOpacity={0.7}
               >
-                <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
+                <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
               </TouchableOpacity>
               
               <View style={styles.headerCenter}>
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}
+                  colors={[theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.headerIcon}
                 >
-                  <MaterialCommunityIcons name="account-group" size={24} color="white" />
+                  <MaterialCommunityIcons name="account-group" size={24} color="#fff" />
                 </LinearGradient>
                 <Text style={styles.title}>Create New Group</Text>
               </View>
@@ -120,15 +123,15 @@ useEffect(() => {
             {/* Message Display */}
             {message ? (
               <LinearGradient
-                colors={success ? ['#d3f9d8', '#b2f2bb'] : ['#fff5f5', '#ffe3e3']}
+                colors={success ? [theme.primaryLight, theme.primaryLight] : [theme.errorBg, theme.errorBg]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.messageBox}
+                style={[styles.messageBox, { borderColor: success ? theme.primaryBorder : theme.errorBorder }]}
               >
                 <MaterialCommunityIcons 
                   name={success ? "check-circle" : "alert-circle"} 
                   size={20} 
-                  color={success ? "#2b8a3e" : "#fa5252"} 
+                  color={success ? theme.primary : theme.error} 
                 />
                 <Text style={[
                   styles.messageText,
@@ -146,20 +149,21 @@ useEffect(() => {
             </View>
             
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.inputGradient}
+              style={[styles.inputGradient, { borderColor: theme.border }]}
             >
-              <MaterialCommunityIcons name="account-group" size={20} color="#868e96" style={styles.inputIcon} />
+              <MaterialCommunityIcons name="account-group" size={20} color={theme.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="e.g., Family, Roommates, Team"
-                placeholderTextColor="#adb5bd"
+                placeholderTextColor={theme.textPlaceholder}
                 value={groupName}
                 onChangeText={setGroupName}
                 editable={!loading}
                 autoFocus
+                selectionColor={theme.primary}
               />
             </LinearGradient>
             
@@ -170,33 +174,34 @@ useEffect(() => {
             </View>
             
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.inputGradient}
+              style={[styles.inputGradient, { borderColor: theme.border }]}
             >
-              <MaterialCommunityIcons name="text" size={20} color="#868e96" style={styles.inputIcon} />
+              <MaterialCommunityIcons name="text" size={20} color={theme.textMuted} style={styles.inputIcon} />
               <TextInput
                 style={[styles.input, styles.textArea]}
                 placeholder="What's this group for? (e.g., Household chores, Project work)"
-                placeholderTextColor="#adb5bd"
+                placeholderTextColor={theme.textPlaceholder}
                 value={description}
                 onChangeText={setDescription}
                 editable={!loading}
                 multiline
                 numberOfLines={3}
                 textAlignVertical="top"
+                selectionColor={theme.primary}
               />
             </LinearGradient>
 
             {/* Info Card */}
             <LinearGradient
-              colors={['#e7f5ff', '#d0ebff']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.infoCard}
+              style={[styles.infoCard, { borderColor: theme.primaryBorder }]}
             >
-              <MaterialCommunityIcons name="information" size={20} color="#2b8a3e" />
+              <MaterialCommunityIcons name="information" size={20} color={theme.primary} />
               <Text style={styles.infoText}>
                 After creating the group, you'll get an invite code to share with members
               </Text>
@@ -204,25 +209,29 @@ useEffect(() => {
             
             {/* Create Button */}
             <TouchableOpacity
-              style={[styles.button, (!groupName.trim() || loading) && styles.buttonDisabled]}
+              style={[styles.button, (!isFormValid || loading) && styles.buttonDisabled]}
               onPress={handleCreate}
-              disabled={!groupName.trim() || loading}
+              disabled={!isFormValid || loading}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={groupName.trim() ? ['#2b8a3e', '#1e6b2c'] : ['#e9ecef', '#dee2e6']}
+                colors={isFormValid ? [theme.primary, theme.primaryDark] : [theme.bgTertiary, theme.border]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.buttonGradient}
               >
                 {loading ? (
-                  <ActivityIndicator color="white" />
+                  <ActivityIndicator color="#fff" />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="plus-circle" size={20} color={groupName.trim() ? "white" : "#868e96"} />
+                    <MaterialCommunityIcons 
+                      name="plus-circle" 
+                      size={20} 
+                      color={isFormValid ? "#fff" : theme.textMuted} 
+                    />
                     <Text style={[
                       styles.buttonText,
-                      !groupName.trim() && styles.buttonTextDisabled
+                      !isFormValid && styles.buttonTextDisabled
                     ]}>
                       Create Group
                     </Text>
@@ -236,6 +245,7 @@ useEffect(() => {
               onPress={handleCancel}
               disabled={loading}
               style={styles.cancelContainer}
+              activeOpacity={0.6}
             >
               <Text style={styles.link}>Cancel</Text>
             </TouchableOpacity>
@@ -245,188 +255,3 @@ useEffect(() => {
     </ScreenWrapper>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
-  },
-  content: {
-    flexGrow: 1,
-    padding: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-    shadowColor: '#2b8a3e',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#212529',
-    textAlign: 'center',
-  },
-  rightSpacer: {
-    width: 44,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#868e96',
-    textAlign: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 20,
-    lineHeight: 20,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
-  },
-  required: {
-    fontSize: 12,
-    color: '#fa5252',
-    fontWeight: '500',
-  },
-  optional: {
-    fontSize: 12,
-    color: '#868e96',
-    fontWeight: '500',
-  },
-  inputGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    paddingHorizontal: 12,
-  },
-  inputIcon: {
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    height: 52,
-    fontSize: 16,
-    color: '#212529',
-    backgroundColor: 'transparent',
-  },
-  textArea: {
-    height: 100,
-    paddingTop: 12,
-    paddingBottom: 12,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 20,
-    marginBottom: 10,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#b2f2bb',
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#2b8a3e',
-    lineHeight: 18,
-  },
-  button: {
-    borderRadius: 12,
-    marginTop: 24,
-    marginBottom: 16,
-    overflow: 'hidden',
-    shadowColor: '#2b8a3e',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  buttonGradient: {
-    height: 52,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  buttonDisabled: {
-    shadowOpacity: 0,
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  buttonTextDisabled: {
-    color: '#868e96',
-  },
-  cancelContainer: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  link: {
-    color: '#868e96',
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  messageBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  messageText: {
-    flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  successText: {
-    color: '#2b8a3e',
-  },
-  errorText: {
-    color: '#fa5252',
-  },
-}); 

@@ -1,13 +1,13 @@
-// src/styles/adminDashboard.styles.ts - COMPLETE FINAL VERSION
-
+// src/styles/adminDashboard.styles.ts - Dark Mode Version
 import { StyleSheet, Dimensions } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-export const adminDashboardStyles = StyleSheet.create({
+export const makeAdminDashboardStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -15,19 +15,19 @@ export const adminDashboardStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.border,
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -37,10 +37,10 @@ export const adminDashboardStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -50,10 +50,10 @@ export const adminDashboardStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -68,7 +68,7 @@ export const adminDashboardStyles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     flex: 1,
     textAlign: 'center',
   },
@@ -81,12 +81,12 @@ export const adminDashboardStyles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   errorText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#fa5252',
+    color: theme.error,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -114,7 +114,7 @@ export const adminDashboardStyles = StyleSheet.create({
     padding: 20,
     borderRadius: 16,
     marginBottom: 20,
-    shadowColor: '#2b8a3e',
+    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -137,7 +137,7 @@ export const adminDashboardStyles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginTop: 16,
     marginBottom: 12,
   },
@@ -149,13 +149,13 @@ export const adminDashboardStyles = StyleSheet.create({
   },
   statCard: {
     width: (width - 40) / 2,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    shadowColor: '#000',
+    borderColor: theme.border,
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -174,7 +174,7 @@ export const adminDashboardStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   statValueContainer: {
     flexDirection: 'row',
@@ -184,19 +184,19 @@ export const adminDashboardStyles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#212529',
+    color: theme.text,
   },
   statTitle: {
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
     marginBottom: 2,
   },
   statSubtitle: {
     fontSize: 11,
-    color: '#adb5bd',
+    color: theme.textPlaceholder,
   },
   statBadge: {
-    backgroundColor: '#fa5252',
+    backgroundColor: theme.error,
     borderRadius: 12,
     minWidth: 20,
     height: 20,
@@ -204,7 +204,7 @@ export const adminDashboardStyles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 6,
     borderWidth: 1,
-    borderColor: 'white',
+    borderColor: theme.card,
   },
   statBadgeText: {
     color: 'white',
@@ -216,8 +216,8 @@ export const adminDashboardStyles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    backgroundColor: 'white',
+    borderColor: theme.border,
+    backgroundColor: theme.card,
   },
   rotationHeader: {
     flexDirection: 'row',
@@ -231,7 +231,7 @@ export const adminDashboardStyles = StyleSheet.create({
   },
   rotationMessage: {
     fontSize: 13,
-    color: '#495057',
+    color: theme.textSecondary,
     marginBottom: 12,
     lineHeight: 18,
   },
@@ -239,7 +239,7 @@ export const adminDashboardStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
+    borderTopColor: theme.border,
     paddingTop: 12,
   },
   rotationStat: {
@@ -248,11 +248,11 @@ export const adminDashboardStyles = StyleSheet.create({
   rotationStatValue: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#212529',
+    color: theme.text,
   },
   rotationStatLabel: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 2,
   },
   progressCard: {
@@ -260,8 +260,8 @@ export const adminDashboardStyles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    backgroundColor: 'white',
+    borderColor: theme.border,
+    backgroundColor: theme.card,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -272,16 +272,16 @@ export const adminDashboardStyles = StyleSheet.create({
   progressTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   progressPercentage: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#2b8a3e',
+    color: theme.primary,
   },
   progressBarContainer: {
     height: 8,
-    backgroundColor: '#e9ecef',
+    backgroundColor: theme.bgTertiary,
     borderRadius: 4,
     marginBottom: 8,
     overflow: 'hidden',
@@ -296,15 +296,15 @@ export const adminDashboardStyles = StyleSheet.create({
   },
   progressStatsText: {
     fontSize: 12,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   memberCard: {
     padding: 12,
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    backgroundColor: 'white',
+    borderColor: theme.border,
+    backgroundColor: theme.card,
   },
   memberHeader: {
     flexDirection: 'row',
@@ -334,7 +334,7 @@ export const adminDashboardStyles = StyleSheet.create({
   memberName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 4,
   },
   memberBadges: {
@@ -349,10 +349,10 @@ export const adminDashboardStyles = StyleSheet.create({
   roleBadgeText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   adminRoleText: {
-    color: '#2b8a3e',
+    color: theme.primary,
   },
   rotationBadge: {
     flexDirection: 'row',
@@ -364,12 +364,12 @@ export const adminDashboardStyles = StyleSheet.create({
   },
   rotationBadgeText: {
     fontSize: 10,
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '600',
   },
   rotationBadgeTextOff: {
     fontSize: 10,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   activityItem: {
     flexDirection: 'row',
@@ -378,8 +378,8 @@ export const adminDashboardStyles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    backgroundColor: 'white',
+    borderColor: theme.border,
+    backgroundColor: theme.card,
   },
   activityIcon: {
     width: 40,
@@ -389,19 +389,19 @@ export const adminDashboardStyles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   activityContent: {
     flex: 1,
   },
   activityDescription: {
     fontSize: 14,
-    color: '#212529',
+    color: theme.text,
     marginBottom: 2,
   },
   activityTime: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   actionsGrid: {
     flexDirection: 'row',
@@ -415,7 +415,7 @@ export const adminDashboardStyles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'visible',
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
     position: 'relative',
     backgroundColor: 'transparent',
   },
@@ -436,7 +436,7 @@ export const adminDashboardStyles = StyleSheet.create({
     position: 'absolute',
     top: -10,
     right: -10,
-    backgroundColor: '#fa5252',
+    backgroundColor: theme.error,
     borderRadius: 12,
     minWidth: 22,
     height: 22,
@@ -444,10 +444,10 @@ export const adminDashboardStyles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 6,
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: theme.card,
     zIndex: 10,
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 2,

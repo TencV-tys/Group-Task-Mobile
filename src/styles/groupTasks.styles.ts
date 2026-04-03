@@ -1,23 +1,24 @@
-// src/styles/groupTasks.styles.ts
+// src/styles/groupTasks.styles.ts - Dark Mode Version
 import { StyleSheet, Dimensions } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-export const styles = StyleSheet.create({
+export const makeGroupTasksStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa'
+    backgroundColor: theme.bgSecondary,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: 80
+    paddingBottom: 80,
   },
   loadingText: {
     marginTop: 12,
-    color: '#868e96',
-    fontSize: 14
+    color: theme.textMuted,
+    fontSize: 14,
   },
   header: {
     flexDirection: 'row',
@@ -26,18 +27,18 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#dee2e6',
+    borderBottomColor: theme.border,
     minHeight: 56,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -47,13 +48,13 @@ export const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8
+    paddingHorizontal: 8,
   },
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
-    textAlign: 'center'
+    color: theme.text,
+    textAlign: 'center',
   },
   connectionStatus: {
     flexDirection: 'row',
@@ -69,29 +70,18 @@ export const styles = StyleSheet.create({
   },
   connectionText: {
     fontSize: 10,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   headerRight: {
-    flexDirection: 'row', 
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     width: 80,
-    justifyContent: 'flex-end'
+    justifyContent: 'flex-end',
   },
-  detailRow: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 6,
-  marginBottom: 4,
-},
-// ✅ ADD THIS - Disabled task card style for non-clickable tasks
-disabledTaskCard: {
-  opacity: 0.6,
-  backgroundColor: '#f8f9fa',
-},
-draftsButton: {
-  padding: 8,
-},
+  draftsButton: {
+    padding: 8,
+  },
   swapButton: {
     position: 'relative',
     padding: 8,
@@ -100,7 +90,7 @@ draftsButton: {
     position: 'absolute',
     top: 0,
     right: 0,
-    backgroundColor: '#fa5252',
+    backgroundColor: theme.error,
     borderRadius: 12,
     minWidth: 20,
     height: 20,
@@ -108,10 +98,10 @@ draftsButton: {
     alignItems: 'center',
     paddingHorizontal: 6,
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: theme.card,
   },
   swapBadgeText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 11,
     fontWeight: 'bold',
   },
@@ -123,50 +113,49 @@ draftsButton: {
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    paddingBottom: 100
+    paddingBottom: 100,
   },
   errorText: {
-    color: '#fa5252',
+    color: theme.error,
     textAlign: 'center',
     marginBottom: 16,
     fontSize: 16,
-    marginTop: 12
+    marginTop: 12,
   },
   retryButton: {
     borderRadius: 8,
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
   retryButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 12,
   },
   retryButtonText: {
-    color: '#495057',
+    color: theme.text,
     fontWeight: '600',
-    fontSize: 16
+    fontSize: 16,
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 70
+    paddingBottom: 70,
   },
   taskCard: {
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    position: 'relative'
+    position: 'relative',
   },
-  activeTaskCard: {
-    borderWidth: 2,
-    borderColor: '#495057',
+  disabledTaskCard: {
+    opacity: 0.6,
   },
   taskHeader: {
     flexDirection: 'row',
-    marginBottom: 12
+    marginBottom: 12,
   },
   taskIcon: {
     width: 40,
@@ -174,64 +163,29 @@ draftsButton: {
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12
+    marginRight: 12,
   },
   taskInfo: {
     flex: 1,
-    marginRight: 40
-  },
-  taskTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6
+    marginRight: 40,
   },
   taskTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     flex: 1,
     marginRight: 8,
-    lineHeight: 22
+    lineHeight: 22,
   },
   completedTaskTitle: {
-    color: '#868e96',
-    textDecorationLine: 'line-through'
-  },
-  activeTaskTitle: {
-    color: '#495057',
-    fontWeight: '700'
-  },
-  editButton: {
-    padding: 4
-  },
-  deleteButton: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#fff5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ffc9c9'
-  },
-  taskDescription: {
-    fontSize: 14,
-    color: '#868e96',
-    marginBottom: 10,
-    lineHeight: 20
-  },
-  completedTaskDescription: {
-    color: '#adb5bd'
+    color: theme.textMuted,
+    textDecorationLine: 'line-through',
   },
   taskMeta: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 8
+    gap: 8,
   },
   pointsBadge: {
     paddingHorizontal: 8,
@@ -239,181 +193,121 @@ draftsButton: {
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4
+    gap: 4,
   },
   taskPoints: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#e67700'
-  },
-  categoryBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12
-  },
-  taskCategory: {
-    fontSize: 12,
-    color: '#495057'
+    color: theme.primary,
   },
   taskFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
+    borderTopColor: theme.border,
     paddingTop: 12,
-    marginTop: 12
+    marginTop: 12,
   },
   taskCreator: {
     fontSize: 12,
-    color: '#868e96',
+    color: theme.textMuted,
     flexDirection: 'row',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   taskDate: {
     fontSize: 12,
-    color: '#868e96'
+    color: theme.textMuted,
   },
   assignmentInfo: {
-    backgroundColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: theme.bgSecondary,
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#dee2e6'
+    borderColor: theme.border,
   },
   myAssignment: {
-    backgroundColor: 'rgba(248, 249, 250, 0.8)',
-    borderColor: '#ced4da'
+    backgroundColor: theme.bgTertiary,
   },
   unassignedInfo: {
-    backgroundColor: 'rgba(255,255,255,0.8)',
+    backgroundColor: theme.bgSecondary,
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: theme.border,
     borderStyle: 'dashed',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6
+    gap: 6,
   },
   unassignedText: {
     fontSize: 13,
-    color: '#868e96',
-    fontStyle: 'italic'
+    color: theme.textMuted,
+    fontStyle: 'italic',
   },
   completedAssignment: {
-    backgroundColor: 'rgba(211, 249, 216, 0.8)',
-    borderColor: '#b2f2bb'
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primaryBorder,
   },
   pendingAssignment: {
-    backgroundColor: 'rgba(255, 243, 191, 0.8)',
-    borderColor: '#ffd43b'
+    backgroundColor: theme.primaryLight,
+    borderColor: theme.primaryBorder,
   },
   assignmentHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 8
+    marginBottom: 8,
   },
   assignmentStatus: {
     fontSize: 14,
-    fontWeight: '600'
-  },
-  assignmentDetails: {
-    gap: 4
-  },
-  assignmentDetail: {
-    fontSize: 12,
-    color: '#495057'
-  },
-  detailLabel: {
     fontWeight: '600',
-    color: '#212529'
   },
   completeNowButton: {
     borderRadius: 8,
     marginBottom: 12,
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
   completeNowContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 12,
-    gap: 8
+    gap: 8,
   },
   completeNowText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
     flex: 1,
-    textAlign: 'center'
-  },
-  timeLeftBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginLeft: 8
-  },
-  timeLeftText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600'
-  },
-  timeLeftContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-    gap: 6
-  },
-  timeLeftLabel: {
-    fontSize: 13,
-    color: '#e67700',
-    fontWeight: '500'
-  },
-  expiredContainer: {
-    borderWidth: 1,
-    borderColor: '#fa5252'
-  },
-  expiredText: {
-    color: '#fa5252'
+    textAlign: 'center',
   },
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 60,
     paddingHorizontal: 20,
-    marginTop: 40
+    marginTop: 40,
   },
   emptyText: {
     fontSize: 18,
-    color: '#868e96',
+    color: theme.textMuted,
     marginBottom: 8,
     marginTop: 16,
-    textAlign: 'center'
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#adb5bd',
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 20
   },
   emptyButton: {
     borderRadius: 8,
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
   emptyButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 12,
   },
   emptyButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
-    fontSize: 16
+    fontSize: 16,
   },
   floatingButtonsContainer: {
     position: 'absolute',
@@ -421,49 +315,36 @@ draftsButton: {
     right: 20,
     alignItems: 'flex-end',
     gap: 12,
-    zIndex: 100
+    zIndex: 100,
   },
   floatingButton: {
     borderRadius: 30,
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
   assignButton: {
     paddingHorizontal: 16,
-    paddingVertical: 10
+    paddingVertical: 10,
   },
   createButton: {
     width: 56,
     height: 56,
-    borderRadius: 28
+    borderRadius: 28,
   },
   reviewButton: {
     paddingHorizontal: 16,
-    paddingVertical: 10
-  },
-  floatingButtonInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10
-  },
-  floatingButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 14
+    paddingVertical: 10,
   },
   bottomTab: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#dee2e6',
+    borderTopColor: theme.border,
     paddingTop: 8,
     paddingHorizontal: 16,
     position: 'absolute',
@@ -473,7 +354,7 @@ draftsButton: {
     justifyContent: 'space-around',
     alignItems: 'center',
     zIndex: 50,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
   },
   tabButton: {
     alignItems: 'center',
@@ -481,22 +362,17 @@ draftsButton: {
     paddingHorizontal: 4,
     minWidth: 80,
     flex: 1,
-    height: '100%'
-  },
-  tabIconContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4
+    height: '100%',
   },
   tabText: {
     fontSize: 12,
-    color: '#8e8e93',
+    color: theme.textMuted,
     textAlign: 'center',
-    fontWeight: '500'
+    fontWeight: '500',
   },
   activeTabText: {
-    color: '#2b8a3e', 
-    fontWeight: '600' 
+    color: theme.primary,
+    fontWeight: '600',
   },
   todaySection: {
     borderRadius: 12,
@@ -505,10 +381,10 @@ draftsButton: {
     borderWidth: 2,
   },
   urgentSection: {
-    borderColor: '#fa5252',
+    borderColor: theme.error,
   },
   warningSection: {
-    borderColor: '#e67700',
+    borderColor: theme.primary,
   },
   todaySectionHeader: {
     flexDirection: 'row',
@@ -527,31 +403,31 @@ draftsButton: {
   },
   todaySectionViewAll: {
     fontSize: 14,
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '600',
   },
   todayTaskItem: {
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
+    borderColor: theme.errorBorder,
   },
   urgentTaskItem: {
     borderWidth: 2,
-    borderColor: '#fa5252',
-    backgroundColor: '#fff5f5',
+    borderColor: theme.error,
+    backgroundColor: theme.errorBg,
   },
   lateTaskItem: {
     borderWidth: 2,
-    borderColor: '#e67700',
-    backgroundColor: '#fff3bf',
+    borderColor: theme.primary,
+    backgroundColor: theme.primaryLight,
   },
   warningTaskItem: {
     borderWidth: 1,
-    borderColor: '#ffd43b',
-    backgroundColor: '#fff9db',
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryLight,
   },
   todayTaskItemContent: {
     flexDirection: 'row',
@@ -562,18 +438,17 @@ draftsButton: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#fff5f5',
     justifyContent: 'center',
     alignItems: 'center',
   },
   urgentIcon: {
-    backgroundColor: '#fa5252',
+    backgroundColor: theme.error,
   },
   lateIcon: {
-    backgroundColor: '#e67700',
+    backgroundColor: theme.primary,
   },
   warningIcon: {
-    backgroundColor: '#e67700',
+    backgroundColor: theme.primary,
   },
   todayTaskItemInfo: {
     flex: 1,
@@ -581,24 +456,12 @@ draftsButton: {
   todayTaskItemTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 4,
   },
   todayTaskItemTime: {
     fontSize: 12,
-    color: '#868e96',
-  },
-  urgentTime: {
-    color: '#fa5252',
-    fontWeight: '600',
-  },
-  lateTime: {
-    color: '#e67700',
-    fontWeight: '600',
-  },
-  warningTime: {
-    color: '#e67700',
-    fontWeight: '600',
+    color: theme.textMuted,
   },
   todayMoreButton: {
     alignItems: 'center',
@@ -606,7 +469,7 @@ draftsButton: {
   },
   todayMoreButtonText: {
     fontSize: 13,
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '600',
   },
   todayFAB: {
@@ -615,13 +478,13 @@ draftsButton: {
     left: 20,
     right: 20,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
     zIndex: 1000,
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
   todayFABContent: {
     flexDirection: 'row',
@@ -633,7 +496,7 @@ draftsButton: {
     flex: 1,
   },
   todayFABTitle: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '700',
   },
@@ -641,99 +504,13 @@ draftsButton: {
     color: 'rgba(255, 255, 255, 0.9)',
     fontSize: 13,
   },
-  activeBadge: {
-    position: 'absolute',
-    top: -10,
-    right: 10,
-    backgroundColor: '#495057',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 16,
-    gap: 4,
-    zIndex: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  urgentBadge: {
-    backgroundColor: '#fa5252',
-  },
-  lateBadge: {
-    backgroundColor: '#e67700',
-  },
-  warningBadge: {
-    backgroundColor: '#e67700',
-  },
-  activeBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700'
-  },
-  activeStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 8,
-    gap: 4,
-  },
-  activeStatusText: {
-    fontSize: 10,
-    color: '#fff',
-    fontWeight: '600'
-  },
-  activeTaskButton: {
-    borderRadius: 8,
-    marginBottom: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  activeTaskButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 14,
-    paddingHorizontal: 16
-  },
-  activeTaskButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center'
-  },
-  rotationWarningBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff3bf',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginTop: 4,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#ffec99',
-  },
-  rotationWarningText: {
-    fontSize: 10,
-    color: '#e67700',
-    fontWeight: '600',
-  },
   rotationBanner: {
     marginHorizontal: 16,
     marginTop: 8,
     marginBottom: 8,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -751,25 +528,25 @@ draftsButton: {
   rotationBannerTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#e67700',
+    color: theme.primary,
     marginBottom: 2,
   },
   rotationBannerMessage: {
     fontSize: 13,
-    color: '#e67700',
+    color: theme.textSecondary,
     lineHeight: 18,
   },
   warningTitle: {
-    color: '#e67700',
+    color: theme.primary,
   },
   warningMessage: {
-    color: '#e67700',
+    color: theme.textSecondary,
   },
   successTitle: {
-    color: '#2b8a3e',
+    color: theme.primary,
   },
   successMessage: {
-    color: '#2b8a3e',
+    color: theme.textSecondary,
   },
   creationDayBanner: {
     marginHorizontal: 16,
@@ -777,7 +554,7 @@ draftsButton: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   bannerHeader: {
     flexDirection: 'row',
@@ -791,12 +568,12 @@ draftsButton: {
   bannerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 2,
   },
   bannerSubtitle: {
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   bannerStats: {
     gap: 8,
@@ -809,47 +586,31 @@ draftsButton: {
   },
   statText: {
     fontSize: 14,
-    color: '#495057',
+    color: theme.textSecondary,
     flex: 1,
   },
   successText: {
-    color: '#2b8a3e',
+    color: theme.primary,
   },
   warningText: {
-    color: '#e67700',
+    color: theme.primary,
   },
   tasksNeededBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3bf',
+    backgroundColor: theme.primaryLight,
     padding: 10,
     borderRadius: 8,
     marginTop: 4,
     gap: 8,
     borderWidth: 1,
-    borderColor: '#ffec99',
+    borderColor: theme.primaryBorder,
   },
   tasksNeededText: {
     fontSize: 13,
-    color: '#e67700',
+    color: theme.primary,
     fontWeight: '600',
     flex: 1,
-  },
-  warningBox: {
-    flexDirection: 'row',
-    backgroundColor: '#fff3bf',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#ffec99',
-  },
-  warningBoxText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#e67700',
-    lineHeight: 18,
   },
   progressContainer: {
     marginTop: 8,
@@ -858,21 +619,37 @@ draftsButton: {
   },
   progressBar: {
     height: 6,
-    backgroundColor: '#e9ecef',
+    backgroundColor: theme.bgTertiary,
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 4,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#2b8a3e',
+    backgroundColor: theme.primary,
     borderRadius: 3,
   },
   progressText: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 4,
     textAlign: 'center',
   },
-  
+  rotationWarningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 4,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: theme.primaryBorder,
+  },
+  rotationWarningText: {
+    fontSize: 10,
+    color: theme.primary,
+    fontWeight: '600',
+  },
 });

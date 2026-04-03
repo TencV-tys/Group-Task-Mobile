@@ -1,5 +1,4 @@
-// src/screens/GroupTasksScreen.tsx - COMPLETE FIXED VERSION with edit prevention on assigned tasks
-
+// src/screens/GroupTasksScreen.tsx - Dark Mode Added (No features removed)
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
@@ -27,7 +26,8 @@ import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { TokenUtils } from '../utils/tokenUtils';
-import { styles } from '../styles/groupTasks.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeGroupTasksStyles } from '../styles/groupTasks.styles';
 
 type TabType = 'all' | 'my';
 type UrgencyLevel = 'none' | 'urgent' | 'late' | 'warning' | 'expired' | 'completed';
@@ -47,6 +47,9 @@ const formatTimeLeft = (seconds: number): string => {
 };
 
 export default function GroupTasksScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
+  const styles = useMemo(() => makeGroupTasksStyles(theme), [theme]);
+  
   const { groupId, groupName, userRole } = route.params || {};
   const insets = useSafeAreaInsets();
   const isMounted = useRef(true);
@@ -102,9 +105,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
   // ===== CHECK IF TASK IS ASSIGNED =====
   const isTaskAssigned = useCallback((task: any): boolean => {
-    // Check if task has a current assignee
     if (task.currentAssignee) return true;
-    // Check if there are any assignments for current week
     if (task.assignments && task.assignments.length > 0) return true;
     return false;
   }, []);
@@ -513,7 +514,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
   // ===== HANDLER FUNCTIONS =====
   
-  // ✅ FIXED: Check if task is assigned before allowing edit
   const handleEditTask = async (task: any) => {
     if (!await checkToken()) return;
     if (!isAdmin) {
@@ -521,7 +521,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       return;
     }
     
-    // Check if task is assigned
     if (isTaskAssigned(task)) {
       Alert.alert(
         'Cannot Edit Task',
@@ -608,13 +607,13 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     navigation.navigate('TaskDrafts', { groupId, groupName });
   };
 
-  // ===== RENDER FUNCTIONS =====
+  // ===== RENDER FUNCTIONS (UPDATED WITH THEME COLORS) =====
   const renderAssignmentInfo = (task: any) => {
     const hasAssignment = task.userAssignment || task.assignments?.length > 0;
     if (!hasAssignment) {
       return (
         <View style={styles.unassignedInfo}>
-          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
+          <MaterialCommunityIcons name="account-question" size={16} color={theme.textMuted} />
           <Text style={styles.unassignedText}>Not assigned to anyone</Text>
         </View>
       );
@@ -656,7 +655,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     if (!currentAssignment && !task.currentAssignee) {
       return (
         <View style={styles.unassignedInfo}>
-          <MaterialCommunityIcons name="account-question" size={16} color="#868e96" />
+          <MaterialCommunityIcons name="account-question" size={16} color={theme.textMuted} />
           <Text style={styles.unassignedText}>Not assigned</Text>
         </View>
       );
@@ -669,9 +668,9 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     };
 
     const getColor = () => {
-      if (isCompleted) return "#2b8a3e";
-      if (selectedTab === 'my') return "#495057";
-      return isAssignedToMe ? "#495057" : "#868e96";
+      if (isCompleted) return theme.primary;
+      if (selectedTab === 'my') return theme.textSecondary;
+      return isAssignedToMe ? theme.textSecondary : theme.textMuted;
     };
 
     return (
@@ -702,14 +701,14 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
     return (
       <LinearGradient
-        colors={!hasMixedCreationDays ? ['#d3f9d8', '#b2f2bb'] : ['#fff3bf', '#ffec99']}
+        colors={!hasMixedCreationDays ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight]}
         style={styles.creationDayBanner}
       >
         <View style={styles.bannerHeader}>
           <MaterialCommunityIcons 
             name={!hasMixedCreationDays ? "calendar-check" : "calendar-alert"} 
             size={24} 
-            color={!hasMixedCreationDays ? "#2b8a3e" : "#e67700"} 
+            color={!hasMixedCreationDays ? theme.primary : theme.primary} 
           />
           <View style={styles.bannerTextContainer}>
             <Text style={styles.bannerTitle}>
@@ -725,7 +724,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
         <View style={styles.bannerStats}>
           <View style={styles.statRow}>
-            <MaterialCommunityIcons name="format-list-checks" size={16} color="#495057" />
+            <MaterialCommunityIcons name="format-list-checks" size={16} color={theme.textSecondary} />
             <Text style={styles.statText}>{tasks.length} task{tasks.length > 1 ? 's' : ''} created</Text>
           </View>
           
@@ -733,7 +732,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             <MaterialCommunityIcons 
               name={isTodayBaseline ? "thumb-up" : "calendar-alert"} 
               size={16} 
-              color={isTodayBaseline ? "#2b8a3e" : "#e67700"} 
+              color={isTodayBaseline ? theme.primary : theme.primary} 
             />
             <Text style={[styles.statText, isTodayBaseline ? styles.successText : styles.warningText]}>
               {isTodayBaseline 
@@ -744,7 +743,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
           {needsTasks && (
             <View style={styles.tasksNeededBadge}>
-              <MaterialCommunityIcons name="alert" size={14} color="#e67700" />
+              <MaterialCommunityIcons name="alert" size={14} color={theme.primary} />
               <Text style={styles.tasksNeededText}>
                 Need {tasksNeededCount} more task{tasksNeededCount > 1 ? 's' : ''} for perfect rotation ({tasks.length}/{membersInRotationCount})
               </Text>
@@ -752,9 +751,9 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           )}
 
           {hasPerfectCount && membersInRotationCount > 0 && (
-            <View style={[styles.tasksNeededBadge, { backgroundColor: '#d3f9d8' }]}>
-              <MaterialCommunityIcons name="check-circle" size={14} color="#2b8a3e" />
-              <Text style={[styles.tasksNeededText, { color: '#2b8a3e' }]}>
+            <View style={[styles.tasksNeededBadge, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="check-circle" size={14} color={theme.primary} />
+              <Text style={[styles.tasksNeededText, { color: theme.primary }]}>
                 Perfect! {tasks.length} task{tasks.length > 1 ? 's' : ''} for {membersInRotationCount} member{membersInRotationCount > 1 ? 's' : ''} in rotation
               </Text>
             </View>
@@ -764,51 +763,48 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     );
   };
 
-  // In the renderHeader function of GroupTasksScreen.tsx, change:
-
-const renderHeader = () => (
-  <LinearGradient colors={['#ffffff', '#f8f9fa']} style={styles.header}>
-    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-      <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
-    </TouchableOpacity>
-    <View style={styles.titleContainer}>
-      <Text style={styles.title} numberOfLines={1}>{groupName || 'Tasks'}</Text>
-      <View style={styles.connectionStatus}>
-        <View style={[styles.connectionDot, { backgroundColor: isConnected ? '#2b8a3e' : '#fa5252' }]} />
-        <Text style={styles.connectionText}>{isConnected ? 'Live' : 'Offline'}</Text>
-      </View>
-      {isAdmin && rotationStatus && !rotationStatus.hasEnoughTasks && rotationStatus.totalTasks > 0 && (
-        <TouchableOpacity style={styles.rotationWarningBadge} onPress={handleViewRotationSchedule}>
-          <MaterialCommunityIcons name="alert" size={14} color="#e67700" />
-          <Text style={styles.rotationWarningText}>
-            Need {rotationStatus.tasksNeeded} more task{rotationStatus.tasksNeeded > 1 ? 's' : ''}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
-    <View style={styles.headerRight}>
-      {/* ✅ Task Drafts button - ONLY visible to admins */}
-      {isAdmin && (
-        <TouchableOpacity style={styles.draftsButton} onPress={handleViewDrafts}>
-          <MaterialCommunityIcons name="file-document-outline" size={22} color="#2b8a3e" />
-        </TouchableOpacity>
-      )}
-      {!isAdmin && (
-        <TouchableOpacity style={styles.swapButton} onPress={handleNavigateToSwapRequests}>
-          <MaterialCommunityIcons name="swap-horizontal" size={22} color="#2b8a3e" />
-          {totalPendingForMe > 0 && (
-            <View style={styles.swapBadge}>
-              <Text style={styles.swapBadgeText}>{totalPendingForMe}</Text>
-            </View>
-          )}
-        </TouchableOpacity> 
-      )}
-      <TouchableOpacity style={styles.settingsButton} onPress={() => setShowSettingsModal(true)}>
-        <MaterialCommunityIcons name="cog" size={22} color="#2b8a3e" />
+  const renderHeader = () => (
+    <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.header}>
+      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
       </TouchableOpacity>
-    </View>
-  </LinearGradient>
-);
+      <View style={styles.titleContainer}>
+        <Text style={styles.title} numberOfLines={1}>{groupName || 'Tasks'}</Text>
+        <View style={styles.connectionStatus}>
+          <View style={[styles.connectionDot, { backgroundColor: isConnected ? theme.primary : theme.error }]} />
+          <Text style={styles.connectionText}>{isConnected ? 'Live' : 'Offline'}</Text>
+        </View>
+        {isAdmin && rotationStatus && !rotationStatus.hasEnoughTasks && rotationStatus.totalTasks > 0 && (
+          <TouchableOpacity style={styles.rotationWarningBadge} onPress={handleViewRotationSchedule}>
+            <MaterialCommunityIcons name="alert" size={14} color={theme.primary} />
+            <Text style={styles.rotationWarningText}>
+              Need {rotationStatus.tasksNeeded} more task{rotationStatus.tasksNeeded > 1 ? 's' : ''}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+      <View style={styles.headerRight}>
+        {isAdmin && (
+          <TouchableOpacity style={styles.draftsButton} onPress={handleViewDrafts}>
+            <MaterialCommunityIcons name="file-document-outline" size={22} color={theme.primary} />
+          </TouchableOpacity>
+        )}
+        {!isAdmin && (
+          <TouchableOpacity style={styles.swapButton} onPress={handleNavigateToSwapRequests}>
+            <MaterialCommunityIcons name="swap-horizontal" size={22} color={theme.primary} />
+            {totalPendingForMe > 0 && (
+              <View style={styles.swapBadge}>
+                <Text style={styles.swapBadgeText}>{totalPendingForMe}</Text>
+              </View>
+            )}
+          </TouchableOpacity> 
+        )}
+        <TouchableOpacity style={styles.settingsButton} onPress={() => setShowSettingsModal(true)}>
+          <MaterialCommunityIcons name="cog" size={22} color={theme.primary} />
+        </TouchableOpacity>
+      </View>
+    </LinearGradient>
+  );
 
   const renderTodaySection = () => {
     if (!showTodaySection || selectedTab !== 'my') return null;
@@ -820,13 +816,13 @@ const renderHeader = () => (
     
     return (
       <LinearGradient
-        colors={hasUrgent ? ['#fff5f5', '#ffe3e3'] : ['#fff3bf', '#ffec99']}
+        colors={hasUrgent ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]}
         style={[styles.todaySection, hasUrgent ? styles.urgentSection : styles.warningSection]}
       >
         <View style={styles.todaySectionHeader}>
           <View style={styles.todaySectionTitleContainer}>
-            <MaterialCommunityIcons name={hasUrgent ? "timer-alert" : "clock-alert"} size={20} color={hasUrgent ? "#fa5252" : "#e67700"} />
-            <Text style={[styles.todaySectionTitle, { color: hasUrgent ? "#fa5252" : "#e67700" }]}>
+            <MaterialCommunityIcons name={hasUrgent ? "timer-alert" : "clock-alert"} size={20} color={hasUrgent ? theme.error : theme.primary} />
+            <Text style={[styles.todaySectionTitle, { color: hasUrgent ? theme.error : theme.primary }]}>
               {hasUrgent ? 'URGENT - Due Soon' : 'Due Today'}
             </Text>
           </View>
@@ -862,7 +858,7 @@ const renderHeader = () => (
                         task.urgencyLevel === 'urgent' ? "timer" : "clock-alert"} 
                   size={18} 
                   color={task.urgencyLevel === 'late' ? "#fff" : 
-                         task.urgencyLevel === 'urgent' ? "#fa5252" : "#e67700"} 
+                         task.urgencyLevel === 'urgent' ? theme.error : theme.primary} 
                 />
               </View>
               <View style={styles.todayTaskItemInfo}>
@@ -873,7 +869,7 @@ const renderHeader = () => (
                     : 'Due today'}
                 </Text>
               </View>
-              <MaterialCommunityIcons name="chevron-right" size={20} color="#adb5bd" />
+              <MaterialCommunityIcons name="chevron-right" size={20} color={theme.textMuted} />
             </View>
           </TouchableOpacity>
         ))}
@@ -896,20 +892,20 @@ const renderHeader = () => (
     const hasSubmittableNow = todayAssignments.some(t => t.isSubmittableNow);
     
     let config = {
-      colors: ['#2b8a3e', '#1e6b2c'] as [string, string],
+      colors: [theme.primary, theme.primaryDark] as [string, string],
       icon: "check-circle",
       title: "Ready to Submit!",
       message: `${todayAssignments.filter(t => t.isSubmittableNow).length} can submit now`
     };
     
     if (hasLate) {
-      config = { colors: ['#e67700', '#cc5f00'], icon: "timer-alert", title: "⚠️ LATE SUBMISSIONS", message: `${todayAssignments.filter(t => t.urgencyLevel === 'late').length} tasks are late` };
+      config = { colors: [theme.primary, theme.primaryDark], icon: "timer-alert", title: "⚠️ LATE SUBMISSIONS", message: `${todayAssignments.filter(t => t.urgencyLevel === 'late').length} tasks are late` };
     } else if (hasUrgent) {
-      config = { colors: ['#fa5252', '#e03131'], icon: "timer", title: "⏰ URGENT", message: `${todayAssignments.filter(t => t.urgencyLevel === 'urgent').length} tasks ending soon` };
+      config = { colors: [theme.error, theme.error], icon: "timer", title: "⏰ URGENT", message: `${todayAssignments.filter(t => t.urgencyLevel === 'urgent').length} tasks ending soon` };
     } else if (hasWarning) {
-      config = { colors: ['#e67700', '#cc5f00'], icon: "clock-alert", title: "⏳ Due Soon", message: `${todayAssignments.filter(t => t.urgencyLevel === 'warning').length} tasks due in <2hrs` };
+      config = { colors: [theme.primary, theme.primaryDark], icon: "clock-alert", title: "⏳ Due Soon", message: `${todayAssignments.filter(t => t.urgencyLevel === 'warning').length} tasks due in <2hrs` };
     } else if (!hasSubmittableNow) {
-      config = { colors: ['#868e96', '#6c757d'], icon: "clock-start", title: "Today's Tasks", message: `${todayAssignments.length} tasks due today` };
+      config = { colors: [theme.textMuted, theme.textMuted], icon: "clock-start", title: "Today's Tasks", message: `${todayAssignments.length} tasks due today` };
     }
     
     return (
@@ -926,201 +922,192 @@ const renderHeader = () => (
     );
   };
 
- const renderTask = ({ item }: any) => {
-  const isMyTasksView = selectedTab === 'my';
-  const taskIsAssigned = isTaskAssigned(item);
-  
-  // ✅ Check if this task is assigned to the current user
-  const isAssignedToCurrentUser = 
-    item.isAssignedToUser === true || 
-    !!item.userAssignment || 
-    (item.assignments && item.assignments.some((a: any) => a.userId === currentUserId));
-  
-  // ✅ Determine if the task should be clickable
-  const isClickable = isAdmin || isMyTasksView || isAssignedToCurrentUser;
-  
-  // Determine if task can be edited (admin, not my tasks view, and NOT assigned)
-  const canEdit = isAdmin && !isMyTasksView && !taskIsAssigned;
-  
-  // Determine task completion status
-  let isFullyCompleted = false;
-  let completionPercentage = 0;
-  let completedCount = 0;
-  let totalCount = 0;
-  let earnedPoints = 0;
-  let totalPoints = 0;
-  
-  if (isMyTasksView) {
-    if (item.assignmentsCount && item.assignmentsCount > 1) {
-      totalCount = item.assignmentsCount;
-      completedCount = item.completedCount || 0;
-      isFullyCompleted = completedCount === totalCount;
-      completionPercentage = (completedCount / totalCount) * 100;
-      earnedPoints = item.earnedPoints || 0;
-      totalPoints = item.totalPoints || 0;
+  const renderTask = ({ item }: any) => {
+    const isMyTasksView = selectedTab === 'my';
+    const taskIsAssigned = isTaskAssigned(item);
+    
+    const isAssignedToCurrentUser = 
+      item.isAssignedToUser === true || 
+      !!item.userAssignment || 
+      (item.assignments && item.assignments.some((a: any) => a.userId === currentUserId));
+    
+    const isClickable = isAdmin || isMyTasksView || isAssignedToCurrentUser;
+    const canEdit = isAdmin && !isMyTasksView && !taskIsAssigned;
+    
+    let isFullyCompleted = false;
+    let completionPercentage = 0;
+    let completedCount = 0;
+    let totalCount = 0;
+    let earnedPoints = 0;
+    let totalPoints = 0;
+    
+    if (isMyTasksView) {
+      if (item.assignmentsCount && item.assignmentsCount > 1) {
+        totalCount = item.assignmentsCount;
+        completedCount = item.completedCount || 0;
+        isFullyCompleted = completedCount === totalCount;
+        completionPercentage = (completedCount / totalCount) * 100;
+        earnedPoints = item.earnedPoints || 0;
+        totalPoints = item.totalPoints || 0;
+      } else {
+        isFullyCompleted = item.assignment?.completed || item.userAssignment?.completed || false;
+        completionPercentage = isFullyCompleted ? 100 : 0;
+        completedCount = isFullyCompleted ? 1 : 0;
+        totalCount = 1;
+        earnedPoints = isFullyCompleted ? (item.points || 0) : 0;
+        totalPoints = item.points || 0;
+      }
     } else {
-      isFullyCompleted = item.assignment?.completed || item.userAssignment?.completed || false;
-      completionPercentage = isFullyCompleted ? 100 : 0;
-      completedCount = isFullyCompleted ? 1 : 0;
-      totalCount = 1;
-      earnedPoints = isFullyCompleted ? (item.points || 0) : 0;
-      totalPoints = item.points || 0;
+      if (item.assignments && item.assignments.length > 0) {
+        const allAssignments = item.assignments;
+        totalCount = allAssignments.length;
+        const completedAssignments = allAssignments.filter((a: any) => a.completed === true);
+        completedCount = completedAssignments.length;
+        isFullyCompleted = completedCount === totalCount;
+        completionPercentage = (completedCount / totalCount) * 100;
+        earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+        totalPoints = allAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+      } else {
+        totalCount = 0;
+        completedCount = 0;
+        isFullyCompleted = false;
+        completionPercentage = 0;
+        earnedPoints = 0;
+        totalPoints = 0;
+      }
     }
-  } else {
-    if (item.assignments && item.assignments.length > 0) {
-      const allAssignments = item.assignments;
-      totalCount = allAssignments.length;
-      const completedAssignments = allAssignments.filter((a: any) => a.completed === true);
-      completedCount = completedAssignments.length;
-      isFullyCompleted = completedCount === totalCount;
-      completionPercentage = (completedCount / totalCount) * 100;
-      earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-      totalPoints = allAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-    } else {
-      totalCount = 0;
-      completedCount = 0;
-      isFullyCompleted = false;
-      completionPercentage = 0;
-      earnedPoints = 0;
-      totalPoints = 0;
-    }
-  }
-  
-  const validation = validateTaskTime(item);
-  
-  const getGradientColors = (): [string, string] => {
-    if (!isClickable) return ['#f8f9fa', '#e9ecef'];
-    if (isFullyCompleted) return ['#f8f9fa', '#e9ecef'];
-    if (isMyTasksView && validation.isSubmittableNow) {
-      return validation.willBePenalized ? ['#fff3bf', '#ffec99'] : ['#d3f9d8', '#b2f2bb'];
-    }
-    return ['#ffffff', '#f8f9fa'];
-  };
+    
+    const validation = validateTaskTime(item);
+    
+    const getGradientColors = (): [string, string] => {
+      if (!isClickable) return [theme.bgSecondary, theme.bgTertiary];
+      if (isFullyCompleted) return [theme.bgSecondary, theme.bgTertiary];
+      if (isMyTasksView && validation.isSubmittableNow) {
+        return validation.willBePenalized ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight];
+      }
+      return [theme.card, theme.bgSecondary];
+    };
 
-  return (
-    <TouchableOpacity
-      onPress={() => {
-        if (!isClickable) {
-          Alert.alert(
-            'Access Denied',
-            'You can only view details of tasks assigned to you.',
-            [{ text: 'OK' }]
-          );
-          return;
-        }
-        handleViewTaskDetails(item.id);
-      }}
-      onLongPress={() => {
-        if (canEdit) {
-          Alert.alert('Task Options', `"${item.title}"`, [
-            { text: 'Edit', onPress: () => handleEditTask(item) },
-            { text: 'View Details', onPress: () => handleViewTaskDetails(item.id) },
-            { text: 'Cancel', style: 'cancel' }
-          ]);
-        } else if (isAdmin && !isMyTasksView && taskIsAssigned) {
-          Alert.alert(
-            'Cannot Edit',
-            'This task is already assigned to members. Editing assigned tasks could break the rotation system.\n\n' +
-            'Consider creating a new task instead, or wait until the rotation week ends.',
-            [{ text: 'OK' }]
-          );
-        } 
-      }}
-      activeOpacity={isClickable ? 0.7 : 1}
-    > 
-      <LinearGradient 
-        colors={getGradientColors()} 
-        style={[
-          styles.taskCard,
-          !isClickable && styles.disabledTaskCard
-        ]}
-      >
-        {/* Keep the rest of your existing JSX unchanged */}
-        <View style={styles.taskHeader}>
-          <LinearGradient 
-            colors={isFullyCompleted ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']} 
-            style={styles.taskIcon}
-          >
-            <MaterialCommunityIcons 
-              name={isFullyCompleted ? "check" : "format-list-checks"} 
-              size={20} 
-              color={isFullyCompleted ? "white" : "#495057"} 
-            />
-          </LinearGradient>
-          <View style={styles.taskInfo}>
-            <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
-              {item.title}
-            </Text>
-            <View style={styles.taskMeta}>
-              <LinearGradient colors={['#fff3bf', '#ffec99']} style={styles.pointsBadge}>
-                <MaterialCommunityIcons name="star" size={12} color="#e67700" />
-                <Text style={styles.taskPoints}>
-                  {isMyTasksView 
-                    ? (item.assignmentsCount > 1 
-                        ? `${earnedPoints}/${totalPoints} pts` 
-                        : `${item.points} pts`)
-                    : `${earnedPoints}/${totalPoints} pts (${completedCount}/${totalCount} completed)`
-                  }
-                </Text>
-              </LinearGradient>
-            </View>
-          </View>
-        </View>
-        
-        {renderAssignmentInfo(item)}
-        
-        {/* Progress Bar for multiple assignments */}
-        {((isMyTasksView && item.assignmentsCount && item.assignmentsCount > 1 && !isFullyCompleted) ||
-          (!isMyTasksView && totalCount > 1 && !isFullyCompleted)) && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
-            </View>
-            <Text style={styles.progressText}>
-              {isMyTasksView 
-                ? `${completedCount}/${totalCount} slots completed • ${earnedPoints}/${totalPoints} pts`
-                : `${completedCount}/${totalCount} assignments completed • ${earnedPoints}/${totalPoints} total points`
-              }
-            </Text>
-          </View>
-        )}
-        
-        {/* Progress bar for single assignment in admin view */}
-        {!isMyTasksView && totalCount === 1 && !isFullyCompleted && totalCount > 0 && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
-            </View>
-            <Text style={styles.progressText}>
-              {completedCount === 0 ? 'Not completed yet' : 'Completed'}
-            </Text>
-          </View>
-        )}
-        
-        {isMyTasksView && !isFullyCompleted && validation.isSubmittableNow && (
-          <TouchableOpacity onPress={() => handleCompleteNow(item)}>
-            <LinearGradient colors={validation.willBePenalized ? ['#e67700', '#cc5f00'] : ['#2b8a3e', '#1e6b2c']} style={styles.completeNowButton}>
-              <View style={styles.completeNowContent}>
-                <MaterialCommunityIcons name={validation.willBePenalized ? "timer-alert" : "check-circle"} size={20} color="white" />
-                <Text style={styles.completeNowText}>
-                  {validation.willBePenalized ? 'Submit Late' : 'Complete Now'}
-                </Text>
-              </View>
+    return (
+      <TouchableOpacity
+        onPress={() => {
+          if (!isClickable) {
+            Alert.alert(
+              'Access Denied',
+              'You can only view details of tasks assigned to you.',
+              [{ text: 'OK' }]
+            );
+            return;
+          }
+          handleViewTaskDetails(item.id);
+        }}
+        onLongPress={() => {
+          if (canEdit) {
+            Alert.alert('Task Options', `"${item.title}"`, [
+              { text: 'Edit', onPress: () => handleEditTask(item) },
+              { text: 'View Details', onPress: () => handleViewTaskDetails(item.id) },
+              { text: 'Cancel', style: 'cancel' }
+            ]);
+          } else if (isAdmin && !isMyTasksView && taskIsAssigned) {
+            Alert.alert(
+              'Cannot Edit',
+              'This task is already assigned to members. Editing assigned tasks could break the rotation system.\n\n' +
+              'Consider creating a new task instead, or wait until the rotation week ends.',
+              [{ text: 'OK' }]
+            );
+          } 
+        }}
+        activeOpacity={isClickable ? 0.7 : 1}
+      > 
+        <LinearGradient 
+          colors={getGradientColors()} 
+          style={[
+            styles.taskCard,
+            !isClickable && styles.disabledTaskCard
+          ]}
+        >
+          <View style={styles.taskHeader}>
+            <LinearGradient 
+              colors={isFullyCompleted ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]} 
+              style={styles.taskIcon}
+            >
+              <MaterialCommunityIcons 
+                name={isFullyCompleted ? "check" : "format-list-checks"} 
+                size={20} 
+                color={isFullyCompleted ? "#fff" : theme.textMuted} 
+              />
             </LinearGradient>
-          </TouchableOpacity>
-        )}
-        
-        <View style={styles.taskFooter}>
-          <Text style={styles.taskCreator}>
-            <MaterialCommunityIcons name="account" size={12} color="#868e96" /> {item.creator?.fullName || 'Admin'}
-          </Text>
-          <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  ); 
-};
-
+            <View style={styles.taskInfo}>
+              <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
+                {item.title}
+              </Text>
+              <View style={styles.taskMeta}>
+                <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pointsBadge}>
+                  <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                  <Text style={styles.taskPoints}>
+                    {isMyTasksView 
+                      ? (item.assignmentsCount > 1 
+                          ? `${earnedPoints}/${totalPoints} pts` 
+                          : `${item.points} pts`)
+                      : `${earnedPoints}/${totalPoints} pts (${completedCount}/${totalCount} completed)`
+                    }
+                  </Text>
+                </LinearGradient>
+              </View>
+            </View>
+          </View>
+          
+          {renderAssignmentInfo(item)}
+          
+          {((isMyTasksView && item.assignmentsCount && item.assignmentsCount > 1 && !isFullyCompleted) ||
+            (!isMyTasksView && totalCount > 1 && !isFullyCompleted)) && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+              </View>
+              <Text style={styles.progressText}>
+                {isMyTasksView 
+                  ? `${completedCount}/${totalCount} slots completed • ${earnedPoints}/${totalPoints} pts`
+                  : `${completedCount}/${totalCount} assignments completed • ${earnedPoints}/${totalPoints} total points`
+                }
+              </Text>
+            </View>
+          )}
+          
+          {!isMyTasksView && totalCount === 1 && !isFullyCompleted && totalCount > 0 && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+              </View>
+              <Text style={styles.progressText}>
+                {completedCount === 0 ? 'Not completed yet' : 'Completed'}
+              </Text>
+            </View>
+          )}
+          
+          {isMyTasksView && !isFullyCompleted && validation.isSubmittableNow && (
+            <TouchableOpacity onPress={() => handleCompleteNow(item)}>
+              <LinearGradient colors={validation.willBePenalized ? [theme.primary, theme.primaryDark] : [theme.primary, theme.primaryDark]} style={styles.completeNowButton}>
+                <View style={styles.completeNowContent}>
+                  <MaterialCommunityIcons name={validation.willBePenalized ? "timer-alert" : "check-circle"} size={20} color="white" />
+                  <Text style={styles.completeNowText}>
+                    {validation.willBePenalized ? 'Submit Late' : 'Complete Now'}
+                  </Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+          
+          <View style={styles.taskFooter}>
+            <Text style={styles.taskCreator}>
+              <MaterialCommunityIcons name="account" size={12} color={theme.textMuted} /> {item.creator?.fullName || 'Admin'}
+            </Text>
+            <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    ); 
+  };
 
   const renderContent = () => {
     let currentTasks = [];
@@ -1145,17 +1132,17 @@ const renderHeader = () => (
           </>
         }
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refreshTasks} colors={['#2b8a3e']} />
+          <RefreshControl refreshing={refreshing} onRefresh={refreshTasks} colors={[theme.primary]} />
         }
         ListEmptyComponent={showEmpty ? (
           <View style={styles.emptyContainer}>
-            <MaterialCommunityIcons name={selectedTab === 'my' ? "clipboard-text" : "clipboard-list"} size={64} color="#dee2e6" />
+            <MaterialCommunityIcons name={selectedTab === 'my' ? "clipboard-text" : "clipboard-list"} size={64} color={theme.border} />
             <Text style={styles.emptyText}>
               {selectedTab === 'my' ? 'No tasks assigned to you' : 'No tasks yet'}
             </Text>
             {isAdmin && selectedTab === 'all' && (
               <TouchableOpacity style={styles.emptyButton} onPress={handleCreateTask}>
-                <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={styles.emptyButtonGradient}>
+                <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.emptyButtonGradient}>
                   <Text style={styles.emptyButtonText}>Create First Task</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -1171,32 +1158,32 @@ const renderHeader = () => (
   const renderBottomTabs = () => {
     return (
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         style={[styles.bottomTab, { height: 70 + insets.bottom, paddingBottom: insets.bottom }]}
       >
         {isAdmin ? (
           <>
             <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="view-dashboard" size={24} color="#8e8e93" />
+              <MaterialCommunityIcons name="view-dashboard" size={24} color={theme.textMuted} />
               <Text style={styles.tabText}>Dashboard</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('all')} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="format-list-bulleted" size={24} color={selectedTab === 'all' ? '#2b8a3e' : '#8e8e93'} />
+              <MaterialCommunityIcons name="format-list-bulleted" size={24} color={selectedTab === 'all' ? theme.primary : theme.textMuted} />
               <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>All Tasks</Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
             <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('all')} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="format-list-bulleted" size={24} color={selectedTab === 'all' ? '#2b8a3e' : '#8e8e93'} />
+              <MaterialCommunityIcons name="format-list-bulleted" size={24} color={selectedTab === 'all' ? theme.primary : theme.textMuted} />
               <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>All Tasks</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('my')} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="clipboard-check" size={24} color={selectedTab === 'my' ? '#2b8a3e' : '#8e8e93'} />
+              <MaterialCommunityIcons name="clipboard-check" size={24} color={selectedTab === 'my' ? theme.primary : theme.textMuted} />
               <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>My Tasks</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="view-dashboard" size={24} color="#8e8e93" />
+              <MaterialCommunityIcons name="view-dashboard" size={24} color={theme.textMuted} />
               <Text style={styles.tabText}>Dashboard</Text>
             </TouchableOpacity>
           </>
@@ -1210,7 +1197,7 @@ const renderHeader = () => (
     return (
       <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Loading user data...</Text>
         </View>
       </ScreenWrapper>
@@ -1221,7 +1208,7 @@ const renderHeader = () => (
     return (
       <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
+          <ActivityIndicator size="large" color={theme.primary} />
           <Text style={styles.loadingText}>Loading tasks...</Text>
         </View>
       </ScreenWrapper>
@@ -1232,10 +1219,10 @@ const renderHeader = () => (
     return (
       <ScreenWrapper style={styles.container}>
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
+          <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => fetchTasks()}>
-            <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={styles.retryButtonGradient}>
+            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.retryButtonGradient}>
               <Text style={styles.retryButtonText}>Retry</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -1247,7 +1234,7 @@ const renderHeader = () => (
   // ===== MAIN RENDER =====
   return (
     <ScreenWrapper noBottom={true} style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.card} />
       {renderHeader()}
 
       {isAdmin && selectedTab === 'all' && rotationStatus && rotationStatus.totalTasks > 0 && (
@@ -1255,10 +1242,10 @@ const renderHeader = () => (
           <LinearGradient
             colors={
               !rotationStatus.hasEnoughTasks 
-                ? ['#fff3bf', '#ffec99']
+                ? [theme.primaryLight, theme.primaryLight]
                 : rotationStatus.totalTasks === rotationStatus.membersInRotation
-                  ? ['#d3f9d8', '#b2f2bb']
-                  : ['#e7f5ff', '#d0ebff']
+                  ? [theme.primaryLight, theme.primaryLight]
+                  : [theme.primaryLight, theme.primaryLight]
             }
             style={styles.rotationBannerGradient}
           >
@@ -1273,10 +1260,10 @@ const renderHeader = () => (
               size={20} 
               color={
                 !rotationStatus.hasEnoughTasks 
-                  ? "#e67700" 
+                  ? theme.primary
                   : rotationStatus.totalTasks === rotationStatus.membersInRotation
-                    ? "#2b8a3e"
-                    : "#2b8a3e"
+                    ? theme.primary
+                    : theme.primary
               } 
             />
             <View style={styles.rotationBannerText}>
@@ -1303,7 +1290,7 @@ const renderHeader = () => (
                     : `You have ${rotationStatus.totalTasks} tasks for ${rotationStatus.membersInRotation} members in rotation.`}
               </Text>
             </View>
-            <MaterialCommunityIcons name="chevron-right" size={20} color="#2b8a3e" />
+            <MaterialCommunityIcons name="chevron-right" size={20} color={theme.primary} />
           </LinearGradient>
         </TouchableOpacity>
       )}
@@ -1314,20 +1301,20 @@ const renderHeader = () => (
       {isAdmin && selectedTab === 'all' && (
         <View style={styles.floatingButtonsContainer}>
           <TouchableOpacity onPress={() => navigation.navigate('PendingVerifications', { groupId, groupName, userRole })}>
-            <LinearGradient colors={['#fa5252', '#e03131']} style={[styles.floatingButton, styles.reviewButton]}>
+            <LinearGradient colors={[theme.error, theme.error]} style={[styles.floatingButton, styles.reviewButton]}>
               <MaterialCommunityIcons name="clipboard-check" size={22} color="white" />
             </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity onPress={handleNavigateToAssignment}>
-            <LinearGradient colors={['#2b8a3e', '#1e6b2c']} style={[styles.floatingButton, styles.assignButton]}>
+            <LinearGradient colors={[theme.primary, theme.primaryDark]} style={[styles.floatingButton, styles.assignButton]}>
               <MaterialCommunityIcons name="account-switch" size={22} color="white" />
             </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity onPress={handleCreateTask}>
-            <LinearGradient colors={['#f8f9fa', '#e9ecef']} style={[styles.floatingButton, styles.createButton]}>
-              <MaterialCommunityIcons name="plus" size={28} color="#495057" />
+            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={[styles.floatingButton, styles.createButton]}>
+              <MaterialCommunityIcons name="plus" size={28} color={theme.textMuted} />
             </LinearGradient>
           </TouchableOpacity>
         </View>

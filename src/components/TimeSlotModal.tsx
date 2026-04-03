@@ -16,7 +16,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   convertTo24Hour,
   convertTo12Hour, 
-  validateTimeSlot,
+  validateTimeSlot, 
   HOUR_OPTIONS,
   MINUTE_OPTIONS,
   PERIOD_OPTIONS

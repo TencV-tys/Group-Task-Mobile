@@ -1,0 +1,185 @@
+// src/styles/createGroup.styles.ts
+import { StyleSheet } from 'react-native';
+import { Theme } from '../context/ThemeContext';
+
+export const makeCreateGroupStyles = (theme: Theme) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.bgSecondary,
+  },
+  content: {
+    flexGrow: 1,
+    padding: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    shadowColor: theme.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: theme.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.text,
+    textAlign: 'center',
+  },
+  rightSpacer: {
+    width: 44,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: theme.textMuted,
+    textAlign: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 20,
+    lineHeight: 20,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  required: {
+    fontSize: 12,
+    color: theme.error,
+    fontWeight: '500',
+  },
+  optional: {
+    fontSize: 12,
+    color: theme.textMuted,
+    fontWeight: '500',
+  },
+  inputGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+  },
+  inputIcon: {
+    marginRight: 8,
+  },
+  input: {
+    flex: 1,
+    height: 52,
+    fontSize: 16,
+    color: theme.text,
+    backgroundColor: 'transparent',
+  },
+  textArea: {
+    height: 100,
+    paddingTop: 12,
+    paddingBottom: 12,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    marginBottom: 10,
+    gap: 12,
+    borderWidth: 1,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 13,
+    color: theme.primary,
+    lineHeight: 18,
+  },
+  button: {
+    borderRadius: 12,
+    marginTop: 24,
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: theme.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  buttonGradient: {
+    height: 52,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  buttonDisabled: {
+    shadowOpacity: 0,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  buttonTextDisabled: {
+    color: theme.textMuted,
+  },
+  cancelContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  link: {
+    color: theme.textMuted,
+    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  messageBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 12,
+    borderWidth: 1,
+  },
+  messageText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  successText: {
+    color: theme.primary,
+  },
+  errorText: {
+    color: theme.error,
+  },
+});

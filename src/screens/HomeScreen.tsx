@@ -312,7 +312,7 @@ export default function HomeScreen({ navigation }: any) {
       {/* Header */}
       <Animated.View style={[styles.header, { opacity: animations.header, transform: [{ translateY: animations.header.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] }]}>
         <View>
-          <Text style={styles.headerTitle}>Dashboard</Text>
+          <Text style={styles.headerTitle}>Home</Text>
           <Text style={styles.headerSubtitle}>Welcome back, {user.fullName?.split(' ')[0] || 'User'}!</Text>
         </View>
         <View style={styles.headerRight}>

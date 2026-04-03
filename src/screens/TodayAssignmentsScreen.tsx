@@ -1,5 +1,4 @@
-// src/screens/TodayAssignmentsScreen.tsx - ADDED detailed console logs
-
+// src/screens/TodayAssignmentsScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -18,8 +17,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { AssignmentService, TodayAssignment } from '../services/AssignmentService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
  
 export default function TodayAssignmentsScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
   const { groupId, groupName } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false); 
@@ -173,28 +174,28 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
     const isLate = item.willBePenalized;
     
     if (isLate) {
-      return ['#fff3bf', '#ffec99']; // Light orange gradient for late (warning)
+      return [theme.primaryLight, theme.primaryLight];
     }
     if (isUrgent) {
-      return ['#fff5f5', '#ffe3e3']; // Light red gradient for urgent (danger)
+      return [theme.errorBg, theme.errorBg];
     }
     if (item.canSubmit) {
-      return ['#d3f9d8', '#b2f2bb']; // Light green gradient for available (success)
+      return [theme.primaryLight, theme.primaryLight];
     }
-    return ['#ffffff', '#f8f9fa']; // Default white/light gray gradient
+    return [theme.card, theme.bgSecondary];
   };
 
   // Get status badge colors
   const getStatusBadgeColors = (item: TodayAssignment): [string, string] => {
     const isLate = item.willBePenalized;
-    if (isLate) return ['#fff3bf', '#ffec99']; // Orange for late
-    if (item.canSubmit) return ['#d3f9d8', '#b2f2bb']; // Green for available
-    return ['#f1f3f5', '#e9ecef']; // Light gray for waiting
+    if (isLate) return [theme.primaryLight, theme.primaryLight];
+    if (item.canSubmit) return [theme.primaryLight, theme.primaryLight];
+    return [theme.bgSecondary, theme.bgTertiary];
   };
 
   // Get timer gradient colors
   const getTimerGradientColors = (isUrgent: boolean): [string, string] => {
-    return isUrgent ? ['#ffc9c9', '#ffb3b3'] : ['#d3f9d8', '#b2f2bb'];
+    return isUrgent ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight];
   };
 
   const renderAssignment = ({ item }: { item: TodayAssignment }) => {
@@ -214,22 +215,23 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
           style={[
             styles.assignmentCard,
             isLate ? styles.lateCard : null,
-            isUrgent ? styles.urgentCard : null
+            isUrgent ? styles.urgentCard : null,
+            { borderColor: theme.border }
           ].filter(Boolean)}
         >
           <View style={styles.cardHeader}>
             <View style={styles.taskInfo}>
-              <Text style={styles.taskTitle} numberOfLines={2}>
+              <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
                 {item.taskTitle}
               </Text>
-              <Text style={styles.groupName}>{item.group?.name || 'Unknown Group'}</Text>
+              <Text style={[styles.groupName, { color: theme.textMuted }]}>{item.group?.name || 'Unknown Group'}</Text>
             </View>
             
             <LinearGradient
               colors={getStatusBadgeColors(item)}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.statusBadge}
+              style={[styles.statusBadge, { borderColor: theme.border }]}
             >
               <MaterialCommunityIcons 
                 name={
@@ -238,14 +240,15 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
                 } 
                 size={14} 
                 color={
-                  isLate ? "#e67700" :
-                  item.canSubmit ? "#2b8a3e" : "#6c757d"
+                  isLate ? theme.primary :
+                  item.canSubmit ? theme.primary : theme.textMuted
                 } 
               />
               <Text style={[
                 styles.statusText,
                 isLate ? styles.lateText :
-                item.canSubmit ? styles.availableText : styles.waitingText
+                item.canSubmit ? styles.availableText : styles.waitingText,
+                { color: isLate ? theme.primary : item.canSubmit ? theme.primary : theme.textMuted }
               ]}>
                 {isLate ? 'Late' : item.canSubmit ? 'Available' : 'Waiting'}
               </Text>
@@ -254,8 +257,8 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
 
           <View style={styles.detailsRow}>
             <View style={styles.timeSlot}>
-              <MaterialCommunityIcons name="clock" size={16} color="#868e96" />
-              <Text style={styles.timeSlotText}>
+              <MaterialCommunityIcons name="clock" size={16} color={theme.textMuted} />
+              <Text style={[styles.timeSlotText, { color: theme.textSecondary }]}>
                 {item.timeSlot 
                   ? `${item.timeSlot.startTime} - ${item.timeSlot.endTime}`
                   : 'Anytime today'}
@@ -263,16 +266,16 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
             </View>
 
             <LinearGradient
-              colors={['#fff3bf', '#ffec99']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.pointsBadge}
+              style={[styles.pointsBadge, { borderColor: theme.border }]}
             >
-              <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-              <Text style={styles.pointsText}>
+              <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+              <Text style={[styles.pointsText, { color: theme.primary }]}>
                 {item.finalPoints || item.taskPoints} pts
                 {item.willBePenalized && item.finalPoints && (
-                  <Text style={styles.penaltyText}> (-{item.taskPoints - item.finalPoints})</Text>
+                  <Text style={[styles.penaltyText, { color: theme.error }]}> (-{item.taskPoints - item.finalPoints})</Text>
                 )}
               </Text>
             </LinearGradient>
@@ -283,21 +286,21 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
               colors={getTimerGradientColors(isUrgent)}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.timerContainer}
+              style={[styles.timerContainer, { borderColor: theme.border }]}
             >
               <MaterialCommunityIcons 
                 name={isUrgent ? "timer-alert" : "timer"} 
                 size={16} 
-                color={isUrgent ? "#fa5252" : "#2b8a3e"} 
+                color={isUrgent ? theme.error : theme.primary} 
               />
-              <Text style={[styles.timerText, isUrgent && styles.urgentTimerText]}>
+              <Text style={[styles.timerText, isUrgent && styles.urgentTimerText, { color: isUrgent ? theme.error : theme.primary }]}>
                 {formatTimeLeft(item.timeLeft)} {item.canSubmit ? 'left to submit' : 'until submission opens'}
               </Text>
             </LinearGradient>
           )}
 
           {item.reason && !item.canSubmit && (
-            <Text style={styles.reasonText}>{item.reason}</Text>
+            <Text style={[styles.reasonText, { color: theme.textMuted }]}>{item.reason}</Text>
           )}
         </LinearGradient>
       </TouchableOpacity>
@@ -306,33 +309,33 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
 
   const renderHeader = () => (
     <LinearGradient
-      colors={['#ffffff', '#f8f9fa']}
+      colors={[theme.card, theme.bgSecondary]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
-      style={styles.header}
+      style={[styles.header, { borderBottomColor: theme.border }]}
     >
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
       </TouchableOpacity>
       
       <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
           Today's Assignments
         </Text>
         {groupName && (
-          <Text style={styles.subtitle}>{groupName}</Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>{groupName}</Text>
         )}
       </View>
       
       <TouchableOpacity 
-        style={styles.refreshButton}
+        style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         onPress={() => fetchTodayAssignments(true)}
         disabled={refreshing}
       >
         {refreshing ? (
-          <ActivityIndicator size="small" color="#2b8a3e" />
+          <ActivityIndicator size="small" color={theme.primary} />
         ) : (
-          <MaterialCommunityIcons name="refresh" size={20} color="#495057" />
+          <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
         )}
       </TouchableOpacity>
     </LinearGradient>
@@ -341,10 +344,10 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   if (loading && !refreshing) {
     console.log('⏳ [TodayAssignments] Showing loading indicator');
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading today's assignments...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading today's assignments...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -353,17 +356,17 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   if (authError) {
     console.log('⚠️ [TodayAssignments] Showing auth error screen');
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.errorContainer}>
-          <MaterialCommunityIcons name="lock-alert" size={64} color="#fa5252" />
-          <Text style={styles.errorText}>Authentication Error</Text>
-          <Text style={styles.errorSubtext}>Please log in again</Text>
+          <MaterialCommunityIcons name="lock-alert" size={64} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>Authentication Error</Text>
+          <Text style={[styles.errorSubtext, { color: theme.textMuted }]}>Please log in again</Text>
           <TouchableOpacity 
             style={styles.retryButton}
             onPress={() => navigation.navigate('Login')}
           >
             <LinearGradient
-              colors={['#fa5252', '#e03131']}
+              colors={[theme.error, theme.error]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.retryButtonGradient}
@@ -379,8 +382,8 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   console.log(`🎨 [TodayAssignments] Rendering ${assignments.length} assignments`);
 
   return (
-    <ScreenWrapper style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.card} />
       {renderHeader()}
 
       <FlatList
@@ -391,23 +394,23 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={() => fetchTodayAssignments(true)}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         ListEmptyComponent={
           !loading ? (
             <View style={styles.emptyContainer}>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.emptyIconContainer}
+                style={[styles.emptyIconContainer, { borderColor: theme.border }]}
               >
-                <MaterialCommunityIcons name="calendar-check" size={40} color="#2b8a3e" />
+                <MaterialCommunityIcons name="calendar-check" size={40} color={theme.primary} />
               </LinearGradient>
-              <Text style={styles.emptyTitle}>No assignments due today!</Text>
-              <Text style={styles.emptySubtext}>
+              <Text style={[styles.emptyTitle, { color: theme.textMuted }]}>No assignments due today!</Text>
+              <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
                 You're all caught up for today
               </Text>
             </View>
@@ -419,11 +422,9 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   );
 }
 
-// Styles remain the same as before...
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa'
   },
   header: {
     flexDirection: 'row',
@@ -431,19 +432,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -457,12 +454,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 12,
-    color: '#868e96',
     marginTop: 2,
     textAlign: 'center',
   },
@@ -470,10 +465,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -486,7 +479,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#868e96',
     fontSize: 14,
   },
   errorContainer: {
@@ -496,7 +488,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    color: '#fa5252',
     fontSize: 18,
     fontWeight: '600',
     marginTop: 16,
@@ -504,7 +495,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   errorSubtext: {
-    color: '#868e96',
     fontSize: 14,
     marginBottom: 24,
     textAlign: 'center',
@@ -518,7 +508,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   retryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
     fontSize: 16,
   },
@@ -530,20 +520,16 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   lateCard: {
-    borderColor: '#ffd43b',
     borderWidth: 2,
   },
   urgentCard: {
-    borderColor: '#fa5252',
     borderWidth: 2,
   },
   cardHeader: {
@@ -559,12 +545,10 @@ const styles = StyleSheet.create({
   taskTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 4,
   },
   groupName: {
     fontSize: 13,
-    color: '#868e96',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -574,21 +558,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 4,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   statusText: {
     fontSize: 12,
     fontWeight: '600',
   },
-  availableText: {
-    color: '#2b8a3e',
-  },
-  waitingText: {
-    color: '#868e96',
-  },
-  lateText: {
-    color: '#e67700',
-  },
+  availableText: {},
+  waitingText: {},
+  lateText: {},
   detailsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -602,7 +579,6 @@ const styles = StyleSheet.create({
   },
   timeSlotText: {
     fontSize: 14,
-    color: '#495057',
   },
   pointsBadge: {
     flexDirection: 'row',
@@ -612,16 +588,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 4,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   pointsText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#e67700',
   },
   penaltyText: {
     fontSize: 11,
-    color: '#fa5252',
     fontWeight: '400',
   },
   timerContainer: {
@@ -631,19 +604,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 6,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   timerText: {
     fontSize: 13,
-    color: '#2b8a3e',
     fontWeight: '500',
   },
-  urgentTimerText: {
-    color: '#fa5252',
-  },
+  urgentTimerText: {},
   reasonText: {
     fontSize: 13,
-    color: '#868e96',
     fontStyle: 'italic',
     marginTop: 8,
   },
@@ -661,18 +629,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#868e96',
     textAlign: 'center',
     lineHeight: 20,
     paddingHorizontal: 32,

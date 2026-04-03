@@ -1,5 +1,4 @@
-// src/screens/MemberDashboardScreen.tsx - COMPLETE FIXED VERSION
-
+// src/screens/MemberDashboardScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -24,10 +23,13 @@ import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { TokenUtils } from '../utils/tokenUtils';
 import { SettingsModal } from '../components/SettingsModal'; 
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { memberDashboardStyles as styles } from '../styles/memberDashboard.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeMemberDashboardStyles } from '../styles/memberDashboard.styles';
 import { API_BASE_URL } from '../config/api';
 
 export const MemberDashboardScreen = ({ navigation, route }: any) => {
+  const { theme, isDark } = useTheme();
+  const styles = makeMemberDashboardStyles(theme);
   const { groupId, groupName } = route.params;
   
   const [loading, setLoading] = useState(true);
@@ -463,7 +465,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     title, 
     value, 
     icon, 
-    color = '#2b8a3e', 
+    color = theme.primary, 
     subtitle,
     onPress,
     navigateTo,
@@ -480,7 +482,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
     return (
       <TouchableOpacity
-        style={styles.statCard}
+        style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}
         onPress={handlePress}
         activeOpacity={0.7}
         disabled={!navigateTo && !onPress}
@@ -490,19 +492,19 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             colors={[`${color}20`, `${color}10`]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.statIconContainer}
+            style={[styles.statIconContainer, { borderColor: theme.border }]}
           >
             <MaterialCommunityIcons name={icon} size={24} color={color} />
           </LinearGradient>
-          <Text style={styles.statValue}>{value}</Text>
+          <Text style={[styles.statValue, { color: theme.text }]}>{value}</Text>
         </View>
-        <Text style={styles.statTitle}>{title}</Text>
-        {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
+        <Text style={[styles.statTitle, { color: theme.textMuted }]}>{title}</Text>
+        {subtitle && <Text style={[styles.statSubtitle, { color: theme.textPlaceholder }]}>{subtitle}</Text>}
         {(navigateTo || onPress) && (
           <MaterialCommunityIcons 
             name="chevron-right" 
             size={16} 
-            color="#adb5bd" 
+            color={theme.textMuted} 
             style={{ position: 'absolute', bottom: 12, right: 12 }}
           />
         )}
@@ -529,14 +531,14 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={isCompleted ? ['#f8f9fa', '#e9ecef'] : ['#ffffff', '#f8f9fa']}
+          colors={isCompleted ? [theme.bgSecondary, theme.bgTertiary] : [theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.taskCard}
+          style={[styles.taskCard, { borderColor: theme.border }]}
         >
           <View style={styles.taskHeader}>
             <LinearGradient
-              colors={isCompleted ? ['#868e96', '#6c757d'] : ['#2b8a3e', '#1e6b2c']}
+              colors={isCompleted ? [theme.textMuted, theme.textMuted] : [theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.taskIcon}
@@ -544,29 +546,30 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
               <MaterialCommunityIcons
                 name={isCompleted ? "check" : "format-list-checks"}
                 size={20}
-                color="white"
+                color="#fff"
               />
             </LinearGradient>
             <View style={styles.taskInfo}>
               <Text style={[
                 styles.taskTitle,
-                isCompleted && styles.completedTaskTitle
+                isCompleted && styles.completedTaskTitle,
+                { color: isCompleted ? theme.textMuted : theme.text }
               ]} numberOfLines={1}>
                 {task.title || task.taskTitle}
               </Text>
               <View style={styles.taskMeta}>
                 <LinearGradient
-                  colors={['#fff3bf', '#ffec99']}
+                  colors={[theme.primaryLight, theme.primaryLight]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.pointsBadge}
                 >
-                  <MaterialCommunityIcons name="star" size={12} color="#e67700" />
-                  <Text style={styles.pointsText}>{task.points || task.assignment?.points || 0} pts</Text>
+                  <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                  <Text style={[styles.pointsText, { color: theme.primary }]}>{task.points || task.assignment?.points || 0} pts</Text>
                 </LinearGradient>
                 {isDueToday && !isCompleted && (
                   <LinearGradient
-                    colors={['#fa5252', '#e03131']}
+                    colors={[theme.error, theme.error]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.dueBadge}
@@ -576,7 +579,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
                 )}
                 {isOverdue && !isCompleted && (
                   <LinearGradient
-                    colors={['#e67700', '#cc5f00']}
+                    colors={[theme.primary, theme.primaryDark]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.dueBadge}
@@ -588,9 +591,9 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             </View>
           </View>
           {task.timeSlot && (
-            <View style={styles.timeSlotContainer}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color="#868e96" />
-              <Text style={styles.timeSlotText}>
+            <View style={[styles.timeSlotContainer, { backgroundColor: theme.bgSecondary }]}>
+              <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+              <Text style={[styles.timeSlotText, { color: theme.textSecondary }]}>
                 {task.timeSlot.startTime} - {task.timeSlot.endTime}
               </Text>
             </View>
@@ -602,17 +605,17 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
   if (loading && !refreshing) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>My Dashboard</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>My Dashboard</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading dashboard...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -620,20 +623,20 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
   if (error && !refreshing) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>My Dashboard</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>My Dashboard</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={styles.centerContainer}>
-          <MaterialCommunityIcons name="alert-circle" size={48} color="#fa5252" />
-          <Text style={styles.errorText}>{error}</Text>
+          <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => loadDashboardData()}>
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.retryButtonGradient}
@@ -647,21 +650,21 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>{groupName}</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>{groupName}</Text>
         
         <View style={styles.headerRight}>
-          <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
-            <MaterialCommunityIcons name="refresh" size={22} color="#2b8a3e" />
+          <TouchableOpacity onPress={handleRefresh} style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="refresh" size={22} color={theme.primary} />
           </TouchableOpacity>
           
-          <TouchableOpacity onPress={handleSettingsPress} style={styles.settingsButton}>
-            <MaterialCommunityIcons name="cog" size={22} color="#2b8a3e" />
+          <TouchableOpacity onPress={handleSettingsPress} style={[styles.settingsButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="cog" size={22} color={theme.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -672,15 +675,15 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         contentContainerStyle={styles.scrollContent}
       >
         {/* Welcome Card */}
         <LinearGradient
-          colors={['#2b8a3e', '#1e6b2c']}
+          colors={[theme.primary, theme.primaryDark]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.welcomeCard}
@@ -697,35 +700,35 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         {/* Points Overview */}
         <View style={styles.pointsContainer}>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.pointsCard}
+            style={[styles.pointsCard, { borderColor: theme.border }]}
           >
-            <Text style={styles.pointsLabel}>This Week</Text>
-            <Text style={styles.pointsValue}>{points.thisWeek}</Text>
-            <Text style={styles.pointsSubtext}>points earned</Text>
+            <Text style={[styles.pointsLabel, { color: theme.textMuted }]}>This Week</Text>
+            <Text style={[styles.pointsValue, { color: theme.primary }]}>{points.thisWeek}</Text>
+            <Text style={[styles.pointsSubtext, { color: theme.textPlaceholder }]}>points earned</Text>
           </LinearGradient>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.pointsCard}
+            style={[styles.pointsCard, { borderColor: theme.border }]}
           >
-            <Text style={styles.pointsLabel}>Total</Text>
-            <Text style={styles.pointsValue}>{points.total}</Text>
-            <Text style={styles.pointsSubtext}>lifetime points</Text>
+            <Text style={[styles.pointsLabel, { color: theme.textMuted }]}>Total</Text>
+            <Text style={[styles.pointsValue, { color: theme.primary }]}>{points.total}</Text>
+            <Text style={[styles.pointsSubtext, { color: theme.textPlaceholder }]}>lifetime points</Text>
           </LinearGradient>
         </View>
 
         {/* Quick Stats - CLICKABLE */}
-        <Text style={styles.sectionTitle}>Your Stats</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Stats</Text>
         <View style={styles.statsGrid}>
           <StatCard
             title="Pending Tasks"
             value={pendingTasks.length}
             icon="clock-outline"
-            color="#e67700"
+            color={theme.primary}
             navigateTo="GroupTasks"
             navigationParams={{ groupId, groupName, userRole: 'MEMBER', tab: 'my' }}
           />
@@ -733,7 +736,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             title="Completed"
             value={typeof completedTasks === 'number' ? completedTasks : completedTasks.length}
             icon="check-circle"
-            color="#2b8a3e"
+            color={theme.primary}
             navigateTo="TaskCompletionHistory"
             navigationParams={{ groupId, groupName, userRole: 'MEMBER' }}
           />
@@ -741,7 +744,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             title="Due Today"
             value={tasksDueToday.length}
             icon="calendar-today"
-            color="#fa5252"
+            color={theme.error}
             navigateTo="TodayAssignments"
             navigationParams={{ groupId, groupName }}
           />
@@ -749,7 +752,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             title="My Swaps"
             value={mySwapRequestsCount}
             icon="swap-horizontal"
-            color="#2b8a3e"
+            color={theme.primary}
             navigateTo="MySwapRequests"
             navigationParams={{ groupId, groupName }}
           />
@@ -757,7 +760,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             title="My Neglected"
             value={stats?.myNeglectedCount || 0}
             icon="timer-off"
-            color="#fa5252"
+            color={theme.error}
             navigateTo="NeglectedTasks"
             navigationParams={{ groupId, groupName, userRole: 'MEMBER' }}
           />
@@ -767,10 +770,10 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         {tasksDueToday.length > 0 && (
           <>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Due Today</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Due Today</Text>
               {tasksDueToday.length > 2 && (
                 <TouchableOpacity onPress={() => navigation.navigate('TodayAssignments', { groupId, groupName })}>
-                  <Text style={styles.viewAllText}>View All</Text>
+                  <Text style={[styles.viewAllText, { color: theme.primary }]}>View All</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -783,7 +786,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         {/* Pending Tasks */}
         {pendingTasks.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Upcoming Tasks</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Upcoming Tasks</Text>
             {pendingTasks.slice(0, 3).map((task: any) => (
               <TaskCard key={task.id} task={task} />
             ))}
@@ -791,64 +794,64 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         )}
 
         {/* Quick Actions */}
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
         <View style={styles.actionsGrid}>
           <TouchableOpacity
-            style={styles.actionCard}
+            style={[styles.actionCard, { borderColor: theme.border }]}
             onPress={() => navigation.navigate('MySwapRequests')}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.actionGradient}
             >
-              <MaterialCommunityIcons name="swap-horizontal" size={24} color="white" />
+              <MaterialCommunityIcons name="swap-horizontal" size={24} color="#fff" />
               <Text style={styles.actionText}>My Swaps</Text>
             </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.actionCard}
+            style={[styles.actionCard, { borderColor: theme.border }]}
             onPress={() => navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole: 'MEMBER' })}
           >
             <LinearGradient
-              colors={['#495057', '#343a40']}
+              colors={[theme.textSecondary, theme.textMuted]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.actionGradient}
             >
-              <MaterialCommunityIcons name="history" size={24} color="white" />
+              <MaterialCommunityIcons name="history" size={24} color="#fff" />
               <Text style={styles.actionText}>History</Text>
             </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.actionCard}
+            style={[styles.actionCard, { borderColor: theme.border }]}
             onPress={() => navigation.navigate('RotationSchedule', { groupId, groupName, userRole: 'MEMBER' })}
           >
             <LinearGradient
-              colors={['#495057', '#343a40']}
+              colors={[theme.textSecondary, theme.textMuted]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.actionGradient}
             >
-              <MaterialCommunityIcons name="calendar-sync" size={24} color="white" />
+              <MaterialCommunityIcons name="calendar-sync" size={24} color="#fff" />
               <Text style={styles.actionText}>Schedule</Text>
             </LinearGradient>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.actionCard}
+            style={[styles.actionCard, { borderColor: theme.border }]}
             onPress={() => navigation.navigate('FullLeaderboard', { groupId, groupName })}
           >
             <LinearGradient
-              colors={['#495057', '#343a40']}
+              colors={[theme.textSecondary, theme.textMuted]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.actionGradient}
             >
-              <MaterialCommunityIcons name="podium" size={24} color="white" />
+              <MaterialCommunityIcons name="podium" size={24} color="#fff" />
               <Text style={styles.actionText}>Leaderboard</Text>
             </LinearGradient>
           </TouchableOpacity>

@@ -1,11 +1,11 @@
-// src/styles/createSwapRequest.styles.ts
-
+// src/styles/createSwapRequest.styles.ts - Dark Mode Version
 import { StyleSheet } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
-export const createSwapRequestStyles = StyleSheet.create({
+export const makeCreateSwapRequestStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
   },
   keyboardView: {
     flex: 1,
@@ -18,7 +18,7 @@ export const createSwapRequestStyles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   header: {
     flexDirection: 'row',
@@ -26,19 +26,19 @@ export const createSwapRequestStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.border,
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -47,7 +47,7 @@ export const createSwapRequestStyles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
   },
   scrollContent: {
     padding: 16,
@@ -61,13 +61,13 @@ export const createSwapRequestStyles = StyleSheet.create({
   pendingTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#e67700',
+    color: theme.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   pendingText: {
     fontSize: 14,
-    color: '#868e96',
+    color: theme.textMuted,
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 20,
@@ -81,7 +81,7 @@ export const createSwapRequestStyles = StyleSheet.create({
     paddingVertical: 12,
   },
   viewRequestButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -90,7 +90,8 @@ export const createSwapRequestStyles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.card,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -104,16 +105,17 @@ export const createSwapRequestStyles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.bgSecondary,
   },
   cardTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
   },
   taskTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 20,
   },
   detailsGrid: {
@@ -128,16 +130,16 @@ export const createSwapRequestStyles = StyleSheet.create({
   },
   detailLabel: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 4,
   },
   detailValue: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
   },
   pointsValue: {
-    color: '#e67700',
+    color: theme.primary,
   },
   assignmentDayBadge: {
     flexDirection: 'row',
@@ -149,15 +151,16 @@ export const createSwapRequestStyles = StyleSheet.create({
     gap: 6,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   assignmentDayText: {
     fontSize: 12,
-    color: '#495057',
+    color: theme.textSecondary,
   },
   assignmentDayBold: {
     fontWeight: '700',
-    color: '#495057',
+    color: theme.text,
   },
   frequencyBadge: {
     flexDirection: 'row',
@@ -169,11 +172,12 @@ export const createSwapRequestStyles = StyleSheet.create({
     gap: 6,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   frequencyText: {
     fontSize: 11,
-    color: '#495057',
+    color: theme.textSecondary,
     fontWeight: '500',
   },
   scopeBadge: {
@@ -185,12 +189,13 @@ export const createSwapRequestStyles = StyleSheet.create({
     alignSelf: 'flex-start',
     gap: 6,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   scopeBadgeText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   warningCard: {
     borderRadius: 12,
@@ -200,7 +205,8 @@ export const createSwapRequestStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
+    borderColor: theme.errorBorder,
+    backgroundColor: theme.errorBg,
   },
   warningContent: {
     flex: 1,
@@ -208,12 +214,12 @@ export const createSwapRequestStyles = StyleSheet.create({
   warningTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fa5252',
+    color: theme.error,
     marginBottom: 4,
   },
   warningText: {
     fontSize: 13,
-    color: '#c92a2a',
+    color: theme.error,
     lineHeight: 18,
   },
   infoSuccessCard: {
@@ -224,17 +230,18 @@ export const createSwapRequestStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     borderWidth: 1,
-    borderColor: '#b2f2bb',
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryLight,
   },
   successTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2b8a3e',
+    color: theme.primary,
     marginBottom: 4,
   },
   successText: {
     fontSize: 13,
-    color: '#1e6b2c',
+    color: theme.primary,
     lineHeight: 18,
   },
   infoBanner: {
@@ -245,7 +252,8 @@ export const createSwapRequestStyles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   infoBannerContent: {
     flex: 1,
@@ -253,12 +261,12 @@ export const createSwapRequestStyles = StyleSheet.create({
   infoBannerTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 4,
   },
   infoBannerText: {
     fontSize: 13,
-    color: '#495057',
+    color: theme.textSecondary,
     lineHeight: 18,
   },
   section: {
@@ -267,22 +275,22 @@ export const createSwapRequestStyles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
+    color: theme.textSecondary,
     marginBottom: 12,
   },
   selectorButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   selectorButtonRequired: {
-    borderColor: '#ffc9c9',
+    borderColor: theme.errorBorder,
   },
   selectorContent: {
     flexDirection: 'row',
@@ -291,19 +299,19 @@ export const createSwapRequestStyles = StyleSheet.create({
   },
   selectorText: {
     fontSize: 14,
-    color: '#212529',
+    color: theme.text,
     fontWeight: '500',
   },
   selectorTextSelected: {
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '600',
   },
   memberList: { 
     marginTop: 8,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
     overflow: 'hidden',
   },
   memberItem: {
@@ -313,7 +321,7 @@ export const createSwapRequestStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f5',
+    borderBottomColor: theme.borderLight,
   },
   memberInfo: {
     flexDirection: 'row',
@@ -326,9 +334,10 @@ export const createSwapRequestStyles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: theme.bgSecondary,
   },
   anyoneAvatar: {
-    backgroundColor: '#e9ecef',
+    backgroundColor: theme.bgTertiary,
   },
   avatarImage: {
     width: 40,
@@ -338,17 +347,17 @@ export const createSwapRequestStyles = StyleSheet.create({
   avatarText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   memberName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 2,
   },
   memberRole: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   noMembersContainer: {
     alignItems: 'center',
@@ -357,7 +366,7 @@ export const createSwapRequestStyles = StyleSheet.create({
   },
   noMembersText: {
     fontSize: 14,
-    color: '#adb5bd',
+    color: theme.textPlaceholder,
     textAlign: 'center',
   },
   expiryOptions: {
@@ -368,6 +377,8 @@ export const createSwapRequestStyles = StyleSheet.create({
     flex: 1,
     borderRadius: 8,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: theme.border,
   },
   expiryOptionGradient: {
     paddingVertical: 10,
@@ -376,28 +387,28 @@ export const createSwapRequestStyles = StyleSheet.create({
   expiryOptionText: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#495057',
+    color: theme.textSecondary,
   },
   expiryOptionTextActive: {
-    color: 'white',
+    color: '#fff',
   },
   expiryOptionActive: {
-    borderWidth: 1,
-    borderColor: '#495057',
+    borderWidth: 2,
+    borderColor: theme.primary,
   },
   reasonInputGradient: {
     borderRadius: 12,
     padding: 2,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   reasonInput: {
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 14,
-    color: '#212529',
+    color: theme.text,
     minHeight: 100,
     textAlignVertical: 'top',
   },
@@ -409,20 +420,21 @@ export const createSwapRequestStyles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
   },
   infoText: {
     flex: 1,
     fontSize: 12,
-    color: '#868e96',
+    color: theme.textMuted,
     lineHeight: 18,
   },
   footer: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
+    borderTopColor: theme.border,
   },
   submitButton: {
     borderRadius: 12,
@@ -441,12 +453,12 @@ export const createSwapRequestStyles = StyleSheet.create({
   submitButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: 'white',
+    color: '#fff',
   },
   disabledHint: {
     textAlign: 'center',
     fontSize: 12,
-    color: '#fa5252',
+    color: theme.error,
     marginTop: 8,
   },
 });

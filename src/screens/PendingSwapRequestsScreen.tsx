@@ -1,4 +1,4 @@
-// src/screens/PendingSwapRequestsScreen.tsx - COMPLETE WITH ADMIN READ-ONLY
+// src/screens/PendingSwapRequestsScreen.tsx - Dark Mode Added
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -21,8 +21,10 @@ import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 export const PendingSwapRequestsScreen = () => {
+  const { theme, isDark } = useTheme();
   const navigation = useNavigation();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -243,36 +245,36 @@ export const PendingSwapRequestsScreen = () => {
     const selectedDay = item.selectedDay;
     const selectedTimeSlot = item.selectedTimeSlot;
     
-    // ✅ Check if this request is for the current user
+    // Check if this request is for the current user
     const isTargetUser = item.targetUserId === currentUserId;
     const isOpenToAnyone = !item.targetUserId;
     const canActOnRequest = !isAdmin && (isTargetUser || isOpenToAnyone);
 
     return (
       <TouchableOpacity
-        style={styles.requestCard}
+        style={[styles.requestCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}
         onPress={() => handleViewDetails(item.id)}
         activeOpacity={0.7}
       >
         <View style={styles.cardHeader}>
           <View style={styles.requesterInfo}>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.avatar}
+              style={[styles.avatar, { borderColor: theme.border }]}
             >
               {requesterAvatar ? (
                 <Image source={{ uri: requesterAvatar }} style={styles.avatarImage} />
               ) : (
-                <Text style={styles.avatarText}>
+                <Text style={[styles.avatarText, { color: theme.textSecondary }]}>
                   {requesterName.charAt(0).toUpperCase()}
                 </Text>
               )}
             </LinearGradient>
             <View>
-              <Text style={styles.requesterName}>{requesterName}</Text>
-              <Text style={styles.requestTime}>
+              <Text style={[styles.requesterName, { color: theme.text }]}>{requesterName}</Text>
+              <Text style={[styles.requestTime, { color: theme.textMuted }]}>
                 {new Date(item.createdAt).toLocaleDateString()}
               </Text>
             </View>
@@ -281,7 +283,7 @@ export const PendingSwapRequestsScreen = () => {
             colors={[statusColor + '20', statusColor + '10']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.statusBadge}
+            style={[styles.statusBadge, { borderColor: theme.border }]}
           >
             <MaterialCommunityIcons name={statusIcon as any} size={12} color={statusColor} />
             <Text style={[styles.statusText, { color: statusColor }]}>
@@ -290,28 +292,30 @@ export const PendingSwapRequestsScreen = () => {
           </LinearGradient>
         </View>
 
-        <View style={styles.taskContainer}>
-          <Text style={styles.taskTitle} numberOfLines={2}>
+        <View style={[styles.taskContainer, { borderTopColor: theme.borderLight }]}>
+          <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
             {taskTitle}
           </Text>
           
           <LinearGradient
-            colors={scope === 'day' ? ['#EEF2FF', '#dbe4ff'] : ['#f8f9fa', '#e9ecef']}
+            colors={scope === 'day' ? ['#EEF2FF', '#dbe4ff'] : [theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[
               styles.scopeBadge,
-              scope === 'day' && styles.dayScopeBadge
+              scope === 'day' && styles.dayScopeBadge,
+              { borderColor: theme.border }
             ]}
           >
             <MaterialCommunityIcons 
               name={scope === 'day' ? 'calendar-today' : 'calendar-week'} 
               size={12} 
-              color={scope === 'day' ? '#4F46E5' : '#495057'} 
+              color={scope === 'day' ? '#4F46E5' : theme.textSecondary} 
             />
             <Text style={[
               styles.scopeBadgeText,
-              scope === 'day' && styles.dayScopeBadgeText
+              scope === 'day' && styles.dayScopeBadgeText,
+              { color: scope === 'day' ? '#4F46E5' : theme.textSecondary }
             ]}>
               {scope === 'day' 
                 ? `Swap for ${selectedDay || 'specific day'}`
@@ -321,13 +325,13 @@ export const PendingSwapRequestsScreen = () => {
           
           {scope === 'day' && selectedTimeSlot && (
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.timeSlotBadge}
+              style={[styles.timeSlotBadge, { borderColor: theme.border }]}
             >
-              <MaterialCommunityIcons name="clock-outline" size={10} color="#868e96" />
-              <Text style={styles.timeSlotText}>
+              <MaterialCommunityIcons name="clock-outline" size={10} color={theme.textMuted} />
+              <Text style={[styles.timeSlotText, { color: theme.textSecondary }]}>
                 {selectedTimeSlot.startTime} - {selectedTimeSlot.endTime}
                 {selectedTimeSlot.label ? ` (${selectedTimeSlot.label})` : ''}
               </Text>
@@ -335,44 +339,44 @@ export const PendingSwapRequestsScreen = () => {
           )}
           
           <View style={styles.detailsGrid}>
-            <View style={styles.detailItem}>
-              <MaterialCommunityIcons name="calendar-outline" size={14} color="#868e96" />
-              <Text style={styles.detailText}>
+            <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+              <MaterialCommunityIcons name="calendar-outline" size={14} color={theme.textMuted} />
+              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
                 {dueDate ? new Date(dueDate).toLocaleDateString() : 'N/A'}
               </Text>
             </View>
             
             {timeSlot && scope !== 'day' && (
-              <View style={styles.detailItem}>
-                <MaterialCommunityIcons name="clock-outline" size={14} color="#868e96" />
-                <Text style={styles.detailText}>{timeSlot}</Text>
+              <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+                <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+                <Text style={[styles.detailText, { color: theme.textSecondary }]}>{timeSlot}</Text>
               </View>
             )}
             
-            <View style={styles.detailItem}>
-              <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-              <Text style={styles.detailText}>{points} pts</Text>
+            <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
+              <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+              <Text style={[styles.detailText, { color: theme.textSecondary }]}>{points} pts</Text>
             </View>
           </View>
 
           {item.reason && (
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.reasonContainer}
+              style={[styles.reasonContainer, { borderColor: theme.border }]}
             >
-              <Text style={styles.reasonLabel}>Reason:</Text>
-              <Text style={styles.reasonText} numberOfLines={2}>
+              <Text style={[styles.reasonLabel, { color: theme.textMuted }]}>Reason:</Text>
+              <Text style={[styles.reasonText, { color: theme.textSecondary }]} numberOfLines={2}>
                 {item.reason}
               </Text>
             </LinearGradient>
           )}
 
           {item.expiresAt && (
-            <View style={styles.expiryContainer}>
-              <MaterialCommunityIcons name="clock-outline" size={12} color="#e67700" />
-              <Text style={styles.expiryText}>
+            <View style={[styles.expiryContainer, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="clock-outline" size={12} color={theme.primary} />
+              <Text style={[styles.expiryText, { color: theme.primary }]}>
                 Expires: {new Date(item.expiresAt).toLocaleDateString()}
               </Text>
             </View>
@@ -381,46 +385,46 @@ export const PendingSwapRequestsScreen = () => {
 
         {/* Action Buttons - Only for non-admin users who are the target */}
         {item.status === 'PENDING' && canActOnRequest && (
-          <View style={styles.actionButtons}>
+          <View style={[styles.actionButtons, { borderTopColor: theme.borderLight }]}>
             <TouchableOpacity
-              style={[styles.actionButton, styles.acceptButton]}
+              style={[styles.actionButton, styles.acceptButton, { borderColor: theme.primaryBorder }]}
               onPress={() => handleAccept(item.id, item.scope, item.selectedDay)}
               disabled={isProcessing}
             >
               <LinearGradient
-                colors={['#d3f9d8', '#b2f2bb']}
+                colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.actionButtonGradient}
               >
                 {isProcessing ? (
-                  <ActivityIndicator size="small" color="#2b8a3e" />
+                  <ActivityIndicator size="small" color={theme.primary} />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="check" size={16} color="#2b8a3e" />
-                    <Text style={styles.acceptButtonText}>Accept</Text>
+                    <MaterialCommunityIcons name="check" size={16} color={theme.primary} />
+                    <Text style={[styles.acceptButtonText, { color: theme.primary }]}>Accept</Text>
                   </>
                 )}
               </LinearGradient>
             </TouchableOpacity>
             
             <TouchableOpacity
-              style={[styles.actionButton, styles.rejectButton]}
+              style={[styles.actionButton, styles.rejectButton, { borderColor: theme.errorBorder }]}
               onPress={() => handleReject(item.id)}
               disabled={isProcessing}
             >
               <LinearGradient
-                colors={['#fff5f5', '#ffe3e3']}
+                colors={[theme.errorBg, theme.errorBg]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.actionButtonGradient}
               >
                 {isProcessing ? (
-                  <ActivityIndicator size="small" color="#fa5252" />
+                  <ActivityIndicator size="small" color={theme.error} />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="close" size={16} color="#fa5252" />
-                    <Text style={styles.rejectButtonText}>Reject</Text>
+                    <MaterialCommunityIcons name="close" size={16} color={theme.error} />
+                    <Text style={[styles.rejectButtonText, { color: theme.error }]}>Reject</Text>
                   </>
                 )}
               </LinearGradient>
@@ -431,13 +435,13 @@ export const PendingSwapRequestsScreen = () => {
         {/* Admin View Only Badge */}
         {item.status === 'PENDING' && isAdmin && (
           <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
+            colors={[theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.adminViewBadge}
+            style={[styles.adminViewBadge, { borderColor: theme.border }]}
           >
-            <MaterialCommunityIcons name="eye" size={14} color="#2b8a3e" />
-            <Text style={styles.adminViewText}>Admin View Only</Text>
+            <MaterialCommunityIcons name="eye" size={14} color={theme.primary} />
+            <Text style={[styles.adminViewText, { color: theme.primary }]}>Admin View Only</Text>
           </LinearGradient>
         )}
       </TouchableOpacity>
@@ -446,10 +450,10 @@ export const PendingSwapRequestsScreen = () => {
 
   if (isLoadingUser) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -457,28 +461,28 @@ export const PendingSwapRequestsScreen = () => {
 
   if (loading && !refreshing && pendingForMe.length === 0) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading swap requests...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading swap requests...</Text>
         </View>
       </ScreenWrapper>
     );
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
         
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Swap Requests</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Swap Requests</Text>
           {totalPendingForMe > 0 && (
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.badge}
@@ -489,23 +493,23 @@ export const PendingSwapRequestsScreen = () => {
         </View>
         
         <TouchableOpacity
-          style={styles.historyButton}
+          style={[styles.historyButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
           onPress={() => (navigation as any).navigate('MySwapRequests')}
         >
-          <MaterialCommunityIcons name="history" size={22} color="#495057" />
+          <MaterialCommunityIcons name="history" size={22} color={theme.textMuted} />
         </TouchableOpacity>
       </View>
 
       {/* Admin Info Banner */}
       {isAdmin && (
         <LinearGradient
-          colors={['#e7f5ff', '#d0ebff']}
+          colors={[theme.primaryLight, theme.primaryLight]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.adminInfoBanner}
+          style={[styles.adminInfoBanner, { borderColor: theme.primaryBorder }]}
         >
-          <MaterialCommunityIcons name="information" size={16} color="#2b8a3e" />
-          <Text style={styles.adminInfoText}>
+          <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
+          <Text style={[styles.adminInfoText, { color: theme.primary }]}>
             Admin View - You can see all pending swap requests but cannot accept or reject them.
           </Text>
         </LinearGradient>
@@ -520,22 +524,22 @@ export const PendingSwapRequestsScreen = () => {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={handleRefresh}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.emptyIconContainer}
+              style={[styles.emptyIconContainer, { borderColor: theme.border }]}
             >
-              <MaterialCommunityIcons name="swap-horizontal" size={40} color="#adb5bd" />
+              <MaterialCommunityIcons name="swap-horizontal" size={40} color={theme.textPlaceholder} />
             </LinearGradient>
-            <Text style={styles.emptyTitle}>No Pending Requests</Text>
-            <Text style={styles.emptyText}>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>No Pending Requests</Text>
+            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
               {isAdmin 
                 ? 'No pending swap requests in this group'
                 : 'You don\'t have any swap requests waiting for your response.'}
@@ -550,7 +554,6 @@ export const PendingSwapRequestsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   centerContainer: {
     flex: 1,
@@ -560,7 +563,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
   },
   header: {
     flexDirection: 'row',
@@ -568,19 +570,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -593,7 +591,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
   },
   badge: {
     position: 'absolute',
@@ -606,10 +603,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 6,
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: '#fff',
   },
   badgeText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 10,
     fontWeight: 'bold',
   },
@@ -617,10 +614,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -636,11 +631,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     borderRadius: 8,
     gap: 8,
+    borderWidth: 1,
   },
   adminInfoText: {
     flex: 1,
     fontSize: 12,
-    color: '#2b8a3e',
     lineHeight: 16,
   },
   listContent: {
@@ -648,17 +643,14 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   requestCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   cardHeader: {
     flexDirection: 'row',
@@ -678,7 +670,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   avatarImage: {
     width: 38,
@@ -686,18 +677,15 @@ const styles = StyleSheet.create({
     borderRadius: 19,
   },
   avatarText: {
-    color: '#495057',
     fontSize: 16,
     fontWeight: '600',
   },
   requesterName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
   },
   requestTime: {
     fontSize: 11,
-    color: '#868e96',
     marginTop: 2,
   },
   statusBadge: {
@@ -708,7 +696,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 4,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   statusText: {
     fontSize: 11,
@@ -716,13 +703,11 @@ const styles = StyleSheet.create({
   },
   taskContainer: {
     borderTopWidth: 1,
-    borderTopColor: '#f1f3f5',
     paddingTop: 16,
   },
   taskTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 12,
   },
   scopeBadge: {
@@ -735,19 +720,13 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
-  dayScopeBadge: {
-    borderColor: '#dbe4ff',
-  },
+  dayScopeBadge: {},
   scopeBadgeText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#495057',
   },
-  dayScopeBadgeText: {
-    color: '#4F46E5',
-  },
+  dayScopeBadgeText: {},
   timeSlotBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -758,11 +737,9 @@ const styles = StyleSheet.create({
     gap: 4,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   timeSlotText: {
     fontSize: 11,
-    color: '#495057',
   },
   detailsGrid: {
     flexDirection: 'row',
@@ -774,38 +751,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#f8f9fa',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   detailText: {
     fontSize: 12,
-    color: '#495057',
   },
   reasonContainer: {
     padding: 12,
     borderRadius: 8,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   reasonLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#868e96',
     marginBottom: 4,
   },
   reasonText: {
     fontSize: 13,
-    color: '#212529',
   },
   expiryContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     marginTop: 12,
-    backgroundColor: '#fff3bf',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -813,7 +784,6 @@ const styles = StyleSheet.create({
   },
   expiryText: {
     fontSize: 11,
-    color: '#e67700',
     fontWeight: '500',
   },
   actionButtons: {
@@ -822,7 +792,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#f1f3f5',
   },
   actionButton: {
     flex: 1,
@@ -838,21 +807,17 @@ const styles = StyleSheet.create({
   },
   acceptButton: {
     borderWidth: 1,
-    borderColor: '#b2f2bb',
   },
   acceptButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2b8a3e',
   },
   rejectButton: {
     borderWidth: 1,
-    borderColor: '#ffc9c9',
   },
   rejectButtonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#fa5252',
   },
   adminViewBadge: {
     flexDirection: 'row',
@@ -863,11 +828,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: 6,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   adminViewText: {
     fontSize: 12,
-    color: '#2b8a3e',
     fontWeight: '500',
   },
   emptyContainer: {
@@ -884,17 +847,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#868e96',
     textAlign: 'center',
     paddingHorizontal: 32,
     lineHeight: 20,

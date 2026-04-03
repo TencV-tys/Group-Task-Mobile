@@ -1,12 +1,13 @@
-// src/styles/memberDashboard.styles.ts
+// src/styles/memberDashboard.styles.ts - Dark Mode Version
 import { StyleSheet, Dimensions } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-export const memberDashboardStyles = StyleSheet.create({
+export const makeMemberDashboardStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -14,68 +15,68 @@ export const memberDashboardStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.border,
     minHeight: 60,
   },
-quickSwapButton: {
-  borderRadius: 12,
-  overflow: 'hidden',
-  marginBottom: 8,
-},
-quickSwapGradient: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  padding: 16,
-  gap: 12,
-},
-quickSwapTextContainer: {
-  flex: 1,
-},
-quickSwapTitle: {
-  fontSize: 16,
-  fontWeight: '600',
-  color: 'white',
-},
-quickSwapSubtitle: {
-  fontSize: 12,
-  color: 'rgba(255,255,255,0.8)',
-  marginTop: 2,
-},
-swapActionsGrid: {
-  flexDirection: 'row',
-  gap: 12,
-  marginTop: 8,
-},
-swapActionCard: {
-  flex: 1,
-  borderRadius: 12,
-  overflow: 'hidden',
-},
-swapActionGradient: {
-  alignItems: 'center',
-  paddingVertical: 16,
-  paddingHorizontal: 12,
-  gap: 8,
-},
-swapActionTitle: {
-  fontSize: 16,
-  fontWeight: '600',
-  color: '#212529',
-},
-swapActionSubtitle: {
-  fontSize: 12,
-  color: '#868e96',
-},
+  quickSwapButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  quickSwapGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  quickSwapTextContainer: {
+    flex: 1,
+  },
+  quickSwapTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  quickSwapSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  swapActionsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  swapActionCard: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  swapActionGradient: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  swapActionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: theme.text,
+  },
+  swapActionSubtitle: {
+    fontSize: 12,
+    color: theme.textMuted,
+  },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -85,10 +86,10 @@ swapActionSubtitle: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -98,10 +99,10 @@ swapActionSubtitle: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -116,7 +117,7 @@ swapActionSubtitle: {
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     flex: 1,
     textAlign: 'center',
   },
@@ -129,12 +130,12 @@ swapActionSubtitle: {
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
+    color: theme.textMuted,
   },
   errorText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#fa5252',
+    color: theme.error,
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -147,7 +148,7 @@ swapActionSubtitle: {
     paddingVertical: 12,
   },
   retryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -162,7 +163,7 @@ swapActionSubtitle: {
     padding: 20,
     borderRadius: 16,
     marginBottom: 20,
-    shadowColor: '#2b8a3e',
+    shadowColor: theme.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -175,7 +176,7 @@ swapActionSubtitle: {
   welcomeTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: 'white',
+    color: '#fff',
     marginBottom: 4,
   },
   welcomeSubtitle: {
@@ -185,7 +186,7 @@ swapActionSubtitle: {
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginTop: 16,
     marginBottom: 12,
   },
@@ -198,7 +199,7 @@ swapActionSubtitle: {
   },
   viewAllText: {
     fontSize: 13,
-    color: '#2b8a3e',
+    color: theme.primary,
     fontWeight: '600',
   },
   statsGrid: {
@@ -209,12 +210,11 @@ swapActionSubtitle: {
   },
   statCard: {
     width: (width - 40) / 2,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   statHeader: {
     flexDirection: 'row',
@@ -229,21 +229,20 @@ swapActionSubtitle: {
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   statValue: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#212529',
+    color: theme.text,
   },
   statTitle: {
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
     marginBottom: 2,
   },
   statSubtitle: {
     fontSize: 11,
-    color: '#adb5bd',
+    color: theme.textPlaceholder,
   },
   pointsContainer: {
     flexDirection: 'row',
@@ -256,32 +255,30 @@ swapActionSubtitle: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
   },
   pointsLabel: {
     fontSize: 13,
-    color: '#868e96',
+    color: theme.textMuted,
     marginBottom: 4,
   },
   pointsValue: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#2b8a3e',
+    color: theme.primary,
     marginBottom: 2,
   },
   pointsSubtext: {
     fontSize: 11,
-    color: '#adb5bd',
+    color: theme.textPlaceholder,
   },
   taskCard: {
     padding: 12,
     borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
   },
   taskHeader: {
     flexDirection: 'row',
@@ -302,11 +299,11 @@ swapActionSubtitle: {
   taskTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 4,
   },
   completedTaskTitle: {
-    color: '#868e96',
+    color: theme.textMuted,
     textDecorationLine: 'line-through',
   },
   taskMeta: {
@@ -323,7 +320,7 @@ swapActionSubtitle: {
   },
   pointsText: {
     fontSize: 10,
-    color: '#e67700',
+    color: theme.primary,
     fontWeight: '600',
   },
   dueBadge: {
@@ -333,20 +330,20 @@ swapActionSubtitle: {
   },
   dueBadgeText: {
     fontSize: 10,
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
   },
   timeSlotContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
     padding: 8,
     borderRadius: 8,
   },
   timeSlotText: {
     fontSize: 12,
-    color: '#495057',
+    color: theme.textSecondary,
   },
   actionsGrid: {
     flexDirection: 'row',
@@ -360,7 +357,6 @@ swapActionSubtitle: {
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   actionGradient: {
     padding: 16,
@@ -370,7 +366,7 @@ swapActionSubtitle: {
   actionText: {
     fontSize: 13,
     fontWeight: '600',
-    color: 'white',
+    color: '#fff',
     textAlign: 'center',
   },
 });

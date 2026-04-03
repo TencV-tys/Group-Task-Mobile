@@ -1,4 +1,4 @@
-// src/screens/UpdateTaskScreen.tsx - UPDATED with correct color hierarchy
+// src/screens/UpdateTaskScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -21,7 +21,10 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TimeSlotModal } from '../components/TimeSlotModal';
 import { DAY_OF_WEEK_OPTIONS, formatTimeDisplay } from '../utils/timeUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
+
 export default function UpdateTaskScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
   const { task, groupId, groupName } = route.params || {};
   const { loading, error, success, updateTask, reset } = useUpdateTask();
   
@@ -311,17 +314,17 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
 
   if (!task) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.title}>Edit Task</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Edit Task</Text>
           <View style={styles.headerSpacer} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading task data...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading task data...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -344,13 +347,13 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
   };
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleCancel} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+        <TouchableOpacity onPress={handleCancel} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
-        <Text style={styles.title}>Edit Task</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Edit Task</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -369,69 +372,70 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
           >
             {groupName && (
               <LinearGradient
-                colors={['#e7f5ff', '#d0ebff']}
+                colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.groupInfo}
+                style={[styles.groupInfo, { borderColor: theme.primaryBorder }]}
               >
                 <View style={styles.groupInfoContent}>
-                  <MaterialCommunityIcons name="account-group" size={16} color="#2b8a3e" />
+                  <MaterialCommunityIcons name="account-group" size={16} color={theme.primary} />
                   <View>
-                    <Text style={styles.groupLabel}>Group:</Text>
-                    <Text style={styles.groupName}>{groupName}</Text>
+                    <Text style={[styles.groupLabel, { color: theme.primary }]}>Group:</Text>
+                    <Text style={[styles.groupName, { color: theme.text }]}>{groupName}</Text>
                   </View>
                 </View>
-                <Text style={styles.groupNote}>
+                <Text style={[styles.groupNote, { color: theme.textSecondary }]}>
                   Editing rotation task
                 </Text>
               </LinearGradient>
             )}
 
             <LinearGradient
-              colors={['#ffffff', '#f8f9fa']}
+              colors={[theme.card, theme.bgSecondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.formSection}
+              style={[styles.formSection, { borderColor: theme.border }]}
             >
-              <Text style={styles.sectionTitle}>Task Details</Text>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Task Details</Text>
 
               {/* Title Input */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Title *</Text>
+                <Text style={[styles.label, { color: theme.textMuted }]}>Title *</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.inputGradient}
+                  style={[styles.inputGradient, { borderColor: theme.border }]}
                 >
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     placeholder="What needs to be done?"
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
                     value={form.title}
                     onChangeText={(text) => setForm({ ...form, title: text })}
                     maxLength={100}
                     editable={!loading}
+                    selectionColor={theme.primary}
                   />
                 </LinearGradient>
-                <Text style={styles.helperText}>
+                <Text style={[styles.helperText, { color: theme.textMuted }]}>
                   {form.title.length}/100 characters
                 </Text>
               </View>
 
               {/* Description Input */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Description</Text>
+                <Text style={[styles.label, { color: theme.textMuted }]}>Description</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={[styles.inputGradient, styles.textAreaGradient]}
+                  style={[styles.inputGradient, styles.textAreaGradient, { borderColor: theme.border }]}
                 >
                   <TextInput
-                    style={[styles.input, styles.textArea]}
+                    style={[styles.input, styles.textArea, { color: theme.text }]}
                     placeholder="Add more details about this task..."
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
                     value={form.description}
                     onChangeText={(text) => setForm({ ...form, description: text })}
                     multiline
@@ -439,9 +443,10 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                     textAlignVertical="top"
                     maxLength={500}
                     editable={!loading}
+                    selectionColor={theme.primary}
                   />
                 </LinearGradient>
-                <Text style={styles.helperText}>
+                <Text style={[styles.helperText, { color: theme.textMuted }]}>
                   {form.description.length}/500 characters
                 </Text>
               </View>
@@ -449,72 +454,72 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
               {/* Total Points Input */}
               <View style={styles.inputGroup}>
                 <View style={styles.labelContainer}>
-                  <Text style={styles.label}>Total Task Points *</Text>
+                  <Text style={[styles.label, { color: theme.textMuted }]}>Total Task Points *</Text>
                   <LinearGradient
-                    colors={['#fff5f5', '#ffe3e3']}
+                    colors={[theme.errorBg, theme.errorBg]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.pointsLimitBadge}
                   >
-                    <Text style={styles.pointsLimitText}>Max: 10</Text>
+                    <Text style={[styles.pointsLimitText, { color: theme.error }]}>Max: 10</Text>
                   </LinearGradient>
                 </View>
                 <View style={styles.pointsInputContainer}>
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={[
                       styles.pointsInputGradient,
-                      !isPointsWithinLimit() && styles.inputErrorGradient
+                      !isPointsWithinLimit() && styles.inputErrorGradient,
+                      { borderColor: theme.border }
                     ]}
                   >
                     <TextInput
-                      style={styles.pointsInput}
+                      style={[styles.pointsInput, { color: theme.text }]}
                       placeholder="1-10"
-                      placeholderTextColor="#adb5bd"
+                      placeholderTextColor={theme.textPlaceholder}
                       value={form.points}
                       onChangeText={handlePointsChange}
                       keyboardType="number-pad"
                       maxLength={2}
                       editable={!loading}
+                      selectionColor={theme.primary}
                     />
                   </LinearGradient>
-                  <Text style={styles.pointsLabel}>points</Text>
+                  <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>points</Text>
                 </View>
-                <Text style={styles.helperText}>
+                <Text style={[styles.helperText, { color: theme.textMuted }]}>
                   Total reward points for this task (1-10)
                 </Text>
                 {!isPointsWithinLimit() && (
-                  <Text style={styles.errorText}>
+                  <Text style={[styles.errorText, { color: theme.error }]}>
                     Points must be between 1 and 10
                   </Text>
                 )}
               </View>
 
               {/* Points Summary */}
-              <View style={styles.pointsSummary}>
+              <View style={[styles.pointsSummary, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
                 <View style={styles.pointsSummaryRow}>
-                  <MaterialCommunityIcons name="star" size={14} color="#2b8a3e" />
-                  <Text style={styles.pointsSummaryText}>
-                    Total: <Text style={styles.pointsHighlight}>{form.points}</Text>
+                  <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+                  <Text style={[styles.pointsSummaryText, { color: theme.textSecondary }]}>
+                    Total: <Text style={[styles.pointsHighlight, { color: theme.primary }]}>{form.points}</Text>
                   </Text>
                 </View>
                 <View style={styles.pointsSummaryRow}>
-                  <MaterialCommunityIcons name="clock-outline" size={14} color="#495057" />
-                  <Text style={styles.pointsSummaryText}>
-                    Assigned to slots: <Text style={styles.pointsHighlight}>{totalTimeSlotPoints}</Text>
+                  <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+                  <Text style={[styles.pointsSummaryText, { color: theme.textSecondary }]}>
+                    Assigned to slots: <Text style={[styles.pointsHighlight, { color: theme.primary }]}>{totalTimeSlotPoints}</Text>
                   </Text>
                 </View>
                 <View style={styles.pointsSummaryRow}>
-                  <MaterialCommunityIcons name="star-outline" size={14} color="#495057" />
-                  <Text style={[
-                    styles.pointsSummaryText,
-                    !isPointsValid && styles.errorText
-                  ]}>
+                  <MaterialCommunityIcons name="star-outline" size={14} color={theme.textMuted} />
+                  <Text style={[styles.pointsSummaryText, { color: theme.textSecondary }]}>
                     Remaining: <Text style={[
                       styles.pointsHighlight,
-                      !isPointsValid && styles.errorText
+                      !isPointsValid && styles.errorText,
+                      { color: !isPointsValid ? theme.error : theme.primary }
                     ]}>
                       {remainingPoints}
                     </Text>
@@ -522,8 +527,8 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                 </View>
                 {hasTimeSlotExceedingLimit() && (
                   <View style={styles.warningRow}>
-                    <MaterialCommunityIcons name="alert-circle" size={14} color="#fa5252" />
-                    <Text style={styles.errorText}>
+                    <MaterialCommunityIcons name="alert-circle" size={14} color={theme.error} />
+                    <Text style={[styles.errorText, { color: theme.error }]}>
                       Some slots exceed 10 points
                     </Text>
                   </View>
@@ -532,47 +537,50 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
 
               {/* Category Input */}
               <View style={[styles.inputGroup, styles.halfWidth]}>
-                <Text style={styles.label}>Category</Text>
+                <Text style={[styles.label, { color: theme.textMuted }]}>Category</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.inputGradient}
+                  style={[styles.inputGradient, { borderColor: theme.border }]}
                 >
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { color: theme.text }]}
                     placeholder="e.g., Chores, Work, Study"
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
                     value={form.category}
                     onChangeText={(text) => setForm({ ...form, category: text })}
                     maxLength={50}
                     editable={!loading}
+                    selectionColor={theme.primary}
                   />
                 </LinearGradient>
-                <Text style={styles.helperText}>Optional</Text>
+                <Text style={[styles.helperText, { color: theme.textMuted }]}>Optional</Text>
               </View>
 
               {/* Frequency Selection */}
               <View style={styles.inputGroup}>
-                <Text style={styles.label}>Frequency *</Text>
+                <Text style={[styles.label, { color: theme.textMuted }]}>Frequency *</Text>
                 <View style={styles.frequencyContainer}>
                   <TouchableOpacity
                     style={[
                       styles.frequencyButton,
-                      form.executionFrequency === 'WEEKLY' && styles.frequencyButtonActive
+                      form.executionFrequency === 'WEEKLY' && styles.frequencyButtonActive,
+                      { borderColor: theme.border }
                     ]}
                     onPress={() => handleFrequencyChange('WEEKLY')}
                     disabled={loading}
                   >
                     <LinearGradient
-                      colors={form.executionFrequency === 'WEEKLY' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                      colors={form.executionFrequency === 'WEEKLY' ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.frequencyButtonGradient}
                     >
                       <Text style={[
                         styles.frequencyButtonText,
-                        form.executionFrequency === 'WEEKLY' && styles.frequencyButtonTextActive
+                        form.executionFrequency === 'WEEKLY' && styles.frequencyButtonTextActive,
+                        { color: form.executionFrequency === 'WEEKLY' ? '#fff' : theme.textSecondary }
                       ]}>
                         Weekly
                       </Text>
@@ -581,27 +589,29 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                   <TouchableOpacity
                     style={[
                       styles.frequencyButton,
-                      form.executionFrequency === 'DAILY' && styles.frequencyButtonActive
+                      form.executionFrequency === 'DAILY' && styles.frequencyButtonActive,
+                      { borderColor: theme.border }
                     ]}
                     onPress={() => handleFrequencyChange('DAILY')}
                     disabled={loading}
                   >
                     <LinearGradient
-                      colors={form.executionFrequency === 'DAILY' ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                      colors={form.executionFrequency === 'DAILY' ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.frequencyButtonGradient}
                     >
                       <Text style={[
                         styles.frequencyButtonText,
-                        form.executionFrequency === 'DAILY' && styles.frequencyButtonTextActive
+                        form.executionFrequency === 'DAILY' && styles.frequencyButtonTextActive,
+                        { color: form.executionFrequency === 'DAILY' ? '#fff' : theme.textSecondary }
                       ]}>
                         Daily
                       </Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.helperText}>
+                <Text style={[styles.helperText, { color: theme.textMuted }]}>
                   How often this task needs to be done
                 </Text>
               </View>
@@ -610,10 +620,10 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
               <View style={styles.inputGroup}>
                 <View style={styles.timeSlotsHeader}>
                   <View style={styles.timeSlotsTitleContainer}>
-                    <Text style={styles.label}>
+                    <Text style={[styles.label, { color: theme.textMuted }]}>
                       Time Slots {form.executionFrequency === 'DAILY' ? '*' : ''}
                     </Text>
-                    <Text style={styles.timeSlotsSubtitle}>
+                    <Text style={[styles.timeSlotsSubtitle, { color: theme.textMuted }]}>
                       Max 10 points per slot
                     </Text>
                   </View>
@@ -623,24 +633,24 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                     disabled={loading}
                   >
                     <LinearGradient
-                      colors={['#2b8a3e', '#1e6b2c']}
+                      colors={[theme.primary, theme.primaryDark]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={styles.addTimeSlotGradient}
                     >
-                      <MaterialCommunityIcons name="plus" size={16} color="white" />
+                      <MaterialCommunityIcons name="plus" size={16} color="#fff" />
                       <Text style={styles.addTimeSlotText}>Add</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 </View>
                 
                 {form.timeSlots.length === 0 ? (
-                  <View style={styles.emptyTimeSlots}>
-                    <MaterialCommunityIcons name="clock-outline" size={40} color="#dee2e6" />
-                    <Text style={styles.emptyTimeSlotsText}>
+                  <View style={[styles.emptyTimeSlots, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                    <MaterialCommunityIcons name="clock-outline" size={40} color={theme.border} />
+                    <Text style={[styles.emptyTimeSlotsText, { color: theme.textMuted }]}>
                       No time slots added yet
                     </Text>
-                    <Text style={styles.emptyTimeSlotsSubtext}>
+                    <Text style={[styles.emptyTimeSlotsSubtext, { color: theme.textPlaceholder }]}>
                       Click "Add" to create time slots with points
                     </Text>
                   </View>
@@ -653,29 +663,31 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                       return (
                         <LinearGradient
                           key={index}
-                          colors={exceedsLimit ? ['#fff5f5', '#ffe3e3'] : ['#f8f9fa', '#e9ecef']}
+                          colors={exceedsLimit ? [theme.errorBg, theme.errorBg] : [theme.bgSecondary, theme.bgTertiary]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                           style={[
                             styles.timeSlotItem,
-                            exceedsLimit && styles.timeSlotItemError
+                            exceedsLimit && styles.timeSlotItemError,
+                            { borderColor: theme.border }
                           ]}
                         >
                           <View style={styles.timeSlotInfo}>
                             <View style={styles.timeSlotHeader}>
-                              <Text style={styles.timeSlotTime}>
+                              <Text style={[styles.timeSlotTime, { color: theme.text }]}>
                                 {formatTimeDisplay(slot.startTime)} - {formatTimeDisplay(slot.endTime)}
                               </Text>
                               {slot.points && slotPoints > 0 && (
                                 <LinearGradient
-                                  colors={exceedsLimit ? ['#fff5f5', '#ffe3e3'] : ['#d3f9d8', '#b2f2bb']}
+                                  colors={exceedsLimit ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]}
                                   start={{ x: 0, y: 0 }}
                                   end={{ x: 1, y: 1 }}
                                   style={styles.pointsBadge}
                                 >
                                   <Text style={[
                                     styles.pointsBadgeText,
-                                    exceedsLimit && styles.pointsBadgeErrorText
+                                    exceedsLimit && styles.pointsBadgeErrorText,
+                                    { color: exceedsLimit ? theme.error : theme.primary }
                                   ]}>
                                     {slot.points} pts
                                   </Text>
@@ -683,23 +695,23 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                               )}
                             </View>
                             {slot.label ? (
-                              <Text style={styles.timeSlotLabel}>{slot.label}</Text>
+                              <Text style={[styles.timeSlotLabel, { color: theme.textMuted }]}>{slot.label}</Text>
                             ) : null}
                           </View>
                           <View style={styles.timeSlotActions}>
                             <TouchableOpacity
-                              style={styles.timeSlotActionButton}
+                              style={[styles.timeSlotActionButton, { backgroundColor: theme.card, borderColor: theme.border }]}
                               onPress={() => handleEditTimeSlot(index)}
                               disabled={loading}
                             >
-                              <MaterialCommunityIcons name="pencil" size={16} color="#495057" />
+                              <MaterialCommunityIcons name="pencil" size={16} color={theme.textSecondary} />
                             </TouchableOpacity>
                             <TouchableOpacity
-                              style={styles.timeSlotActionButton}
+                              style={[styles.timeSlotActionButton, { backgroundColor: theme.card, borderColor: theme.border }]}
                               onPress={() => handleRemoveTimeSlot(index)}
                               disabled={loading}
                             >
-                              <MaterialCommunityIcons name="delete" size={16} color="#fa5252" />
+                              <MaterialCommunityIcons name="delete" size={16} color={theme.error} />
                             </TouchableOpacity>
                           </View>
                         </LinearGradient>
@@ -712,27 +724,29 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
               {/* Day Selection for WEEKLY tasks */}
               {form.executionFrequency === 'WEEKLY' && (
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>Days *</Text>
+                  <Text style={[styles.label, { color: theme.textMuted }]}>Days *</Text>
                   <View style={styles.daysContainer}>
                     {DAY_OF_WEEK_OPTIONS.map((day) => (
                       <TouchableOpacity
                         key={day.value}
                         style={[
                           styles.dayButton,
-                          form.selectedDays.includes(day.value) && styles.dayButtonActive
+                          form.selectedDays.includes(day.value) && styles.dayButtonActive,
+                          { borderColor: theme.border }
                         ]}
                         onPress={() => toggleDaySelection(day.value)}
                         disabled={loading}
                       >
                         <LinearGradient
-                          colors={form.selectedDays.includes(day.value) ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+                          colors={form.selectedDays.includes(day.value) ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 1 }}
                           style={styles.dayButtonGradient}
                         >
                           <Text style={[
                             styles.dayButtonText,
-                            form.selectedDays.includes(day.value) && styles.dayButtonTextActive
+                            form.selectedDays.includes(day.value) && styles.dayButtonTextActive,
+                            { color: form.selectedDays.includes(day.value) ? '#fff' : theme.textSecondary }
                           ]}>
                             {day.label}
                           </Text>
@@ -740,7 +754,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                       </TouchableOpacity>
                     ))}
                   </View>
-                  <Text style={styles.helperText}>
+                  <Text style={[styles.helperText, { color: theme.textMuted }]}>
                     Selected: {form.selectedDays.length} day(s)
                   </Text>
                 </View>
@@ -749,11 +763,12 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
               {/* Recurring Toggle */}
               <View style={styles.inputGroup}>
                 <View style={styles.toggleContainer}>
-                  <Text style={styles.label}>Recurring Task</Text>
+                  <Text style={[styles.label, { color: theme.textMuted }]}>Recurring Task</Text>
                   <TouchableOpacity
                     style={[
                       styles.toggleSwitch,
-                      form.isRecurring && styles.toggleSwitchActive
+                      form.isRecurring && styles.toggleSwitchActive,
+                      { backgroundColor: form.isRecurring ? theme.primary : theme.bgTertiary }
                     ]}
                     onPress={() => setForm({ ...form, isRecurring: !form.isRecurring })}
                     disabled={loading}
@@ -764,7 +779,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                     ]} />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.helperText}>
+                <Text style={[styles.helperText, { color: theme.textMuted }]}>
                   Recurring tasks rotate among group members weekly
                 </Text>
               </View>
@@ -772,30 +787,30 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
 
             {error && (
               <LinearGradient
-                colors={['#fff5f5', '#ffe3e3']}
+                colors={[theme.errorBg, theme.errorBg]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.errorBox}
+                style={[styles.errorBox, { borderColor: theme.errorBorder }]}
               >
-                <MaterialCommunityIcons name="alert-circle" size={18} color="#fa5252" />
-                <Text style={styles.errorText}>⚠️ {error}</Text>
+                <MaterialCommunityIcons name="alert-circle" size={18} color={theme.error} />
+                <Text style={[styles.errorText, { color: theme.error }]}>⚠️ {error}</Text>
               </LinearGradient>
             )}
 
             {/* Action Buttons */}
             <View style={styles.actions}>
               <TouchableOpacity
-                style={[styles.cancelButton, loading && styles.buttonDisabled]}
+                style={[styles.cancelButton, loading && styles.buttonDisabled, { borderColor: theme.border }]}
                 onPress={handleCancel}
                 disabled={loading}
               >
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.cancelButtonGradient}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>Cancel</Text>
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -808,23 +823,24 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
                 disabled={isSubmitDisabled()}
               >
                 <LinearGradient
-                  colors={isSubmitDisabled() ? ['#f8f9fa', '#e9ecef'] : ['#2b8a3e', '#1e6b2c']}
+                  colors={isSubmitDisabled() ? [theme.bgSecondary, theme.bgTertiary] : [theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.submitButtonGradient}
                 >
                   {loading ? (
-                    <ActivityIndicator color={isSubmitDisabled() ? "#495057" : "white"} size="small" />
+                    <ActivityIndicator color={isSubmitDisabled() ? theme.textMuted : "#fff"} size="small" />
                   ) : (
                     <>
                       <MaterialCommunityIcons 
                         name="check-circle" 
                         size={18} 
-                        color={isSubmitDisabled() ? "#868e96" : "white"} 
+                        color={isSubmitDisabled() ? theme.textMuted : "#fff"} 
                       />
                       <Text style={[
                         styles.submitButtonText,
-                        isSubmitDisabled() && styles.submitButtonTextDisabled
+                        isSubmitDisabled() && styles.submitButtonTextDisabled,
+                        { color: isSubmitDisabled() ? theme.textMuted : "#fff" }
                       ]}>
                         Update Task
                       </Text>
@@ -836,42 +852,42 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
 
             {/* Task Information */}
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.taskInfo}
+              style={[styles.taskInfo, { borderColor: theme.border }]}
             >
-              <Text style={styles.infoTitle}>Task Information</Text>
+              <Text style={[styles.infoTitle, { color: theme.text }]}>Task Information</Text>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Created:</Text>
-                <Text style={styles.infoValue}>
+                <Text style={[styles.infoLabel, { color: theme.textMuted }]}>Created:</Text>
+                <Text style={[styles.infoValue, { color: theme.textSecondary }]}>
                   {new Date(task.createdAt).toLocaleDateString()}
                 </Text>
               </View>
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Creator:</Text>
-                <Text style={styles.infoValue}>
+                <Text style={[styles.infoLabel, { color: theme.textMuted }]}>Creator:</Text>
+                <Text style={[styles.infoValue, { color: theme.textSecondary }]}>
                   {task.creator?.fullName || 'Admin'}
                 </Text>
               </View> 
               {task.rotationOrder && (
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Rotation Order:</Text>
-                  <Text style={styles.infoValue}>#{task.rotationOrder}</Text>
+                  <Text style={[styles.infoLabel, { color: theme.textMuted }]}>Rotation Order:</Text>
+                  <Text style={[styles.infoValue, { color: theme.textSecondary }]}>#{task.rotationOrder}</Text>
                 </View>
               )}
               {task.currentAssignee && (
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Current Assignee:</Text>
-                  <Text style={styles.infoValue}>
+                  <Text style={[styles.infoLabel, { color: theme.textMuted }]}>Current Assignee:</Text>
+                  <Text style={[styles.infoValue, { color: theme.textSecondary }]}>
                     {task.assignments?.[0]?.user?.fullName || 'Assigned'}
                   </Text>
                 </View>
               )}
               {task.assignments && task.assignments.length > 0 && (
                 <View style={styles.infoRow}>
-                  <Text style={styles.infoLabel}>Total Assignments:</Text>
-                  <Text style={styles.infoValue}>
+                  <Text style={[styles.infoLabel, { color: theme.textMuted }]}>Total Assignments:</Text>
+                  <Text style={[styles.infoValue, { color: theme.textSecondary }]}>
                     {task.assignments.length} time(s)
                   </Text>
                 </View>
@@ -880,32 +896,32 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
 
             {/* Info Box */}
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.infoBox}
+              style={[styles.infoBox, { borderColor: theme.border }]}
             >
-              <Text style={styles.infoTitle}>💡 Important Rules</Text>
+              <Text style={[styles.infoTitle, { color: theme.text }]}>💡 Important Rules</Text>
               <View style={styles.infoList}>
                 <View style={styles.infoItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
-                  <Text style={styles.infoText}>Total task points: 1-10 only</Text>
+                  <MaterialCommunityIcons name="circle-small" size={16} color={theme.primary} />
+                  <Text style={[styles.infoText, { color: theme.textSecondary }]}>Total task points: 1-10 only</Text>
                 </View>
                 <View style={styles.infoItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
-                  <Text style={styles.infoText}>Time slot points: Max 10 per slot</Text>
+                  <MaterialCommunityIcons name="circle-small" size={16} color={theme.primary} />
+                  <Text style={[styles.infoText, { color: theme.textSecondary }]}>Time slot points: Max 10 per slot</Text>
                 </View>
                 <View style={styles.infoItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
-                  <Text style={styles.infoText}>Daily tasks require time slots</Text>
+                  <MaterialCommunityIcons name="circle-small" size={16} color={theme.primary} />
+                  <Text style={[styles.infoText, { color: theme.textSecondary }]}>Daily tasks require time slots</Text>
                 </View>
                 <View style={styles.infoItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
-                  <Text style={styles.infoText}>Weekly tasks need at least one day</Text>
+                  <MaterialCommunityIcons name="circle-small" size={16} color={theme.primary} />
+                  <Text style={[styles.infoText, { color: theme.textSecondary }]}>Weekly tasks need at least one day</Text>
                 </View>
                 <View style={styles.infoItem}>
-                  <MaterialCommunityIcons name="circle-small" size={16} color="#2b8a3e" />
-                  <Text style={styles.infoText}>End time must be after start time</Text>
+                  <MaterialCommunityIcons name="circle-small" size={16} color={theme.primary} />
+                  <Text style={[styles.infoText, { color: theme.textSecondary }]}>End time must be after start time</Text>
                 </View>
               </View>
             </LinearGradient>
@@ -933,7 +949,6 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa'
   },
   header: {
     flexDirection: 'row',
@@ -941,19 +956,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -962,12 +973,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     flex: 1,
-    textAlign: 'center'
+    textAlign: 'center',
   },
   headerSpacer: {
-    width: 36
+    width: 36,
   },
   content: {
     flex: 1,
@@ -978,19 +988,17 @@ const styles = StyleSheet.create({
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96'
   },
   groupInfo: {
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#b2f2bb',
   },
   groupInfoContent: {
     flexDirection: 'row',
@@ -1000,16 +1008,13 @@ const styles = StyleSheet.create({
   },
   groupLabel: {
     fontSize: 12,
-    color: '#2b8a3e',
   },
   groupName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529'
   },
   groupNote: {
     fontSize: 12,
-    color: '#495057',
     fontStyle: 'italic',
     marginLeft: 24,
   },
@@ -1018,21 +1023,18 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
-    marginBottom: 20
+    marginBottom: 20,
   },
   inputGroup: {
-    marginBottom: 24
+    marginBottom: 24,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#adb5bd', // SECONDARY: Light Gray
     marginBottom: 6,
     marginLeft: 4,
   },
@@ -1049,7 +1051,6 @@ const styles = StyleSheet.create({
   },
   pointsLimitText: {
     fontSize: 11,
-    color: '#fa5252',
     fontWeight: '600',
   },
   pointsInputContainer: {
@@ -1061,40 +1062,31 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   pointsInput: {
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     backgroundColor: 'transparent',
     textAlign: 'center',
   },
   pointsLabel: {
     fontSize: 14,
-    color: '#495057', // TERTIARY: Dark Gray
     width: 50,
   },
   inputGradient: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
-  inputErrorGradient: {
-    borderColor: '#fa5252',
-  },
+  inputErrorGradient: {},
   input: {
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 15,
-    color: '#212529',
     backgroundColor: 'transparent',
   },
-  inputError: {
-    color: '#fa5252',
-  },
+  inputError: {},
   textArea: {
     minHeight: 100,
     paddingTop: 12,
@@ -1106,21 +1098,17 @@ const styles = StyleSheet.create({
   },
   helperText: {
     fontSize: 11,
-    color: '#868e96',
     marginTop: 4,
-    marginLeft: 2
+    marginLeft: 2,
   },
   errorText: {
-    color: '#fa5252',
     fontSize: 12,
     marginTop: 2,
   },
   pointsSummary: {
-    backgroundColor: '#f8f9fa',
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
     marginBottom: 20,
     gap: 6,
   },
@@ -1131,11 +1119,9 @@ const styles = StyleSheet.create({
   },
   pointsSummaryText: {
     fontSize: 13,
-    color: '#495057',
   },
   pointsHighlight: {
     fontWeight: '600',
-    color: '#2b8a3e', // PRIMARY: Dark Green
   },
   warningRow: {
     flexDirection: 'row',
@@ -1144,48 +1130,43 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   halfWidth: {
-    width: '100%'
+    width: '100%',
   },
   frequencyContainer: {
     flexDirection: 'row',
-    gap: 10
+    gap: 10,
   },
   frequencyButton: {
     flex: 1,
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   frequencyButtonGradient: {
     paddingVertical: 12,
     alignItems: 'center',
   },
   frequencyButtonActive: {
-    borderColor: '#2b8a3e', // PRIMARY: Dark Green
+    borderWidth: 2,
   },
   frequencyButtonText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#495057' // TERTIARY: Dark Gray
   },
-  frequencyButtonTextActive: {
-    color: 'white'
-  },
+  frequencyButtonTextActive: {},
   timeSlotsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12
+    marginBottom: 12,
   },
   timeSlotsTitleContainer: {
     flex: 1,
-    marginRight: 12
+    marginRight: 12,
   },
   timeSlotsSubtitle: {
     fontSize: 11,
-    color: '#868e96',
-    marginTop: 2
+    marginTop: 2,
   },
   addTimeSlotButton: {
     borderRadius: 8,
@@ -1201,31 +1182,27 @@ const styles = StyleSheet.create({
   addTimeSlotText: {
     fontSize: 13,
     fontWeight: '600',
-    color: 'white'
+    color: '#fff',
   },
   emptyTimeSlots: {
     alignItems: 'center',
     paddingVertical: 30,
-    backgroundColor: '#f8f9fa',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    borderStyle: 'dashed'
+    borderStyle: 'dashed',
   },
   emptyTimeSlotsText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#868e96',
     marginTop: 12,
-    marginBottom: 4
+    marginBottom: 4,
   },
   emptyTimeSlotsSubtext: {
     fontSize: 12,
-    color: '#adb5bd',
-    textAlign: 'center'
+    textAlign: 'center',
   },
   timeSlotsList: {
-    gap: 8
+    gap: 8,
   },
   timeSlotItem: {
     flexDirection: 'row',
@@ -1234,29 +1211,24 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
-  timeSlotItemError: {
-    borderColor: '#fa5252',
-  },
+  timeSlotItemError: {},
   timeSlotInfo: {
     flex: 1,
-    marginRight: 8
+    marginRight: 8,
   },
   timeSlotHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4
+    marginBottom: 4,
   },
   timeSlotTime: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529'
   },
   timeSlotLabel: {
     fontSize: 12,
-    color: '#868e96',
   },
   pointsBadge: {
     paddingHorizontal: 8,
@@ -1266,11 +1238,8 @@ const styles = StyleSheet.create({
   pointsBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#2b8a3e', // PRIMARY: Dark Green
   },
-  pointsBadgeErrorText: {
-    color: '#fa5252',
-  },
+  pointsBadgeErrorText: {},
   timeSlotActions: {
     flexDirection: 'row',
     gap: 6,
@@ -1279,11 +1248,9 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   daysContainer: {
     flexDirection: 'row',
@@ -1296,7 +1263,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   dayButtonGradient: {
     flex: 1,
@@ -1304,45 +1270,38 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dayButtonActive: {
-    borderColor: '#2b8a3e', // PRIMARY: Dark Green
+    borderWidth: 2,
   },
   dayButtonText: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#495057' // TERTIARY: Dark Gray
   },
-  dayButtonTextActive: {
-    color: 'white'
-  },
+  dayButtonTextActive: {},
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   toggleSwitch: {
     width: 48,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#e9ecef',
     padding: 2,
-    justifyContent: 'center'
+    justifyContent: 'center',
   },
-  toggleSwitchActive: {
-    backgroundColor: '#2b8a3e' // PRIMARY: Dark Green
-  },
+  toggleSwitchActive: {},
   toggleCircle: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'white',
-    shadowColor: '#000',
+    backgroundColor: '#fff',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2
+    elevation: 2,
   },
   toggleCircleActive: {
-    transform: [{ translateX: 22 }]
+    transform: [{ translateX: 22 }],
   },
   errorBox: {
     flexDirection: 'row',
@@ -1352,19 +1311,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
   },
   actions: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 20
+    marginBottom: 20,
   },
   cancelButton: {
     flex: 1,
     borderRadius: 10,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   cancelButtonGradient: {
     paddingVertical: 14,
@@ -1373,7 +1330,6 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#495057' // TERTIARY: Dark Gray
   },
   submitButton: {
     flex: 2,
@@ -1390,25 +1346,20 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: 'white'
   },
-  submitButtonTextDisabled: {
-    color: '#868e96'
-  },
+  submitButtonTextDisabled: {},
   buttonDisabled: {
-    opacity: 0.7
+    opacity: 0.7,
   },
   taskInfo: {
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   infoTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 12,
   },
   infoRow: {
@@ -1418,11 +1369,9 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 13,
-    color: '#868e96',
   },
   infoValue: {
     fontSize: 13,
-    color: '#212529',
     fontWeight: '500',
   },
   infoBox: {
@@ -1430,7 +1379,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   infoList: {
     gap: 6,
@@ -1442,7 +1390,6 @@ const styles = StyleSheet.create({
   },
   infoText: {
     fontSize: 13,
-    color: '#495057',
     lineHeight: 18,
     flex: 1,
   },

@@ -1,4 +1,4 @@
-// src/screens/CompleteAssignmentScreen.tsx - CLEAN with separated concerns
+// src/screens/CompleteAssignmentScreen.tsx - Dark Mode Added
 import React, { useEffect } from 'react';
 import {
   View,
@@ -18,11 +18,14 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useCompleteAssignment } from '../hooks/useCompleteAssignment';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { completeAssignmentStyles as styles } from '../styles/completeAssignment.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeCompleteAssignmentStyles } from '../styles/completeAssignment.styles';
 
 const { width } = Dimensions.get('window');
 
 export default function CompleteAssignmentScreen({ navigation, route }: any) {
+  const { theme, isDark } = useTheme();
+  const styles = makeCompleteAssignmentStyles(theme);
   const { assignmentId, taskTitle, dueDate, timeSlot, onCompleted } = route.params || {};
   
   // ===== HOOK - ALL LOGIC IS HERE =====
@@ -101,12 +104,12 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     return (
       <LinearGradient
         colors={
-          timeStatus === 'expired' ? ['#fff5f5', '#ffe3e3'] :
-          timeStatus === 'waiting' ? ['#fff3bf', '#ffec99'] :
-          timeStatus === 'submission_open' && isLate ? ['#fff3bf', '#ffec99'] :
-          timeStatus === 'submission_open' ? ['#d3f9d8', '#b2f2bb'] :
-          timeStatus === 'wrong_day' ? ['#f8f9fa', '#e9ecef'] :
-          ['#f8f9fa', '#e9ecef']
+          timeStatus === 'expired' ? [theme.errorBg, theme.errorBg] :
+          timeStatus === 'waiting' ? [theme.primaryLight, theme.primaryLight] :
+          timeStatus === 'submission_open' && isLate ? [theme.primaryLight, theme.primaryLight] :
+          timeStatus === 'submission_open' ? [theme.primaryLight, theme.primaryLight] :
+          timeStatus === 'wrong_day' ? [theme.bgSecondary, theme.bgTertiary] :
+          [theme.bgSecondary, theme.bgTertiary]
         }
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -143,7 +146,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             ]}>
               {formatTime(timeLeft)}
             </Text>
-            <Text style={styles.timeInstructions}>
+            <Text style={[styles.timeInstructions, { color: theme.textSecondary }]}>
               {isLate 
                 ? 'Late submission - points will be reduced' 
                 : `On-time until ${lateThresholdString} - submit now!`}
@@ -151,8 +154,8 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             
             {isWarning && !isLate && (
               <View style={styles.warningMessage}>
-                <MaterialCommunityIcons name="alert-circle" size={16} color="#e67700" />
-                <Text style={styles.warningText}>
+                <MaterialCommunityIcons name="alert-circle" size={16} color={theme.primary} />
+                <Text style={[styles.warningText, { color: theme.primary }]}>
                   {isCritical ? 'Late threshold approaching!' : 'On-time window ending soon'}
                 </Text>
               </View>
@@ -160,8 +163,8 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             
             {isLate && (
               <View style={styles.warningMessage}>
-                <MaterialCommunityIcons name="timer-alert" size={16} color="#e67700" />
-                <Text style={styles.warningText}>
+                <MaterialCommunityIcons name="timer-alert" size={16} color={theme.primary} />
+                <Text style={[styles.warningText, { color: theme.primary }]}>
                   Submitting late - points will be reduced
                 </Text>
               </View>
@@ -172,10 +175,10 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             <Text style={[styles.timerText, { color: timeStatusMsg.color }]}>
               {formatTime(timeLeft)}
             </Text>
-            <Text style={styles.timeInstructions}>
+            <Text style={[styles.timeInstructions, { color: theme.textSecondary }]}>
               Submission opens at {openTimeString}
             </Text>
-            <Text style={styles.scheduleInfo}>
+            <Text style={[styles.scheduleInfo, { color: theme.textMuted }]}>
               On-time: {openTimeString} - {lateThresholdString} | Late: {lateThresholdString} - {(() => {
                 const graceEnd = new Date(openTimeFormatted.getTime() + 30 * 60000);
                 return graceEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -183,22 +186,22 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             </Text>
           </>
         ) : (
-          <Text style={styles.timeMessage}>
+          <Text style={[styles.timeMessage, { color: theme.textSecondary }]}>
             {timeStatusMsg.message}
           </Text>
         )}
         
-        <View style={styles.timeSlotInfo}>
-          <Text style={styles.timeSlotLabel}>Time Slot:</Text>
-          <Text style={styles.timeSlotValue}>
+        <View style={[styles.timeSlotInfo, { borderTopColor: theme.border }]}>
+          <Text style={[styles.timeSlotLabel, { color: theme.textMuted }]}>Time Slot:</Text>
+          <Text style={[styles.timeSlotValue, { color: theme.textSecondary }]}>
             {timeSlot.startTime} - {timeSlot.endTime}
             {timeSlot.label && ` (${timeSlot.label})`}
           </Text>
         </View>
         
-        <View style={styles.submissionWindowInfo}>
-          <MaterialCommunityIcons name="information" size={14} color="#868e96" />
-          <Text style={styles.submissionWindowText}>
+        <View style={[styles.submissionWindowInfo, { backgroundColor: theme.bgSecondary }]}>
+          <MaterialCommunityIcons name="information" size={14} color={theme.textMuted} />
+          <Text style={[styles.submissionWindowText, { color: theme.textMuted }]}>
             On-time: Until {lateThresholdString} | Late: Until {(() => {
               const graceEnd = new Date(openTimeFormatted.getTime() + 30 * 60000);
               return graceEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -212,8 +215,8 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   // ===== RENDER PHOTO SECTION =====
   const renderPhotoSection = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Proof Photo *</Text>
-      <Text style={styles.sectionDescription}>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Proof Photo *</Text>
+      <Text style={[styles.sectionDescription, { color: theme.textMuted }]}>
         Take or upload a photo as proof of completion
       </Text>
       
@@ -223,24 +226,24 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
           <View style={styles.photoActions}>
             <TouchableOpacity style={styles.photoActionButton} onPress={pickImage}>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.photoActionGradient}
               >
-                <MaterialCommunityIcons name="image-edit" size={14} color="#495057" />
-                <Text style={styles.photoActionText}>Change</Text>
+                <MaterialCommunityIcons name="image-edit" size={14} color={theme.textSecondary} />
+                <Text style={[styles.photoActionText, { color: theme.textSecondary }]}>Change</Text>
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={styles.photoActionButton} onPress={takePhoto}>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.photoActionGradient}
               >
-                <MaterialCommunityIcons name="camera" size={14} color="#495057" />
-                <Text style={styles.photoActionText}>Retake</Text>
+                <MaterialCommunityIcons name="camera" size={14} color={theme.textSecondary} />
+                <Text style={[styles.photoActionText, { color: theme.textSecondary }]}>Retake</Text>
               </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity 
@@ -248,13 +251,13 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
               onPress={() => setPhoto(null)}
             >
               <LinearGradient
-                colors={['#fff5f5', '#ffe3e3']}
+                colors={[theme.errorBg, theme.errorBg]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.photoActionGradient, styles.removeGradient]}
               >
-                <MaterialCommunityIcons name="delete" size={14} color="#fa5252" />
-                <Text style={[styles.photoActionText, styles.removeText]}>Remove</Text>
+                <MaterialCommunityIcons name="delete" size={14} color={theme.error} />
+                <Text style={[styles.photoActionText, styles.removeText, { color: theme.error }]}>Remove</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -263,32 +266,32 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         <View style={styles.photoUploadOptions}>
           <TouchableOpacity style={styles.photoOption} onPress={takePhoto}>
             <LinearGradient
-              colors={['#e7f5ff', '#d0ebff']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.photoOptionGradient}
             >
-              <MaterialCommunityIcons name="camera" size={28} color="#2b8a3e" />
-              <Text style={styles.photoOptionText}>Take Photo</Text>
+              <MaterialCommunityIcons name="camera" size={28} color={theme.primary} />
+              <Text style={[styles.photoOptionText, { color: theme.primary }]}>Take Photo</Text>
             </LinearGradient>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.photoOption} onPress={pickImage}>
             <LinearGradient
-              colors={['#e7f5ff', '#d0ebff']}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.photoOptionGradient}
             >
-              <MaterialCommunityIcons name="image" size={28} color="#2b8a3e" />
-              <Text style={styles.photoOptionText}>Choose from Gallery</Text>
+              <MaterialCommunityIcons name="image" size={28} color={theme.primary} />
+              <Text style={[styles.photoOptionText, { color: theme.primary }]}>Choose from Gallery</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
       )}
       
       {errors.photo && (
-        <Text style={styles.errorText}>{errors.photo}</Text>
+        <Text style={[styles.errorText, { color: theme.error }]}>{errors.photo}</Text>
       )}
     </View>
   );
@@ -296,38 +299,39 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   // ===== RENDER NOTES SECTION =====
   const renderNotesSection = () => (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Notes (Optional)</Text>
-      <Text style={styles.sectionDescription}>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Notes (Optional)</Text>
+      <Text style={[styles.sectionDescription, { color: theme.textMuted }]}>
         Add any additional information about your completion
       </Text>
       
       <LinearGradient
-        colors={['#f8f9fa', '#e9ecef']}
+        colors={[theme.bgSecondary, theme.bgTertiary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.notesGradient, errors.notes && styles.inputError]}
+        style={[styles.notesGradient, errors.notes && styles.inputError, { borderColor: theme.border }]}
       >
         <TextInput
-          style={styles.notesInput}
+          style={[styles.notesInput, { color: theme.text }]}
           value={notes}
           onChangeText={(text) => {
             setNotes(text);
           }}
           placeholder="Describe what you did, any issues encountered, or additional details..."
-          placeholderTextColor="#adb5bd"
+          placeholderTextColor={theme.textPlaceholder}
           multiline
           numberOfLines={4}
           maxLength={500}
           textAlignVertical="top"
+          selectionColor={theme.primary}
         />
       </LinearGradient>
       
       <View style={styles.notesFooter}>
-        <Text style={styles.charCount}>
+        <Text style={[styles.charCount, { color: theme.textMuted }]}>
           {notes.length}/500 characters
         </Text>
         {errors.notes && (
-          <Text style={styles.errorText}>{errors.notes}</Text>
+          <Text style={[styles.errorText, { color: theme.error }]}>{errors.notes}</Text>
         )}
       </View>
     </View>
@@ -335,16 +339,16 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
 
   // ===== RENDER HEADER =====
   const renderHeader = () => (
-    <View style={styles.header}>
+    <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
       <TouchableOpacity 
         onPress={() => navigation.goBack()}
-        style={styles.backButton}
+        style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
       >
-        <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
       </TouchableOpacity>
       
       <View style={styles.titleContainer}>
-        <Text style={styles.title} numberOfLines={1}>
+        <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
           Complete Assignment
         </Text>
       </View>
@@ -354,7 +358,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   );
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -363,27 +367,27 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.card}
+            style={[styles.card, { borderColor: theme.border }]}
           >
             {/* Task Info */}
             <View style={styles.taskInfoSection}>
-              <Text style={styles.taskTitle}>{taskTitle}</Text>
+              <Text style={[styles.taskTitle, { color: theme.text }]}>{taskTitle}</Text>
               
               <View style={styles.taskDetails}>
                 <View style={styles.taskDetailRow}>
-                  <MaterialCommunityIcons name="calendar" size={16} color="#868e96" />
-                  <Text style={styles.taskDetailText}>
+                  <MaterialCommunityIcons name="calendar" size={16} color={theme.textMuted} />
+                  <Text style={[styles.taskDetailText, { color: theme.textSecondary }]}>
                     Due: {new Date(dueDate).toLocaleDateString()}
                   </Text>
                 </View>
                 
                 {timeSlot && (
                   <View style={styles.taskDetailRow}>
-                    <MaterialCommunityIcons name="clock" size={16} color="#868e96" />
-                    <Text style={styles.taskDetailText}>
+                    <MaterialCommunityIcons name="clock" size={16} color={theme.textMuted} />
+                    <Text style={[styles.taskDetailText, { color: theme.textSecondary }]}>
                       Time Slot: {timeSlot.startTime} - {timeSlot.endTime}
                     </Text>
                   </View>
@@ -413,27 +417,28 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             >
               <LinearGradient
                 colors={
-                  !isSubmittable || submitting ? ['#f8f9fa', '#e9ecef'] :
-                  timeStatus === 'submission_open' && isLate ? ['#e67700', '#cc5f00'] :
-                  timeStatus === 'submission_open' ? ['#2b8a3e', '#1e6b2c'] :
-                  ['#868e96', '#6c757d']
+                  !isSubmittable || submitting ? [theme.bgSecondary, theme.bgTertiary] :
+                  timeStatus === 'submission_open' && isLate ? [theme.primary, theme.primaryDark] :
+                  timeStatus === 'submission_open' ? [theme.primary, theme.primaryDark] :
+                  [theme.textMuted, theme.textMuted]
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.submitButtonGradient}
               >
                 {submitting ? (
-                  <ActivityIndicator size="small" color={!isSubmittable ? "#495057" : "white"} />
+                  <ActivityIndicator size="small" color={!isSubmittable ? theme.textMuted : "#fff"} />
                 ) : (
                   <View style={styles.submitButtonContent}>
                     <MaterialCommunityIcons 
                       name={timeStatus === 'submission_open' ? (isLate ? "timer-alert" : "check-circle") : "clock"} 
                       size={20} 
-                      color={!isSubmittable ? "#868e96" : "white"} 
+                      color={!isSubmittable ? theme.textMuted : "#fff"} 
                     />
                     <Text style={[
                       styles.submitButtonText,
-                      !isSubmittable && styles.submitButtonTextDisabled
+                      !isSubmittable && styles.submitButtonTextDisabled,
+                      { color: !isSubmittable ? theme.textMuted : "#fff" }
                     ]}>
                       {timeStatus === 'submission_open' 
                         ? (isLate ? 'Submit Late (Points Reduced)' : 'Submit On-Time')
@@ -449,19 +454,19 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             </TouchableOpacity>
             
             {timeStatus === 'wrong_day' && (
-              <Text style={styles.disabledText}>
+              <Text style={[styles.disabledText, { color: theme.textMuted }]}>
                 This assignment can only be submitted on the due date: {new Date(dueDate).toLocaleDateString()}
               </Text>
             )}
             
             {timeStatus === 'waiting' && timeLeft !== null && (
-              <Text style={styles.waitingText}>
+              <Text style={[styles.waitingText, { color: theme.primary }]}>
                 Submission opens at {timeSlot?.endTime} ({formatTime(timeLeft)} remaining)
               </Text>
             )}
             
             {timeStatus === 'expired' && (
-              <Text style={styles.expiredMessage}>
+              <Text style={[styles.expiredMessage, { color: theme.error }]}>
                 The 30-minute grace period has ended. Please contact an administrator.
               </Text>
             )}

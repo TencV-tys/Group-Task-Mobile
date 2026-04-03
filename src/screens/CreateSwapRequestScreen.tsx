@@ -1,5 +1,4 @@
-// src/screens/CreateSwapRequestScreen.tsx - COMPLETE FIXED VERSION (NO "ANYONE" OPTION)
-
+// src/screens/CreateSwapRequestScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -21,7 +20,8 @@ import { SwapRequestService } from '../services/SwapRequestService';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { createSwapRequestStyles as styles } from '../styles/createSwapRequest.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeCreateSwapRequestStyles } from '../styles/createSwapRequest.styles';
 
 type CreateSwapRequestRouteParams = {
   assignmentId: string;
@@ -44,6 +44,8 @@ type CreateSwapRequestRouteParams = {
 }; 
 
 export const CreateSwapRequestScreen = () => {
+  const { theme, isDark } = useTheme();
+  const styles = makeCreateSwapRequestStyles(theme);
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<{ params: CreateSwapRequestRouteParams }, 'params'>>();
   const { 
@@ -213,97 +215,97 @@ export const CreateSwapRequestScreen = () => {
   };
 
   // Filter eligible members based on swap scope
-const filterEligibleMembers = async () => {
-  if (allMembers.length === 0) return;
-  
-  setLoadingMembers(true);
-  
-  // Filter out current user and admins
-  const eligibleBaseMembers = allMembers.filter(m => 
-    m.userId !== currentUserId && 
-    m.role !== 'ADMIN' &&
-    m.inRotation === true
-  );
-  
-  try {
-    let eligible: any[] = [];
+  const filterEligibleMembers = async () => {
+    if (allMembers.length === 0) return;
     
-    if (swapScope === 'day' && selectedDay) {
-      // DAY SWAP: ONLY members who:
-      // 1. Have ANY tasks this week (are assigned to something)
-      // 2. Are FREE on the specific day
-      console.log(`🔍 Filtering for DAY swap on ${selectedDay}`);
-      console.log(`   Only showing members who are assigned (have tasks) but free on ${selectedDay}`);
+    setLoadingMembers(true);
+    
+    // Filter out current user and admins
+    const eligibleBaseMembers = allMembers.filter(m => 
+      m.userId !== currentUserId && 
+      m.role !== 'ADMIN' &&
+      m.inRotation === true
+    );
+    
+    try {
+      let eligible: any[] = [];
       
-      for (const member of eligibleBaseMembers) {
-        // First check: Does this member have ANY tasks this week?
-        const hasAnyAssignment = await checkMemberHasAnyAssignmentThisWeek(
-          member.userId || member.id,
-          currentWeek
-        );
+      if (swapScope === 'day' && selectedDay) {
+        // DAY SWAP: ONLY members who:
+        // 1. Have ANY tasks this week (are assigned to something)
+        // 2. Are FREE on the specific day
+        console.log(`🔍 Filtering for DAY swap on ${selectedDay}`);
+        console.log(`   Only showing members who are assigned (have tasks) but free on ${selectedDay}`);
         
-        // If they have NO tasks at all, skip them (unassigned members)
-        if (!hasAnyAssignment) {
-          console.log(`   ❌ ${member.fullName} is NOT eligible (no tasks at all this week - unassigned)`);
-          continue;
+        for (const member of eligibleBaseMembers) {
+          // First check: Does this member have ANY tasks this week?
+          const hasAnyAssignment = await checkMemberHasAnyAssignmentThisWeek(
+            member.userId || member.id,
+            currentWeek
+          );
+          
+          // If they have NO tasks at all, skip them (unassigned members)
+          if (!hasAnyAssignment) {
+            console.log(`   ❌ ${member.fullName} is NOT eligible (no tasks at all this week - unassigned)`);
+            continue;
+          }
+          
+          // Second check: Does this member have a task on the specific day?
+          const hasAssignmentOnDay = await checkMemberHasAssignmentOnDay(
+            member.userId || member.id,
+            selectedDay,
+            currentWeek
+          );
+          
+          // Eligible if they HAVE tasks this week BUT are FREE on this specific day
+          if (!hasAssignmentOnDay) {
+            eligible.push(member);
+            console.log(`   ✅ ${member.fullName} is eligible (has tasks, but free on ${selectedDay})`);
+          } else {
+            console.log(`   ❌ ${member.fullName} is NOT eligible (has tasks AND has task on ${selectedDay})`);
+          }
         }
         
-        // Second check: Does this member have a task on the specific day?
-        const hasAssignmentOnDay = await checkMemberHasAssignmentOnDay(
-          member.userId || member.id,
-          selectedDay,
-          currentWeek
-        );
+        setEligibleCount(eligible.length);
+        console.log(`✅ Found ${eligible.length} eligible members for day swap on ${selectedDay}`);
         
-        // Eligible if they HAVE tasks this week BUT are FREE on this specific day
-        if (!hasAssignmentOnDay) {
-          eligible.push(member);
-          console.log(`   ✅ ${member.fullName} is eligible (has tasks, but free on ${selectedDay})`);
-        } else {
-          console.log(`   ❌ ${member.fullName} is NOT eligible (has tasks AND has task on ${selectedDay})`);
+      } else if (swapScope === 'week') {
+        // WEEK SWAP: ONLY members who HAVE assignments this week (for exchange)
+        console.log(`🔍 Filtering for WEEK swap`);
+        
+        for (const member of eligibleBaseMembers) {
+          const hasAnyAssignment = await checkMemberHasAnyAssignmentThisWeek(
+            member.userId || member.id,
+            currentWeek
+          );
+          
+          // ONLY eligible if they HAVE assignments this week (for fair exchange)
+          if (hasAnyAssignment) {
+            eligible.push(member);
+            console.log(`   ✅ ${member.fullName} is eligible (has tasks to exchange)`);
+          } else {
+            console.log(`   ❌ ${member.fullName} is NOT eligible (no tasks to exchange - unassigned)`);
+          }
         }
+        
+        setEligibleCount(eligible.length);
+        console.log(`✅ Found ${eligible.length} eligible members for week swap`);
       }
       
-      setEligibleCount(eligible.length);
-      console.log(`✅ Found ${eligible.length} eligible members for day swap on ${selectedDay}`);
+      setMembers(eligible);
       
-    } else if (swapScope === 'week') {
-      // WEEK SWAP: ONLY members who HAVE assignments this week (for exchange)
-      console.log(`🔍 Filtering for WEEK swap`);
-      
-      for (const member of eligibleBaseMembers) {
-        const hasAnyAssignment = await checkMemberHasAnyAssignmentThisWeek(
-          member.userId || member.id,
-          currentWeek
-        );
-        
-        // ONLY eligible if they HAVE assignments this week (for fair exchange)
-        if (hasAnyAssignment) {
-          eligible.push(member);
-          console.log(`   ✅ ${member.fullName} is eligible (has tasks to exchange)`);
-        } else {
-          console.log(`   ❌ ${member.fullName} is NOT eligible (no tasks to exchange - unassigned)`);
-        }
+      if (eligible.length === 0) {
+        console.log(`⚠️ No eligible members found for ${swapScope} swap`);
       }
       
-      setEligibleCount(eligible.length);
-      console.log(`✅ Found ${eligible.length} eligible members for week swap`);
+    } catch (error) {
+      console.error('Error filtering members:', error);
+      setMembers(eligibleBaseMembers);
+      setEligibleCount(eligibleBaseMembers.length);
+    } finally {
+      setLoadingMembers(false);
     }
-    
-    setMembers(eligible);
-    
-    if (eligible.length === 0) {
-      console.log(`⚠️ No eligible members found for ${swapScope} swap`);
-    }
-    
-  } catch (error) {
-    console.error('Error filtering members:', error);
-    setMembers(eligibleBaseMembers);
-    setEligibleCount(eligibleBaseMembers.length);
-  } finally {
-    setLoadingMembers(false);
-  }
-};
+  };
 
   const checkSwapAvailability = async () => {
     setChecking(true);
@@ -435,15 +437,15 @@ const filterEligibleMembers = async () => {
       if (eligibleCount === 0) {
         return (
           <LinearGradient
-            colors={['#fff5f5', '#ffe3e3']}
+            colors={[theme.errorBg, theme.errorBg]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.warningCard}
           >
-            <MaterialCommunityIcons name="alert-circle" size={24} color="#fa5252" />
+            <MaterialCommunityIcons name="alert-circle" size={24} color={theme.error} />
             <View style={styles.warningContent}>
-              <Text style={styles.warningTitle}>No Eligible Members</Text>
-              <Text style={styles.warningText}>
+              <Text style={[styles.warningTitle, { color: theme.error }]}>No Eligible Members</Text>
+              <Text style={[styles.warningText, { color: theme.textSecondary }]}>
                 All members already have tasks on {selectedDay}. No one can accept this day swap.
               </Text>
             </View>
@@ -452,15 +454,15 @@ const filterEligibleMembers = async () => {
       } else if (eligibleCount > 0) {
         return (
           <LinearGradient
-            colors={['#d3f9d8', '#b2f2bb']}
+            colors={[theme.primaryLight, theme.primaryLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.infoSuccessCard}
           >
-            <MaterialCommunityIcons name="check-circle" size={24} color="#2b8a3e" />
+            <MaterialCommunityIcons name="check-circle" size={24} color={theme.primary} />
             <View style={styles.warningContent}>
-              <Text style={styles.successTitle}>{eligibleCount} Member{eligibleCount !== 1 ? 's' : ''} Available</Text>
-              <Text style={styles.successText}>
+              <Text style={[styles.successTitle, { color: theme.primary }]}>{eligibleCount} Member{eligibleCount !== 1 ? 's' : ''} Available</Text>
+              <Text style={[styles.successText, { color: theme.textSecondary }]}>
                 {eligibleCount} member{eligibleCount !== 1 ? 's are' : ' is'} free on {selectedDay} and can receive your task.
               </Text>
             </View>
@@ -471,15 +473,15 @@ const filterEligibleMembers = async () => {
       if (eligibleCount === 0) {
         return (
           <LinearGradient
-            colors={['#fff5f5', '#ffe3e3']}
+            colors={[theme.errorBg, theme.errorBg]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.warningCard}
           >
-            <MaterialCommunityIcons name="alert-circle" size={24} color="#fa5252" />
+            <MaterialCommunityIcons name="alert-circle" size={24} color={theme.error} />
             <View style={styles.warningContent}>
-              <Text style={styles.warningTitle}>No Eligible Members</Text>
-              <Text style={styles.warningText}>
+              <Text style={[styles.warningTitle, { color: theme.error }]}>No Eligible Members</Text>
+              <Text style={[styles.warningText, { color: theme.textSecondary }]}>
                 No members have tasks this week to exchange. Week swap requires both parties to have tasks.
               </Text>
             </View>
@@ -488,15 +490,15 @@ const filterEligibleMembers = async () => {
       } else if (eligibleCount > 0) {
         return (
           <LinearGradient
-            colors={['#e7f5ff', '#d0ebff']}
+            colors={[theme.primaryLight, theme.primaryLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.infoBanner}
           >
-            <MaterialCommunityIcons name="information" size={22} color="#2b8a3e" />
+            <MaterialCommunityIcons name="information" size={22} color={theme.primary} />
             <View style={styles.infoBannerContent}>
-              <Text style={styles.infoBannerTitle}>Week Swap - Exchange</Text>
-              <Text style={styles.infoBannerText}>
+              <Text style={[styles.infoBannerTitle, { color: theme.primary }]}>Week Swap - Exchange</Text>
+              <Text style={[styles.infoBannerText, { color: theme.textSecondary }]}>
                 {eligibleCount} member{eligibleCount !== 1 ? 's have' : ' has'} tasks this week and can exchange their entire week with you.
               </Text>
             </View>
@@ -509,10 +511,10 @@ const filterEligibleMembers = async () => {
 
   if (checking || loadingMembers) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#495057" />
-          <Text style={styles.loadingText}>Checking availability...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Checking availability...</Text>
         </View>
       </ScreenWrapper>
     );
@@ -523,18 +525,18 @@ const filterEligibleMembers = async () => {
 
   if (existingRequest && canSwap.canSwap === false && canSwap.reason?.includes('pending')) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Request Swap</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Request Swap</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={styles.centerContainer}>
-          <MaterialCommunityIcons name="clock-alert" size={64} color="#e67700" />
-          <Text style={styles.pendingTitle}>Pending Request Exists</Text>
-          <Text style={styles.pendingText}>
+          <MaterialCommunityIcons name="clock-alert" size={64} color={theme.primary} />
+          <Text style={[styles.pendingTitle, { color: theme.text }]}>Pending Request Exists</Text>
+          <Text style={[styles.pendingText, { color: theme.textMuted }]}>
             You already have a pending swap request for this assignment.
           </Text>
           <TouchableOpacity
@@ -549,7 +551,7 @@ const filterEligibleMembers = async () => {
             }}
           >
             <LinearGradient
-              colors={['#495057', '#343a40']}
+              colors={[theme.textSecondary, theme.textMuted]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.viewRequestButtonGradient}
@@ -563,104 +565,104 @@ const filterEligibleMembers = async () => {
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Request Swap</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Request Swap</Text>
           <View style={{ width: 36 }} />
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           {/* Assignment Info Card */}
           <LinearGradient
-            colors={['#ffffff', '#f8f9fa']}
+            colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.assignmentCard}
+            style={[styles.assignmentCard, { borderColor: theme.border }]}
           >
             <View style={styles.cardHeader}>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.taskIconContainer}
               >
-                <MaterialCommunityIcons name="swap-horizontal" size={22} color="#495057" />
+                <MaterialCommunityIcons name="swap-horizontal" size={22} color={theme.textSecondary} />
               </LinearGradient>
-              <Text style={styles.cardTitle}>Assignment Details</Text>
+              <Text style={[styles.cardTitle, { color: theme.text }]}>Assignment Details</Text>
             </View>
             
-            <Text style={styles.taskTitle}>{taskTitle || 'Task'}</Text>
+            <Text style={[styles.taskTitle, { color: theme.text }]}>{taskTitle || 'Task'}</Text>
             
             <View style={styles.detailsGrid}>
               <View style={styles.detailItem}>
-                <MaterialCommunityIcons name="calendar-outline" size={14} color="#868e96" />
-                <Text style={styles.detailLabel}>Due Date</Text>
-                <Text style={styles.detailValue}>{formattedDueDate}</Text>
+                <MaterialCommunityIcons name="calendar-outline" size={14} color={theme.textMuted} />
+                <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Due Date</Text>
+                <Text style={[styles.detailValue, { color: theme.textSecondary }]}>{formattedDueDate}</Text>
               </View>
               
               <View style={styles.detailItem}>
-                <MaterialCommunityIcons name="clock-outline" size={14} color="#868e96" />
-                <Text style={styles.detailLabel}>Time</Text>
-                <Text style={styles.detailValue}>{timeSlot || 'Scheduled'}</Text>
+                <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+                <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Time</Text>
+                <Text style={[styles.detailValue, { color: theme.textSecondary }]}>{timeSlot || 'Scheduled'}</Text>
               </View>
               
               <View style={styles.detailItem}>
-                <MaterialCommunityIcons name="star" size={14} color="#e67700" />
-                <Text style={styles.detailLabel}>Points</Text>
-                <Text style={[styles.detailValue, styles.pointsValue]}>{taskPoints || 0}</Text>
+                <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+                <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Points</Text>
+                <Text style={[styles.detailValue, styles.pointsValue, { color: theme.primary }]}>{taskPoints || 0}</Text>
               </View>
             </View>
 
             {selectedDay && swapScope === 'day' && (
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.assignmentDayBadge}
+                style={[styles.assignmentDayBadge, { borderColor: theme.border }]}
               >
-                <MaterialCommunityIcons name="calendar-today" size={14} color="#495057" />
-                <Text style={styles.assignmentDayText}>
-                  Swapping: <Text style={styles.assignmentDayBold}>{selectedDay}</Text>
+                <MaterialCommunityIcons name="calendar-today" size={14} color={theme.textSecondary} />
+                <Text style={[styles.assignmentDayText, { color: theme.textSecondary }]}>
+                  Swapping: <Text style={[styles.assignmentDayBold, { color: theme.text }]}>{selectedDay}</Text>
                 </Text>
               </LinearGradient>
             )}
             
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.frequencyBadge}
+              style={[styles.frequencyBadge, { borderColor: theme.border }]}
             >
               <MaterialCommunityIcons 
                 name={isDailyTask ? "calendar" : "calendar-week"} 
                 size={12} 
-                color="#495057" 
+                color={theme.textSecondary} 
               />
-              <Text style={styles.frequencyText}>
+              <Text style={[styles.frequencyText, { color: theme.textSecondary }]}>
                 {isDailyTask ? 'Daily Task' : 'Weekly Task'}
               </Text>
             </LinearGradient>
 
             <LinearGradient
-              colors={['#f8f9fa', '#e9ecef']}
+              colors={[theme.bgSecondary, theme.bgTertiary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.scopeBadge}
+              style={[styles.scopeBadge, { borderColor: theme.border }]}
             >
               <MaterialCommunityIcons 
                 name={swapScope === 'week' ? 'calendar-week' : 'calendar-today'} 
                 size={12} 
-                color="#495057" 
+                color={theme.textSecondary} 
               />
-              <Text style={styles.scopeBadgeText}>
+              <Text style={[styles.scopeBadgeText, { color: theme.textSecondary }]}>
                 {swapScope === 'week' ? 'Swapping entire week' : `Swapping ${selectedDay || 'specific day'}`}
               </Text>
             </LinearGradient>
@@ -668,15 +670,15 @@ const filterEligibleMembers = async () => {
 
           {!canSwap.canSwap && (
             <LinearGradient
-              colors={['#fff5f5', '#ffe3e3']}
+              colors={[theme.errorBg, theme.errorBg]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.warningCard}
+              style={[styles.warningCard, { borderColor: theme.errorBorder }]}
             >
-              <MaterialCommunityIcons name="alert-circle" size={24} color="#fa5252" />
+              <MaterialCommunityIcons name="alert-circle" size={24} color={theme.error} />
               <View style={styles.warningContent}>
-                <Text style={styles.warningTitle}>Cannot Request Swap</Text>
-                <Text style={styles.warningText}>{canSwap.reason}</Text>
+                <Text style={[styles.warningTitle, { color: theme.error }]}>Cannot Request Swap</Text>
+                <Text style={[styles.warningText, { color: theme.textSecondary }]}>{canSwap.reason}</Text>
               </View>
             </LinearGradient>
           )}
@@ -684,17 +686,17 @@ const filterEligibleMembers = async () => {
           {canSwap.canSwap && (
             <>
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.infoBanner}
+                style={[styles.infoBanner, { borderColor: theme.border }]}
               >
-                <MaterialCommunityIcons name="information" size={22} color="#495057" />
+                <MaterialCommunityIcons name="information" size={22} color={theme.primary} />
                 <View style={styles.infoBannerContent}>
-                  <Text style={styles.infoBannerTitle}>
+                  <Text style={[styles.infoBannerTitle, { color: theme.primary }]}>
                     {swapScope === 'week' ? 'Swap Entire Week' : 'Swap Specific Day'}
                   </Text>
-                  <Text style={styles.infoBannerText}>
+                  <Text style={[styles.infoBannerText, { color: theme.textSecondary }]}>
                     {swapScope === 'week' 
                       ? 'You\'re swapping ALL your tasks for the entire week with another member.'
                       : `You're transferring your ${selectedDay || 'this day'} task to another member.`}
@@ -707,10 +709,10 @@ const filterEligibleMembers = async () => {
 
               {/* Member Selection - REQUIRED */}
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Select Member to Swap With *</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Select Member to Swap With *</Text>
                 
                 <TouchableOpacity
-                  style={[styles.selectorButton, !targetUserId && styles.selectorButtonRequired]}
+                  style={[styles.selectorButton, !targetUserId && styles.selectorButtonRequired, { backgroundColor: theme.card, borderColor: theme.border }]}
                   onPress={() => setShowMemberSelector(!showMemberSelector)}
                   activeOpacity={0.7}
                 >
@@ -718,26 +720,26 @@ const filterEligibleMembers = async () => {
                     <MaterialCommunityIcons 
                       name={targetUserId ? "account-check" : "account-plus"} 
                       size={18} 
-                      color={targetUserId ? "#2b8a3e" : "#495057"} 
+                      color={targetUserId ? theme.primary : theme.textSecondary} 
                     />
-                    <Text style={[styles.selectorText, targetUserId && styles.selectorTextSelected]}>
+                    <Text style={[styles.selectorText, targetUserId && styles.selectorTextSelected, { color: targetUserId ? theme.primary : theme.textSecondary }]}>
                       {getSelectedMemberName()}
                     </Text>
                   </View>
                   <MaterialCommunityIcons 
                     name={showMemberSelector ? "chevron-up" : "chevron-down"} 
                     size={18} 
-                    color="#868e96" 
+                    color={theme.textMuted} 
                   />
                 </TouchableOpacity>
 
                 {showMemberSelector && (
-                  <View style={styles.memberList}>
+                  <View style={[styles.memberList, { backgroundColor: theme.card, borderColor: theme.border }]}>
                     {members.length > 0 ? (
                       members.map(member => (
                         <TouchableOpacity
                           key={member.userId || member.id}
-                          style={styles.memberItem}
+                          style={[styles.memberItem, { borderBottomColor: theme.borderLight }]}
                           onPress={() => {
                             setTargetUserId(member.userId || member.id);
                             setShowMemberSelector(false);
@@ -746,10 +748,10 @@ const filterEligibleMembers = async () => {
                         >
                           <View style={styles.memberInfo}>
                             <LinearGradient
-                              colors={['#f8f9fa', '#e9ecef']}
+                              colors={[theme.bgSecondary, theme.bgTertiary]}
                               start={{ x: 0, y: 0 }}
                               end={{ x: 1, y: 1 }}
-                              style={styles.avatar}
+                              style={[styles.avatar, { borderColor: theme.border }]}
                             >
                               {member.avatarUrl ? (
                                 <Image 
@@ -757,14 +759,14 @@ const filterEligibleMembers = async () => {
                                   style={styles.avatarImage} 
                                 />
                               ) : (
-                                <Text style={styles.avatarText}>
+                                <Text style={[styles.avatarText, { color: theme.textSecondary }]}>
                                   {member.fullName?.charAt(0).toUpperCase() || '?'}
                                 </Text>
                               )}
                             </LinearGradient>
                             <View>
-                              <Text style={styles.memberName}>{member.fullName || 'Unknown'}</Text>
-                              <Text style={styles.memberRole}>
+                              <Text style={[styles.memberName, { color: theme.text }]}>{member.fullName || 'Unknown'}</Text>
+                              <Text style={[styles.memberRole, { color: theme.textMuted }]}>
                                 {swapScope === 'day' && selectedDay
                                   ? `Free on ${selectedDay}`
                                   : swapScope === 'week'
@@ -774,14 +776,14 @@ const filterEligibleMembers = async () => {
                             </View>
                           </View>
                           {targetUserId === (member.userId || member.id) && (
-                            <MaterialCommunityIcons name="check-circle" size={20} color="#2b8a3e" />
+                            <MaterialCommunityIcons name="check-circle" size={20} color={theme.primary} />
                           )}
                         </TouchableOpacity>
                       ))
                     ) : (
                       <View style={styles.noMembersContainer}>
-                        <MaterialCommunityIcons name="account-off" size={32} color="#adb5bd" />
-                        <Text style={styles.noMembersText}>
+                        <MaterialCommunityIcons name="account-off" size={32} color={theme.textPlaceholder} />
+                        <Text style={[styles.noMembersText, { color: theme.textMuted }]}>
                           {swapScope === 'day' && selectedDay
                             ? `No members available on ${selectedDay}`
                             : swapScope === 'week'
@@ -795,7 +797,7 @@ const filterEligibleMembers = async () => {
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Request Expires</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Request Expires</Text>
                 <View style={styles.expiryOptions}>
                   {(['24h', '48h', '72h', 'never'] as const).map(option => (
                     <TouchableOpacity
@@ -803,12 +805,13 @@ const filterEligibleMembers = async () => {
                       style={[
                         styles.expiryOption,
                         expiresIn === option && styles.expiryOptionActive,
+                        { borderColor: theme.border }
                       ]}
                       onPress={() => setExpiresIn(option)}
                       activeOpacity={0.7}
                     >
                       <LinearGradient
-                        colors={expiresIn === option ? ['#495057', '#343a40'] : ['#f8f9fa', '#e9ecef']}
+                        colors={expiresIn === option ? [theme.textSecondary, theme.textMuted] : [theme.bgSecondary, theme.bgTertiary]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.expiryOptionGradient}
@@ -817,6 +820,7 @@ const filterEligibleMembers = async () => {
                           style={[
                             styles.expiryOptionText,
                             expiresIn === option && styles.expiryOptionTextActive,
+                            { color: expiresIn === option ? '#fff' : theme.textSecondary }
                           ]}
                         >
                           {option === 'never' ? 'Never' : option}
@@ -828,34 +832,35 @@ const filterEligibleMembers = async () => {
               </View>
 
               <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Reason (Optional)</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Reason (Optional)</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.reasonInputGradient}
+                  style={[styles.reasonInputGradient, { borderColor: theme.border }]}
                 >
                   <TextInput
-                    style={styles.reasonInput}
+                    style={[styles.reasonInput, { color: theme.text }]}
                     placeholder="Why do you need to swap this task?"
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
                     value={reason}
                     onChangeText={setReason}
                     multiline
                     numberOfLines={4}
                     textAlignVertical="top"
+                    selectionColor={theme.primary}
                   />
                 </LinearGradient>
               </View>
 
               <LinearGradient
-                colors={['#f8f9fa', '#e9ecef']}
+                colors={[theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.infoNote}
+                style={[styles.infoNote, { borderColor: theme.border }]}
               >
-                <MaterialCommunityIcons name="information" size={18} color="#495057" />
-                <Text style={styles.infoText}>
+                <MaterialCommunityIcons name="information" size={18} color={theme.textMuted} />
+                <Text style={[styles.infoText, { color: theme.textMuted }]}>
                   {swapScope === 'week' 
                     ? 'This will swap ALL your tasks for the current week with the selected member.'
                     : `This will transfer your ${selectedDay} task to the selected member.`}
@@ -866,7 +871,7 @@ const filterEligibleMembers = async () => {
         </ScrollView>
 
         {canSwap.canSwap && (
-          <View style={styles.footer}>
+          <View style={[styles.footer, { backgroundColor: theme.card, borderTopColor: theme.border }]}>
             <TouchableOpacity
               style={[
                 styles.submitButton, 
@@ -880,18 +885,18 @@ const filterEligibleMembers = async () => {
               <LinearGradient
                 colors={
                   loading || !targetUserId || (swapScope === 'day' && eligibleCount === 0)
-                    ? ['#f8f9fa', '#e9ecef'] 
-                    : ['#2b8a3e', '#1e6b2c']
+                    ? [theme.bgSecondary, theme.bgTertiary] 
+                    : [theme.primary, theme.primaryDark]
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.submitButtonGradient}
               >
                 {loading ? (
-                  <ActivityIndicator color="#495057" />
+                  <ActivityIndicator color={theme.textMuted} />
                 ) : (
                   <>
-                    <MaterialCommunityIcons name="swap-horizontal" size={18} color="white" />
+                    <MaterialCommunityIcons name="swap-horizontal" size={18} color="#fff" />
                     <Text style={styles.submitButtonText}>
                       {swapScope === 'week' 
                         ? `Send Week Swap Request to ${getSelectedMemberName()}`
@@ -904,7 +909,7 @@ const filterEligibleMembers = async () => {
               </LinearGradient>
             </TouchableOpacity>
             {!targetUserId && (
-              <Text style={styles.disabledHint}>
+              <Text style={[styles.disabledHint, { color: theme.textMuted }]}>
                 ⓘ Please select a member to swap with
               </Text>
             )}
@@ -913,6 +918,6 @@ const filterEligibleMembers = async () => {
       </KeyboardAvoidingView>
     </ScreenWrapper>
   ); 
-};
+}; 
 
 export default CreateSwapRequestScreen;

@@ -1,4 +1,4 @@
-// src/screens/PrivacyPolicyScreen.tsx - UPDATED with TokenUtils
+// src/screens/PrivacyPolicyScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -10,16 +10,17 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 ADD THIS IMPORT
+import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 export default function PrivacyPolicyScreen({ navigation }: any) {
+  const { theme, isDark } = useTheme();
   const [loading, setLoading] = useState(true);
 
   // ===== CHECK AUTH STATUS USING TOKENUTILS =====
   const checkAuth = useCallback(async () => {
     try {
-      // Get user to check if logged in (non-blocking)
       const user = await TokenUtils.getUser();
       console.log('🔐 PrivacyPolicy: Auth status:', user ? 'Logged in' : 'Guest');
     } catch (error) {
@@ -37,34 +38,33 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
     if (navigation.canGoBack()) {
       navigation.goBack();
     } else {
-      // If can't go back (opened from deep link), go to Login
       navigation.navigate('Login');
     }
   };
 
   if (loading) {
     return (
-      <ScreenWrapper style={styles.container}>
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading...</Text>
         </View>
       </ScreenWrapper>
     );
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity 
           onPress={handleBack}
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
         
-        <Text style={styles.headerTitle}>Privacy Policy</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Privacy Policy</Text>
         
         <View style={styles.headerRight} />
       </View>
@@ -75,24 +75,24 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
       >
         {/* Last Updated */}
         <LinearGradient
-          colors={['#f8f9fa', '#e9ecef']}
+          colors={[theme.bgSecondary, theme.bgTertiary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.lastUpdatedCard}
+          style={[styles.lastUpdatedCard, { borderColor: theme.border }]}
         >
-          <MaterialCommunityIcons name="calendar-clock" size={16} color="#2b8a3e" />
-          <Text style={styles.lastUpdatedText}>Last Updated: March 15, 2024</Text>
+          <MaterialCommunityIcons name="calendar-clock" size={16} color={theme.primary} />
+          <Text style={[styles.lastUpdatedText, { color: theme.textSecondary }]}>Last Updated: March 15, 2024</Text>
         </LinearGradient>
 
         {/* Introduction */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.sectionCard}
+          style={[styles.sectionCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
         >
-          <Text style={styles.sectionTitle}>Introduction</Text>
-          <Text style={styles.sectionText}>
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>Introduction</Text>
+          <Text style={[styles.sectionText, { color: theme.textSecondary }]}>
             At GroupTask, we respect your privacy and are committed to protecting your personal data. 
             This privacy policy explains how we collect, use, and safeguard your information when you use our application.
           </Text>
@@ -100,73 +100,73 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
 
         {/* Information We Collect */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.sectionCard}
+          style={[styles.sectionCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
         >
-          <Text style={styles.sectionTitle}>Information We Collect</Text>
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>Information We Collect</Text>
           
           <View style={styles.bulletPoint}>
-            <MaterialCommunityIcons name="circle-small" size={20} color="#2b8a3e" />
-            <Text style={styles.bulletText}>Account information (name, email, profile picture)</Text>
+            <MaterialCommunityIcons name="circle-small" size={20} color={theme.primary} />
+            <Text style={[styles.bulletText, { color: theme.textSecondary }]}>Account information (name, email, profile picture)</Text>
           </View>
           
           <View style={styles.bulletPoint}>
-            <MaterialCommunityIcons name="circle-small" size={20} color="#2b8a3e" />
-            <Text style={styles.bulletText}>Group and task data you create</Text>
+            <MaterialCommunityIcons name="circle-small" size={20} color={theme.primary} />
+            <Text style={[styles.bulletText, { color: theme.textSecondary }]}>Group and task data you create</Text>
           </View>
           
           <View style={styles.bulletPoint}>
-            <MaterialCommunityIcons name="circle-small" size={20} color="#2b8a3e" />
-            <Text style={styles.bulletText}>Assignment completion history and points earned</Text>
+            <MaterialCommunityIcons name="circle-small" size={20} color={theme.primary} />
+            <Text style={[styles.bulletText, { color: theme.textSecondary }]}>Assignment completion history and points earned</Text>
           </View>
           
           <View style={styles.bulletPoint}>
-            <MaterialCommunityIcons name="circle-small" size={20} color="#2b8a3e" />
-            <Text style={styles.bulletText}>Device information and app usage data</Text>
+            <MaterialCommunityIcons name="circle-small" size={20} color={theme.primary} />
+            <Text style={[styles.bulletText, { color: theme.textSecondary }]}>Device information and app usage data</Text>
           </View>
         </LinearGradient>
 
         {/* How We Use Your Information */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.sectionCard}
+          style={[styles.sectionCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
         >
-          <Text style={styles.sectionTitle}>How We Use Your Information</Text>
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>How We Use Your Information</Text>
           
           <View style={styles.bulletPoint}>
-            <MaterialCommunityIcons name="circle-small" size={20} color="#2b8a3e" />
-            <Text style={styles.bulletText}>To provide and maintain our services</Text>
+            <MaterialCommunityIcons name="circle-small" size={20} color={theme.primary} />
+            <Text style={[styles.bulletText, { color: theme.textSecondary }]}>To provide and maintain our services</Text>
           </View>
           
           <View style={styles.bulletPoint}>
-            <MaterialCommunityIcons name="circle-small" size={20} color="#2b8a3e" />
-            <Text style={styles.bulletText}>To notify you about task assignments and updates</Text>
+            <MaterialCommunityIcons name="circle-small" size={20} color={theme.primary} />
+            <Text style={[styles.bulletText, { color: theme.textSecondary }]}>To notify you about task assignments and updates</Text>
           </View>
           
           <View style={styles.bulletPoint}>
-            <MaterialCommunityIcons name="circle-small" size={20} color="#2b8a3e" />
-            <Text style={styles.bulletText}>To calculate points and track group contributions</Text>
+            <MaterialCommunityIcons name="circle-small" size={20} color={theme.primary} />
+            <Text style={[styles.bulletText, { color: theme.textSecondary }]}>To calculate points and track group contributions</Text>
           </View>
           
           <View style={styles.bulletPoint}>
-            <MaterialCommunityIcons name="circle-small" size={20} color="#2b8a3e" />
-            <Text style={styles.bulletText}>To improve and personalize your experience</Text>
+            <MaterialCommunityIcons name="circle-small" size={20} color={theme.primary} />
+            <Text style={[styles.bulletText, { color: theme.textSecondary }]}>To improve and personalize your experience</Text>
           </View>
         </LinearGradient>
 
         {/* Data Sharing */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.sectionCard}
+          style={[styles.sectionCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
         >
-          <Text style={styles.sectionTitle}>Data Sharing</Text>
-          <Text style={styles.sectionText}>
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>Data Sharing</Text>
+          <Text style={[styles.sectionText, { color: theme.textSecondary }]}>
             We do not sell your personal information. Your data is shared only within your groups 
             as necessary for task management and collaboration.
           </Text>
@@ -174,13 +174,13 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
 
         {/* Data Security */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.sectionCard}
+          style={[styles.sectionCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
         >
-          <Text style={styles.sectionTitle}>Data Security</Text>
-          <Text style={styles.sectionText}>
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>Data Security</Text>
+          <Text style={[styles.sectionText, { color: theme.textSecondary }]}>
             We implement appropriate security measures to protect your personal information. 
             However, no method of transmission over the Internet is 100% secure.
           </Text>
@@ -188,13 +188,13 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
 
         {/* Your Rights */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.sectionCard}
+          style={[styles.sectionCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
         >
-          <Text style={styles.sectionTitle}>Your Rights</Text>
-          <Text style={styles.sectionText}>
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>Your Rights</Text>
+          <Text style={[styles.sectionText, { color: theme.textSecondary }]}>
             You have the right to access, update, or delete your personal information. 
             You can do this through your profile settings or by contacting support.
           </Text>
@@ -202,13 +202,13 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
 
         {/* Changes to Policy */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.sectionCard}
+          style={[styles.sectionCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
         >
-          <Text style={styles.sectionTitle}>Changes to This Policy</Text>
-          <Text style={styles.sectionText}>
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>Changes to This Policy</Text>
+          <Text style={[styles.sectionText, { color: theme.textSecondary }]}>
             We may update this privacy policy from time to time. We will notify you of any changes 
             by posting the new policy on this page.
           </Text>
@@ -216,13 +216,13 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
 
         {/* Contact Information */}
         <LinearGradient
-          colors={['#ffffff', '#f8f9fa']}
+          colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.sectionCard, styles.lastCard]}
+          style={[styles.sectionCard, styles.lastCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
         >
-          <Text style={styles.sectionTitle}>Contact Us</Text>
-          <Text style={styles.sectionText}>
+          <Text style={[styles.sectionTitle, { color: theme.primary }]}>Contact Us</Text>
+          <Text style={[styles.sectionText, { color: theme.textSecondary }]}>
             If you have questions about this privacy policy, please contact us at:{'\n'}
             support@grouptask.com
           </Text>
@@ -235,12 +235,12 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Signup')}
           >
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.signupButtonGradient}
             >
-              <MaterialCommunityIcons name="account-plus" size={20} color="white" />
+              <MaterialCommunityIcons name="account-plus" size={20} color="#fff" />
               <Text style={styles.signupButtonText}>Create an Account</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -250,11 +250,9 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
   );
 }
 
-// Add these to your styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   header: {
     flexDirection: 'row',
@@ -262,19 +260,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -283,7 +277,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     textAlign: 'center',
   },
   headerRight: {
@@ -297,7 +290,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#868e96',
   },
   scrollContent: {
     padding: 16,
@@ -312,11 +304,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   lastUpdatedText: {
     fontSize: 13,
-    color: '#495057',
     fontWeight: '500',
   },
   sectionCard: {
@@ -324,8 +314,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -337,12 +325,10 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2b8a3e',
     marginBottom: 12,
   },
   sectionText: {
     fontSize: 14,
-    color: '#495057',
     lineHeight: 20,
   },
   bulletPoint: {
@@ -353,7 +339,6 @@ const styles = StyleSheet.create({
   bulletText: {
     flex: 1,
     fontSize: 14,
-    color: '#495057',
     lineHeight: 20,
   },
   signupButton: {
@@ -361,7 +346,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: '#2b8a3e',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -375,7 +359,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   signupButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },

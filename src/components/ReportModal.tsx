@@ -1,4 +1,4 @@
-// src/components/ReportModal.tsx - UPDATED with TokenUtils
+// src/components/ReportModal.tsx - Dark Mode Added
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -15,7 +15,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
+import { useTheme } from '../context/ThemeContext';
 
 const REPORT_REASONS = [
   { value: 'INAPPROPRIATE_CONTENT', label: 'Inappropriate Content', icon: 'alert-octagon' },
@@ -33,7 +34,7 @@ interface ReportModalProps {
   groupId: string;
   groupName: string;
   onSubmit: (data: { type: string; description: string }) => Promise<void>;
-  navigation?: any; // 👈 Add navigation for redirect on auth error
+  navigation?: any;
 }
 
 export const ReportModal: React.FC<ReportModalProps> = ({
@@ -42,8 +43,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   groupId,
   groupName,
   onSubmit,
-  navigation // 👈 Add navigation prop
+  navigation
 }) => {
+  const { theme, isDark } = useTheme();
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -84,7 +86,6 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   }, [authError, visible, navigation, onClose]);
 
   const handleSubmit = async () => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) return;
 
@@ -110,7 +111,6 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         [{ text: 'OK', onPress: handleClose }]
       );
     } catch (error) {
-      // Check if error is auth-related
       if (error instanceof Error && 
           (error.message.toLowerCase().includes('token') || 
            error.message.toLowerCase().includes('auth') ||
@@ -136,7 +136,6 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     setStep('reason');
   };
 
-  // If auth error, don't render modal content
   if (authError) {
     return null;
   }
@@ -149,46 +148,46 @@ export const ReportModal: React.FC<ReportModalProps> = ({
       onRequestClose={handleClose}
     >
       <KeyboardAvoidingView 
-        style={styles.modalOverlay}
+        style={[styles.modalOverlay, { backgroundColor: theme.overlay }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.modalContent}>
+        <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
           {/* Header - Fixed at top */}
-          <View style={styles.header}>
+          <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
             <View style={styles.headerLeft}>
               {step === 'description' && (
-                <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-                  <MaterialCommunityIcons name="arrow-left" size={20} color="#495057" />
+                <TouchableOpacity onPress={handleBack} style={[styles.backButton, { backgroundColor: theme.bgSecondary }]}>
+                  <MaterialCommunityIcons name="arrow-left" size={20} color={theme.textMuted} />
                 </TouchableOpacity>
               )}
               <LinearGradient
-                colors={['#fa5252', '#e03131']}
+                colors={[theme.error, theme.error]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.headerIcon}
               >
-                <MaterialCommunityIcons name="flag" size={18} color="white" />
+                <MaterialCommunityIcons name="flag" size={18} color="#fff" />
               </LinearGradient>
-              <Text style={styles.headerTitle}>Report Group</Text>
+              <Text style={[styles.headerTitle, { color: theme.text }]}>Report Group</Text>
             </View>
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              <MaterialCommunityIcons name="close" size={20} color="#868e96" />
+            <TouchableOpacity onPress={handleClose} style={[styles.closeButton, { backgroundColor: theme.bgTertiary }]}>
+              <MaterialCommunityIcons name="close" size={20} color={theme.textMuted} />
             </TouchableOpacity>
           </View>
 
           {/* Scrollable Content - Takes remaining space */}
           <ScrollView 
-            style={styles.body} 
+            style={[styles.body, { backgroundColor: theme.card }]} 
             contentContainerStyle={styles.bodyContent}
             showsVerticalScrollIndicator={true}
             bounces={true}
           >
-            <Text style={styles.groupNameText}>{groupName}</Text>
+            <Text style={[styles.groupNameText, { color: theme.textMuted }]}>{groupName}</Text>
             
             {step === 'reason' ? (
               <>
-                <Text style={styles.sectionTitle}>Why are you reporting this group?</Text>
-                <Text style={styles.sectionSubtitle}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Why are you reporting this group?</Text>
+                <Text style={[styles.sectionSubtitle, { color: theme.textMuted }]}>
                   Your report is anonymous. We'll review it and take appropriate action.
                 </Text>
 
@@ -198,14 +197,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       key={reason.value}
                       style={[
                         styles.reasonCard,
-                        selectedReason === reason.value && styles.reasonCardSelected
+                        selectedReason === reason.value && styles.reasonCardSelected,
+                        { 
+                          backgroundColor: selectedReason === reason.value ? theme.errorBg : theme.bgSecondary,
+                          borderColor: selectedReason === reason.value ? theme.errorBorder : theme.border
+                        }
                       ]}
                       onPress={() => setSelectedReason(reason.value)}
                     >
                       <LinearGradient
                         colors={selectedReason === reason.value 
-                          ? ['#fa5252', '#e03131'] 
-                          : ['#f8f9fa', '#e9ecef']}
+                          ? [theme.error, theme.error] 
+                          : [theme.bgSecondary, theme.bgTertiary]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={[
@@ -216,17 +219,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                         <MaterialCommunityIcons 
                           name={reason.icon as any} 
                           size={18} 
-                          color={selectedReason === reason.value ? 'white' : '#495057'} 
+                          color={selectedReason === reason.value ? '#fff' : theme.textSecondary} 
                         />
                       </LinearGradient>
                       <Text style={[
                         styles.reasonText,
-                        selectedReason === reason.value && styles.reasonTextSelected
+                        selectedReason === reason.value && styles.reasonTextSelected,
+                        { color: selectedReason === reason.value ? theme.text : theme.textSecondary }
                       ]}>
                         {reason.label}
                       </Text>
                       {selectedReason === reason.value && (
-                        <MaterialCommunityIcons name="check-circle" size={20} color="#fa5252" />
+                        <MaterialCommunityIcons name="check-circle" size={20} color={theme.error} />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -236,7 +240,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               <>
                 <View style={styles.selectedReasonBanner}>
                   <LinearGradient
-                    colors={['#fa5252', '#e03131']}
+                    colors={[theme.error, theme.error]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.selectedReasonBadge}
@@ -245,44 +249,45 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                       {REPORT_REASONS.find(r => r.value === selectedReason)?.label}
                     </Text>
                   </LinearGradient>
-                  <Text style={styles.selectedReasonHint}>
+                  <Text style={[styles.selectedReasonHint, { color: theme.textMuted }]}>
                     Please provide more details
                   </Text>
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Description *</Text>
+                  <Text style={[styles.inputLabel, { color: theme.textSecondary }]}>Description *</Text>
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                    style={styles.inputGradient}
+                    style={[styles.inputGradient, { borderColor: theme.border }]}
                   >
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, { color: theme.text }]}
                       placeholder="Describe the issue in detail..."
-                      placeholderTextColor="#adb5bd"
+                      placeholderTextColor={theme.textPlaceholder}
                       value={description}
                       onChangeText={setDescription}
                       multiline
                       numberOfLines={5}
                       textAlignVertical="top"
                       maxLength={500}
+                      selectionColor={theme.primary}
                     />
                   </LinearGradient>
-                  <Text style={styles.charCount}>
+                  <Text style={[styles.charCount, { color: theme.textMuted }]}>
                     {description.length}/500 characters
                   </Text>
                 </View>
 
                 <LinearGradient
-                  colors={['#fff5f5', '#ffe3e3']}
+                  colors={[theme.errorBg, theme.errorBg]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.noteCard}
+                  style={[styles.noteCard, { borderColor: theme.errorBorder }]}
                 >
-                  <MaterialCommunityIcons name="information" size={18} color="#fa5252" />
-                  <Text style={styles.noteText}>
+                  <MaterialCommunityIcons name="information" size={18} color={theme.error} />
+                  <Text style={[styles.noteText, { color: theme.textSecondary }]}>
                     Reports are reviewed by our team. False reports may result in action against your account.
                   </Text>
                 </LinearGradient>
@@ -294,7 +299,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
           </ScrollView>
 
           {/* Footer - Fixed at bottom */}
-          <View style={styles.footer}>
+          <View style={[styles.footer, { borderTopColor: theme.border, backgroundColor: theme.card }]}>
             {step === 'reason' ? (
               <TouchableOpacity
                 style={[styles.nextButton, !selectedReason && styles.nextButtonDisabled]}
@@ -302,18 +307,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 disabled={!selectedReason || submitting}
               >
                 <LinearGradient
-                  colors={selectedReason ? ['#fa5252', '#e03131'] : ['#f8f9fa', '#e9ecef']}
+                  colors={selectedReason ? [theme.error, theme.error] : [theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.nextButtonGradient}
                 >
-                  <Text style={[styles.nextButtonText, !selectedReason && styles.nextButtonTextDisabled]}>
+                  <Text style={[styles.nextButtonText, !selectedReason && styles.nextButtonTextDisabled, { color: selectedReason ? '#fff' : theme.textMuted }]}>
                     Next
                   </Text>
                   <MaterialCommunityIcons 
                     name="arrow-right" 
                     size={18} 
-                    color={selectedReason ? 'white' : '#868e96'} 
+                    color={selectedReason ? '#fff' : theme.textMuted} 
                   />
                 </LinearGradient>
               </TouchableOpacity>
@@ -325,12 +330,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   disabled={submitting}
                 >
                   <LinearGradient
-                    colors={['#f8f9fa', '#e9ecef']}
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.cancelButtonGradient}
                   >
-                    <Text style={styles.cancelButtonText}>Back</Text>
+                    <Text style={[styles.cancelButtonText, { color: theme.textSecondary }]}>Back</Text>
                   </LinearGradient>
                 </TouchableOpacity>
 
@@ -340,16 +345,16 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                   disabled={submitting}
                 >
                   <LinearGradient
-                    colors={submitting ? ['#f8f9fa', '#e9ecef'] : ['#fa5252', '#e03131']}
+                    colors={submitting ? [theme.bgSecondary, theme.bgTertiary] : [theme.error, theme.error]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.submitButtonGradient}
                   >
                     {submitting ? (
-                      <ActivityIndicator size="small" color="#868e96" />
+                      <ActivityIndicator size="small" color={theme.textMuted} />
                     ) : (
                       <>
-                        <MaterialCommunityIcons name="flag" size={18} color="white" />
+                        <MaterialCommunityIcons name="flag" size={18} color="#fff" />
                         <Text style={styles.submitButtonText}>Submit Report</Text>
                       </>
                     )}
@@ -364,15 +369,12 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   );
 };
 
-// Styles remain the same...
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
@@ -384,8 +386,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
-    backgroundColor: 'white',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     zIndex: 10,
@@ -400,7 +400,6 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -414,20 +413,17 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     flex: 1,
   },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f1f3f5',
     justifyContent: 'center',
     alignItems: 'center',
   },
   body: {
     flex: 1,
-    backgroundColor: '#ffffff',
   },
   bodyContent: {
     padding: 16,
@@ -435,19 +431,16 @@ const styles = StyleSheet.create({
   },
   groupNameText: {
     fontSize: 14,
-    color: '#868e96',
     marginBottom: 16,
     fontStyle: 'italic',
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 8,
   },
   sectionSubtitle: {
     fontSize: 13,
-    color: '#868e96',
     marginBottom: 20,
     lineHeight: 18,
   },
@@ -458,15 +451,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
-    backgroundColor: '#f8f9fa',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
     gap: 12,
   },
   reasonCardSelected: {
-    borderColor: '#fa5252',
-    backgroundColor: '#fff5f5',
+    borderWidth: 2,
   },
   reasonIcon: {
     width: 36,
@@ -482,10 +472,8 @@ const styles = StyleSheet.create({
   reasonText: {
     flex: 1,
     fontSize: 14,
-    color: '#495057',
   },
   reasonTextSelected: {
-    color: '#212529',
     fontWeight: '500',
   },
   selectedReasonBanner: {
@@ -499,13 +487,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   selectedReasonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
     fontSize: 14,
   },
   selectedReasonHint: {
     fontSize: 13,
-    color: '#868e96',
   },
   inputGroup: {
     marginBottom: 20,
@@ -513,24 +500,20 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#495057',
     marginBottom: 8,
   },
   inputGradient: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   input: {
     padding: 12,
     fontSize: 14,
-    color: '#212529',
     minHeight: 100,
     backgroundColor: 'transparent',
   },
   charCount: {
     fontSize: 11,
-    color: '#868e96',
     textAlign: 'right',
     marginTop: 4,
   },
@@ -540,19 +523,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#ffc9c9',
   },
   noteText: {
     flex: 1,
     fontSize: 12,
-    color: '#495057',
     lineHeight: 18,
   },
   footer: {
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e9ecef',
-    backgroundColor: 'white',
   },
   nextButton: {
     borderRadius: 12,
@@ -568,11 +547,8 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: 'white',
   },
-  nextButtonTextDisabled: {
-    color: '#868e96',
-  },
+  nextButtonTextDisabled: {},
   nextButtonDisabled: {
     opacity: 0.7,
   },
@@ -593,7 +569,6 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#495057',
   },
   submitButton: {
     flex: 1,
@@ -608,7 +583,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   submitButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

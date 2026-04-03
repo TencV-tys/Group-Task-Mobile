@@ -1,4 +1,4 @@
-// src/screens/AccountSettingsScreen.tsx - FULLY UPDATED with TokenUtils
+// src/screens/AccountSettingsScreen.tsx - Dark Mode Added
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -18,9 +18,13 @@ import { AuthService } from '../services/AuthService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
-import { accountSettingsStyles as styles } from '../styles/accountSettings.styles';
+import { useTheme } from '../context/ThemeContext';
+import { makeAccountSettingsStyles } from '../styles/accountSettings.styles';
 
 export default function AccountSettingsScreen({ navigation }: any) {
+  const { theme, isDark } = useTheme();
+  const styles = makeAccountSettingsStyles(theme);
+  
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -199,19 +203,20 @@ export default function AccountSettingsScreen({ navigation }: any) {
     toggleVisibility 
   }: any) => (
     <LinearGradient
-      colors={['#f8f9fa', '#e9ecef']}
+      colors={[theme.bgSecondary, theme.bgTertiary]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={styles.passwordContainer}
+      style={[styles.passwordContainer, { borderColor: theme.border }]}
     >
       <TextInput
-        style={styles.passwordInput}
+        style={[styles.passwordInput, { color: theme.text }]}
         placeholder={placeholder}
-        placeholderTextColor="#adb5bd"
+        placeholderTextColor={theme.textPlaceholder}
         value={value}
         onChangeText={onChangeText}
         secureTextEntry={!showPassword}
         editable={!saving}
+        selectionColor={theme.primary}
       />
       <TouchableOpacity 
         style={styles.eyeButton}
@@ -227,34 +232,34 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
   if (loading) {
     return (
-      <ScreenWrapper style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Account Settings</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Account Settings</Text>
           <View style={{ width: 36 }} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading settings...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading settings...</Text>
         </View>
       </ScreenWrapper>
     );
   }
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+        <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Account Settings</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Account Settings</Text>
           <View style={{ width: 36 }} />
         </View>
 
@@ -264,50 +269,51 @@ export default function AccountSettingsScreen({ navigation }: any) {
         >
           {/* Profile Information */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Profile Information</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Profile Information</Text>
             
             <LinearGradient
-              colors={['#ffffff', '#f8f9fa']}
+              colors={[theme.card, theme.bgSecondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.card}
+              style={[styles.card, { borderColor: theme.border }]}
             >
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Full Name</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Full Name</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.inputGradient}
+                  style={[styles.inputGradient, { borderColor: theme.border }]}
                 >
                   <TextInput
-                    style={[styles.input, saving && styles.inputDisabled]}
+                    style={[styles.input, saving && styles.inputDisabled, { color: theme.text }]}
                     placeholder="Your full name"
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
                     value={fullName}
                     onChangeText={setFullName}
                     editable={!saving}
+                    selectionColor={theme.primary}
                   />
                 </LinearGradient>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Email Address</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Email Address</Text>
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.inputGradient}
+                  style={[styles.inputGradient, { borderColor: theme.border }]}
                 >
                   <TextInput
-                    style={[styles.input, styles.disabledInput]}
+                    style={[styles.input, styles.disabledInput, { color: theme.textMuted, backgroundColor: theme.bgSecondary }]}
                     placeholder="Email address"
-                    placeholderTextColor="#adb5bd"
+                    placeholderTextColor={theme.textPlaceholder}
                     value={email}
                     editable={false}
                   />
                 </LinearGradient>
-                <Text style={styles.hintText}>Email cannot be changed</Text>
+                <Text style={[styles.hintText, { color: theme.textMuted }]}>Email cannot be changed</Text>
               </View>
 
               <TouchableOpacity
@@ -316,16 +322,16 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 disabled={saving}
               >
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}
+                  colors={[theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.saveButtonGradient}
                 >
                   {saving ? (
-                    <ActivityIndicator color="white" size="small" />
+                    <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <>
-                      <MaterialCommunityIcons name="content-save" size={18} color="white" />
+                      <MaterialCommunityIcons name="content-save" size={18} color="#fff" />
                       <Text style={styles.saveButtonText}>Save Changes</Text>
                     </>
                   )}
@@ -336,16 +342,16 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
           {/* Change Password */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Change Password</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Change Password</Text>
             
             <LinearGradient
-              colors={['#ffffff', '#f8f9fa']}
+              colors={[theme.card, theme.bgSecondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.card}
+              style={[styles.card, { borderColor: theme.border }]}
             >
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Current Password</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Current Password</Text>
                 <PasswordInput
                   placeholder="Enter current password"
                   value={currentPassword}
@@ -356,7 +362,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>New Password</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>New Password</Text>
                 <PasswordInput
                   placeholder="Enter new password (min. 6 characters)"
                   value={newPassword}
@@ -367,7 +373,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Confirm New Password</Text>
+                <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Confirm New Password</Text>
                 <PasswordInput
                   placeholder="Re-enter new password"
                   value={confirmPassword}
@@ -383,12 +389,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 disabled={saving}
               >
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}
+                  colors={[theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.changePasswordGradient}
                 >
-                  <MaterialCommunityIcons name="lock-reset" size={18} color="white" />
+                  <MaterialCommunityIcons name="lock-reset" size={18} color="#fff" />
                   <Text style={styles.changePasswordText}>Update Password</Text>
                 </LinearGradient>
               </TouchableOpacity>

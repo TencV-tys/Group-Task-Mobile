@@ -1,4 +1,4 @@
-// src/screens/NotificationsScreen.tsx - COMPLETE with expired/deleted handling
+// src/screens/NotificationsScreen.tsx - Dark Mode Added
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -16,8 +16,11 @@ import { useNotifications } from '../notificationHook/useNotifications';
 import { NotificationTypes } from '../services/NotificationService';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useTheme } from '../context/ThemeContext';
 
 export default function NotificationsScreen({ navigation }: any) {
+  const { theme, isDark } = useTheme();
+  
   const {
     loading,
     notifications,
@@ -78,7 +81,6 @@ export default function NotificationsScreen({ navigation }: any) {
         type === NotificationTypes.SWAP_CANCELLED ||
         type === NotificationTypes.SWAP_COMPLETED) {
       
-      // If the swap request ID exists but we're getting 404/400 errors, mark as deleted
       if (data?.swapRequestId && data?.isDeleted === true) {
         return { valid: false, message: 'This swap request has been deleted.', type: 'deleted' };
       }
@@ -110,12 +112,10 @@ export default function NotificationsScreen({ navigation }: any) {
         type === NotificationTypes.SUBMISSION_VERIFIED ||
         type === NotificationTypes.SUBMISSION_REJECTED) {
       
-      // Check if the task was deleted
       if (data?.taskDeleted === true || data?.isTaskDeleted === true) {
         return { valid: false, message: 'The task for this submission has been deleted.', type: 'deleted' };
       }
       
-      // Check if the task ID is invalid
       if (data?.taskId && data?.taskId === 'null') {
         return { valid: false, message: 'The associated task has been removed.', type: 'deleted' };
       }
@@ -136,7 +136,6 @@ export default function NotificationsScreen({ navigation }: any) {
       await markAsRead(notification.id);
     }
 
-    // ✅ Check if notification content is valid
     const validation = isNotificationValid(notification.type, notification.data);
     
     if (!validation.valid) {
@@ -164,12 +163,9 @@ export default function NotificationsScreen({ navigation }: any) {
         type === NotificationTypes.SWAP_CANCELLED ||
         type === NotificationTypes.SWAP_COMPLETED) {
       
-      // ✅ Check if swap request exists before navigating
       if (data?.swapRequestId) {
-        // Navigate to swap details, but let the screen handle 404 gracefully
         navigation.navigate('SwapRequestDetails', { 
           requestId: data.swapRequestId,
-          // Pass a flag that this might be deleted
           mayBeDeleted: true
         });
       } else if (data?.assignmentId && !data?.taskDeleted) {
@@ -432,41 +428,41 @@ export default function NotificationsScreen({ navigation }: any) {
   };
 
   const getNotificationColor = (type: string, isValid: boolean): string => {
-    if (!isValid) return '#868e96';
+    if (!isValid) return theme.textMuted;
     
     const colors: Record<string, string> = {
-      'ROTATION_COMPLETED': '#2b8a3e',
-      [NotificationTypes.POINT_DEDUCTION]: '#fa5252',
-      [NotificationTypes.LATE_SUBMISSION]: '#e67700',
-      [NotificationTypes.NEGLECT_DETECTED]: '#fa5252',
-      [NotificationTypes.TASK_REMINDER]: '#e67700',
-      [NotificationTypes.TASK_ACTIVE]: '#2b8a3e',
-      [NotificationTypes.TASK_ASSIGNED]: '#2b8a3e',
-      [NotificationTypes.TASK_COMPLETED]: '#2b8a3e',
-      [NotificationTypes.TASK_OVERDUE]: '#fa5252',
-      [NotificationTypes.TASK_CREATED]: '#495057',
-      [NotificationTypes.SUBMISSION_PENDING]: '#e67700',
-      [NotificationTypes.SUBMISSION_VERIFIED]: '#2b8a3e',
-      [NotificationTypes.SUBMISSION_REJECTED]: '#fa5252',
-      [NotificationTypes.SUBMISSION_DECISION]: '#495057',
-      [NotificationTypes.FEEDBACK_SUBMITTED]: '#e67700',
-      [NotificationTypes.FEEDBACK_STATUS_UPDATE]: '#495057',
-      [NotificationTypes.GROUP_INVITE]: '#2b8a3e',
-      [NotificationTypes.GROUP_JOINED]: '#2b8a3e',
-      [NotificationTypes.GROUP_CREATED]: '#495057',
-      [NotificationTypes.NEW_MEMBER]: '#2b8a3e',
+      'ROTATION_COMPLETED': theme.primary,
+      [NotificationTypes.POINT_DEDUCTION]: theme.error,
+      [NotificationTypes.LATE_SUBMISSION]: theme.primary,
+      [NotificationTypes.NEGLECT_DETECTED]: theme.error,
+      [NotificationTypes.TASK_REMINDER]: theme.primary,
+      [NotificationTypes.TASK_ACTIVE]: theme.primary,
+      [NotificationTypes.TASK_ASSIGNED]: theme.primary,
+      [NotificationTypes.TASK_COMPLETED]: theme.primary,
+      [NotificationTypes.TASK_OVERDUE]: theme.error,
+      [NotificationTypes.TASK_CREATED]: theme.textSecondary,
+      [NotificationTypes.SUBMISSION_PENDING]: theme.primary,
+      [NotificationTypes.SUBMISSION_VERIFIED]: theme.primary,
+      [NotificationTypes.SUBMISSION_REJECTED]: theme.error,
+      [NotificationTypes.SUBMISSION_DECISION]: theme.textSecondary,
+      [NotificationTypes.FEEDBACK_SUBMITTED]: theme.primary,
+      [NotificationTypes.FEEDBACK_STATUS_UPDATE]: theme.textSecondary,
+      [NotificationTypes.GROUP_INVITE]: theme.primary,
+      [NotificationTypes.GROUP_JOINED]: theme.primary,
+      [NotificationTypes.GROUP_CREATED]: theme.textSecondary,
+      [NotificationTypes.NEW_MEMBER]: theme.primary,
       [NotificationTypes.SWAP_REQUEST]: '#4F46E5',
-      [NotificationTypes.SWAP_ACCEPTED]: '#2b8a3e',
-      [NotificationTypes.SWAP_REJECTED]: '#fa5252',
-      [NotificationTypes.SWAP_CANCELLED]: '#868e96',
-      [NotificationTypes.SWAP_COMPLETED]: '#2b8a3e',
-      [NotificationTypes.SWAP_ADMIN_NOTIFICATION]: '#495057',
-      [NotificationTypes.SWAP_EXPIRED]: '#868e96',
-      [NotificationTypes.POINTS_EARNED]: '#e67700',
-      [NotificationTypes.MENTION]: '#495057',
-      [NotificationTypes.REMINDER]: '#2b8a3e',
+      [NotificationTypes.SWAP_ACCEPTED]: theme.primary,
+      [NotificationTypes.SWAP_REJECTED]: theme.error,
+      [NotificationTypes.SWAP_CANCELLED]: theme.textMuted,
+      [NotificationTypes.SWAP_COMPLETED]: theme.primary,
+      [NotificationTypes.SWAP_ADMIN_NOTIFICATION]: theme.textSecondary,
+      [NotificationTypes.SWAP_EXPIRED]: theme.textMuted,
+      [NotificationTypes.POINTS_EARNED]: theme.primary,
+      [NotificationTypes.MENTION]: theme.textSecondary,
+      [NotificationTypes.REMINDER]: theme.primary,
     };
-    return colors[type] || '#868e96';
+    return colors[type] || theme.textMuted;
   };
 
   const formatTime = (dateString: string) => {
@@ -497,13 +493,14 @@ export default function NotificationsScreen({ navigation }: any) {
         style={[
           styles.notificationCard,
           !item.read && styles.unreadCard,
-          isExpiredOrDeleted && styles.expiredCard
+          isExpiredOrDeleted && styles.expiredCard,
+          { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }
         ]}
         onPress={() => handleNotificationPress(item)}
         activeOpacity={0.7}
       >
         <LinearGradient
-          colors={isExpiredOrDeleted ? ['#868e96', '#6c757d'] : [iconColor, iconColor + 'dd']}
+          colors={isExpiredOrDeleted ? [theme.textMuted, theme.textMuted] : [iconColor, iconColor + 'dd']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.iconContainer}
@@ -511,20 +508,20 @@ export default function NotificationsScreen({ navigation }: any) {
           <MaterialCommunityIcons 
             name={iconName as any} 
             size={18} 
-            color="white" 
+            color="#fff" 
           />
         </LinearGradient>
         
         <View style={styles.contentContainer}>
           <View style={styles.headerContainer}>
-            <Text style={[styles.title, !item.read && styles.unreadTitle]} numberOfLines={1}>
+            <Text style={[styles.title, !item.read && styles.unreadTitle, { color: theme.text }]} numberOfLines={1}>
               {item.title}
               {isExpiredOrDeleted && ' (Unavailable)'}
             </Text>
-            <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
+            <Text style={[styles.timeText, { color: theme.textMuted }]}>{formatTime(item.createdAt)}</Text>
           </View>
           
-          <Text style={[styles.message, isExpiredOrDeleted && styles.expiredMessage]} numberOfLines={2}>
+          <Text style={[styles.message, isExpiredOrDeleted && styles.expiredMessage, { color: theme.textMuted }]} numberOfLines={2}>
             {item.message}
             {isExpiredOrDeleted && ` ⚠️ ${validation.message || 'Content no longer available'}`}
           </Text>
@@ -538,11 +535,12 @@ export default function NotificationsScreen({ navigation }: any) {
               <MaterialCommunityIcons 
                 name={validation.type === 'deleted' ? "delete" : "timer-off"} 
                 size={10} 
-                color={validation.type === 'deleted' ? "#fa5252" : "#e67700"} 
+                color={validation.type === 'deleted' ? theme.error : theme.primary} 
               />
               <Text style={[
                 styles.statusBadgeText,
-                validation.type === 'deleted' ? styles.deletedBadgeText : styles.expiredBadgeText
+                validation.type === 'deleted' ? styles.deletedBadgeText : styles.expiredBadgeText,
+                { color: validation.type === 'deleted' ? theme.error : theme.primary }
               ]}>
                 {validation.type === 'deleted' ? 'Deleted' : 'Expired'}
               </Text>
@@ -554,8 +552,8 @@ export default function NotificationsScreen({ navigation }: any) {
             <>
               {item.type === 'ROTATION_COMPLETED' && item.data?.newWeek && (
                 <View style={styles.previewInfo}>
-                  <MaterialCommunityIcons name="calendar-sync" size={12} color="#2b8a3e" />
-                  <Text style={styles.previewText}>
+                  <MaterialCommunityIcons name="calendar-sync" size={12} color={theme.primary} />
+                  <Text style={[styles.previewText, { color: theme.textSecondary }]}>
                     Week {item.data.newWeek} • {item.data.taskCount || 0} new tasks
                   </Text>
                 </View>
@@ -563,36 +561,36 @@ export default function NotificationsScreen({ navigation }: any) {
               
               {item.type === NotificationTypes.POINT_DEDUCTION && item.data?.points && (
                 <View style={styles.previewInfo}>
-                  <MaterialCommunityIcons name="star-remove" size={12} color="#fa5252" />
-                  <Text style={styles.previewText}>Lost {Math.abs(item.data.points)} points</Text>
+                  <MaterialCommunityIcons name="star-remove" size={12} color={theme.error} />
+                  <Text style={[styles.previewText, { color: theme.textSecondary }]}>Lost {Math.abs(item.data.points)} points</Text>
                 </View>
               )}
               
               {item.type === NotificationTypes.LATE_SUBMISSION && item.data?.finalPoints && (
                 <View style={styles.previewInfo}>
-                  <MaterialCommunityIcons name="timer-alert" size={12} color="#e67700" />
-                  <Text style={styles.previewText}>Points: {item.data.finalPoints}</Text>
+                  <MaterialCommunityIcons name="timer-alert" size={12} color={theme.primary} />
+                  <Text style={[styles.previewText, { color: theme.textSecondary }]}>Points: {item.data.finalPoints}</Text>
                 </View>
               )}
               
               {item.type === NotificationTypes.TASK_ASSIGNED && item.data?.taskTitle && (
                 <View style={styles.previewInfo}>
-                  <MaterialCommunityIcons name="star" size={12} color="#e67700" />
-                  <Text style={styles.previewText}>{item.data.taskPoints || 0} pts</Text>
+                  <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                  <Text style={[styles.previewText, { color: theme.textSecondary }]}>{item.data.taskPoints || 0} pts</Text>
                 </View>
               )}
               
               {item.type === NotificationTypes.SWAP_REQUEST && item.data?.taskTitle && (
                 <View style={styles.previewInfo}>
                   <MaterialCommunityIcons name="swap-horizontal" size={12} color="#4F46E5" />
-                  <Text style={styles.previewText}>Swap: {item.data.taskTitle}</Text>
+                  <Text style={[styles.previewText, { color: theme.textSecondary }]}>Swap: {item.data.taskTitle}</Text>
                 </View>
               )}
               
               {item.type === NotificationTypes.SUBMISSION_PENDING && item.data?.taskTitle && (
                 <View style={styles.previewInfo}>
-                  <MaterialCommunityIcons name="clock-check" size={12} color="#e67700" />
-                  <Text style={styles.previewText}>Needs Review: {item.data.taskTitle}</Text>
+                  <MaterialCommunityIcons name="clock-check" size={12} color={theme.primary} />
+                  <Text style={[styles.previewText, { color: theme.textSecondary }]}>Needs Review: {item.data.taskTitle}</Text>
                 </View>
               )}
             </>
@@ -604,11 +602,11 @@ export default function NotificationsScreen({ navigation }: any) {
           onPress={() => handleDelete(item.id)}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <MaterialCommunityIcons name="close" size={14} color="#adb5bd" />
+          <MaterialCommunityIcons name="close" size={14} color={theme.textMuted} />
         </TouchableOpacity>
 
-        {!item.read && !isExpiredOrDeleted && <View style={styles.unreadDot} />}
-        {isExpiredOrDeleted && <View style={styles.expiredDot} />}
+        {!item.read && !isExpiredOrDeleted && <View style={[styles.unreadDot, { backgroundColor: theme.primary }]} />}
+        {isExpiredOrDeleted && <View style={[styles.expiredDot, { backgroundColor: theme.error }]} />}
       </TouchableOpacity>
     );
   };
@@ -616,15 +614,15 @@ export default function NotificationsScreen({ navigation }: any) {
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <LinearGradient
-        colors={['#f8f9fa', '#e9ecef']}
+        colors={[theme.bgSecondary, theme.bgTertiary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.emptyIconContainer}
+        style={[styles.emptyIconContainer, { borderColor: theme.border }]}
       >
-        <MaterialCommunityIcons name="bell-off-outline" size={40} color="#2b8a3e" />
+        <MaterialCommunityIcons name="bell-off-outline" size={40} color={theme.primary} />
       </LinearGradient>
-      <Text style={styles.emptyTitle}>No notifications</Text>
-      <Text style={styles.emptyText}>
+      <Text style={[styles.emptyTitle, { color: theme.textMuted }]}>No notifications</Text>
+      <Text style={[styles.emptyText, { color: theme.textPlaceholder }]}>
         When you get notifications about rotations, tasks, swaps, or points, they'll appear here
       </Text>
     </View>
@@ -634,26 +632,26 @@ export default function NotificationsScreen({ navigation }: any) {
     if (!loading) return null;
     return (
       <View style={styles.footerLoader}>
-        <ActivityIndicator size="small" color="#2b8a3e" />
+        <ActivityIndicator size="small" color={theme.primary} />
       </View>
     );
   };
 
   return (
-    <ScreenWrapper style={styles.container}>
-      <View style={styles.header}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+      <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()} 
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color="#495057" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>Notifications</Text>
+          <Text style={[styles.title, { color: theme.text }]}>Notifications</Text>
           {unreadCount > 0 && (
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.badge}
@@ -665,13 +663,13 @@ export default function NotificationsScreen({ navigation }: any) {
         
         <TouchableOpacity 
           onPress={handleMarkAllAsRead}
-          style={[styles.markAllButton, unreadCount === 0 && styles.disabledButton]}
+          style={[styles.markAllButton, unreadCount === 0 && styles.disabledButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
           disabled={unreadCount === 0}
         >
           <MaterialCommunityIcons 
             name="check-all" 
             size={20} 
-            color={unreadCount > 0 ? "#2b8a3e" : "#adb5bd"} 
+            color={unreadCount > 0 ? theme.primary : theme.textPlaceholder} 
           />
         </TouchableOpacity>
       </View>
@@ -685,8 +683,8 @@ export default function NotificationsScreen({ navigation }: any) {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         onEndReached={handleLoadMore}
@@ -703,7 +701,6 @@ export default function NotificationsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   header: {
     flexDirection: 'row',
@@ -711,19 +708,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -739,7 +732,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529', 
   },
   badge: {
     borderRadius: 12,
@@ -750,7 +742,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   badgeText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 11,
     fontWeight: 'bold',
   },
@@ -758,10 +750,8 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -776,27 +766,20 @@ const styles = StyleSheet.create({
   },
   notificationCard: {
     flexDirection: 'row',
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
     position: 'relative',
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   unreadCard: {
-    backgroundColor: '#f8f9fa',
-    borderColor: '#2b8a3e',
-    borderWidth: 1,
+    borderWidth: 2,
   },
   expiredCard: {
-    backgroundColor: '#f8f9fa',
-    borderColor: '#ffc9c9',
     borderWidth: 1,
     opacity: 0.8,
   },
@@ -807,7 +790,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -824,22 +806,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   unreadTitle: {
-    color: '#212529',
     fontWeight: '600',
   },
   timeText: {
     fontSize: 10,
-    color: '#868e96',
     marginLeft: 8,
   },
   message: {
-    fontSize: 12, 
-    color: '#868e96',
+    fontSize: 12,
     lineHeight: 16,
   },
-  expiredMessage: {
-    color: '#fa5252',
-  },
+  expiredMessage: {},
   previewInfo: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -848,7 +825,6 @@ const styles = StyleSheet.create({
   },
   previewText: {
     fontSize: 11,
-    color: '#495057',
     fontWeight: '500',
   },
   unreadDot: {
@@ -858,7 +834,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#2b8a3e',
   },
   expiredDot: {
     position: 'absolute',
@@ -867,7 +842,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#fa5252',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -889,12 +863,8 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
   },
-  deletedBadgeText: {
-    color: '#fa5252',
-  },
-  expiredBadgeText: {
-    color: '#e67700',
-  },
+  deletedBadgeText: {},
+  expiredBadgeText: {},
   deleteButton: {
     padding: 4,
     alignSelf: 'flex-start',
@@ -913,18 +883,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#868e96',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyText: {
     fontSize: 14,
-    color: '#adb5bd',
     textAlign: 'center',
     paddingHorizontal: 32,
     lineHeight: 20,

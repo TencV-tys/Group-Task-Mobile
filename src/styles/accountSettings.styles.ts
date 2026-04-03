@@ -1,10 +1,11 @@
-// src/styles/accountSettings.styles.ts
+// src/styles/accountSettings.styles.ts - Dark Mode Version
 import { StyleSheet } from 'react-native';
+import { Theme } from '../context/ThemeContext';
 
-export const accountSettingsStyles = StyleSheet.create({
+export const makeAccountSettingsStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: theme.bgSecondary,
   },
   header: {
     flexDirection: 'row',
@@ -12,19 +13,19 @@ export const accountSettingsStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: theme.border,
     minHeight: 60,
   },
   backButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'white',
+    backgroundColor: theme.card,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -33,7 +34,7 @@ export const accountSettingsStyles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     textAlign: 'center',
   },
   loadingContainer: {
@@ -43,7 +44,7 @@ export const accountSettingsStyles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#868e96',
+    color: theme.textMuted,
     fontSize: 14,
   },
   scrollContent: {
@@ -56,7 +57,7 @@ export const accountSettingsStyles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#212529',
+    color: theme.text,
     marginBottom: 8,
     paddingLeft: 4,
     textTransform: 'uppercase',
@@ -66,7 +67,7 @@ export const accountSettingsStyles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   inputGroup: {
     marginBottom: 16,
@@ -74,32 +75,32 @@ export const accountSettingsStyles = StyleSheet.create({
   inputLabel: {
     fontSize: 13,
     fontWeight: '500',
-    color: '#868e96',
+    color: theme.textMuted,
     marginBottom: 6,
     marginLeft: 4,
   },
   inputGradient: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: theme.border,
   },
   input: {
     height: 48,
     paddingHorizontal: 14,
     fontSize: 15,
-    color: '#212529',
+    color: theme.text,
     backgroundColor: 'transparent',
   },
   inputDisabled: {
     opacity: 0.6,
   },
   disabledInput: {
-    color: '#868e96',
-    backgroundColor: '#f8f9fa',
+    color: theme.textMuted,
+    backgroundColor: theme.bgSecondary,
   },
   hintText: {
     fontSize: 11,
-    color: '#868e96',
+    color: theme.textMuted,
     marginTop: 4,
     marginLeft: 4,
     fontStyle: 'italic',
@@ -107,7 +108,6 @@ export const accountSettingsStyles = StyleSheet.create({
   passwordContainer: {
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -116,7 +116,6 @@ export const accountSettingsStyles = StyleSheet.create({
     height: 48,
     paddingHorizontal: 14,
     fontSize: 15,
-    color: '#212529',
     backgroundColor: 'transparent',
   },
   eyeButton: {
@@ -141,7 +140,7 @@ export const accountSettingsStyles = StyleSheet.create({
     paddingVertical: 12,
   },
   saveButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },
@@ -158,7 +157,7 @@ export const accountSettingsStyles = StyleSheet.create({
     paddingVertical: 12,
   },
   changePasswordText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 15,
     fontWeight: '600',
   },

@@ -1,4 +1,4 @@
-// src/screens/MyGroupsScreen.tsx - UPDATED with Report button
+// src/screens/MyGroupsScreen.tsx - Dark Mode Added
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -16,10 +16,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMyGroups } from '../groupHook/useMyGroups';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { ReportModal } from '../components/ReportModal'; // 👈 IMPORT YOUR EXISTING COMPONENT
+import { ReportModal } from '../components/ReportModal';
 import { ReportService } from '../services/ReportService';
+import { useTheme } from '../context/ThemeContext';
 
 export default function MyGroupsScreen({ navigation }: any) {
+  const { theme, isDark } = useTheme();
   const { 
     groups, 
     loading, 
@@ -40,15 +42,15 @@ export default function MyGroupsScreen({ navigation }: any) {
     fetchGroups();
   }, []);
 
-useEffect(() => {
-  if (authError) {
-    Alert.alert(
-      'Session Expired',
-      'Please log in again',
-      [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
-    );
-  }
-}, [authError, navigation]);
+  useEffect(() => {
+    if (authError) {
+      Alert.alert(
+        'Session Expired',
+        'Please log in again',
+        [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
+      );
+    }
+  }, [authError, navigation]);
 
   const handleCreateGroup = () => {
     navigation.navigate('CreateGroup', {
@@ -140,7 +142,6 @@ useEffect(() => {
     });
   };
 
-  // 👇 NEW: Report handlers
   const handleReportGroup = (group: any) => {
     setSelectedGroupForReport(group);
     setReportModalVisible(true);
@@ -166,17 +167,17 @@ useEffect(() => {
             style={[
               styles.groupIcon,
               styles.groupAvatarImage,
-              { borderColor: isAdmin ? '#2b8a3e' : '#e9ecef' }
+              { borderColor: isAdmin ? theme.primary : theme.border }
             ]}
           />
           {isAdmin && (
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.adminBadge}
             >
-              <MaterialCommunityIcons name="crown" size={10} color="white" />
+              <MaterialCommunityIcons name="crown" size={10} color="#fff" />
             </LinearGradient>
           )}
         </View>
@@ -186,29 +187,29 @@ useEffect(() => {
       return (
         <View style={styles.groupIconContainer}>
           <LinearGradient
-            colors={isAdmin ? ['#2b8a3e', '#1e6b2c'] : ['#f8f9fa', '#e9ecef']}
+            colors={isAdmin ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[
               styles.groupIcon,
-              { borderWidth: 1, borderColor: isAdmin ? '#2b8a3e' : '#e9ecef' }
+              { borderWidth: 1, borderColor: isAdmin ? theme.primary : theme.border }
             ]}
           >
             <Text style={[
               styles.groupIconText,
-              { color: isAdmin ? 'white' : '#495057' }
+              { color: isAdmin ? '#fff' : theme.textSecondary }
             ]}>
               {groupName.charAt(0).toUpperCase()}
             </Text>
           </LinearGradient>
           {isAdmin && (
             <LinearGradient
-              colors={['#2b8a3e', '#1e6b2c']}
+              colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.adminBadge}
             >
-              <MaterialCommunityIcons name="crown" size={10} color="white" />
+              <MaterialCommunityIcons name="crown" size={10} color="#fff" />
             </LinearGradient>
           )}
         </View>
@@ -223,7 +224,7 @@ useEffect(() => {
     
     return (
       <TouchableOpacity 
-        style={styles.groupCard}
+        style={[styles.groupCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}
         onPress={() => handleGroupPress(item)}
         activeOpacity={0.7}
       >
@@ -232,16 +233,17 @@ useEffect(() => {
           
           <View style={styles.groupMainInfo}>
             <View style={styles.groupTitleRow}>
-              <Text style={styles.groupName} numberOfLines={1}>{groupName}</Text>
+              <Text style={[styles.groupName, { color: theme.text }]} numberOfLines={1}>{groupName}</Text>
               <LinearGradient
-                colors={isAdmin ? ['#d3f9d8', '#b2f2bb'] : ['#f8f9fa', '#e9ecef']}
+                colors={isAdmin ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.roleBadge}
               >
                 <Text style={[
                   styles.groupRole,
-                  isAdmin && styles.adminRoleText
+                  isAdmin && styles.adminRoleText,
+                  { color: isAdmin ? theme.primary : theme.textSecondary }
                 ]}>
                   {isAdmin ? 'Admin' : 'Member'}
                 </Text>
@@ -249,72 +251,71 @@ useEffect(() => {
             </View>
             
             {item.description ? (
-              <Text style={styles.groupDescription} numberOfLines={2}>
+              <Text style={[styles.groupDescription, { color: theme.textSecondary }]} numberOfLines={2}>
                 {item.description}
               </Text>
             ) : (
-              <Text style={styles.groupNoDescription}>No description</Text>
+              <Text style={[styles.groupNoDescription, { color: theme.textPlaceholder }]}>No description</Text>
             )}
             
             <View style={styles.groupQuickStats}>
               <View style={styles.statItem}>
-                <MaterialCommunityIcons name="account-group" size={14} color="#868e96" />
-                <Text style={styles.statText}>{item.memberCount || 1}</Text>
+                <MaterialCommunityIcons name="account-group" size={14} color={theme.textMuted} />
+                <Text style={[styles.statText, { color: theme.textSecondary }]}>{item.memberCount || 1}</Text>
               </View>
               <View style={styles.statItem}>
-                <MaterialCommunityIcons name="clipboard-check" size={14} color="#868e96" />
-                <Text style={styles.statText}>{item.taskCount || 0}</Text>
+                <MaterialCommunityIcons name="clipboard-check" size={14} color={theme.textMuted} />
+                <Text style={[styles.statText, { color: theme.textSecondary }]}>{item.taskCount || 0}</Text>
               </View>
             </View>
           </View>
         </View>
         
-        <View style={styles.groupActions}>
+        <View style={[styles.groupActions, { borderTopColor: theme.borderLight }]}>
           <TouchableOpacity 
-            style={styles.actionButton}
+            style={[styles.actionButton, { backgroundColor: theme.bgSecondary }]}
             onPress={(e) => {
               e.stopPropagation();
               handleInviteGroup(item);
             }}
           >
-            <MaterialCommunityIcons name="account-plus" size={16} color="#2b8a3e" />
-            <Text style={styles.actionButtonText}>Invite</Text>
+            <MaterialCommunityIcons name="account-plus" size={16} color={theme.primary} />
+            <Text style={[styles.actionButtonText, { color: theme.textSecondary }]}>Invite</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={styles.actionButton}
+            style={[styles.actionButton, { backgroundColor: theme.bgSecondary }]}
             onPress={(e) => {
               e.stopPropagation();
               handleTasksGroup(item);
             }}
           >
-            <MaterialCommunityIcons name="clipboard-text" size={16} color="#495057" />
-            <Text style={styles.actionButtonText}>Tasks</Text>
+            <MaterialCommunityIcons name="clipboard-text" size={16} color={theme.textSecondary} />
+            <Text style={[styles.actionButtonText, { color: theme.textSecondary }]}>Tasks</Text>
           </TouchableOpacity>
           
           {isAdmin && (
             <TouchableOpacity 
-              style={styles.actionButton}
+              style={[styles.actionButton, { backgroundColor: theme.bgSecondary }]}
               onPress={(e) => {
                 e.stopPropagation();
                 handleManageGroup(item);
               }}
             >
-              <MaterialCommunityIcons name="cog" size={16} color="#495057" />
-              <Text style={styles.actionButtonText}>Manage</Text>
+              <MaterialCommunityIcons name="cog" size={16} color={theme.textSecondary} />
+              <Text style={[styles.actionButtonText, { color: theme.textSecondary }]}>Manage</Text>
             </TouchableOpacity>
           )}
 
-          {/* 👇 NEW: Report Button - Always visible to all members */}
           <TouchableOpacity 
-            style={[styles.actionButton, styles.reportButton]}
+            style={[styles.actionButton, styles.reportButton, { backgroundColor: theme.errorBg }]}
             onPress={(e) => {
               e.stopPropagation();
               handleReportGroup(item);
             }}
           >
-            <MaterialCommunityIcons name="flag" size={16} color="#fa5252" />
-            <Text style={[styles.actionButtonText, styles.reportButtonText]}>Report</Text>
+            <MaterialCommunityIcons name="flag" size={16} color={theme.error} />
+            <Text style={[styles.actionButtonText, styles.reportButtonText, { color: theme.error }]}>Report</Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -325,8 +326,8 @@ useEffect(() => {
     if (loading && !refreshing) {
       return (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2b8a3e" />
-          <Text style={styles.loadingText}>Loading your groups...</Text>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading your groups...</Text>
         </View>
       );
     }
@@ -334,23 +335,23 @@ useEffect(() => {
     if (error) {
       return (
         <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={60} color="#fa5252" />
+          <View style={[styles.emptyIconContainer, { backgroundColor: theme.bgSecondary }]}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={60} color={theme.error} />
           </View>
-          <Text style={styles.emptyTitle}>Error Loading Groups</Text>
-          <Text style={styles.emptySubtext}>{error}</Text>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>Error Loading Groups</Text>
+          <Text style={[styles.emptySubtext, { color: theme.textMuted }]}>{error}</Text>
           <View style={styles.emptyActions}>
             <TouchableOpacity 
               style={styles.primaryButton}
               onPress={() => fetchGroups()}
             >
               <LinearGradient
-                colors={['#2b8a3e', '#1e6b2c']}
+                colors={[theme.primary, theme.primaryDark]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.primaryButtonGradient}
               >
-                <MaterialCommunityIcons name="refresh" size={18} color="white" />
+                <MaterialCommunityIcons name="refresh" size={18} color="#fff" />
                 <Text style={styles.primaryButtonText}>Try Again</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -368,17 +369,17 @@ useEffect(() => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={refreshGroups}
-            colors={['#2b8a3e']}
-            tintColor="#2b8a3e"
+            colors={[theme.primary]}
+            tintColor={theme.primary}
           />
         }
         ListHeaderComponent={
           <View style={styles.listHeader}>
-            <Text style={styles.listHeaderTitle}>
+            <Text style={[styles.listHeaderTitle, { color: theme.text }]}>
               {groups.length} {groups.length === 1 ? 'Group' : 'Groups'}
             </Text>
             {searchQuery ? (
-              <Text style={styles.listHeaderSubtitle}>
+              <Text style={[styles.listHeaderSubtitle, { color: theme.textMuted }]}>
                 Showing {filteredGroups.length} result{filteredGroups.length !== 1 ? 's' : ''}
               </Text>
             ) : null}
@@ -386,11 +387,11 @@ useEffect(() => {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <View style={styles.emptyIconContainer}>
-              <MaterialCommunityIcons name="account-group" size={60} color="#dee2e6" />
+            <View style={[styles.emptyIconContainer, { backgroundColor: theme.bgSecondary }]}>
+              <MaterialCommunityIcons name="account-group" size={60} color={theme.border} />
             </View>
-            <Text style={styles.emptyTitle}>No Groups Yet</Text>
-            <Text style={styles.emptySubtext}>
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>No Groups Yet</Text>
+            <Text style={[styles.emptySubtext, { color: theme.textMuted }]}>
               Create your first group to organize tasks with friends or family
             </Text>
             <View style={styles.emptyActions}>
@@ -399,12 +400,12 @@ useEffect(() => {
                 onPress={handleCreateGroup}
               >
                 <LinearGradient
-                  colors={['#2b8a3e', '#1e6b2c']}
+                  colors={[theme.primary, theme.primaryDark]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.primaryButtonGradient}
                 >
-                  <MaterialCommunityIcons name="plus" size={18} color="white" />
+                  <MaterialCommunityIcons name="plus" size={18} color="#fff" />
                   <Text style={styles.primaryButtonText}>Create Group</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -413,13 +414,13 @@ useEffect(() => {
                 onPress={handleJoinGroup}
               >
                 <LinearGradient
-                  colors={['#f8f9fa', '#e9ecef']}
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.secondaryButtonGradient}
                 >
-                  <MaterialCommunityIcons name="login" size={18} color="#495057" />
-                  <Text style={styles.secondaryButtonText}>Join Group</Text>
+                  <MaterialCommunityIcons name="login" size={18} color={theme.textSecondary} />
+                  <Text style={[styles.secondaryButtonText, { color: theme.textSecondary }]}>Join Group</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
@@ -432,24 +433,24 @@ useEffect(() => {
   };
 
   return (
-    <ScreenWrapper style={styles.container}>
+    <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
       <LinearGradient
-        colors={['#ffffff', '#f8f9fa']}
+        colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
-        style={styles.header}
+        style={[styles.header, { borderBottomColor: theme.border }]}
       >
         <TouchableOpacity 
           onPress={() => navigation.goBack()} 
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#495057" />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>My Groups</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, { color: theme.text }]}>My Groups</Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>
             {groups.length} {groups.length === 1 ? 'group' : 'groups'}
           </Text>
         </View>
@@ -457,12 +458,12 @@ useEffect(() => {
         <TouchableOpacity 
           onPress={refreshGroups}
           disabled={refreshing}
-          style={styles.refreshButton}
+          style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
           {refreshing ? (
-            <ActivityIndicator size="small" color="#2b8a3e" />
+            <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={22} color="#495057" />
+            <MaterialCommunityIcons name="refresh" size={22} color={theme.textMuted} />
           )}
         </TouchableOpacity>
       </LinearGradient>
@@ -475,12 +476,12 @@ useEffect(() => {
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={['#2b8a3e', '#1e6b2c']}
+            colors={[theme.primary, theme.primaryDark]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.quickActionGradient}
           >
-            <MaterialCommunityIcons name="plus-circle" size={18} color="white" />
+            <MaterialCommunityIcons name="plus-circle" size={18} color="#fff" />
             <Text style={styles.quickActionText}>Create</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -491,13 +492,13 @@ useEffect(() => {
           activeOpacity={0.8}
         >
           <LinearGradient
-            colors={['#f8f9fa', '#e9ecef']}
+            colors={[theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.quickActionGradient}
           >
-            <MaterialCommunityIcons name="login" size={18} color="#495057" />
-            <Text style={[styles.quickActionText, styles.joinActionText]}>Join</Text>
+            <MaterialCommunityIcons name="login" size={18} color={theme.textSecondary} />
+            <Text style={[styles.quickActionText, styles.joinActionText, { color: theme.textSecondary }]}>Join</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -519,21 +520,9 @@ useEffect(() => {
   );
 }
 
-// Add these new styles
-const additionalStyles = {
-  reportButton: {
-    backgroundColor: '#fff5f5',
-  },
-  reportButtonText: {
-    color: '#fa5252',
-  },
-};
-
-// Merge with existing styles
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
   },
   // Header
   header: {
@@ -543,7 +532,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
     minHeight: 60,
   },
   backButton: { 
@@ -552,8 +540,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'white',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -566,11 +552,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529',
   },
   subtitle: {
     fontSize: 12,
-    color: '#868e96',
     marginTop: 2,
   },
   refreshButton: {
@@ -579,8 +563,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'white',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -597,7 +579,6 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 10,
     overflow: 'hidden',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -613,11 +594,9 @@ const styles = StyleSheet.create({
   quickActionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'white',
+    color: '#fff',
   },
-  joinActionText: {
-    color: '#495057',
-  },
+  joinActionText: {},
   // Group List
   listContent: {
     padding: 16,
@@ -629,24 +608,21 @@ const styles = StyleSheet.create({
   listHeaderTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
   },
   listHeaderSubtitle: {
     fontSize: 14,
-    color: '#868e96',
     marginTop: 4,
   },
   // Group Card
   groupCard: {
-    backgroundColor: 'white',
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
   },
   groupHeader: {
     flexDirection: 'row',
@@ -681,7 +657,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'white',
+    borderColor: '#fff',
   },
   groupMainInfo: {
     flex: 1,
@@ -695,7 +671,6 @@ const styles = StyleSheet.create({
   groupName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#212529',
     flex: 1,
     marginRight: 8,
   },
@@ -707,20 +682,15 @@ const styles = StyleSheet.create({
   groupRole: {
     fontSize: 11,
     fontWeight: '500',
-    color: '#495057',
   },
-  adminRoleText: {
-    color: '#2b8a3e',
-  },
+  adminRoleText: {},
   groupDescription: {
     fontSize: 14,
-    color: '#495057',
     lineHeight: 20,
     marginBottom: 8,
   },
   groupNoDescription: {
     fontSize: 14,
-    color: '#adb5bd',
     fontStyle: 'italic',
     marginBottom: 8,
   },
@@ -735,13 +705,11 @@ const styles = StyleSheet.create({
   },
   statText: {
     fontSize: 13,
-    color: '#495057',
     fontWeight: '500',
   },
   groupActions: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    borderTopColor: '#f1f3f5',
     paddingTop: 12,
     gap: 8,
     flexWrap: 'wrap',
@@ -756,20 +724,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
     borderRadius: 8,
-    backgroundColor: '#f8f9fa',
   },
   actionButtonText: {
     fontSize: 12,
     fontWeight: '500',
-    color: '#495057',
   },
-  // Report button styles
-  reportButton: {
-    backgroundColor: '#fff5f5',
-  },
-  reportButtonText: {
-    color: '#fa5252',
-  },
+  reportButton: {},
+  reportButtonText: {},
   // Loading & Empty States
   loadingContainer: {
     flex: 1,
@@ -778,7 +739,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#868e96',
     marginTop: 12,
   },
   emptyContainer: {
@@ -790,7 +750,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -798,13 +757,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212529',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#868e96',
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 20,
@@ -817,7 +774,6 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
     minWidth: 140,
-    shadowColor: '#2b8a3e',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -834,13 +790,12 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: 'white',
+    color: '#fff',
   },
   secondaryButton: {
     borderRadius: 10,
     overflow: 'hidden',
     minWidth: 140,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -857,6 +812,5 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#495057',
   },
 });

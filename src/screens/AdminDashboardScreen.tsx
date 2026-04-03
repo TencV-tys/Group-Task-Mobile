@@ -19,7 +19,7 @@ import { GroupMembersService } from '../services/GroupMemberService';
 import { GroupActivityService } from '../services/GroupActivityService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { useRotationStatus } from '../hooks/useRotationStatus';
-import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
+import { useRealtimeTasks } from '../hooks/useRealtimeTasks'; 
 import { useRealtimeAssignments } from '../hooks/useRealtimeAssignments';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
@@ -265,10 +265,10 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
           
           initialLoadDone.current = true;
         }
-      } else {
+      } else { 
         console.log('Falling back to individual API calls...');
         
-        const statsResult = await TaskService.getTaskStatistics(groupId);
+        const statsResult = await TaskService.getTaskStatistics(groupId); 
         if (statsResult.success && isMounted.current) {
           setStats(statsResult.statistics);
         }
@@ -548,7 +548,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             <LinearGradient
               colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              end={{ x: 1, y: 1 }} 
               style={styles.retryButtonGradient}
             >
               <Text style={styles.retryButtonText}>Retry</Text>
@@ -703,7 +703,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
           />
           <StatCard
             title="Neglected Tasks"
-            value={stats?.neglectedCount || 0}
+            value={stats?.neglected?.count || 0}
             icon="timer-off"
             color={theme.error}
             navigateTo="NeglectedTasks"
@@ -711,131 +711,125 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
           />
         </View>
 
-        {/* Task Stats - 2x4 Grid (8 cards) */}
-        {stats && (
-          <>
-            <Text style={styles.sectionTitle}>Task Statistics</Text>
-            <View style={styles.statsGrid}>
-              <StatCard
-                title="Total Tasks"
-                value={stats.totalTasks || 0}
-                icon="format-list-checks"
-                color={theme.primary}
-                navigateTo="GroupTasks"
-                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-              />
-              <StatCard
-                title="Recurring"
-                value={stats.recurringTasks || 0}
-                icon="repeat"
-                color={theme.primary}
-                navigateTo="RotationSchedule"
-                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-              />
-              <StatCard
-                title="This Week"
-                value={stats.currentWeek?.totalAssignments || 0}
-                icon="calendar-week"
-                color={theme.primary}
-                navigateTo="TaskCompletionHistory"
-                navigationParams={{ groupId, groupName, userRole: 'ADMIN', week: stats.currentWeek?.weekNumber }}
-              />
-              <StatCard
-                title="Completed"
-                value={stats.currentWeek?.completedAssignments || 0}
-                icon="check-circle"
-                color={theme.primary}
-                subtitle={`${stats.currentWeek?.completedPoints || 0} pts`}
-                navigateTo="TaskCompletionHistory"
-                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-              />
-              
-              <StatCard
-                title="Pending"
-                value={stats.currentWeek?.pendingAssignments || 0}
-                icon="clock-outline"
-                color={theme.primary}
-                navigateTo="TaskCompletionHistory"
-                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-              />
-              <StatCard
-                title="Team Overview"
-                value={members.length}
-                icon="account-group"
-                color={theme.primary}
-                navigateTo="TeamOverview"
-                navigationParams={{ groupId, groupName }}
-              />
-              <StatCard
-                title="Swap Approvals"
-                value={totalPendingForAdmin}
-                icon="swap-horizontal"
-                color={theme.primary}
-                navigateTo="AdminSwapApprovals"
-                navigationParams={{ groupId, groupName }}
-              />
-              <StatCard
-                title="Completion Rate"
-                value={`${stats.currentWeek?.totalAssignments > 0
-                  ? Math.round((stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100)
-                  : 0}%`}
-                icon="percent"
-                color={theme.primary}
-                navigateTo="TaskCompletionHistory"
-                navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-              />
-            </View>
+       {/* Task Stats - 2x4 Grid (8 cards) */}
+{stats && (
+  <>
+    <Text style={styles.sectionTitle}>Task Statistics</Text>
+    <View style={styles.statsGrid}>
+      <StatCard
+        title="Total Tasks"
+        value={stats.totalTasks || 0}
+        icon="format-list-checks"
+        color={theme.primary}
+        navigateTo="GroupTasks"
+        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+      />
+      <StatCard
+        title="Recurring"
+        value={stats.recurringTasks || 0}
+        icon="repeat"
+        color={theme.primary}
+        navigateTo="RotationSchedule"
+        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+      />
+      <StatCard
+        title="This Week"
+        value={stats.weeklyCompletion?.total || 0}  // ✅ FIXED
+        icon="calendar-week"
+        color={theme.primary}
+        navigateTo="TaskCompletionHistory"
+        navigationParams={{ groupId, groupName, userRole: 'ADMIN', week: stats.currentWeek?.weekNumber }}
+      />
+      <StatCard
+        title="Completed"
+        value={stats.weeklyCompletion?.completed || 0}  // ✅ FIXED
+        icon="check-circle"
+        color={theme.primary}
+        subtitle={`${stats.points?.earned || 0} pts`}
+        navigateTo="TaskCompletionHistory"
+        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+      />
+      
+      <StatCard
+        title="Pending"
+        value={(stats.weeklyCompletion?.total || 0) - (stats.weeklyCompletion?.completed || 0)}  // ✅ FIXED - Calculate pending
+        icon="clock-outline"
+        color={theme.primary}
+        navigateTo="TaskCompletionHistory"
+        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+      />
+      <StatCard
+        title="Team Overview"
+        value={members.length}
+        icon="account-group"
+        color={theme.primary}
+        navigateTo="TeamOverview"
+        navigationParams={{ groupId, groupName }}
+      />
+      <StatCard
+        title="Swap Approvals"
+        value={totalPendingForAdmin}
+        icon="swap-horizontal"
+        color={theme.primary}
+        navigateTo="AdminSwapApprovals"
+        navigationParams={{ groupId, groupName }}
+      />
+      <StatCard
+        title="Completion Rate"
+        value={`${stats.weeklyCompletion?.percentage || 0}%`}  // ✅ FIXED
+        icon="percent"
+        color={theme.primary}
+        navigateTo="TaskCompletionHistory"
+        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+      />
+    </View>
 
-            {/* Completion Progress */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole: 'ADMIN' })}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={[theme.card, theme.bgSecondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.progressCard}
-              >
-                <View style={styles.progressHeader}>
-                  <Text style={styles.progressTitle}>Weekly Completion</Text>
-                  <Text style={styles.progressPercentage}>
-                    {stats.currentWeek?.totalAssignments > 0
-                      ? Math.round((stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100)
-                      : 0}%
-                  </Text>
-                </View>
-                <View style={styles.progressBarContainer}>
-                  <View
-                    style={[
-                      styles.progressBar,
-                      {
-                        width: `${stats.currentWeek?.totalAssignments > 0
-                          ? (stats.currentWeek?.completedAssignments / stats.currentWeek?.totalAssignments) * 100
-                          : 0}%`,
-                        backgroundColor: theme.primary
-                      }
-                    ]}
-                  />
-                </View>
-                <View style={styles.progressStats}>
-                  <Text style={styles.progressStatsText}>
-                    {stats.currentWeek?.completedAssignments || 0} of {stats.currentWeek?.totalAssignments || 0} tasks
-                  </Text>
-                  <Text style={styles.progressStatsText}>
-                    {stats.currentWeek?.completedPoints || 0} pts earned
-                  </Text>
-                </View>
-                <MaterialCommunityIcons 
-                  name="chevron-right" 
-                  size={20} 
-                  color={theme.textMuted} 
-                  style={{ position: 'absolute', bottom: 16, right: 16 }}
-                />
-              </LinearGradient>
-            </TouchableOpacity>
-          </>
-        )}
+    {/* Completion Progress */}
+    <TouchableOpacity
+      onPress={() => navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole: 'ADMIN' })}
+      activeOpacity={0.7}
+    >
+      <LinearGradient
+        colors={[theme.card, theme.bgSecondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.progressCard}
+      >
+        <View style={styles.progressHeader}>
+          <Text style={styles.progressTitle}>Weekly Completion</Text>
+          <Text style={styles.progressPercentage}>
+            {stats.weeklyCompletion?.percentage || 0}%
+          </Text>
+        </View>
+        <View style={styles.progressBarContainer}>
+          <View
+            style={[
+              styles.progressBar,
+              {
+                width: `${stats.weeklyCompletion?.percentage || 0}%`,
+                backgroundColor: theme.primary
+              }
+            ]}
+          />
+        </View>
+        <View style={styles.progressStats}>
+          <Text style={styles.progressStatsText}>
+            {stats.weeklyCompletion?.completed || 0} of {stats.weeklyCompletion?.total || 0} tasks
+          </Text>
+          <Text style={styles.progressStatsText}>
+            {stats.points?.earned || 0} pts earned
+          </Text>
+        </View>
+        <MaterialCommunityIcons 
+          name="chevron-right" 
+          size={20} 
+          color={theme.textMuted} 
+          style={{ position: 'absolute', bottom: 16, right: 16 }}
+        />
+      </LinearGradient>
+    </TouchableOpacity>
+  </>
+)}
 
         {/* Recent Activity */}
         {recentActivity.length > 0 && (

@@ -79,7 +79,9 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   // ===== CUSTOM HOOKS =====
   const { status: rotationStatus, checkStatus } = useRotationStatus(groupId);
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
-  const { isConnected } = useRealtimeNotifications({ showAlerts: false });
+  const { isConnected } = useRealtimeNotifications({ showAlerts: false, suppressOfflineWarning: true });
+
+   
 
   // ===== REALTIME HOOKS =====
   const {

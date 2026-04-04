@@ -1,4 +1,4 @@
-// screens/TaskDraftsScreen.tsx - Dark Mode Added
+// screens/TaskDraftsScreen.tsx - FIXED VERSION (no function in params)
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -24,6 +24,7 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
   const [drafts, setDrafts] = useState<TaskDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [hasNavigated, setHasNavigated] = useState(false);
 
   const loadDrafts = useCallback(async () => {
     try {
@@ -36,15 +37,11 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
       console.log('📋 Loaded drafts:', draftsList.length);
       setDrafts(draftsList);
       
-      if (draftsList.length === 0 && groupId) {
-        console.log('🚀 No drafts found, redirecting to CreateTask screen');
-        navigation.replace('CreateTask', {
-          groupId,
-          groupName,
-          onTaskCreated: () => {
-            navigation.navigate('GroupTasks', { groupId, groupName, userRole: 'ADMIN' });
-          }
-        });
+      // ✅ FIXED: Don't auto-redirect, just show empty state
+      // Let the user manually create a task
+      if (draftsList.length === 0 && groupId && !hasNavigated) {
+        console.log('📋 No drafts found, showing empty state');
+        // Don't auto-redirect - just show empty state
       }
     } catch (error) {
       console.error('Error loading drafts:', error);
@@ -52,7 +49,7 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [groupId, groupName, navigation]);
+  }, [groupId, hasNavigated]);
 
   useFocusEffect(
     useCallback(() => {
@@ -80,11 +77,20 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
 
   const handleCreateFromDraft = (draft: TaskDraft) => {
     console.log('🚀 Creating from draft:', draft.title);
+    // ✅ FIXED: Don't pass functions as params
     navigation.navigate('CreateTask', {
       groupId: draft.groupId,
       groupName: draft.groupName,
       draftData: draft,
       createFromDraft: true
+    });
+  };
+
+  const handleCreateNewTask = () => {
+    // ✅ FIXED: Don't pass functions as params
+    navigation.navigate('CreateTask', {
+      groupId,
+      groupName
     });
   };
 
@@ -180,23 +186,50 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={drafts}
-        renderItem={renderDraft}
-        keyExtractor={item => item.id}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadDrafts();
-            }}
-            colors={[theme.primary]}
-            tintColor={theme.primary}
-          />
-        }
-        contentContainerStyle={styles.listContainer}
-      />
+      {drafts.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <LinearGradient
+            colors={[theme.bgSecondary, theme.bgTertiary]}
+            style={[styles.emptyIconContainer, { borderColor: theme.border }]}
+          >
+            <MaterialCommunityIcons name="file-document-outline" size={48} color={theme.primary} />
+          </LinearGradient>
+          <Text style={[styles.emptyTitle, { color: theme.text }]}>No Drafts Found</Text>
+          <Text style={[styles.emptySubtext, { color: theme.textMuted }]}>
+            You don't have any saved task drafts
+          </Text>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={handleCreateNewTask}
+          >
+            <LinearGradient
+              colors={[theme.primary, theme.primaryDark]}
+              style={styles.createButtonGradient}
+            >
+              <MaterialCommunityIcons name="plus" size={18} color="white" />
+              <Text style={styles.createButtonText}>Create New Task</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={drafts}
+          renderItem={renderDraft}
+          keyExtractor={item => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadDrafts();
+              }}
+              colors={[theme.primary]}
+              tintColor={theme.primary}
+            />
+          }
+          contentContainerStyle={styles.listContainer}
+        />
+      )}
     </ScreenWrapper>
   );
 }
@@ -320,5 +353,47 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  createButton: {
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  createButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  createButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

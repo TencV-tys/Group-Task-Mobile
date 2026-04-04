@@ -12,6 +12,7 @@ interface UseRealtimeNotificationsProps {
   onNewNotification?: (data: any) => void;
   showAlerts?: boolean;
   alertTypes?: string[]; // Array of notification types to show alerts for
+  suppressOfflineWarning?: boolean;
 }
 
 export function useRealtimeNotifications(props?: UseRealtimeNotificationsProps) {

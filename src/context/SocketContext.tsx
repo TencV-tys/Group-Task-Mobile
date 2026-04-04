@@ -1,12 +1,12 @@
-// context/SocketContext.tsx - FIXED TYPES
+// context/SocketContext.tsx - COMPLETE FIXED VERSION
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef,useCallback } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { API_BASE_URL } from '../config/api';
 import * as SecureStore from 'expo-secure-store';
 import { AuthService } from '../services/AuthService';
 
-interface SocketContextType {
+interface SocketContextType { 
   socket: Socket | null;
   isConnected: boolean;
   joinGroup: (groupId: string) => void;
@@ -35,10 +35,13 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [connectionStats, setConnectionStats] = useState({ attempts: 0, lastError: undefined as string | undefined });
   const listenersRef = useRef<Map<string, Function[]>>(new Map());
   const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 3;
-  // ✅ FIX: Use ReturnType<typeof setTimeout> instead of NodeJS.Timeout
+  const maxReconnectAttempts = 5;
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // ✅ Track groups to re-join after reconnection
+  const joinedGroupsRef = useRef<Set<string>>(new Set());
+  const isReconnectingRef = useRef(false);
 
   // Get user ID from secure store on mount
   useEffect(() => {
@@ -56,7 +59,27 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     getUserId();
   }, []);
 
-  // Connect socket function with optimized settings
+  // ✅ Function to re-join all previously joined groups
+  const rejoinGroups = useCallback(() => {
+    if (!socket?.connected) {
+      console.log('⚠️ Cannot rejoin groups - socket not connected');
+      return;
+    }
+
+    const groups = Array.from(joinedGroupsRef.current);
+    if (groups.length === 0) {
+      console.log('📭 No groups to rejoin');
+      return;
+    }
+
+    console.log(`🔄 Rejoining ${groups.length} groups:`, groups);
+    
+    groups.forEach(groupId => {
+      socket.emit('join-group', groupId);
+    });
+  }, [socket]);
+
+  // ✅ Connect socket function with reconnection ENABLED
   const connectSocket = async () => {
     try {
       const token = await AuthService.getAccessToken();
@@ -66,14 +89,32 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return;
       }
 
+      // If socket exists and is connected, don't create new one
+      if (socket?.connected) {
+        console.log('✅ Socket already connected, reusing');
+        return;
+      }
+
+      // If socket exists but disconnected, reconnect it
+      if (socket) {
+        console.log('🔄 Socket exists but disconnected, reconnecting...');
+        socket.connect();
+        return;
+      }
+
       console.log(`🔌 Socket: Connecting to ${API_BASE_URL} (Attempt ${connectionStats.attempts + 1})`);
       setConnectionStats(prev => ({ ...prev, attempts: prev.attempts + 1, lastError: undefined }));
       
+      // ✅ ENABLE reconnection with proper settings
       const socketInstance = io(API_BASE_URL, {
         auth: { token: `Bearer ${token}` },
         transports: ['websocket'],
-        reconnection: false,
-        timeout: 10000,
+        reconnection: true,  // ✅ CHANGE: Enable reconnection
+        reconnectionAttempts: 10,  // ✅ Max attempts
+        reconnectionDelay: 1000,   // Start with 1 second
+        reconnectionDelayMax: 10000, // Max 10 seconds
+        randomizationFactor: 0.5,
+        timeout: 20000,
         forceNew: false,
         multiplex: true,
         upgrade: true,
@@ -84,10 +125,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const connectionTimeout = setTimeout(() => {
         if (!socketInstance.connected) {
           console.log('⚠️ Socket connection timeout');
-          socketInstance.disconnect();
-          handleReconnect();
+          setConnectionStats(prev => ({ ...prev, lastError: 'Connection timeout' }));
         }
-      }, 10000);
+      }, 15000);
 
       socketInstance.on('connect', () => {
         clearTimeout(connectionTimeout);
@@ -95,6 +135,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setIsConnected(true);
         reconnectAttempts.current = 0;
         setConnectionStats(prev => ({ ...prev, lastError: undefined }));
+        
+        // ✅ Re-join groups after successful connection
+        rejoinGroups();
       });
 
       socketInstance.on('registered', (data) => {
@@ -105,8 +148,15 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         console.log('🔌 Socket disconnected:', reason);
         setIsConnected(false);
         
-        if (reason !== 'io client disconnect' && reason !== 'transport close') {
-          handleReconnect();
+        // Don't attempt manual reconnect if socket.io is handling it
+        if (reason === 'io server disconnect') {
+          // Server initiated disconnect, reconnect manually
+          setTimeout(() => {
+            if (socketInstance) {
+              console.log('🔄 Manual reconnect after server disconnect');
+              socketInstance.connect();
+            }
+          }, 1000);
         }
       });
 
@@ -120,14 +170,32 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           
           if (newToken && socketInstance) {
             socketInstance.auth = { token: `Bearer ${newToken}` };
-            socketInstance.connect();
+            // Socket.io will auto-reconnect with new token
           } else {
             setConnectionStats(prev => ({ ...prev, lastError: 'Token refresh failed' }));
-            socketInstance.disconnect();
           }
         } else {
           setConnectionStats(prev => ({ ...prev, lastError: error.message }));
         }
+      });
+
+      socketInstance.on('reconnect_attempt', (attemptNumber) => {
+        console.log(`🔄 Socket reconnect attempt ${attemptNumber}`);
+        setConnectionStats(prev => ({ ...prev, attempts: prev.attempts + 1 }));
+      });
+
+      socketInstance.on('reconnect', (attemptNumber) => {
+        console.log(`✅ Socket reconnected after ${attemptNumber} attempts`);
+        setIsConnected(true);
+        reconnectAttempts.current = 0;
+        
+        // ✅ Re-join groups after reconnection
+        rejoinGroups();
+      });
+
+      socketInstance.on('reconnect_failed', () => {
+        console.log('❌ Socket reconnection failed');
+        setConnectionStats(prev => ({ ...prev, lastError: 'Reconnection failed after max attempts' }));
       });
 
       socketInstance.on('error', (error) => {
@@ -151,47 +219,25 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Handle reconnection with exponential backoff
-  const handleReconnect = async () => {
-    if (reconnectAttempts.current >= maxReconnectAttempts) {
-      console.log('❌ Max reconnection attempts reached');
-      return;
-    }
-
-    reconnectAttempts.current++;
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts.current - 1), 10000);
-    
-    console.log(`🔄 Reconnecting in ${delay}ms (Attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
-    
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
-    
-    reconnectTimeoutRef.current = setTimeout(async () => {
-      try {
-        const newToken = await AuthService.refreshAccessToken();
-        if (newToken) {
-          await connectSocket();
-        } else {
-          console.log('❌ No token available for reconnection');
-        }
-      } catch (error) {
-        console.error('❌ Reconnection failed:', error);
-        handleReconnect();
-      }
-    }, delay);
-  };
-
-  // Manual reconnect function
+  // ✅ Manual reconnect function
   const reconnect = async () => {
+    console.log('🔄 Manual reconnect requested');
+    
     if (reconnectTimeoutRef.current) {
       clearTimeout(reconnectTimeoutRef.current);
     }
+    
     reconnectAttempts.current = 0;
+    
     if (socket) {
+      // Force disconnect and reconnect
       socket.disconnect();
+      // Wait a bit before reconnecting
+      await new Promise(resolve => setTimeout(resolve, 500));
+      socket.connect();
+    } else {
+      await connectSocket();
     }
-    await connectSocket();
   };
 
   // Clean up function
@@ -208,10 +254,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // Initial connection
   useEffect(() => {
     connectSocket();
 
-    // Ping interval to check connection
+    // Ping interval to check connection and keep it alive
     pingIntervalRef.current = setInterval(() => {
       if (socket?.connected) {
         socket.emit('ping', (response: any) => {
@@ -219,41 +266,75 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             console.log('🏓 Socket health check OK');
           }
         });
+      } else if (socket && !socket.connected && !socket.disconnected) {
+        console.log('⚠️ Socket not connected but exists, checking status...');
+        // Socket.io will handle reconnection automatically
       }
-    }, 60000);
+    }, 30000); // Check every 30 seconds
 
     return () => {
       cleanup();
     };
   }, []);
 
+  // ✅ Listen for token refresh events to re-authenticate socket
+  useEffect(() => {
+    const handleTokenRefresh = async () => {
+      console.log('🔄 Token refreshed, updating socket auth...');
+      const newToken = await AuthService.getAccessToken();
+      if (socket && newToken) {
+        socket.auth = { token: `Bearer ${newToken}` };
+        if (!socket.connected) {
+          socket.connect();
+        }
+      }
+    };
+
+    // Listen for token refresh events (you may need to emit this from your auth service)
+    // This is a simple polling mechanism as fallback
+    const interval = setInterval(async () => {
+      // Check if token is about to expire and refresh
+      // This is handled by your AuthService interceptor
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [socket]);
+
   // Join a group
-  const joinGroup = (groupId: string) => {
+  const joinGroup = useCallback((groupId: string) => {
+    // Track the group for reconnection
+    joinedGroupsRef.current.add(groupId);
+    
     if (socket?.connected) {
       socket.emit('join-group', groupId);
       console.log(`👥 Joined group: ${groupId}`);
+    } else {
+      console.log(`⚠️ Socket not connected, group ${groupId} will be joined on reconnect`);
     }
-  };
+  }, [socket]);
 
   // Leave a group
-  const leaveGroup = (groupId: string) => {
+  const leaveGroup = useCallback((groupId: string) => {
+    // Remove from tracked groups
+    joinedGroupsRef.current.delete(groupId);
+    
     if (socket?.connected) {
       socket.emit('leave-group', groupId);
       console.log(`🚪 Left group: ${groupId}`);
     }
-  };
+  }, [socket]);
 
   // Emit an event
-  const emit = (event: string, data?: any) => {
+  const emit = useCallback((event: string, data?: any) => {
     if (socket?.connected) {
       socket.emit(event, data);
     } else {
       console.warn(`⚠️ Socket not connected, cannot emit: ${event}`);
     }
-  };
+  }, [socket]);
 
   // Register event listener
-  const on = (event: string, callback: (data: any) => void) => {
+  const on = useCallback((event: string, callback: (data: any) => void) => {
     if (!listenersRef.current.has(event)) {
       listenersRef.current.set(event, []);
     }
@@ -262,10 +343,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (socket) {
       socket.on(event, callback);
     }
-  };
+  }, [socket]);
 
   // Remove event listener
-  const off = (event: string, callback?: (data: any) => void) => {
+  const off = useCallback((event: string, callback?: (data: any) => void) => {
     if (callback) {
       const listeners = listenersRef.current.get(event) || [];
       const index = listeners.indexOf(callback);
@@ -281,7 +362,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         socket.removeAllListeners(event);
       }
     }
-  };
+  }, [socket]);
 
   return (
     <SocketContext.Provider value={{

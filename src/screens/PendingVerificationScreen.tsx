@@ -1,5 +1,6 @@
-// src/screens/PendingVerificationsScreen.tsx - Dark Mode Added
-import React, { useState, useEffect } from 'react';
+// src/screens/PendingVerificationsScreen.tsx - FIXED PAGINATION
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,8 +10,8 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  StatusBar, 
-  Image 
+  StatusBar,
+  Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -19,45 +20,48 @@ import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
 
+const PAGE_SIZE = 20;
+
 export default function PendingVerificationsScreen({ navigation, route }: any) {
   const { theme, isDark } = useTheme();
   const { groupId, groupName, userRole } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
   const [submissions, setSubmissions] = useState<any[]>([]);
   const [filter, setFilter] = useState<'pending' | 'verified' | 'rejected'>('pending');
   const [stats, setStats] = useState<any>(null);
   
+  // ✅ FIXED: Track total count from API
+  const [totalCount, setTotalCount] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  
+  // ✅ FIXED: Use ref for current page to avoid stale closures
+  const currentPageRef = useRef(0);
+  const isLoadingRef = useRef(false);
+  
   const isAdmin = userRole === 'ADMIN';
 
-  useEffect(() => {
-    if (authError) {
-      Alert.alert(
-        'Session Expired',
-        'Please log in again',
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              setAuthError(false);
-              navigation.navigate('Login');
-            }
-          }
-        ]
-      );
-    }
-  }, [authError, navigation]);
-
+  // ✅ FIXED: Reset everything when filter changes
   useEffect(() => {
     if (!isAdmin) {
       Alert.alert('Access Denied', 'Only administrators can access this screen');
       navigation.goBack();
       return;
     }
-    fetchSubmissions();
+    
+    // Reset pagination state on filter change
+    currentPageRef.current = 0;
+    setSubmissions([]);
+    setTotalCount(0);
+    setHasMore(true);
+    setLoading(true);
+    
     fetchStats();
+    fetchSubmissions(0, true); // Fetch first page with reset
   }, [groupId, filter]);
 
   const fetchStats = async () => {
@@ -78,7 +82,11 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     }
   };
 
-  const fetchSubmissions = async (isRefreshing = false) => {
+  // ✅ FIXED: Proper fetch function with page parameter
+  const fetchSubmissions = async (page: number, reset = false) => {
+    // Prevent duplicate requests
+    if (isLoadingRef.current && !reset) return;
+    
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
@@ -87,16 +95,24 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     if (!hasToken) {
       setLoading(false);
       setRefreshing(false);
+      setIsLoadingMore(false);
       return;
     }
 
-    if (isRefreshing) setRefreshing(true);
-    else setLoading(true);
+    isLoadingRef.current = true;
+    
+    if (reset) {
+      setLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
     
     setError(null);
     
     try {
-      console.log(`Fetching ${filter} submissions for group:`, groupId);
+      const offset = page * PAGE_SIZE;
+      
+      console.log(`📥 Fetching ${filter} submissions for group: ${groupId}, page: ${page}, offset: ${offset}`);
       
       let statusParam: string | undefined;
       if (filter === 'pending') {
@@ -109,10 +125,15 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
       
       const result = await AssignmentService.getGroupAssignments(groupId, {
         status: statusParam,
-        limit: 100
+        limit: PAGE_SIZE,
+        offset: offset
       });
       
-      console.log('API Response:', result);
+      console.log('📥 API Response:', {
+        success: result.success,
+        total: result.total,
+        assignmentsCount: result.assignments?.length
+      });
       
       if (result.success) {
         let assignments = result.assignments || result.data?.assignments || [];
@@ -149,7 +170,21 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           };
         });
         
-        setSubmissions(processed);
+        // ✅ FIXED: Update total count from API
+        const total = result.total || result.data?.total || 0;
+        setTotalCount(total);
+        
+        // ✅ FIXED: Calculate hasMore based on actual total
+        const newHasMore = (offset + processed.length) < total;
+        setHasMore(newHasMore);
+        
+        if (reset) {
+          setSubmissions(processed);
+        } else {
+          setSubmissions(prev => [...prev, ...processed]);
+        }
+        
+        console.log(`✅ Loaded ${processed.length} items. Total: ${total}, HasMore: ${newHasMore}`);
       } else {
         setError(result.message || 'Failed to load submissions');
       }
@@ -159,7 +194,50 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setIsLoadingMore(false);
+      isLoadingRef.current = false;
     }
+  };
+
+  // ✅ FIXED: Load more function
+  const handleLoadMore = useCallback(() => {
+    // Don't load if:
+    // - Already loading more
+    // - No more items to load
+    // - Currently loading or refreshing
+    // - Total loaded equals total count
+    if (isLoadingMore || !hasMore || loading || refreshing) {
+      console.log('🚫 Skip load more:', { isLoadingMore, hasMore, loading, refreshing });
+      return;
+    }
+    
+    const nextPage = currentPageRef.current + 1;
+    const offset = nextPage * PAGE_SIZE;
+    
+    // Check if we've already loaded everything
+    if (offset >= totalCount && totalCount > 0) {
+      console.log('🏁 Already loaded all items');
+      setHasMore(false);
+      return;
+    }
+    
+    console.log(`📥 Loading more: page ${nextPage}, offset ${offset}`);
+    currentPageRef.current = nextPage;
+    fetchSubmissions(nextPage, false);
+  }, [isLoadingMore, hasMore, loading, refreshing, totalCount]);
+
+  // ✅ FIXED: Refresh function
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    currentPageRef.current = 0;
+    setHasMore(true);
+    fetchSubmissions(0, true);
+  }, []);
+
+  // ✅ FIXED: Filter change handler
+  const handleFilterChange = (newFilter: 'pending' | 'verified' | 'rejected') => {
+    if (newFilter === filter) return;
+    setFilter(newFilter);
   };
 
   const handleViewSubmission = (assignment: any) => {
@@ -176,7 +254,10 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
       assignmentId: assignment.id,
       isAdmin: true,
       onVerified: () => {
-        fetchSubmissions();
+        // Refresh after verification
+        currentPageRef.current = 0;
+        setHasMore(true);
+        fetchSubmissions(0, true);
         fetchStats();
       }
     });
@@ -216,9 +297,11 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               
               if (result.success) {
                 Alert.alert('Success', 'Submission approved successfully');
-                setSubmissions(prev => prev.filter(item => item.id !== assignment.id));
+                // Refresh after approval
+                currentPageRef.current = 0;
+                setHasMore(true);
+                fetchSubmissions(0, true);
                 fetchStats();
-                fetchSubmissions();
               } else {
                 Alert.alert('Error', result.message || 'Failed to approve submission');
               }
@@ -265,9 +348,11 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               
               if (result.success) {
                 Alert.alert('Success', 'Submission rejected');
-                setSubmissions(prev => prev.filter(item => item.id !== assignment.id));
+                // Refresh after rejection
+                currentPageRef.current = 0;
+                setHasMore(true);
+                fetchSubmissions(0, true);
                 fetchStats();
-                fetchSubmissions();
               } else {
                 Alert.alert('Error', result.message || 'Failed to reject submission');
               }
@@ -330,7 +415,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           filter === 'pending' && styles.activeFilterTab,
           { backgroundColor: theme.bgSecondary }
         ]}
-        onPress={() => setFilter('pending')}
+        onPress={() => handleFilterChange('pending')}
       >
         <MaterialCommunityIcons 
           name="clock-check" 
@@ -358,7 +443,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           filter === 'verified' && styles.activeFilterTab,
           { backgroundColor: theme.bgSecondary }
         ]}
-        onPress={() => setFilter('verified')}
+        onPress={() => handleFilterChange('verified')}
       >
         <MaterialCommunityIcons 
           name="check-circle" 
@@ -376,7 +461,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           filter === 'rejected' && styles.activeFilterTab,
           { backgroundColor: theme.bgSecondary }
         ]}
-        onPress={() => setFilter('rejected')}
+        onPress={() => handleFilterChange('rejected')}
       >
         <MaterialCommunityIcons 
           name="close-circle" 
@@ -387,6 +472,43 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           Rejected
         </Text>
       </TouchableOpacity>
+    </View>
+  );
+
+  // ✅ FIXED: Footer component for load more indicator
+  const renderFooter = () => {
+    if (!isLoadingMore) return null;
+    
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={theme.primary} />
+        <Text style={[styles.footerText, { color: theme.textMuted }]}>Loading more...</Text>
+      </View>
+    );
+  };
+
+  // ✅ FIXED: Empty component
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <MaterialCommunityIcons 
+        name={
+          filter === 'pending' ? 'clock-check-outline' : 
+          filter === 'verified' ? 'check-circle-outline' : 
+          'close-circle-outline'
+        } 
+        size={64} 
+        color={theme.border} 
+      />
+      <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+        {filter === 'pending' ? 'No pending submissions' : 
+         filter === 'verified' ? 'No verified submissions' : 
+         'No rejected submissions'}
+      </Text>
+      <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
+        {filter === 'pending' 
+          ? 'When members submit assignments, they will appear here'
+          : 'No submissions in this category'}
+      </Text>
     </View>
   );
 
@@ -654,10 +776,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
       
       <TouchableOpacity 
         style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
-        onPress={() => {
-          fetchSubmissions();
-          fetchStats();
-        }}
+        onPress={handleRefresh}
       >
         <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
       </TouchableOpacity>
@@ -686,7 +805,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
-            onPress={() => fetchSubmissions()}
+            onPress={handleRefresh}
           >
             <LinearGradient
               colors={[theme.primary, theme.primaryDark]}
@@ -706,37 +825,15 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => {
-                fetchSubmissions(true);
-                fetchStats();
-              }}
+              onRefresh={handleRefresh}
               colors={[theme.primary]}
               tintColor={theme.primary}
             />
           }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons 
-                name={
-                  filter === 'pending' ? 'clock-check-outline' : 
-                  filter === 'verified' ? 'check-circle-outline' : 
-                  'close-circle-outline'
-                } 
-                size={64} 
-                color={theme.border} 
-              />
-              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-                {filter === 'pending' ? 'No pending submissions' : 
-                 filter === 'verified' ? 'No verified submissions' : 
-                 'No rejected submissions'}
-              </Text>
-              <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
-                {filter === 'pending' 
-                  ? 'When members submit assignments, they will appear here'
-                  : 'No submissions in this category'}
-              </Text>
-            </View>
-          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={renderEmpty}
           contentContainerStyle={styles.listContainer}
         />
       )}
@@ -744,7 +841,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   );
 }
 
-// Styles remain the same - only colors are applied inline
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -889,12 +985,24 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
-    paddingBottom: 20
+    paddingBottom: 20,
+    flexGrow: 1,
+  },
+  footerLoader: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  footerText: {
+    fontSize: 12,
   },
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 60,
-    paddingHorizontal: 20
+    paddingHorizontal: 20,
+    flex: 1,
   },
   emptyText: {
     fontSize: 16,

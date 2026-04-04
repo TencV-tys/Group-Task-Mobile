@@ -187,11 +187,6 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
     marginTop: 4,
     marginLeft: 2,
   },
-  errorText: {
-    color: theme.error,
-    fontSize: 12,
-    marginTop: 2,
-  },
 
   // ─── Points ───────────────────────────────────────────────────────────────
   pointsLimitBadge: {
@@ -530,15 +525,23 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
 
   // ─── Error Box ────────────────────────────────────────────────────────────
   errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 14,
-    borderRadius: 10,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: theme.errorBorder,
-  },
+  flexDirection: 'row',
+  alignItems: 'flex-start', // changed from 'center'
+  gap: 8,
+  padding: 14,
+  borderRadius: 10,
+  marginBottom: 16,
+  borderWidth: 1,
+  borderColor: theme.errorBorder,
+},
+errorText: {
+  color: theme.error,
+  fontSize: 12,
+  marginTop: 2,
+  flex: 1,        // add this
+  flexShrink: 1,  // add this
+  flexWrap: 'wrap', // add this
+},
 
   // ─── Action Buttons ───────────────────────────────────────────────────────
   actions: {

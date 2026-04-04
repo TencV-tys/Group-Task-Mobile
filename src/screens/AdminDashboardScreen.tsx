@@ -710,7 +710,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
             navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />
         </View>
-
+ 
        {/* Task Stats - 2x4 Grid (8 cards) */}
 {stats && (
   <>
@@ -733,14 +733,6 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
         navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
       />
       <StatCard
-        title="This Week"
-        value={stats.weeklyCompletion?.total || 0}  // ✅ FIXED
-        icon="calendar-week"
-        color={theme.primary}
-        navigateTo="TaskCompletionHistory"
-        navigationParams={{ groupId, groupName, userRole: 'ADMIN', week: stats.currentWeek?.weekNumber }}
-      />
-      <StatCard
         title="Completed"
         value={stats.weeklyCompletion?.completed || 0}  // ✅ FIXED
         icon="check-circle"
@@ -749,15 +741,22 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
         navigateTo="TaskCompletionHistory"
         navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
       />
-      
       <StatCard
-        title="Pending"
-        value={(stats.weeklyCompletion?.total || 0) - (stats.weeklyCompletion?.completed || 0)}  // ✅ FIXED - Calculate pending
-        icon="clock-outline"
-        color={theme.primary}
-        navigateTo="TaskCompletionHistory"
-        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-      />
+  title="This Week"
+  value={stats.weeklyCompletion?.total || 0}
+  icon="calendar-week"
+  color={theme.primary}
+  navigateTo="DetailedStatistics"
+  navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+/>
+       <StatCard
+  title="Pending"
+  value={(stats.weeklyCompletion?.total || 0) - (stats.weeklyCompletion?.completed || 0)}
+  icon="clock-outline"
+  color={theme.primary}
+  navigateTo="DetailedStatistics"
+  navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+/>
       <StatCard
         title="Team Overview"
         value={members.length}

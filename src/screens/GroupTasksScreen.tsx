@@ -81,8 +81,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
   const { isConnected } = useRealtimeNotifications({ showAlerts: false, suppressOfflineWarning: true });
 
-   
-
   // ===== REALTIME HOOKS =====
   const {
     events: taskEvents,
@@ -545,6 +543,41 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     navigation.navigate('RotationSchedule', { groupId, groupName, userRole });
   };
 
+ 
+const handleDeleteTask = async (task: any) => {
+  if (!await checkToken()) return;
+
+  const isAssigned = isTaskAssigned(task);
+
+  Alert.alert(
+    '🗑️ Delete Task',
+    isAssigned
+      ? `Delete "${task.title}"?\n\nAssignment history will be preserved for members. The rotation slot will be freed up for a new task.`
+      : `Delete "${task.title}"?\n\nThis task has no active assignments. This cannot be undone.`,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          // Optimistically remove from local state immediately
+          setTasks(prev => prev.filter(t => t.id !== task.id));
+          setMyTasks(prev => prev.filter(t => t.id !== task.id));
+
+          const result = await TaskService.deleteTask(task.id);
+          if (result.success) {
+            refreshTasks(); // sync with server
+          } else {
+            // Revert on failure
+            refreshTasks();
+            Alert.alert('Error', result.message || 'Failed to delete task');
+          }
+        }
+      }
+    ]
+  );
+};
+
   const handleCreateTask = async () => {
     if (!await checkToken()) return;
     if (!isAdmin) {
@@ -1003,22 +1036,36 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           }
           handleViewTaskDetails(item.id);
         }}
-        onLongPress={() => {
-          if (canEdit) {
-            Alert.alert('Task Options', `"${item.title}"`, [
-              { text: 'Edit', onPress: () => handleEditTask(item) },
-              { text: 'View Details', onPress: () => handleViewTaskDetails(item.id) },
-              { text: 'Cancel', style: 'cancel' }
-            ]);
-          } else if (isAdmin && !isMyTasksView && taskIsAssigned) {
-            Alert.alert(
-              'Cannot Edit',
-              'This task is already assigned to members. Editing assigned tasks could break the rotation system.\n\n' +
-              'Consider creating a new task instead, or wait until the rotation week ends.',
-              [{ text: 'OK' }]
-            );
-          } 
-        }}
+       onLongPress={() => {
+  if (!isAdmin || isMyTasksView) return;
+
+  if (!taskIsAssigned) {
+    // Unassigned - can edit or delete freely
+    Alert.alert('Task Options', `"${item.title}"`, [
+      { text: 'Edit', onPress: () => handleEditTask(item) },
+      { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item) },
+      { text: 'Cancel', style: 'cancel' }
+    ]);
+  } else {
+    // Assigned - both options available but with context
+    Alert.alert('Task Options', `"${item.title}"`, [
+      { 
+        text: 'Edit ⚠️', 
+        onPress: () => Alert.alert(
+          'Cannot Edit Assigned Task',
+          'This task is already assigned. Editing could break the rotation system.\n\nConsider creating a new task instead.',
+          [{ text: 'OK' }]
+        )
+      },
+      { 
+        text: 'Delete', 
+        style: 'destructive', 
+        onPress: () => handleDeleteTask(item) 
+      },
+      { text: 'Cancel', style: 'cancel' }
+    ]);
+  }
+}}
         activeOpacity={isClickable ? 0.7 : 1}
       > 
         <LinearGradient 

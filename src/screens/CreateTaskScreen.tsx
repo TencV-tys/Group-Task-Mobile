@@ -888,7 +888,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 colors={[theme.errorBg, theme.errorBg]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.errorBox}
+                style={styles.errorBox} 
               >
                 <MaterialCommunityIcons name="alert-circle" size={18} color={theme.error} />
                 <Text style={styles.errorText}>⚠️ {error}</Text>
@@ -1018,4 +1018,4 @@ export default function CreateTaskScreen({ navigation, route }: any) {
       />
     </ScreenWrapper>
   );
-}
+}  

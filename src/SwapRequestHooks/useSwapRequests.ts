@@ -1,4 +1,4 @@
-// SwapRequestHooks/useSwapRequests.ts - FULL UPDATED VERSION (429 FIXED)
+// SwapRequestHooks/useSwapRequests.ts - FIXED VERSION
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { SwapRequestFilters, SwapRequest, SwapRequestService } from '../services/SwapRequestService';
@@ -21,13 +21,15 @@ export const useSwapRequests = () => {
   const [authError, setAuthError] = useState(false);
 
   // =========================
-  // Anti-spam / anti-429 refs
+  // Anti-spam / anti-429 refs - FIXED
   // =========================
   const pendingForMeLoadingRef = useRef(false);
   const lastPendingForMeLoadRef = useRef(0);
+  const lastPendingForMeFiltersRef = useRef<string>('');
 
   const myRequestsLoadingRef = useRef(false);
   const lastMyRequestsLoadRef = useRef(0);
+  const lastMyRequestsFiltersRef = useRef<string>('');
 
   // =========================
   // Check token
@@ -86,19 +88,29 @@ export const useSwapRequests = () => {
   }, [authError]);
 
   // =========================
-  // Load my swap requests
+  // Load my swap requests - FIXED DEBOUNCE
   // =========================
   const loadMyRequests = useCallback(async (filters?: SwapRequestFilters, force = false) => {
     const now = Date.now();
+    const filterKey = JSON.stringify(filters || {});
 
+    // Don't block if it's a different filter (e.g., switching from ACCEPTED to ALL)
+    const isSameFilter = lastMyRequestsFiltersRef.current === filterKey;
+    
     if (myRequestsLoadingRef.current) {
       console.log('⏸️ Skipping loadMyRequests: already loading');
       return;
     }
 
-    if (!force && now - lastMyRequestsLoadRef.current < 3000) {
-      console.log('⏸️ Skipping loadMyRequests: called too soon');
+    // Only apply time restriction if it's the SAME filter
+    if (!force && isSameFilter && now - lastMyRequestsLoadRef.current < 2000) {
+      console.log('⏸️ Skipping loadMyRequests: same filter called too soon');
       return;
+    }
+
+    // Allow immediate reload if filter changed
+    if (!isSameFilter) {
+      console.log('🔄 Filter changed, allowing immediate reload');
     }
 
     const hasToken = await checkToken();
@@ -114,6 +126,7 @@ export const useSwapRequests = () => {
 
     myRequestsLoadingRef.current = true;
     lastMyRequestsLoadRef.current = now;
+    lastMyRequestsFiltersRef.current = filterKey;
 
     setLoading(true);
     setError(null);
@@ -153,10 +166,13 @@ export const useSwapRequests = () => {
   }, [userId, checkToken]);
 
   // =========================
-  // Load pending requests for current user (429-safe)
+  // Load pending requests for current user - FIXED DEBOUNCE
   // =========================
   const loadPendingForMe = useCallback(async (groupId?: string, force = false) => {
     const now = Date.now();
+    const filterKey = groupId || 'no-group';
+
+    const isSameFilter = lastPendingForMeFiltersRef.current === filterKey;
 
     // Prevent duplicate requests while one is still loading
     if (pendingForMeLoadingRef.current) {
@@ -164,10 +180,15 @@ export const useSwapRequests = () => {
       return;
     }
 
-    // Prevent rapid repeated calls within 3 seconds
-    if (!force && now - lastPendingForMeLoadRef.current < 3000) {
-      console.log('⏸️ Skipping loadPendingForMe: called too soon');
+    // Only apply time restriction if it's the SAME filter
+    if (!force && isSameFilter && now - lastPendingForMeLoadRef.current < 2000) {
+      console.log('⏸️ Skipping loadPendingForMe: same filter called too soon');
       return;
+    }
+
+    // Allow immediate reload if filter changed
+    if (!isSameFilter) {
+      console.log('🔄 Group filter changed, allowing immediate reload');
     }
 
     const hasToken = await checkToken();
@@ -183,6 +204,7 @@ export const useSwapRequests = () => {
 
     pendingForMeLoadingRef.current = true;
     lastPendingForMeLoadRef.current = now;
+    lastPendingForMeFiltersRef.current = filterKey;
 
     setLoading(true);
     setError(null);
@@ -221,9 +243,9 @@ export const useSwapRequests = () => {
     }
   }, [userId, checkToken]);
 
-  // =========================
-  // Load pending requests for admin approval
-  // =========================
+  // ... rest of the functions remain the same ...
+  
+  // Load pending for admin
   const loadPendingForAdmin = useCallback(async (groupId: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -268,9 +290,7 @@ export const useSwapRequests = () => {
     }
   }, [checkToken]);
 
-  // =========================
   // Admin approve swap request
-  // =========================
   const adminApproveSwapRequest = useCallback(async (requestId: string, notes?: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -318,9 +338,7 @@ export const useSwapRequests = () => {
     }
   }, [checkToken, currentGroupId, loadPendingForAdmin]);
 
-  // =========================
   // Admin reject swap request
-  // =========================
   const adminRejectSwapRequest = useCallback(async (requestId: string, reason: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -368,9 +386,7 @@ export const useSwapRequests = () => {
     }
   }, [checkToken, currentGroupId, loadPendingForAdmin]);
 
-  // =========================
   // Create swap request
-  // =========================
   const createSwapRequest = useCallback(async (data: {
     assignmentId: string;
     reason?: string;
@@ -455,9 +471,7 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
-  // =========================
   // Accept swap request
-  // =========================
   const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () => void) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -525,9 +539,7 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
-  // =========================
   // Reject swap request
-  // =========================
   const rejectSwapRequest = useCallback(async (requestId: string, reason?: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -574,9 +586,7 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
-  // =========================
   // Cancel swap request
-  // =========================
   const cancelSwapRequest = useCallback(async (requestId: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -623,34 +633,26 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
-  // =========================
   // Check if user has pending requests for an assignment
-  // =========================
   const hasPendingRequest = useCallback((assignmentId: string) => {
     return myRequests.some(
       request => request.assignmentId === assignmentId && request.status === 'PENDING'
     );
   }, [myRequests]);
 
-  // =========================
   // Get pending request for an assignment
-  // =========================
   const getPendingRequestForAssignment = useCallback((assignmentId: string) => {
     return myRequests.find(
       request => request.assignmentId === assignmentId && request.status === 'PENDING'
     );
   }, [myRequests]);
 
-  // =========================
   // Get swap description
-  // =========================
   const getSwapDescription = useCallback((swapRequest: SwapRequest) => {
     return SwapRequestService.getSwapDescription(swapRequest);
   }, []);
 
-  // =========================
   // Refresh all data
-  // =========================
   const refreshAll = useCallback(async (groupId?: string) => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -665,9 +667,7 @@ export const useSwapRequests = () => {
     ]);
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
-  // =========================
   // Get admin approval status for a request
-  // =========================
   const getAdminApprovalStatus = useCallback((swapRequest: SwapRequest) => {
     return SwapRequestService.getAdminApprovalStatus(swapRequest);
   }, []);

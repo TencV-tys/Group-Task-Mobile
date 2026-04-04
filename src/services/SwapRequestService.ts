@@ -15,7 +15,7 @@ export interface CreateSwapRequestData {
   selectedDay?: string;
   selectedTimeSlotId?: string;
 }
-
+ 
 
 export interface SwapRequest {
   id: string;
@@ -690,15 +690,15 @@ export class SwapRequestService {
   }
 
   static getStatusIcon(status: string): string {
-    switch (status) {
-      case 'PENDING': return 'time-outline';
-      case 'ACCEPTED': return 'checkmark-circle';
-      case 'REJECTED': return 'close-circle';
-      case 'CANCELLED': return 'ban';
-      case 'EXPIRED': return 'alert-circle';
-      default: return 'help-circle';
-    }
+  switch (status) {
+    case 'PENDING': return 'clock-outline';  // ✅ Valid Material Community icon
+    case 'ACCEPTED': return 'check-circle';
+    case 'REJECTED': return 'close-circle';
+    case 'CANCELLED': return 'ban';
+    case 'EXPIRED': return 'alert-circle';
+    default: return 'help-circle';
   }
+}
 
   static getAdminApprovalStatus(swapRequest: SwapRequest): { label: string; color: string; icon: string } {
     if (!swapRequest.requiresAdminApproval) {

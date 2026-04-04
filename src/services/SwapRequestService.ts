@@ -778,4 +778,65 @@ static async checkUserHasAnyAssignmentThisWeek(
   }
 }
 
+// Add these methods to SwapRequestService class in services/SwapRequestService.ts
+
+// BATCH check for multiple users' assignments on a specific day
+static async batchCheckUserAssignments(params: {
+  userIds: string[];
+  groupId: string;
+  day: string;
+  week: number;
+}): Promise<{ success: boolean; results?: Array<{ userId: string; hasAssignmentOnDay: boolean; hasAnyAssignmentThisWeek: boolean }> }> {
+  try {
+    const headers = await TokenUtils.getAuthHeaders(false);
+    
+    const response = await fetch(`${API_URL}/batch-check-assignments`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Batch check failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('SwapRequestService.batchCheckUserAssignments error:', error);
+    return { success: false };
+  }
+}
+
+// BATCH check for multiple users' week assignments
+static async batchCheckUserWeekAssignments(params: {
+  userIds: string[];
+  groupId: string;
+  week: number;
+}): Promise<{ success: boolean; results?: Array<{ userId: string; hasAnyAssignmentThisWeek: boolean; assignmentCount?: number }> }> {
+  try {
+    const headers = await TokenUtils.getAuthHeaders(false);
+    
+    const response = await fetch(`${API_URL}/batch-check-week-assignments`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Batch week check failed: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('SwapRequestService.batchCheckUserWeekAssignments error:', error);
+    return { success: false };
+  }
+}
+
 }

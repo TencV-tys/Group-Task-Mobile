@@ -1,4 +1,5 @@
-// src/components/SettingsModal.tsx - SIMPLE WORKING VERSION
+// src/components/SettingsModal.tsx - COMPLETE FIXED VERSION
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   View,
@@ -55,6 +56,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [weekSwapReason, setWeekSwapReason] = useState<string>('');
   const [firstTaskDate, setFirstTaskDate] = useState<Date | null>(null);
   const [authError, setAuthError] = useState(false);
+  const [recurringTasks, setRecurringTasks] = useState<any[]>([]);
   
   const { createSwapRequest, loading: swapLoading } = useSwapRequests();
 
@@ -89,6 +91,75 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [authError, visible, navigation, onClose]);
 
+  // ===== FIXED: Get the earliest recurring task's creation date =====
+  const getEarliestRecurringTaskDate = async (): Promise<Date | null> => {
+    try {
+      // Fetch all tasks for the group
+      const response = await TaskService.getGroupTasks(groupId);
+      
+      if (response.success && response.tasks) {
+        // Filter to only recurring tasks (not deleted)
+        const recurringTasksList = response.tasks.filter((task: any) => task.isRecurring === true);
+        setRecurringTasks(recurringTasksList);
+        
+        if (recurringTasksList.length === 0) {
+          console.log('📅 No recurring tasks found - week swap not available');
+          return null;
+        }
+        
+        // Sort by creation date (oldest first)
+        const sortedTasks = [...recurringTasksList].sort((a, b) => 
+          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        );
+        
+        const earliestTask = sortedTasks[0];
+        const earliestDate = new Date(earliestTask.createdAt);
+        
+        console.log(`📅 Earliest recurring task: "${earliestTask.title}" created on ${earliestDate.toLocaleDateString()}`);
+        console.log(`   All recurring tasks count: ${recurringTasksList.length}`);
+        
+        return earliestDate;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting earliest recurring task date:', error);
+      return null;
+    }
+  };
+
+  // ===== FIXED: Check week swap availability based on earliest recurring task =====
+  const checkWeekSwapAvailability = (firstTaskDate: Date) => {
+    const now = new Date();
+    const taskCreatedDate = new Date(firstTaskDate);
+    
+    // Calculate hours since the FIRST recurring task was created
+    const hoursSinceTaskCreated = (now.getTime() - taskCreatedDate.getTime()) / (1000 * 60 * 60);
+    const isWithinFirst24Hours = hoursSinceTaskCreated >= 0 && hoursSinceTaskCreated <= 24;
+    
+    const taskCreatedDayName = taskCreatedDate.toLocaleDateString('en-US', { weekday: 'long' });
+    
+    if (!isWithinFirst24Hours) { 
+      setCanSwapWeek(false);
+      if (hoursSinceTaskCreated < 0) {
+        setWeekSwapReason(`Week starts on ${taskCreatedDayName} (task not created yet)`);
+      } else {
+        const daysSince = Math.floor(hoursSinceTaskCreated / 24);
+        setWeekSwapReason(`Week swap window closed. Only available within first 24 hours after the first recurring task was created on ${taskCreatedDayName} (${daysSince} day${daysSince > 1 ? 's' : ''} ago)`);
+      }
+    } else {
+      setCanSwapWeek(true);
+      const hoursLeft = Math.ceil(24 - hoursSinceTaskCreated);
+      const minutesLeft = Math.ceil((24 - hoursSinceTaskCreated) * 60);
+      
+      if (hoursLeft < 1) {
+        setWeekSwapReason(`${minutesLeft} minutes left to swap this week (based on first task created ${taskCreatedDayName})`);
+      } else {
+        setWeekSwapReason(`${hoursLeft} hour${hoursLeft > 1 ? 's' : ''} left to swap this week (based on first task created ${taskCreatedDayName})`);
+      }
+    }
+  };
+
+  // ===== FIXED: Load group data with proper week reset =====
   const loadGroupData = async () => {
     if (!visible) return;
 
@@ -104,6 +175,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
     try {
       setLoadingStats(true);
+      
+      // Get group stats
       const statsResult = await TaskService.getTaskStatistics(groupId);
       if (statsResult.success) {
         setGroupStats(statsResult.statistics);
@@ -116,52 +189,49 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         }
       }
 
+      // Get group info for rotation week
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
         setRotationWeek(groupResult.group?.currentRotationWeek || 1);
       }
 
+      // Get members
       const membersResult = await GroupMembersService.getGroupMembers(groupId);
       if (membersResult.success) {
         setMembers(membersResult.members || []);
       }
 
+      // ===== KEY FIX: Get earliest recurring task date for week swap =====
+      const earliestTaskDate = await getEarliestRecurringTaskDate();
+      setFirstTaskDate(earliestTaskDate);
+      
+      if (earliestTaskDate) {
+        // Calculate week boundaries based on earliest task creation date
+        const weekStart = new Date(earliestTaskDate);
+        weekStart.setHours(0, 0, 0, 0);
+        
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+        weekEnd.setHours(23, 59, 59, 999);
+        
+        setWeekStartDate(weekStart);
+        setWeekEndDate(weekEnd);
+        
+        // Check if week swap is available
+        checkWeekSwapAvailability(earliestTaskDate);
+      } else {
+        // No recurring tasks - cannot swap week
+        setCanSwapWeek(false);
+        setWeekSwapReason('No recurring tasks found. Create a task first to enable week swaps.');
+        setWeekStartDate(null);
+        setWeekEndDate(null);
+      }
+
+      // Load user's tasks
       setLoadingMyTasks(true);
       const myTasksResult = await TaskService.getMyTasks(groupId);
       if (myTasksResult.success && myTasksResult.tasks) {
         setMyAssignments(myTasksResult.tasks);
-        
-        if (myTasksResult.tasks.length > 0) {
-          const tasks = myTasksResult.tasks;
-          let earliestDate: Date | null = null;
-          
-          tasks.forEach((task: any) => {
-            if (task.assignment?.dueDate) {
-              const dueDate = new Date(task.assignment.dueDate);
-              if (!earliestDate || dueDate < earliestDate) {
-                earliestDate = dueDate;
-              }
-            }
-          });
-          
-          if (earliestDate) {
-            setFirstTaskDate(earliestDate);
-            
-            const firstTaskDate = earliestDate as Date;
-            
-            const weekStart = new Date(firstTaskDate);
-            weekStart.setHours(0, 0, 0, 0);
-            
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekStart.getDate() + 6);
-            weekEnd.setHours(23, 59, 59, 999);
-            
-            setWeekStartDate(weekStart);
-            setWeekEndDate(weekEnd);
-            
-            checkWeekSwapAvailability(firstTaskDate);
-          }
-        }
       }
       setLoadingMyTasks(false);
 
@@ -173,41 +243,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const checkWeekSwapAvailability = (firstTaskDate: Date) => {
-    const now = new Date();
-    const taskCreatedDate = new Date(firstTaskDate);
-    
-    const hoursSinceTaskCreated = (now.getTime() - taskCreatedDate.getTime()) / (1000 * 60 * 60);
-    const isWithinFirst24Hours = hoursSinceTaskCreated >= 0 && hoursSinceTaskCreated <= 24;
-    
-    const taskCreatedDayName = taskCreatedDate.toLocaleDateString('en-US', { weekday: 'long' });
-    
-    if (!isWithinFirst24Hours) { 
-      setCanSwapWeek(false);
-      if (hoursSinceTaskCreated < 0) {
-        setWeekSwapReason(`Week starts on ${taskCreatedDayName} (task not created yet)`);
-      } else {
-        const daysSince = Math.floor(hoursSinceTaskCreated / 24);
-        setWeekSwapReason(`Week swap window closed. Only available within first 24 hours after task was created on ${taskCreatedDayName} (${daysSince} day${daysSince > 1 ? 's' : ''} ago)`);
-      }
-    } else {
-      setCanSwapWeek(true);
-      const hoursLeft = Math.ceil(24 - hoursSinceTaskCreated);
-      const minutesLeft = Math.ceil((24 - hoursSinceTaskCreated) * 60);
-      
-      if (hoursLeft < 1) {
-        setWeekSwapReason(`${minutesLeft} minutes left to swap this week (task created ${taskCreatedDayName})`);
-      } else {
-        setWeekSwapReason(`${hoursLeft} hour${hoursLeft > 1 ? 's' : ''} left to swap this week (task created ${taskCreatedDayName})`);
-      }
-    }
-  };
-
   useEffect(() => {
     if (visible) {
       loadGroupData();
     }
-  }, [visible]);
+  }, [visible, groupId]);
 
   const handleSwapEntireWeek = async () => {
     const hasToken = await checkToken();
@@ -280,7 +320,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const handleTaskStatistics = async () => {
     const hasToken = await checkToken();
     if (!hasToken) return;
-    navigation.navigate('DetailedStatistics', { groupId, groupName,userRole });
+    navigation.navigate('DetailedStatistics', { groupId, groupName, userRole });
     onClose();
   };
 
@@ -389,7 +429,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   ).length;
 
   const getHoursLeftText = () => {
-    if (!weekStartDate) return '';
+    if (!weekStartDate || !canSwapWeek) return '';
     const now = new Date();
     const weekStart = new Date(weekStartDate);
     weekStart.setHours(0, 0, 0, 0);

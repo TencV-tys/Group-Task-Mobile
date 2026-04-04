@@ -1,4 +1,5 @@
-// src/screens/CreateSwapRequestScreen.tsx - Dark Mode Added
+// src/screens/CreateSwapRequestScreen.tsx - FIXED with batch API calls
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -135,8 +136,10 @@ export const CreateSwapRequestScreen = () => {
 
   // Filter members when scope or selected day changes
   useEffect(() => {
-    filterEligibleMembers();
-  }, [allMembers, swapScope, selectedDay, currentWeek]);
+    if (allMembers.length > 0 && currentUserId) {
+      filterEligibleMembers();
+    }
+  }, [allMembers, swapScope, selectedDay, currentWeek, currentUserId]);
 
   // Check swap availability when scope changes
   useEffect(() => {
@@ -176,126 +179,122 @@ export const CreateSwapRequestScreen = () => {
     }
   };
 
-  // Check if a member has an assignment on a specific day (for DAY swaps)
-  const checkMemberHasAssignmentOnDay = async (
-    memberId: string, 
-    day: string, 
-    week: number
-  ): Promise<boolean> => {
-    try {
-      const result = await SwapRequestService.checkUserHasAssignmentOnDay(
-        memberId,
-        groupId,
-        day,
-        week 
-      );
-      return result.hasAssignment || false;
-    } catch (error) {
-      console.error('Error checking assignment:', error);
-      return false;
-    }
-  };
-
-  // Check if a member has any assignment this week (for WEEK swaps)
-  const checkMemberHasAnyAssignmentThisWeek = async (
-    memberId: string, 
-    week: number
-  ): Promise<boolean> => {
-    try {
-      const result = await SwapRequestService.checkUserHasAnyAssignmentThisWeek(
-        memberId,
-        groupId,
-        week
-      );
-      return result.hasAssignment || false;
-    } catch (error) {
-      console.error('Error checking any assignment this week:', error);
-      return false;
-    }
-  };
-
-  // Filter eligible members based on swap scope
+  // ===== FIXED: BATCH API CALL to prevent 429 errors =====
   const filterEligibleMembers = async () => {
-    if (allMembers.length === 0) return;
+    if (allMembers.length === 0 || !currentUserId) return;
     
     setLoadingMembers(true);
     
     // Filter out current user and admins
     const eligibleBaseMembers = allMembers.filter(m => 
       m.userId !== currentUserId && 
-      m.role !== 'ADMIN' &&
+      m.groupRole !== 'ADMIN' &&
       m.inRotation === true
     );
     
+    if (eligibleBaseMembers.length === 0) {
+      setMembers([]);
+      setEligibleCount(0);
+      setLoadingMembers(false);
+      return;
+    }
+    
     try {
-      let eligible: any[] = [];
+      let eligibleMemberIds: Set<string> = new Set();
       
       if (swapScope === 'day' && selectedDay) {
-        // DAY SWAP: ONLY members who:
-        // 1. Have ANY tasks this week (are assigned to something)
-        // 2. Are FREE on the specific day
-        console.log(`🔍 Filtering for DAY swap on ${selectedDay}`);
-        console.log(`   Only showing members who are assigned (have tasks) but free on ${selectedDay}`);
+        // DAY SWAP: Batch check all members at once via a single API call
+        console.log(`🔍 Batch checking DAY swap eligibility for ${selectedDay}`);
         
-        for (const member of eligibleBaseMembers) {
-          // First check: Does this member have ANY tasks this week?
-          const hasAnyAssignment = await checkMemberHasAnyAssignmentThisWeek(
-            member.userId || member.id,
-            currentWeek
-          );
+        const memberIds = eligibleBaseMembers.map(m => m.userId);
+        
+        try {
+          // Make a single batch API call instead of multiple individual calls
+          const batchResult = await SwapRequestService.batchCheckUserAssignments({
+            userIds: memberIds,
+            groupId,
+            day: selectedDay,
+            week: currentWeek
+          });
           
-          // If they have NO tasks at all, skip them (unassigned members)
-          if (!hasAnyAssignment) {
-            console.log(`   ❌ ${member.fullName} is NOT eligible (no tasks at all this week - unassigned)`);
-            continue;
+          if (batchResult.success && batchResult.results) {
+            for (const result of batchResult.results) {
+              // Eligible if they have ANY tasks this week AND are free on this day
+              if (result.hasAnyAssignmentThisWeek && !result.hasAssignmentOnDay) {
+                eligibleMemberIds.add(result.userId);
+              }
+            }
           }
+        } catch (batchError) {
+          console.error('Batch check failed, falling back to individual checks:', batchError);
           
-          // Second check: Does this member have a task on the specific day?
-          const hasAssignmentOnDay = await checkMemberHasAssignmentOnDay(
-            member.userId || member.id,
-            selectedDay,
-            currentWeek
-          );
-          
-          // Eligible if they HAVE tasks this week BUT are FREE on this specific day
-          if (!hasAssignmentOnDay) {
-            eligible.push(member);
-            console.log(`   ✅ ${member.fullName} is eligible (has tasks, but free on ${selectedDay})`);
-          } else {
-            console.log(`   ❌ ${member.fullName} is NOT eligible (has tasks AND has task on ${selectedDay})`);
+          // Fallback: Individual checks with delays to avoid rate limiting
+          for (let i = 0; i < eligibleBaseMembers.length; i++) {
+            const member = eligibleBaseMembers[i];
+            
+            // Add delay between requests to avoid 429
+            if (i > 0) await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const [hasAnyAssignment, hasAssignmentOnDay] = await Promise.all([
+              SwapRequestService.checkUserHasAnyAssignmentThisWeek(member.userId, groupId, currentWeek),
+              SwapRequestService.checkUserHasAssignmentOnDay(member.userId, groupId, selectedDay, currentWeek)
+            ]);
+            
+            if (hasAnyAssignment.hasAssignment && !hasAssignmentOnDay.hasAssignment) {
+              eligibleMemberIds.add(member.userId);
+            }
           }
         }
         
-        setEligibleCount(eligible.length);
-        console.log(`✅ Found ${eligible.length} eligible members for day swap on ${selectedDay}`);
+        const eligibleMembers = eligibleBaseMembers.filter(m => eligibleMemberIds.has(m.userId));
+        setMembers(eligibleMembers);
+        setEligibleCount(eligibleMembers.length);
+        console.log(`✅ Found ${eligibleMembers.length} eligible members for day swap on ${selectedDay}`);
         
       } else if (swapScope === 'week') {
-        // WEEK SWAP: ONLY members who HAVE assignments this week (for exchange)
-        console.log(`🔍 Filtering for WEEK swap`);
+        // WEEK SWAP: Batch check all members at once
+        console.log(`🔍 Batch checking WEEK swap eligibility`);
         
-        for (const member of eligibleBaseMembers) {
-          const hasAnyAssignment = await checkMemberHasAnyAssignmentThisWeek(
-            member.userId || member.id,
-            currentWeek
-          );
+        const memberIds = eligibleBaseMembers.map(m => m.userId);
+        
+        try {
+          const batchResult = await SwapRequestService.batchCheckUserWeekAssignments({
+            userIds: memberIds,
+            groupId,
+            week: currentWeek
+          });
           
-          // ONLY eligible if they HAVE assignments this week (for fair exchange)
-          if (hasAnyAssignment) {
-            eligible.push(member);
-            console.log(`   ✅ ${member.fullName} is eligible (has tasks to exchange)`);
-          } else {
-            console.log(`   ❌ ${member.fullName} is NOT eligible (no tasks to exchange - unassigned)`);
+          if (batchResult.success && batchResult.results) {
+            for (const result of batchResult.results) {
+              // Eligible only if they HAVE assignments this week
+              if (result.hasAnyAssignmentThisWeek) {
+                eligibleMemberIds.add(result.userId);
+              }
+            }
+          }
+        } catch (batchError) {
+          console.error('Batch check failed, falling back to individual checks:', batchError);
+          
+          // Fallback: Individual checks with delays
+          for (let i = 0; i < eligibleBaseMembers.length; i++) {
+            const member = eligibleBaseMembers[i];
+            
+            if (i > 0) await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const hasAnyAssignment = await SwapRequestService.checkUserHasAnyAssignmentThisWeek(
+              member.userId, groupId, currentWeek
+            );
+            
+            if (hasAnyAssignment.hasAssignment) {
+              eligibleMemberIds.add(member.userId);
+            }
           }
         }
         
-        setEligibleCount(eligible.length);
-        console.log(`✅ Found ${eligible.length} eligible members for week swap`);
-      }
-      
-      setMembers(eligible);
-      
-      if (eligible.length === 0) {
-        console.log(`⚠️ No eligible members found for ${swapScope} swap`);
+        const eligibleMembers = eligibleBaseMembers.filter(m => eligibleMemberIds.has(m.userId));
+        setMembers(eligibleMembers);
+        setEligibleCount(eligibleMembers.length);
+        console.log(`✅ Found ${eligibleMembers.length} eligible members for week swap`);
       }
       
     } catch (error) {
@@ -770,7 +769,7 @@ export const CreateSwapRequestScreen = () => {
                                 {swapScope === 'day' && selectedDay
                                   ? `Free on ${selectedDay}`
                                   : swapScope === 'week'
-                                    ? `Has ${member.assignmentCount || 'tasks'} this week`
+                                    ? `Has tasks this week`
                                     : 'Member'}
                               </Text>
                             </View>
@@ -918,6 +917,6 @@ export const CreateSwapRequestScreen = () => {
       </KeyboardAvoidingView>
     </ScreenWrapper>
   ); 
-}; 
+};  
 
 export default CreateSwapRequestScreen;

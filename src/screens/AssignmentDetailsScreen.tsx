@@ -1,4 +1,5 @@
-// src/screens/AssignmentDetailsScreen.tsx - Dark Mode Added with Fixed Header
+// src/screens/AssignmentDetailsScreen.tsx - COMPLETE WITH SWAP ORIGIN CARD
+
 import React, { useEffect } from 'react';
 import {
   View,
@@ -396,6 +397,44 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     return null;
   };
 
+  // ===== RENDER SWAP ORIGIN CARD (for tasks acquired via swap) =====
+  const renderSwapOriginCard = () => {
+    // Only show for non-admin users who acquired this via swap
+    if (isAdmin) return null;
+    if (!assignment?.acquiredViaSwap) return null;
+    
+    return (
+      <LinearGradient
+        colors={[theme.primaryLight, theme.primaryLight]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.swapOriginCard, { borderColor: theme.primaryBorder }]}
+      >
+        <MaterialCommunityIcons name="swap-horizontal" size={20} color={theme.primary} />
+        <View style={styles.swapOriginContent}>
+          <Text style={[styles.swapOriginTitle, { color: theme.primary }]}>
+            {assignment.swapScope === 'week' ? '📅 Week Swap' : '🔄 Day Swap'} - Task Transferred
+          </Text>
+          <Text style={[styles.swapOriginText, { color: theme.textSecondary }]}>
+            You received this task from <Text style={{ fontWeight: '600', color: theme.primary }}>{assignment.swappedFromName || 'another member'}</Text>
+            {assignment.swapScope === 'week' 
+              ? ' through a full week swap exchange.'
+              : assignment.swapDay 
+                ? ` through a swap on ${assignment.swapDay}.`
+                : ' through a swap request.'}
+          </Text>
+          {assignment.swapRequestId && (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SwapRequestDetails', { requestId: assignment.swapRequestId })}
+            >
+              <Text style={[styles.viewSwapLink, { color: theme.primary }]}>View Swap Details →</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </LinearGradient>
+    );
+  };
+
   // ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) =====
   const renderVerificationControls = () => {
     if (!isAdmin) return null;
@@ -660,6 +699,9 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                 )}
               </View>
             </View>
+
+            {/* ✅ SWAP ORIGIN CARD - Show if task was acquired via swap */}
+            {renderSwapOriginCard()}
  
             {/* Complete Assignment Button - Only for Owner */}
             {renderCompleteButton()}
@@ -789,6 +831,6 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       {renderHeader()}
       {renderContent()}
       {renderPhotoModal()}
-    </ScreenWrapper>
-  );
+    </ScreenWrapper> 
+  ); 
 }

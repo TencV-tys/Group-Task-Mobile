@@ -1,4 +1,5 @@
-// src/screens/GroupTasksScreen.tsx - Dark Mode Added (No features removed)
+// src/screens/GroupTasksScreen.tsx - COMPLETE FINAL VERSION
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
@@ -100,7 +101,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
   const {
     events: swapEvents,
-    clearSwapCreated
+    clearSwapCreated,
+    clearSwapResponded,
   } = useRealtimeSwapRequests(groupId, currentUserId || '');
 
   // ===== CHECK IF TASK IS ASSIGNED =====
@@ -110,7 +112,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return false;
   }, []);
 
-  // ===== useMemo HOOKS =====
+  // ===== useMemo HOOKS - PRESERVE SWAP INFO =====
   const groupedMyTasks = useMemo(() => {
     if (selectedTab !== 'my') return [];
     
@@ -148,7 +150,13 @@ export default function GroupTasksScreen({ navigation, route }: any) {
           earnedPoints: 0,
           isFullyCompleted: false,
           hasAnyCompleted: false,
-          isDeleted: isDeletedTask
+          isDeleted: isDeletedTask,
+          // ✅ PRESERVE SWAP INFO
+          acquiredViaSwap: item.assignment?.acquiredViaSwap || false,
+          swappedFromName: item.assignment?.swappedFromName || null,
+          swapRequestId: item.assignment?.swapRequestId || null,
+          swapScope: item.assignment?.swapScope || null,
+          swapDay: item.assignment?.swapDay || null
         });
       }
       
@@ -405,6 +413,29 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
   const refreshTasks = useCallback(() => fetchTasks(true), [fetchTasks]);
 
+  // ===== HANDLE TASK CLICK - REDIRECT SWAPPED TASKS TO ASSIGNMENT DETAILS =====
+  const handleViewTaskDetails = async (item: any) => {
+    if (!await checkToken()) return;
+    
+    // ✅ If this is a swapped task in "My Tasks" tab, go directly to Assignment Details
+    const isMyTasksView = selectedTab === 'my';
+    const isAcquiredViaSwap = item.acquiredViaSwap === true;
+    const assignmentId = item.userAssignment?.id;
+    
+    if (isMyTasksView && isAcquiredViaSwap && assignmentId) {
+      console.log('🔄 Swapped task detected, navigating to Assignment Details:', assignmentId);
+      navigation.navigate('AssignmentDetails', { 
+        assignmentId, 
+        isAdmin: false,
+        onVerified: refreshTasks
+      });
+      return;
+    }
+    
+    // Otherwise go to Task Details
+    navigation.navigate('TaskDetails', { taskId: item.id, groupId, userRole });
+  };
+
   // ===== useEffect HOOKS =====
   useEffect(() => {
     if (authError) {
@@ -512,6 +543,13 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return unsubscribe;
   }, [navigation, groupId, loadingUser, refreshTasks]);
 
+  useEffect(() => {
+    if (swapEvents.swapResponded) {
+      refreshTasks();
+      clearSwapResponded();
+    }
+  }, [swapEvents.swapResponded, refreshTasks, clearSwapResponded]);
+
   // ===== HANDLER FUNCTIONS =====
   
   const handleEditTask = async (task: any) => {
@@ -543,40 +581,37 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     navigation.navigate('RotationSchedule', { groupId, groupName, userRole });
   };
 
- 
-const handleDeleteTask = async (task: any) => {
-  if (!await checkToken()) return;
+  const handleDeleteTask = async (task: any) => {
+    if (!await checkToken()) return;
 
-  const isAssigned = isTaskAssigned(task);
+    const isAssigned = isTaskAssigned(task);
 
-  Alert.alert(
-    '🗑️ Delete Task',
-    isAssigned
-      ? `Delete "${task.title}"?\n\nAssignment history will be preserved for members. The rotation slot will be freed up for a new task.`
-      : `Delete "${task.title}"?\n\nThis task has no active assignments. This cannot be undone.`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          // Optimistically remove from local state immediately
-          setTasks(prev => prev.filter(t => t.id !== task.id));
-          setMyTasks(prev => prev.filter(t => t.id !== task.id));
+    Alert.alert(
+      '🗑️ Delete Task',
+      isAssigned
+        ? `Delete "${task.title}"?\n\nAssignment history will be preserved for members. The rotation slot will be freed up for a new task.`
+        : `Delete "${task.title}"?\n\nThis task has no active assignments. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setTasks(prev => prev.filter(t => t.id !== task.id));
+            setMyTasks(prev => prev.filter(t => t.id !== task.id));
 
-          const result = await TaskService.deleteTask(task.id);
-          if (result.success) {
-            refreshTasks(); // sync with server
-          } else {
-            // Revert on failure
-            refreshTasks();
-            Alert.alert('Error', result.message || 'Failed to delete task');
+            const result = await TaskService.deleteTask(task.id);
+            if (result.success) {
+              refreshTasks();
+            } else {
+              refreshTasks();
+              Alert.alert('Error', result.message || 'Failed to delete task');
+            }
           }
         }
-      }
-    ]
-  );
-};
+      ] 
+    );
+  };
 
   const handleCreateTask = async () => {
     if (!await checkToken()) return;
@@ -585,11 +620,6 @@ const handleDeleteTask = async (task: any) => {
       return;
     }
     navigation.navigate('CreateTask', { groupId, groupName, onTaskCreated: refreshTasks });
-  };
-
-  const handleViewTaskDetails = async (taskId: string) => {
-    if (!await checkToken()) return;
-    navigation.navigate('TaskDetails', { taskId, groupId, userRole });
   };
 
   const handleCompleteNow = async (task: any) => {
@@ -642,7 +672,7 @@ const handleDeleteTask = async (task: any) => {
     navigation.navigate('TaskDrafts', { groupId, groupName });
   };
 
-  // ===== RENDER FUNCTIONS (UPDATED WITH THEME COLORS) =====
+  // ===== RENDER FUNCTIONS =====
   const renderAssignmentInfo = (task: any) => {
     const hasAssignment = task.userAssignment || task.assignments?.length > 0;
     if (!hasAssignment) {
@@ -961,13 +991,19 @@ const handleDeleteTask = async (task: any) => {
     const isMyTasksView = selectedTab === 'my';
     const taskIsAssigned = isTaskAssigned(item);
     
+    // ✅ Get swap info from the task level (preserved in groupedMyTasks)
+    const isAcquiredViaSwap = item.acquiredViaSwap === true;
+    const swappedFromName = item.swappedFromName || 'another member';
+    const swapRequestId = item.swapRequestId;
+    const swapScope = item.swapScope;
+    const swapDay = item.swapDay;
+    
     const isAssignedToCurrentUser = 
       item.isAssignedToUser === true || 
       !!item.userAssignment || 
       (item.assignments && item.assignments.some((a: any) => a.userId === currentUserId));
     
     const isClickable = isAdmin || isMyTasksView || isAssignedToCurrentUser;
-    const canEdit = isAdmin && !isMyTasksView && !taskIsAssigned;
     
     let isFullyCompleted = false;
     let completionPercentage = 0;
@@ -985,7 +1021,7 @@ const handleDeleteTask = async (task: any) => {
         earnedPoints = item.earnedPoints || 0;
         totalPoints = item.totalPoints || 0;
       } else {
-        isFullyCompleted = item.assignment?.completed || item.userAssignment?.completed || false;
+        isFullyCompleted = item.userAssignment?.completed || false;
         completionPercentage = isFullyCompleted ? 100 : 0;
         completedCount = isFullyCompleted ? 1 : 0;
         totalCount = 1;
@@ -995,20 +1031,28 @@ const handleDeleteTask = async (task: any) => {
     } else {
       if (item.assignments && item.assignments.length > 0) {
         const allAssignments = item.assignments;
-        totalCount = allAssignments.length;
-        const completedAssignments = allAssignments.filter((a: any) => a.completed === true);
-        completedCount = completedAssignments.length;
-        isFullyCompleted = completedCount === totalCount;
-        completionPercentage = (completedCount / totalCount) * 100;
-        earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-        totalPoints = allAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-      } else {
-        totalCount = 0;
-        completedCount = 0;
-        isFullyCompleted = false;
-        completionPercentage = 0;
-        earnedPoints = 0;
-        totalPoints = 0;
+        
+        if (item.executionFrequency === 'DAILY') {
+          const currentAssigneeId = item.currentAssignee;
+          const assigneeAssignments = currentAssigneeId 
+            ? allAssignments.filter((a: any) => a.userId === currentAssigneeId)
+            : allAssignments;
+          
+          totalCount = assigneeAssignments.length;
+          const completedAssignments = assigneeAssignments.filter((a: any) => a.completed === true);
+          completedCount = completedAssignments.length;
+          earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+          totalPoints = assigneeAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+        } else {
+          totalCount = allAssignments.length;
+          const completedAssignments = allAssignments.filter((a: any) => a.completed === true);
+          completedCount = completedAssignments.length;
+          earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+          totalPoints = allAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+        }
+        
+        isFullyCompleted = totalCount > 0 && completedCount === totalCount;
+        completionPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
       }
     }
     
@@ -1025,54 +1069,44 @@ const handleDeleteTask = async (task: any) => {
 
     return (
       <TouchableOpacity
-        onPress={() => {
-          if (!isClickable) {
-            Alert.alert(
-              'Access Denied',
-              'You can only view details of tasks assigned to you.',
-              [{ text: 'OK' }]
-            );
-            return;
-          }
-          handleViewTaskDetails(item.id);
-        }}
-       onLongPress={() => {
-  if (!isAdmin || isMyTasksView) return;
+        onPress={() => handleViewTaskDetails(item)}
+        onLongPress={() => {
+          if (!isAdmin || isMyTasksView) return;
 
-  if (!taskIsAssigned) {
-    // Unassigned - can edit or delete freely
-    Alert.alert('Task Options', `"${item.title}"`, [
-      { text: 'Edit', onPress: () => handleEditTask(item) },
-      { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item) },
-      { text: 'Cancel', style: 'cancel' }
-    ]);
-  } else {
-    // Assigned - both options available but with context
-    Alert.alert('Task Options', `"${item.title}"`, [
-      { 
-        text: 'Edit ⚠️', 
-        onPress: () => Alert.alert(
-          'Cannot Edit Assigned Task',
-          'This task is already assigned. Editing could break the rotation system.\n\nConsider creating a new task instead.',
-          [{ text: 'OK' }]
-        )
-      },
-      { 
-        text: 'Delete', 
-        style: 'destructive', 
-        onPress: () => handleDeleteTask(item) 
-      },
-      { text: 'Cancel', style: 'cancel' }
-    ]);
-  }
-}}
+          if (!taskIsAssigned) {
+            Alert.alert('Task Options', `"${item.title}"`, [
+              { text: 'Edit', onPress: () => handleEditTask(item) },
+              { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item) },
+              { text: 'Cancel', style: 'cancel' }
+            ]);
+          } else {
+            Alert.alert('Task Options', `"${item.title}"`, [
+              { 
+                text: 'Edit ⚠️', 
+                onPress: () => Alert.alert(
+                  'Cannot Edit Assigned Task',
+                  'This task is already assigned. Editing could break the rotation system.\n\nConsider creating a new task instead.',
+                  [{ text: 'OK' }]
+                )
+              },
+              { 
+                text: 'Delete', 
+                style: 'destructive', 
+                onPress: () => handleDeleteTask(item) 
+              },
+              { text: 'Cancel', style: 'cancel' }
+            ]);
+          }
+        }}
         activeOpacity={isClickable ? 0.7 : 1}
       > 
         <LinearGradient 
           colors={getGradientColors()} 
           style={[
             styles.taskCard,
-            !isClickable && styles.disabledTaskCard
+            !isClickable && styles.disabledTaskCard,
+            // ✅ Orange left border for swapped tasks
+            isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && styles.swappedTaskCard
           ]}
         >
           <View style={styles.taskHeader}>
@@ -1098,13 +1132,56 @@ const handleDeleteTask = async (task: any) => {
                       ? (item.assignmentsCount > 1 
                           ? `${earnedPoints}/${totalPoints} pts` 
                           : `${item.points} pts`)
-                      : `${earnedPoints}/${totalPoints} pts (${completedCount}/${totalCount} completed)`
+                      : item.executionFrequency === 'DAILY'
+                        ? `${completedCount}/${totalCount} days completed`
+                        : `${earnedPoints}/${totalPoints} pts (${completedCount}/${totalCount} completed)`
                     }
                   </Text>
                 </LinearGradient>
+                
+                {/* ✅ SWAP INDICATOR BADGE */}
+                {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
+                  <LinearGradient
+                    colors={['#F59E0B', '#F59E0B']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.swapIndicatorBadge}
+                  >
+                    <MaterialCommunityIcons name="swap-horizontal" size={10} color="#fff" />
+                    <Text style={styles.swapIndicatorText}>
+                      {swapScope === 'week' ? 'Week Swap' : `${swapDay || 'Day'} Swap`}
+                    </Text>
+                  </LinearGradient>
+                )}
               </View>
             </View>
           </View>
+          
+          {/* ✅ SWAP INFO TOOLTIP */}
+          {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
+            <LinearGradient
+              colors={[theme.primaryLight, theme.primaryLight]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.swapInfoTooltip, { borderColor: theme.primaryBorder }]}
+            >
+              <MaterialCommunityIcons name="information" size={14} color={theme.primary} />
+              <Text style={[styles.swapInfoText, { color: theme.primary }]}>
+                Received from {swappedFromName}
+                {swapScope === 'week' ? ' (Full week swap)' : swapDay ? ` (${swapDay})` : ''}
+              </Text>
+              {swapRequestId && (
+                <TouchableOpacity 
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    navigation.navigate('SwapRequestDetails', { requestId: swapRequestId });
+                  }}
+                >
+                  <Text style={[styles.viewSwapLink, { color: theme.primary }]}>View →</Text>
+                </TouchableOpacity>
+              )}
+            </LinearGradient>
+          )}
           
           {renderAssignmentInfo(item)}
           
@@ -1271,7 +1348,7 @@ const handleDeleteTask = async (task: any) => {
           <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => fetchTasks()}>
-            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.retryButtonGradient}>
+            <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.retryButtonGradient}>
               <Text style={styles.retryButtonText}>Retry</Text>
             </LinearGradient>
           </TouchableOpacity>

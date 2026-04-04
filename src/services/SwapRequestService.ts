@@ -836,4 +836,4 @@ static async batchCheckUserWeekAssignments(params: {
   }
 }
 
-}
+}  

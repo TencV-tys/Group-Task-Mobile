@@ -573,7 +573,34 @@ export const makeAssignmentDetailsStyles = (theme: Theme) => StyleSheet.create({
   },
   modalImage: {
     width: width - 40,
-    height: height - 100,
+    height: height - 100, 
     borderRadius: 8,
+  }, 
+  swapOriginCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 12,
+    borderWidth: 1,
+  },
+  swapOriginContent: {
+    flex: 1,
+  },
+  swapOriginTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  swapOriginText: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  viewSwapLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });

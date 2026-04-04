@@ -1,14 +1,15 @@
-// src/services/TaskService.ts - UPDATED with TokenUtils
+// src/services/TaskService.ts - COMPLETE FIXED VERSION
+
 import { API_BASE_URL } from '../config/api';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 
 const API_URL = `${API_BASE_URL}/api/tasks`;
 
-// Better helper function to clean undefined and null values
+// Helper function to clean undefined and null values
 function cleanTaskData(obj: any): any {
   if (obj === null || obj === undefined) {
     return undefined;
-  } 
+  }
   
   if (Array.isArray(obj)) {
     return obj
@@ -26,7 +27,7 @@ function cleanTaskData(obj: any): any {
     }
     return Object.keys(cleaned).length > 0 ? cleaned : undefined;
   }
-   
+  
   return obj;
 }
 
@@ -43,7 +44,7 @@ export interface CreateTaskData {
   isRecurring?: boolean;
   rotationMemberIds?: string[];
   rotationOrder?: number;
-  timeSlots?: Array<{ startTime: string; endTime: string; label?: string }>;
+  timeSlots?: Array<{ startTime: string; endTime: string; label?: string; points?: string | number }>;
   initialAssigneeId?: string;
 }
 
@@ -51,17 +52,13 @@ export type UpdateTaskData = Partial<CreateTaskData>;
 
 export class TaskService {
   
-  // ========== NO NEED FOR getAuthToken and getHeaders anymore - use TokenUtils directly ==========
-
   // ========== CREATE TASK ==========
   static async createTask(groupId: string, taskData: CreateTaskData) {
     try {
-      // Deep clean the data - remove all undefined values
       const cleanedData = cleanTaskData(taskData);
       
       console.log(`TaskService: Creating task for group ${groupId}`, cleanedData);
       
-      // ✅ Use TokenUtils.getAuthHeaders() instead of custom method
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/group/${groupId}/create`, {
@@ -109,7 +106,6 @@ export class TaskService {
       
       console.log(`TaskService: Fetching tasks for group ${groupId}`, week ? `week ${week}` : '');
       
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(url, {
@@ -136,7 +132,6 @@ export class TaskService {
         ? `${API_URL}/group/${groupId}/my-tasks?week=${week}`
         : `${API_URL}/group/${groupId}/my-tasks`;
       
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(url, {
@@ -145,6 +140,22 @@ export class TaskService {
       });
  
       const result = await response.json();
+      
+      // ✅ Log swap info for debugging
+      if (result.success && result.tasks) {
+        const swappedTasks = result.tasks.filter((t: any) => t.assignment?.acquiredViaSwap === true);
+        if (swappedTasks.length > 0) {
+          console.log(`🔄 [API] Found ${swappedTasks.length} tasks acquired via swap:`, 
+            swappedTasks.map((t: any) => ({ 
+              title: t.title, 
+              from: t.assignment?.swappedFromName,
+              scope: t.assignment?.swapScope,
+              day: t.assignment?.swapDay
+            }))
+          );
+        }
+      }
+      
       return result;
 
     } catch (error: any) {
@@ -159,7 +170,6 @@ export class TaskService {
   // ========== GET TASK DETAILS ==========
   static async getTaskDetails(taskId: string) {
     try {
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${taskId}`, {
@@ -182,7 +192,6 @@ export class TaskService {
   // ========== DELETE TASK ==========
   static async deleteTask(taskId: string) {
     try {
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${taskId}`, {
@@ -205,10 +214,8 @@ export class TaskService {
   // ========== UPDATE TASK ==========
   static async updateTask(taskId: string, taskData: UpdateTaskData) {
     try {
-      // Clean the data for updates too
       const cleanedData = cleanTaskData(taskData);
       
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${taskId}`, {
@@ -232,7 +239,6 @@ export class TaskService {
   // ========== GET ROTATION SCHEDULE ==========
   static async getRotationSchedule(groupId: string, weeks: number = 4) {
     try {
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/group/${groupId}/schedule?weeks=${weeks}`, {
@@ -255,7 +261,6 @@ export class TaskService {
   // ========== ROTATE TASKS ==========
   static async rotateTasks(groupId: string) {
     try {
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/group/${groupId}/rotate`, {
@@ -280,7 +285,6 @@ export class TaskService {
     try {
       console.log(`TaskService: Reassigning task ${taskId} to user ${targetUserId}`);
       
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/${taskId}/reassign`, {
@@ -306,7 +310,6 @@ export class TaskService {
     try {
       console.log(`TaskService: Getting statistics for group ${groupId}`);
       
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       const response = await fetch(`${API_URL}/group/${groupId}/statistics`, {
@@ -329,7 +332,6 @@ export class TaskService {
   // ========== GET ROTATION STATUS ==========
   static async getRotationStatus(groupId: string) {
     try {
-      // ✅ Use TokenUtils.getAuthHeaders()
       const headers = await TokenUtils.getAuthHeaders();
       
       console.log('📡 Fetching rotation status from:', `${API_URL}/group/${groupId}/rotation-status`);

@@ -1,4 +1,5 @@
-// src/styles/groupTasks.styles.ts - Dark Mode Version
+// src/styles/groupTasks.styles.ts - COMPLETE WITH DARK MODE AND SWAP STYLES
+
 import { StyleSheet, Dimensions } from 'react-native';
 import { Theme } from '../context/ThemeContext';
 
@@ -649,7 +650,44 @@ export const makeGroupTasksStyles = (theme: Theme) => StyleSheet.create({
   },
   rotationWarningText: {
     fontSize: 10,
-    color: theme.primary,
+    color: theme.primary,  
+    fontWeight: '600',
+  },
+  // ===== SWAP INDICATOR STYLES =====
+  swappedTaskCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
+  },
+  swapIndicatorBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    gap: 4,
+    backgroundColor: '#F59E0B',
+  },
+  swapIndicatorText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  swapInfoTooltip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 8,
+    gap: 6,
+    borderWidth: 1,
+  },
+  swapInfoText: {
+    fontSize: 11,
+    fontWeight: '500',
+    flex: 1,
+  },
+  viewSwapLink: {
+    fontSize: 11,
     fontWeight: '600',
   },
 });

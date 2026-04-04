@@ -103,7 +103,7 @@ export const useSwapRequests = () => {
     }
 
     // Only apply time restriction if it's the SAME filter
-    if (!force && isSameFilter && now - lastMyRequestsLoadRef.current < 2000) {
+    if (!force && isSameFilter && now - lastMyRequestsLoadRef.current < 3000) {
       console.log('⏸️ Skipping loadMyRequests: same filter called too soon');
       return;
     }
@@ -175,13 +175,13 @@ export const useSwapRequests = () => {
     const isSameFilter = lastPendingForMeFiltersRef.current === filterKey;
 
     // Prevent duplicate requests while one is still loading
-    if (pendingForMeLoadingRef.current) {
+    if (pendingForMeLoadingRef.current) { 
       console.log('⏸️ Skipping loadPendingForMe: already loading');
       return;
     }
 
     // Only apply time restriction if it's the SAME filter
-    if (!force && isSameFilter && now - lastPendingForMeLoadRef.current < 2000) {
+    if (!force && isSameFilter && now - lastPendingForMeLoadRef.current < 3000) {
       console.log('⏸️ Skipping loadPendingForMe: same filter called too soon');
       return;
     }
@@ -471,74 +471,59 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
-  // Accept swap request
-  const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () => void) => {
-    const hasToken = await checkToken();
-    if (!hasToken) {
-      return {
-        success: false,
-        message: 'Authentication required',
-        authError: true
-      };
-    }
+ // useSwapRequests.ts - fix acceptSwapRequest
+const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () => void) => {
+  const hasToken = await checkToken();
+  if (!hasToken) return { success: false, message: 'Authentication required', authError: true };
 
-    setLoading(true);
-    setError(null);
-    setAuthError(false);
+  setLoading(true);
+  setError(null);
+  setAuthError(false);
 
-    try {
-      console.log('✅ Accepting swap request:', requestId);
-      const response = await SwapRequestService.acceptSwapRequest(requestId);
+  try {
+    console.log('✅ Accepting swap request:', requestId);
+    const response = await SwapRequestService.acceptSwapRequest(requestId);
 
-      console.log('📦 Accept response:', response);
+    if (response.success) {
+      if (onSuccess) onSuccess();
 
-      if (response.success) {
-        await loadMyRequests(undefined, true);
-        await loadPendingForMe(undefined, true);
+      // ✅ Delay refresh to avoid 429 - socket events will already trigger some reloads
+      setTimeout(async () => {
+        await Promise.all([
+          loadMyRequests(undefined, true),
+          loadPendingForMe(undefined, true)
+        ]);
+      }, 1500);
 
-        if (onSuccess) {
-          onSuccess();
-        }
+      const scope = response.data?.scope || response.scope;
+      const selectedDay = response.data?.selectedDay || response.selectedDay;
+      const transferredCount = response.data?.transferredCount || response.transferredCount;
 
-        const scope = response.data?.scope || response.scope;
-        const selectedDay = response.data?.selectedDay || response.selectedDay;
-        const transferredCount = response.data?.transferredCount || response.transferredCount;
-
-        let successMessage = response.message || 'Swap request accepted successfully!';
-
-        if (scope === 'day') {
-          if (transferredCount && transferredCount > 1) {
-            successMessage = `Swap accepted! You've taken over ${transferredCount} assignments for ${selectedDay}.`;
-          } else if (selectedDay) {
-            successMessage = `Swap accepted! You've taken over ${selectedDay}'s assignment.`;
-          }
-        } else if (scope === 'week') {
-          successMessage = 'Swap accepted! The entire week\'s assignment has been transferred to you.';
-        }
-
-        Alert.alert('Success', successMessage);
-      } else {
-        if (
-          response.message?.toLowerCase().includes('token') ||
-          response.message?.toLowerCase().includes('auth') ||
-          response.message?.toLowerCase().includes('unauthorized')
-        ) {
-          setAuthError(true);
-        }
-        Alert.alert('Error', response.message || 'Failed to accept swap request');
+      let successMessage = response.message || 'Swap request accepted successfully!';
+      if (scope === 'day') {
+        successMessage = transferredCount && transferredCount > 1
+          ? `Swap accepted! You've taken over ${transferredCount} assignments for ${selectedDay}.`
+          : `Swap accepted! You've taken over ${selectedDay}'s assignment.`;
+      } else if (scope === 'week') {
+        successMessage = "Swap accepted! The entire week's assignment has been transferred to you.";
       }
 
-      return response;
-    } catch (err: any) {
-      console.error('❌ Error in acceptSwapRequest:', err);
-      setError(err.message || 'Failed to accept swap request');
-      Alert.alert('Error', err.message || 'Failed to accept swap request');
-      return { success: false, message: err.message };
-    } finally {
-      setLoading(false);
+      Alert.alert('Success', successMessage);
+    } else {
+      if (response.message?.toLowerCase().match(/token|auth|unauthorized/)) setAuthError(true);
+      Alert.alert('Error', response.message || 'Failed to accept swap request');
     }
-  }, [loadMyRequests, loadPendingForMe, checkToken]);
 
+    return response;
+  } catch (err: any) {
+    console.error('❌ Error in acceptSwapRequest:', err);
+    setError(err.message || 'Failed to accept swap request');
+    Alert.alert('Error', err.message || 'Failed to accept swap request');
+    return { success: false, message: err.message };
+  } finally {
+    setLoading(false);
+  }
+}, [loadMyRequests, loadPendingForMe, checkToken]);
   // Reject swap request
   const rejectSwapRequest = useCallback(async (requestId: string, reason?: string) => {
     const hasToken = await checkToken();
@@ -698,4 +683,4 @@ export const useSwapRequests = () => {
     getAdminApprovalStatus,
     refreshAll,
   };
-};
+};  

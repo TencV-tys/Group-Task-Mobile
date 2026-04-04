@@ -157,7 +157,7 @@ export const CreateSwapRequestScreen = () => {
     } catch (error) {
       console.error('Error loading current week:', error);
     }
-  };
+  }; 
 
   const loadAllMembers = async () => {
     setLoadingMembers(true);

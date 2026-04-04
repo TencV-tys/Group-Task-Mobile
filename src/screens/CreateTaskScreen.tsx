@@ -1,5 +1,5 @@
-// src/screens/CreateTaskScreen.tsx - Dark Mode Added
-import React, { useState, useRef, useEffect } from 'react';
+// src/screens/CreateTaskScreen.tsx - FIXED Point Suggestion Logic
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -25,8 +25,6 @@ import { DAY_OF_WEEK_OPTIONS } from '../utils/timeUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { TaskDraftService } from '../services/TaskDraftService';
 
-// ─── Constants ──────────────────────────────────────────────────────────────
-
 type Category = 'Work' | 'Study' | 'Chores' | '';
 
 const CATEGORIES: { value: Category; icon: string }[] = [
@@ -34,8 +32,6 @@ const CATEGORIES: { value: Category; icon: string }[] = [
   { value: 'Study',  icon: 'book-open-outline' },
   { value: 'Chores', icon: 'broom' },
 ];
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 const convertTimeToMinutes = (time: string): number => {
   const [h, m] = time.split(':').map(Number);
@@ -48,8 +44,6 @@ const formatTimeForDisplay = (time: string): string => {
   const display = h % 12 || 12;
   return `${display}:${m.toString().padStart(2, '0')} ${period}`;
 };
-
-// ─── Types ──────────────────────────────────────────────────────────────────
 
 interface TimeSlot {
   id?: string;
@@ -83,8 +77,6 @@ const DEFAULT_FORM: FormState = {
   timeSlots: [],
 };
 
-// ─── Screen ─────────────────────────────────────────────────────────────────
-
 export default function CreateTaskScreen({ navigation, route }: any) {
   const { theme } = useTheme();
   const styles = makeCreateTaskStyles(theme);
@@ -106,8 +98,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
 
-  // ─── Points derived state ────────────────────────────────────────────────
-
   const totalPoints = parseInt(form.points, 10) || 0;
   const usedPoints = form.timeSlots.reduce(
     (sum, s) => sum + (parseInt(s.points || '0', 10) || 0),
@@ -116,7 +106,43 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   const remainingPoints = totalPoints - usedPoints;
   const canAddMoreSlots = remainingPoints > 0 && form.timeSlots.length < 10;
 
-  // ─── Effects ─────────────────────────────────────────────────────────────
+ // ─── FIXED: Points Suggestion Logic ──────────────────────────────────────
+// Points decrease by exactly 1 for each task in order
+// Task 1 = 10 pts, Task 2 = 9 pts, Task 3 = 8 pts, etc.
+const getSuggestedPoints = useCallback(() => {
+  if (!status) return null;
+
+  const membersInRotation = status.membersInRotation || 0;
+  const currentTaskCount = status.totalTasks || 0;
+  const tasksNeeded = Math.max(0, membersInRotation - currentTaskCount);
+
+  if (membersInRotation === 0) return null;
+  if (currentTaskCount >= membersInRotation) return null;
+
+  const nextPosition = currentTaskCount + 1;
+  
+  // Simple formula: points = 11 - position (capped between 1 and 10)
+  // Position 1 → 10 pts, Position 2 → 9 pts, Position 3 → 8 pts, etc.
+  let suggested = 11 - nextPosition;
+  
+  // Ensure it stays within 1-10 range
+  suggested = Math.min(10, Math.max(1, suggested));
+
+  console.log('📊 Point Suggestion Debug:', {
+    membersInRotation,
+    currentTaskCount,
+    tasksNeeded,
+    nextPosition,
+    suggested,
+    expected: `${11 - nextPosition} pts`
+  });
+
+  return {
+    suggested,
+    position: nextPosition,
+    total: membersInRotation,
+  };
+}, [status]);
 
   useEffect(() => {
     if (draftData && (isEditingDraft || createFromDraft)) {
@@ -167,8 +193,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     if (groupId) checkStatus();
   }, [groupId]);
 
-  // ─── Time slot helpers ───────────────────────────────────────────────────
-
   const getNextAvailableStartTime = () => {
     if (form.timeSlots.length === 0) return { hour: '8', minute: '00', period: 'AM' };
 
@@ -194,8 +218,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     if (start.hour === '12') return { ...start, hour: '1' };
     return { ...start, hour: (h + 1).toString() };
   };
-
-  // ─── Handlers ────────────────────────────────────────────────────────────
 
   const updateForm = (patch: Partial<FormState>) =>
     setForm(prev => ({ ...prev, ...patch }));
@@ -275,8 +297,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     setShowTimeSlotModal(false);
   };
 
-  // ─── Validation helpers ──────────────────────────────────────────────────
-
   const hasSlotExceedingLimit = () =>
     form.timeSlots.some(s => parseInt(s.points || '0', 10) > 10);
 
@@ -306,8 +326,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     hasSlotExceedingLimit() ||
     (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
     !weeklyDaysOk;
-
-  // ─── Submit / Draft ───────────────────────────────────────────────────────
 
   const buildTaskPayload = () => {
     const points = parseInt(form.points, 10);
@@ -403,12 +421,10 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   };
 
   const recommendation = getTaskRecommendation();
-
-  // ─── Render ───────────────────────────────────────────────────────────────
+  const pointsSuggestion = getSuggestedPoints();
 
   return (
     <ScreenWrapper style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
@@ -561,6 +577,33 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     <Text style={styles.pointsLimitText}>Max: 10</Text>
                   </LinearGradient>
                 </View>
+
+                {/* ─── Points Suggestion Banner ─── */}
+                {pointsSuggestion && (
+                  <LinearGradient
+                    colors={[theme.primaryLight, theme.primaryLight]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.suggestionBanner}
+                  >
+                    <MaterialCommunityIcons name="lightbulb-on" size={18} color={theme.primary} />
+                    <View style={styles.suggestionTextContainer}>
+                      <Text style={styles.suggestionTitle}>
+                        Suggested: {pointsSuggestion.suggested} pts
+                      </Text>
+                      <Text style={styles.suggestionSubtitle}>
+                        Task {pointsSuggestion.position} of {pointsSuggestion.total} in rotation — higher points for earlier tasks to create fair competition
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => updateForm({ points: pointsSuggestion.suggested.toString() })}
+                      style={[styles.suggestionUseButton, { backgroundColor: theme.primary }]}
+                    >
+                      <Text style={styles.suggestionUseButtonText}>Use</Text>
+                    </TouchableOpacity>
+                  </LinearGradient>
+                )}
+
                 <View style={styles.pointsInputContainer}>
                   <LinearGradient
                     colors={[theme.bgSecondary, theme.bgTertiary]}
@@ -619,7 +662,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 </View>
               </View>
 
-              {/* ── Category Chip Selector ── */}
+              {/* Category */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Category</Text>
                 <View style={styles.categoryChipsContainer}>
@@ -643,12 +686,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                             size={16}
                             color={isActive ? '#fff' : theme.textSecondary}
                           />
-                          <Text
-                            style={[
-                              styles.categoryChipText,
-                              isActive && styles.categoryChipTextActive,
-                            ]}
-                          >
+                          <Text style={[styles.categoryChipText, isActive && styles.categoryChipTextActive]}>
                             {value}
                           </Text>
                         </LinearGradient>
@@ -678,12 +716,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                           end={{ x: 1, y: 1 }}
                           style={styles.frequencyButtonGradient}
                         >
-                          <Text
-                            style={[
-                              styles.frequencyButtonText,
-                              isActive && styles.frequencyButtonTextActive,
-                            ]}
-                          >
+                          <Text style={[styles.frequencyButtonText, isActive && styles.frequencyButtonTextActive]}>
                             {freq.charAt(0) + freq.slice(1).toLowerCase()}
                           </Text>
                         </LinearGradient>
@@ -705,10 +738,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     </Text>
                   </View>
                   <TouchableOpacity
-                    style={[
-                      styles.addTimeSlotButton,
-                      (!canAddMoreSlots || loading) && styles.addTimeSlotDisabled,
-                    ]}
+                    style={[styles.addTimeSlotButton, (!canAddMoreSlots || loading) && styles.addTimeSlotDisabled]}
                     onPress={handleAddTimeSlot}
                     disabled={!canAddMoreSlots || loading}
                   >
@@ -718,17 +748,8 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                       end={{ x: 1, y: 1 }}
                       style={styles.addTimeSlotGradient}
                     >
-                      <MaterialCommunityIcons
-                        name="plus"
-                        size={16}
-                        color={canAddMoreSlots ? '#fff' : theme.textMuted}
-                      />
-                      <Text
-                        style={[
-                          styles.addTimeSlotText,
-                          !canAddMoreSlots && styles.addTimeSlotTextDisabled,
-                        ]}
-                      >
+                      <MaterialCommunityIcons name="plus" size={16} color={canAddMoreSlots ? '#fff' : theme.textMuted} />
+                      <Text style={[styles.addTimeSlotText, !canAddMoreSlots && styles.addTimeSlotTextDisabled]}>
                         Add
                       </Text>
                     </LinearGradient>
@@ -759,32 +780,22 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                           <View style={styles.timeSlotInfo}>
                             <View style={styles.timeSlotHeader}>
                               <Text style={styles.timeSlotTime}>
-                                {formatTimeForDisplay(slot.startTime)} –{' '}
-                                {formatTimeForDisplay(slot.endTime)}
+                                {formatTimeForDisplay(slot.startTime)} – {formatTimeForDisplay(slot.endTime)}
                               </Text>
                               {slot.points && slotPts > 0 && (
                                 <LinearGradient
-                                  colors={
-                                    exceeds ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]
-                                  }
+                                  colors={exceeds ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]}
                                   start={{ x: 0, y: 0 }}
                                   end={{ x: 1, y: 1 }}
                                   style={styles.pointsBadge}
                                 >
-                                  <Text
-                                    style={[
-                                      styles.pointsBadgeText,
-                                      exceeds && styles.pointsBadgeErrorText,
-                                    ]}
-                                  >
+                                  <Text style={[styles.pointsBadgeText, exceeds && styles.pointsBadgeErrorText]}>
                                     {slot.points} pts
                                   </Text>
                                 </LinearGradient>
                               )}
                             </View>
-                            {slot.label ? (
-                              <Text style={styles.timeSlotLabel}>{slot.label}</Text>
-                            ) : null}
+                            {slot.label ? <Text style={styles.timeSlotLabel}>{slot.label}</Text> : null}
                           </View>
                           <View style={styles.timeSlotActions}>
                             <TouchableOpacity
@@ -843,12 +854,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                             end={{ x: 1, y: 1 }}
                             style={styles.dayButtonGradient}
                           >
-                            <Text
-                              style={[
-                                styles.dayButtonText,
-                                isActive && styles.dayButtonTextActive,
-                              ]}
-                            >
+                            <Text style={[styles.dayButtonText, isActive && styles.dayButtonTextActive]}>
                               {day.label}
                             </Text>
                           </LinearGradient>
@@ -868,12 +874,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                     onPress={() => updateForm({ isRecurring: !form.isRecurring })}
                     disabled={loading}
                   >
-                    <View
-                      style={[
-                        styles.toggleCircle,
-                        form.isRecurring && styles.toggleCircleActive,
-                      ]}
-                    />
+                    <View style={[styles.toggleCircle, form.isRecurring && styles.toggleCircleActive]} />
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.helperText}>
@@ -888,7 +889,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 colors={[theme.errorBg, theme.errorBg]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.errorBox} 
+                style={styles.errorBox}
               >
                 <MaterialCommunityIcons name="alert-circle" size={18} color={theme.error} />
                 <Text style={styles.errorText}>⚠️ {error}</Text>
@@ -897,7 +898,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
             {/* Action Buttons */}
             <View style={styles.actions}>
-              {/* Cancel */}
               <TouchableOpacity
                 style={[styles.cancelButton, loading && styles.buttonDisabled]}
                 onPress={() => navigation.goBack()}
@@ -913,12 +913,8 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 </LinearGradient>
               </TouchableOpacity>
 
-              {/* Save as Draft */}
               <TouchableOpacity
-                style={[
-                  styles.draftButton,
-                  (isDraftDisabled() || isSavingDraft) && styles.buttonDisabled,
-                ]}
+                style={[styles.draftButton, (isDraftDisabled() || isSavingDraft) && styles.buttonDisabled]}
                 onPress={handleSaveAsDraft}
                 disabled={isDraftDisabled() || isSavingDraft}
               >
@@ -933,15 +929,12 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   ) : (
                     <>
                       <MaterialCommunityIcons name="content-save" size={16} color="#fff" />
-                      <Text style={styles.draftButtonText}>
-                        {currentDraftId ? 'Update' : 'Draft'}
-                      </Text>
+                      <Text style={styles.draftButtonText}>{currentDraftId ? 'Update' : 'Draft'}</Text>
                     </>
                   )}
                 </LinearGradient>
               </TouchableOpacity>
 
-              {/* Create Task */}
               <TouchableOpacity
                 style={[styles.submitButton, isSubmitDisabled() && styles.buttonDisabled]}
                 onPress={handleSubmit}
@@ -954,10 +947,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   style={styles.submitButtonGradient}
                 >
                   {loading ? (
-                    <ActivityIndicator
-                      color={isSubmitDisabled() ? theme.textMuted : '#fff'}
-                      size="small"
-                    />
+                    <ActivityIndicator color={isSubmitDisabled() ? theme.textMuted : '#fff'} size="small" />
                   ) : (
                     <>
                       <MaterialCommunityIcons
@@ -965,12 +955,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                         size={16}
                         color={isSubmitDisabled() ? theme.textMuted : '#fff'}
                       />
-                      <Text
-                        style={[
-                          styles.submitButtonText,
-                          isSubmitDisabled() && styles.submitButtonTextDisabled,
-                        ]}
-                      >
+                      <Text style={[styles.submitButtonText, isSubmitDisabled() && styles.submitButtonTextDisabled]}>
                         Create
                       </Text>
                     </>
@@ -994,6 +979,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   'Daily tasks require time slots',
                   'Weekly tasks need at least one day',
                   'End time must be after start time',
+                  'Each task gets unique points for fair scoring',
                 ].map(rule => (
                   <View key={rule} style={styles.infoItem}>
                     <MaterialCommunityIcons name="circle-small" size={16} color={theme.primary} />
@@ -1018,4 +1004,4 @@ export default function CreateTaskScreen({ navigation, route }: any) {
       />
     </ScreenWrapper>
   );
-}  
+}

@@ -1,4 +1,4 @@
-// src/styles/createTask.styles.ts - Dark Mode Version
+// src/styles/createTask.styles.ts - COMPLETE UPDATED VERSION
 import { StyleSheet } from 'react-native';
 import { Theme } from '../context/ThemeContext';
 
@@ -97,22 +97,25 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
   },
   warningContent: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 12,
   },
   warningTextContainer: {
     flex: 1,
+    flexShrink: 1,
   },
   warningTitle: {
     fontSize: 15,
     fontWeight: '600',
     color: theme.primary,
     marginBottom: 2,
+    flexWrap: 'wrap',
   },
   warningMessage: {
     fontSize: 13,
     color: theme.primary,
     lineHeight: 18,
+    flexWrap: 'wrap',
   },
   infoTitle: {
     fontSize: 15,
@@ -148,6 +151,7 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '600',
     color: theme.textSecondary,
     marginBottom: 6,
+    marginLeft: 4,
   },
   labelContainer: {
     flexDirection: 'row',
@@ -186,6 +190,50 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
     color: theme.textMuted,
     marginTop: 4,
     marginLeft: 2,
+  },
+  errorText: {
+    color: theme.error,
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  // ─── Points Suggestion Banner ─────────────────────────────────────────────
+  suggestionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryLight,
+  },
+  suggestionTextContainer: {
+    flex: 1,
+    flexShrink: 1,
+  },
+  suggestionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.primary,
+    marginBottom: 2,
+  },
+  suggestionSubtitle: {
+    fontSize: 11,
+    color: theme.textSecondary,
+    lineHeight: 15,
+    flexWrap: 'wrap',
+  },
+  suggestionUseButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  suggestionUseButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 
   // ─── Points ───────────────────────────────────────────────────────────────
@@ -525,23 +573,15 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
 
   // ─── Error Box ────────────────────────────────────────────────────────────
   errorBox: {
-  flexDirection: 'row',
-  alignItems: 'flex-start', // changed from 'center'
-  gap: 8,
-  padding: 14,
-  borderRadius: 10,
-  marginBottom: 16,
-  borderWidth: 1,
-  borderColor: theme.errorBorder,
-},
-errorText: {
-  color: theme.error,
-  fontSize: 12,
-  marginTop: 2,
-  flex: 1,        // add this
-  flexShrink: 1,  // add this
-  flexWrap: 'wrap', // add this
-},
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: theme.errorBorder,
+  },
 
   // ─── Action Buttons ───────────────────────────────────────────────────────
   actions: {

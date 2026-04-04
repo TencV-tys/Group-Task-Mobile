@@ -777,18 +777,15 @@ static async checkUserHasAnyAssignmentThisWeek(
     return { hasAssignment: false, assignmentCount: 0, assignments: [] };
   }
 }
-
-// Add these methods to SwapRequestService class in services/SwapRequestService.ts
-
 // BATCH check for multiple users' assignments on a specific day
 static async batchCheckUserAssignments(params: {
   userIds: string[];
   groupId: string;
-  day: string;
+  day: string; 
   week: number;
 }): Promise<{ success: boolean; results?: Array<{ userId: string; hasAssignmentOnDay: boolean; hasAnyAssignmentThisWeek: boolean }> }> {
   try {
-    const headers = await TokenUtils.getAuthHeaders(false);
+    const headers = await TokenUtils.getAuthHeaders();
     
     const response = await fetch(`${API_URL}/batch-check-assignments`, {
       method: 'POST',
@@ -817,7 +814,7 @@ static async batchCheckUserWeekAssignments(params: {
   week: number;
 }): Promise<{ success: boolean; results?: Array<{ userId: string; hasAnyAssignmentThisWeek: boolean; assignmentCount?: number }> }> {
   try {
-    const headers = await TokenUtils.getAuthHeaders(false);
+    const headers = await TokenUtils.getAuthHeaders();
     
     const response = await fetch(`${API_URL}/batch-check-week-assignments`, {
       method: 'POST',

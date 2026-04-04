@@ -417,7 +417,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
           id: assignmentData.id,
           dueDate: assignmentData.dueDate,
           assignmentDay: assignmentData.assignmentDay,
-          taskTitle: assignmentData.task?.title,
+          taskTitle: assignmentData.task?.title, 
           timeSlot: assignmentData.timeSlot,
           userId: assignmentData.userId,
           isOwner: assignmentData.userId === currentUserId

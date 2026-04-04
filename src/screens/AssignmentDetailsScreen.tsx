@@ -15,7 +15,7 @@ import {
   Dimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient'; 
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 
 import { useAssignmentDetails } from '../hooks/useAssignmentDetails';
 import { ScreenWrapper } from '../components/ScreenWrapper';

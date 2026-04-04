@@ -1,4 +1,5 @@
-// src/screens/MemberDashboardScreen.tsx - Dark Mode Added
+// src/screens/MemberDashboardScreen.tsx - COMPLETE UPDATED VERSION
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -43,8 +44,10 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   
-  // State for my swap requests count
+  // State for my swap requests count (requests I created)
   const [mySwapRequestsCount, setMySwapRequestsCount] = useState(0);
+  // ✅ NEW: State for pending requests for me (requests I need to respond to)
+  const [pendingForMeCount, setPendingForMeCount] = useState(0);
   const [loadingSwaps, setLoadingSwaps] = useState(false);
   
   const isMounted = useRef(true);
@@ -55,6 +58,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   console.log('🏠 [MemberDashboard] Component mounted with params:', { groupId, groupName });
   console.log('🏠 [MemberDashboard] Current userId:', currentUserId);
   console.log('🏠 [MemberDashboard] Current mySwapRequestsCount:', mySwapRequestsCount);
+  console.log('🏠 [MemberDashboard] Current pendingForMeCount:', pendingForMeCount);
 
   // ===== GET USER ID USING TOKENUTILS =====
   useEffect(() => {
@@ -65,8 +69,9 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
           setCurrentUserId(user.id);
           console.log('👤 [MemberDashboard] Current user ID set:', user.id);
           
-          // Fetch swap count immediately after userId is set
+          // Fetch swap counts immediately after userId is set
           await fetchMySwapRequestsCount();
+          await fetchPendingForMeCount();
         } else {
           console.log('⚠️ [MemberDashboard] No user found');
         }
@@ -81,7 +86,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     };
   }, []);
 
-  // ===== FETCH MY SWAP REQUESTS COUNT =====
+  // ===== FETCH MY SWAP REQUESTS COUNT (requests I created) =====
   const fetchMySwapRequestsCount = useCallback(async () => {
     console.log('🔍 [MemberDashboard] fetchMySwapRequestsCount called');
     console.log('🔍 [MemberDashboard] currentUserId:', currentUserId);
@@ -93,7 +98,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     
     setLoadingSwaps(true);
     try {
-      console.log('📡 [MemberDashboard] Fetching swap requests from:', `${API_BASE_URL}/api/swap-requests/my-requests?limit=100`);
+      console.log('📡 [MemberDashboard] Fetching my swap requests from:', `${API_BASE_URL}/api/swap-requests/my-requests?limit=100`);
       
       const headers = await TokenUtils.getAuthHeaders(false);
       const response = await fetch(`${API_BASE_URL}/api/swap-requests/my-requests?limit=100`, {
@@ -110,16 +115,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         ).length;
         
         console.log(`📊 [MemberDashboard] Total requests: ${data.data.requests.length}`);
-        console.log(`📊 [MemberDashboard] Pending requests: ${pendingCount}`);
-        
-        // Log each request's status
-        data.data.requests.forEach((req: any, index: number) => {
-          console.log(`   Request ${index + 1}:`, {
-            id: req.id,
-            status: req.status,
-            assignmentId: req.assignmentId
-          });
-        });
+        console.log(`📊 [MemberDashboard] Pending requests (my swaps): ${pendingCount}`);
         
         setMySwapRequestsCount(pendingCount);
         console.log(`✅ [MemberDashboard] Set mySwapRequestsCount to: ${pendingCount}`);
@@ -135,10 +131,45 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     }
   }, [currentUserId]);
 
+ const fetchPendingForMeCount = useCallback(async () => {
+  console.log('🔍 [MemberDashboard] fetchPendingForMeCount called');
+  
+  if (!currentUserId) {
+    console.log('⚠️ No currentUserId');
+    return;
+  }
+  
+  try {
+    const headers = await TokenUtils.getAuthHeaders(false);
+    const response = await fetch(`${API_BASE_URL}/api/swap-requests/pending-for-me?limit=100`, {
+      headers
+    });
+    
+    const data = await response.json();
+    console.log('📊 Pending for me FULL response:', JSON.stringify(data, null, 2));
+    
+    if (data.success && data.data) {
+      const pendingCount = data.data.total || data.data.requests?.length || 0;
+      console.log(`✅ Pending requests for me: ${pendingCount}`);
+      setPendingForMeCount(pendingCount);
+    } else {
+      console.log('⚠️ No pending requests or API error:', data.message);
+      setPendingForMeCount(0);
+    }
+  } catch (error) {
+    console.error('❌ Error fetching pending for me:', error);
+    setPendingForMeCount(0);
+  }
+}, [currentUserId]);
+
   // ===== LOG STATE CHANGES =====
   useEffect(() => {
     console.log('🔄 [MemberDashboard] mySwapRequestsCount changed to:', mySwapRequestsCount);
   }, [mySwapRequestsCount]);
+  
+  useEffect(() => {
+    console.log('🔄 [MemberDashboard] pendingForMeCount changed to:', pendingForMeCount);
+  }, [pendingForMeCount]);
 
   // ===== REAL-TIME EVENT LISTENERS =====
   const { events: taskEvents, clearRotationCompleted } = useRealtimeTasks(groupId);
@@ -212,13 +243,14 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     assignmentEvents.assignmentPendingVerification
   ]);
 
-  // Refresh when swap requests change
+  // Refresh when swap requests change - update both counts
   useEffect(() => {
     if (swapEvents.swapCreated ||
         swapEvents.swapResponded) {
       console.log('🔄 [MemberDashboard] Swap event detected, refreshing...');
       refreshDashboardData();
       fetchMySwapRequestsCount();
+      fetchPendingForMeCount();
     }
   }, [
     swapEvents.swapCreated,
@@ -243,6 +275,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         
         if (notification.type === 'SWAP_ACCEPTED' || notification.type === 'SWAP_RESPONDED') {
           fetchMySwapRequestsCount();
+          fetchPendingForMeCount();
         }
       }
     },
@@ -253,15 +286,16 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     useCallback(() => {
       console.log('🎯 [MemberDashboard] Screen focused');
       console.log('🎯 [MemberDashboard] Current userId on focus:', currentUserId);
-      console.log('🎯 [MemberDashboard] Current swap count on focus:', mySwapRequestsCount);
+      console.log('🎯 [MemberDashboard] Current swap counts on focus:', { mySwaps: mySwapRequestsCount, pendingForMe: pendingForMeCount });
       
       if (!initialLoadDone.current) {
         loadDashboardData();
       }
       
-      // Always refresh swap count when screen is focused
+      // Always refresh swap counts when screen is focused
       if (currentUserId) {
         fetchMySwapRequestsCount();
+        fetchPendingForMeCount();
       }
     }, [groupId, currentUserId])
   );
@@ -403,9 +437,10 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
       await loadPendingForMe(groupId);
       
-      // Fetch swap count after dashboard loads
+      // Fetch swap counts after dashboard loads
       if (currentUserId) {
         await fetchMySwapRequestsCount();
+        await fetchPendingForMeCount();
       }
 
     } catch (err: any) {
@@ -459,7 +494,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     console.log(`📅 [MemberDashboard] Calculated due today: ${tasksDueToday.length}`);
   }
   
-  console.log(`📊 [MemberDashboard] Final Stats - Pending: ${pendingTasks.length}, Completed: ${completedTasks}, Due Today: ${tasksDueToday.length}, My Swaps: ${mySwapRequestsCount}`);
+  console.log(`📊 [MemberDashboard] Final Stats - Pending: ${pendingTasks.length}, Completed: ${completedTasks}, Due Today: ${tasksDueToday.length}, My Swaps: ${mySwapRequestsCount}, Requests for Me: ${pendingForMeCount}`);
 
   const StatCard = ({ 
     title, 
@@ -756,6 +791,15 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             navigateTo="MySwapRequests"
             navigationParams={{ groupId, groupName }}
           />
+          {/* ✅ NEW: Requests for You - pending swap requests that need your response */}
+          <StatCard
+            title="Requests for You"
+            value={pendingForMeCount}
+            icon="bell-ring-outline"
+            color={theme.error}
+            navigateTo="PendingSwapRequests"
+            navigationParams={{ groupId, groupName }}
+          />
           <StatCard
             title="My Neglected"
             value={stats?.myNeglectedCount || 0}
@@ -808,6 +852,21 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             >
               <MaterialCommunityIcons name="swap-horizontal" size={24} color="#fff" />
               <Text style={styles.actionText}>My Swaps</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionCard, { borderColor: theme.border }]}
+            onPress={() => navigation.navigate('PendingSwapRequests')}
+          >
+            <LinearGradient
+              colors={[theme.error, theme.error]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.actionGradient}
+            >
+              <MaterialCommunityIcons name="bell-ring" size={24} color="#fff" />
+              <Text style={styles.actionText}>Pending Requests</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -869,4 +928,4 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
       />
     </ScreenWrapper>
   );
-};
+}; 

@@ -1,4 +1,4 @@
-// hooks/useAssignmentDetails.ts - COMPLETE WITH ADMIN/OWNER FLAGS AND ASSIGNMENT UPDATED
+// hooks/useAssignmentDetails.ts - COMPLETE WITH UTC FIXES
 
 import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
@@ -9,6 +9,7 @@ import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { useRealtimeAssignments } from './useRealtimeAssignments';
 import { useRealtimeNotifications } from './useRealtimeNotifications'; 
 import { getFullImageUrl } from '../utils/imageUrl';
+import { formatUTCDate, getUTCDayName, isUTCToday } from '../utils/timeUtils';
 
 export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean = false, onVerified?: () => void) => {
   const [loading, setLoading] = useState(true);
@@ -175,7 +176,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
           borderColor: '#e9ecef',
           icon: 'calendar',
           description: assignment 
-            ? `Due on ${new Date(assignment.dueDate).toLocaleDateString()}`
+            ? `Due on ${formatUTCDate(assignment.dueDate)}`
             : 'Not due today',
           buttonText: 'Not Due',
           canSubmit: false
@@ -249,7 +250,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     }
   }, []);
 
-  // Check time validity
+  // ✅ FIXED: Check time validity using UTC
   const checkTimeValidity = useCallback((assignmentData: any) => {
     if (isAdmin && !isOwner) {
       setIsSubmittable(false);
@@ -271,10 +272,12 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
 
     const now = new Date();
     const assignmentDate = new Date(assignmentData.dueDate);
-    const today = now.toDateString();
-    const assignmentDay = assignmentDate.toDateString();
     
-    if (today !== assignmentDay) {
+    // ✅ FIXED: Compare UTC dates properly
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
+    
+    if (todayUTC !== assignmentUTC) {
       setIsSubmittable(false);
       setSubmissionStatus('wrong_day');
       return;
@@ -283,8 +286,9 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     if (assignmentData.timeSlot) {
       const [endHour, endMinute] = assignmentData.timeSlot.endTime.split(':').map(Number);
       
+      // ✅ FIXED: Use UTC hours
       const endTime = new Date(assignmentDate);
-      endTime.setHours(endHour, endMinute, 0, 0);
+      endTime.setUTCHours(endHour, endMinute, 0, 0);
       
       const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
       const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
@@ -363,11 +367,12 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
         const dueDate = new Date(assignmentData.dueDate);
         const [endHour, endMinute] = assignmentData.timeSlot?.endTime.split(':').map(Number) || [0, 0];
         
+        // ✅ FIXED: Use UTC for late check
         const endTime = new Date(dueDate);
-        endTime.setHours(endHour, endMinute, 0, 0);
+        endTime.setUTCHours(endHour, endMinute, 0, 0);
         
         const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
-        const isLateSubmission = now > lateThreshold;
+        const isLateSubmission = now.getTime() > lateThreshold.getTime();
         setIsLate(isLateSubmission);
         
         if (isLateSubmission && assignmentData.points) {
@@ -399,6 +404,14 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     }
   }, [checkTimeValidity, isTaskDeleted, isAdmin, isOwner]);
 
+  // ✅ FIXED: Get UTC day name helper
+  const getUTCDayNameFromDate = useCallback((dateString: string): string => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+    return days[date.getUTCDay()];
+  }, []);
+
   // Fetch assignment details
   const fetchAssignmentDetails = useCallback(async () => {
     console.log('🔄 [fetchAssignmentDetails] START loading');
@@ -413,53 +426,60 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
         console.log('✅ [fetchAssignmentDetails] Success, setting data');
         
         const assignmentData = result.assignment;
+        
+        // ✅ FIXED: Ensure assignmentDay uses UTC
+        const assignmentWithUTCDay = {
+          ...assignmentData,
+          assignmentDay: assignmentData.assignmentDay || getUTCDayNameFromDate(assignmentData.dueDate)
+        };
+        
         console.log('✅ [fetchAssignmentDetails] Assignment data:', {
-          id: assignmentData.id,
-          dueDate: assignmentData.dueDate,
-          assignmentDay: assignmentData.assignmentDay,
-          taskTitle: assignmentData.task?.title, 
-          timeSlot: assignmentData.timeSlot,
-          userId: assignmentData.userId,
-          isOwner: assignmentData.userId === currentUserId
+          id: assignmentWithUTCDay.id,
+          dueDate: assignmentWithUTCDay.dueDate,
+          assignmentDay: assignmentWithUTCDay.assignmentDay,
+          taskTitle: assignmentWithUTCDay.task?.title, 
+          timeSlot: assignmentWithUTCDay.timeSlot,
+          userId: assignmentWithUTCDay.userId,
+          isOwner: assignmentWithUTCDay.userId === currentUserId
         });
         
         // Set admin/owner flags from server
-        setIsAdmin(assignmentData.isAdmin || isAdminProp);
-        setIsOwner(assignmentData.userId === currentUserId);
+        setIsAdmin(assignmentWithUTCDay.isAdmin || isAdminProp);
+        setIsOwner(assignmentWithUTCDay.userId === currentUserId);
         
-        if (assignmentData.isTaskDeleted || (!assignmentData.task && assignmentData.taskTitle)) {
+        if (assignmentWithUTCDay.isTaskDeleted || (!assignmentWithUTCDay.task && assignmentWithUTCDay.taskTitle)) {
           setIsTaskDeleted(true);
-          setDeletedTaskTitle(assignmentData.taskTitle || 'Deleted Task');
+          setDeletedTaskTitle(assignmentWithUTCDay.taskTitle || 'Deleted Task');
           
           setAssignment({
-            ...assignmentData,
+            ...assignmentWithUTCDay,
             isTaskDeleted: true,
-            taskTitle: assignmentData.taskTitle || 'Deleted Task'
+            taskTitle: assignmentWithUTCDay.taskTitle || 'Deleted Task'
           });
           setVerificationStatus(
-            assignmentData.verified ? 'verified' : 
-            assignmentData.verified === false ? 'rejected' : 'pending'
+            assignmentWithUTCDay.verified ? 'verified' : 
+            assignmentWithUTCDay.verified === false ? 'rejected' : 'pending'
           );
-          setAdminNotes(assignmentData.adminNotes || '');
+          setAdminNotes(assignmentWithUTCDay.adminNotes || '');
           setSubmissionStatus('completed');
           setIsSubmittable(false);
           
           Alert.alert(
             'Task Deleted',
-            `The task "${assignmentData.taskTitle || 'Unknown Task'}" has been deleted.\n\nYou can view the submission details but cannot make changes.`,
+            `The task "${assignmentWithUTCDay.taskTitle || 'Unknown Task'}" has been deleted.\n\nYou can view the submission details but cannot make changes.`,
             [{ text: 'OK' }]
           );
         } else {
           setIsTaskDeleted(false);
-          setAssignment(assignmentData);
+          setAssignment(assignmentWithUTCDay);
           setVerificationStatus(
-            assignmentData.verified ? 'verified' : 
-            assignmentData.verified === false ? 'rejected' : 'pending'
+            assignmentWithUTCDay.verified ? 'verified' : 
+            assignmentWithUTCDay.verified === false ? 'rejected' : 'pending'
           );
-          setAdminNotes(assignmentData.adminNotes || '');
+          setAdminNotes(assignmentWithUTCDay.adminNotes || '');
           
-          if (!assignmentData.completed) {
-            await checkTimeValidityWithServer(assignmentData);
+          if (!assignmentWithUTCDay.completed) {
+            await checkTimeValidityWithServer(assignmentWithUTCDay);
           } else {
             setSubmissionStatus('completed');
           }
@@ -482,7 +502,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
       console.log('🏁 [fetchAssignmentDetails] END loading');
       setLoading(false);
     }
-  }, [assignmentId, checkTimeValidityWithServer, isAdminProp, currentUserId]);
+  }, [assignmentId, checkTimeValidityWithServer, isAdminProp, currentUserId, getUTCDayNameFromDate]);
 
   // Handle complete assignment - only for owner
   const handleCompleteAssignment = useCallback((navigation: any, onComplete?: () => void) => {
@@ -578,8 +598,8 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
           return;
         }
         
-        const assignmentDay = assignment.assignmentDay || 
-          (assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase() : undefined);
+        // ✅ FIXED: Use UTC day name
+        const assignmentDay = assignment.assignmentDay || getUTCDayNameFromDate(assignment.dueDate);
         
         navigation.navigate('CreateSwapRequest', {
           assignmentId: assignment.id,
@@ -599,7 +619,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
         Alert.alert('Error', error.message || 'Failed to check swap availability');
       }
     };
-  }, [assignment, isTaskDeleted, isOwner]);
+  }, [assignment, isTaskDeleted, isOwner, getUTCDayNameFromDate]);
 
   // Handle verify - only for admin
   const handleVerify = useCallback(async (verified: boolean) => {

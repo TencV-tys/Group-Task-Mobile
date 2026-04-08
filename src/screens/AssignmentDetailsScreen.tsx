@@ -1,4 +1,4 @@
-// src/screens/AssignmentDetailsScreen.tsx - COMPLETE WITH SWAP ORIGIN CARD
+// src/screens/AssignmentDetailsScreen.tsx - WITH DEBUG LOGS
 
 import React, { useEffect } from 'react';
 import {
@@ -42,7 +42,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     verificationStatus,
     timeLeft,
     isSubmittable,
-    submissionStatus,
+    submissionStatus, 
     isLate,
     penaltyInfo,
     authError,
@@ -81,6 +81,24 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     handleViewPhoto,
     clearAuthError
   } = useAssignmentDetails(assignmentId, isAdminProp, onVerified);
+
+  // ===== DEBUG LOGS =====
+  useEffect(() => {
+    if (assignment) {
+      console.log('\n🔍🔍🔍 [AssignmentDetailsScreen] DEBUG 🔍🔍🔍');
+      console.log('📋 Assignment ID:', assignment.id);
+      console.log('📅 Raw dueDate from API:', assignment.dueDate);
+      console.log('📅 formattedUTCDate result:', formatUTCDate(assignment.dueDate));
+      console.log('📅 formatUTCDayAndDate result:', formatUTCDayAndDate(assignment.dueDate));
+      console.log('📅 getUTCRelativeTime result:', getUTCRelativeTime(assignment.dueDate));
+      console.log('📅 New Date object:', new Date(assignment.dueDate));
+      console.log('📅 UTC string:', new Date(assignment.dueDate).toUTCString());
+      console.log('📅 Local string:', new Date(assignment.dueDate).toLocaleString());
+      console.log('📅 Assignment Day:', assignment.assignmentDay);
+      console.log('👤 Owner:', assignment.user?.fullName);
+      console.log('🔍🔍🔍 END DEBUG 🔍🔍🔍\n');
+    }
+  }, [assignment]);
 
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
@@ -694,7 +712,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                 )}
                 {assignment.completed && assignment.completedAt && (
                   <Text style={[styles.completionDate, { color: theme.textMuted }]}>
-                    Completed {new Date(assignment.completedAt).toLocaleDateString()} • {getTimeDifference(assignment.dueDate, assignment.completedAt)}
+                    Completed {formatUTCDate(assignment.completedAt)} • {getTimeDifference(assignment.dueDate, assignment.completedAt)}
                   </Text>
                 )}
               </View>
@@ -724,6 +742,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
                 </LinearGradient>
               </View>
               
+              {/* ✅ DUE DATE DISPLAY WITH DEBUG */}
               <View style={styles.detailItem}>
                 <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Due Date</Text>
                 <Text style={[styles.detailValue, { color: theme.text }]}>
@@ -804,7 +823,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
               <View style={styles.infoRow}>
                 <MaterialCommunityIcons name="calendar-range" size={14} color={theme.textMuted} />
                 <Text style={[styles.infoText, { color: theme.textSecondary }]}>
-                  Week: {new Date(assignment.weekStart).toLocaleDateString()} - {new Date(assignment.weekEnd).toLocaleDateString()}
+                  Week: {formatUTCDate(assignment.weekStart)} - {formatUTCDate(assignment.weekEnd)}
                 </Text>
               </View>
               {assignment.task?.group && (
@@ -817,20 +836,20 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
               )}
             </LinearGradient>
           </LinearGradient>
-        </ScrollView>
+        </ScrollView> 
         
         {/* Read-Only Footer for Admin */}
         {renderReadOnlyFooter()}
       </>
-    );
+    ); 
   };
 
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.card} />
       {renderHeader()}
-      {renderContent()}
-      {renderPhotoModal()}
+      {renderContent()} 
+      {renderPhotoModal()} 
     </ScreenWrapper> 
   ); 
 }

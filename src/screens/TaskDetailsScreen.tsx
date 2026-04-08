@@ -1,4 +1,4 @@
-// src/screens/TaskDetailsScreen.tsx - FULLY UPDATED
+// src/screens/TaskDetailsScreen.tsx - FULLY UPDATED WITH GROUPED BY DAY
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -40,6 +40,46 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
   const isAdmin = userRole === 'ADMIN';
+
+ 
+  // ===== FIXED UTC DATE HELPER - Shows the actual UTC date without timezone conversion =====
+const formatUTCDate = (dateString: string) => {
+  const date = new Date(dateString);
+  // Extract UTC components directly to avoid timezone conversion
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  return `${monthNames[month]} ${day}, ${year}`;
+};
+
+const formatUTCDateTime = (dateString: string) => {
+  const date = new Date(dateString);
+  const year = date.getUTCFullYear();
+  const month = date.getUTCMonth();
+  const day = date.getUTCDate();
+  const hours = date.getUTCHours();
+  const minutes = date.getUTCMinutes();
+  
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = hours % 12 || 12;
+  
+  return `${monthNames[month]} ${day}, ${year} at ${hour12}:${minutes.toString().padStart(2, '0')} ${ampm} UTC`;
+};
+
+const isDueTodayUTC = (dueDate: string) => {
+  const now = new Date();
+  const due = new Date(dueDate); 
+  
+  // Compare UTC dates directly
+  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dueUTC = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+  
+  return todayUTC === dueUTC;
+};
 
   // ===== LOAD USER ID =====
   useEffect(() => {
@@ -187,13 +227,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     return timer;
   };
 
-  const isDueToday = (dueDate: string) => {
-    const today = new Date().toDateString();
-    const due = new Date(dueDate).toDateString();
-    return today === due;
-  };
-
-  // ===== PROCESS TASK DATA - CRITICAL FOR SWAP =====
+  // ===== PROCESS TASK DATA =====
   const processTaskData = (taskData: any) => {
     // Sort time slots
     if (taskData.timeSlots && taskData.timeSlots.length > 0) {
@@ -212,90 +246,65 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       );
     }
     
-    // Sort assignments
+    // Sort assignments by date then time
     if (taskData.assignments && taskData.assignments.length > 0) {
       const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
       
       taskData.assignments.sort((a: any, b: any) => {
         const dateA = new Date(a.dueDate);
         const dateB = new Date(b.dueDate);
         
-        const dayA = new Date(dateA);
-        dayA.setHours(0, 0, 0, 0);
+        const dayA = Date.UTC(dateA.getUTCFullYear(), dateA.getUTCMonth(), dateA.getUTCDate());
+        const dayB = Date.UTC(dateB.getUTCFullYear(), dateB.getUTCMonth(), dateB.getUTCDate());
         
-        const dayB = new Date(dateB);
-        dayB.setHours(0, 0, 0, 0);
-        
-        const isAToday = dayA.getTime() === today.getTime();
-        const isBToday = dayB.getTime() === today.getTime();
+        const isAToday = dayA === todayUTC;
+        const isBToday = dayB === todayUTC;
         
         if (isAToday && !isBToday) return -1;
         if (!isAToday && isBToday) return 1;
         
-        if (isAToday && isBToday) {
-          const timeA = dateA.getHours() * 60 + dateA.getMinutes();
-          const timeB = dateB.getHours() * 60 + dateB.getMinutes();
+        if (dayA === dayB) {
+          const timeA = dateA.getUTCHours() * 60 + dateA.getUTCMinutes();
+          const timeB = dateB.getUTCHours() * 60 + dateB.getUTCMinutes();
           return timeA - timeB;
         }
         
-        const isAFuture = dayA.getTime() >= today.getTime();
-        const isBFuture = dayB.getTime() >= today.getTime();
-        
-        if (isAFuture && !isBFuture) return -1;
-        if (!isAFuture && isBFuture) return 1;
-        
-        if (isAFuture && isBFuture) {
-          return dateA.getTime() - dateB.getTime();
-        }
-        
-        return dateB.getTime() - dateA.getTime();
+        return dayA - dayB;
       });
     }
     
-    // ✅ CRITICAL: Find assignment for CURRENT logged-in user (for swapped tasks)
+    // Find assignment for CURRENT logged-in user
     if (taskData.assignments && currentUserId) {
       const currentWeek = taskData.group?.currentRotationWeek || 1;
       
-      // Find the assignment that belongs to the current user for this week
       const userAssignmentForCurrentUser = taskData.assignments.find(
         (a: any) => a.userId === currentUserId && a.rotationWeek === currentWeek
       );
       
-      // Set userAssignment to the current user's assignment
       taskData.userAssignment = userAssignmentForCurrentUser || null;
-      
-      console.log('📊 ProcessTaskData:', {
-        currentUserId,
-        currentWeek,
-        hasUserAssignment: !!userAssignmentForCurrentUser,
-        assignmentDueDate: userAssignmentForCurrentUser?.dueDate,
-        allAssignmentsCount: taskData.assignments.length,
-        isSwappedTask: userAssignmentForCurrentUser?.acquiredViaSwap || false
-      });
     }
     
     return taskData;
   };
 
-  // ===== FIND TODAY'S ASSIGNMENT FOR CURRENT USER =====
+  // ===== FIND TODAY'S ASSIGNMENT USING UTC =====
   const findTodayAssignment = (taskData: any) => {
     if (!taskData.assignments || !currentUserId) {
       setTodayAssignment(null);
       return;
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const now = new Date();
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     
-    // Find assignment for CURRENT USER that is due today
     const todayAssignments = taskData.assignments.filter((a: any) => {
       if (a.userId !== currentUserId) return false;
       
       const dueDate = new Date(a.dueDate);
-      dueDate.setHours(0, 0, 0, 0);
+      const dueUTC = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
       
-      return dueDate.getTime() === today.getTime();
+      return dueUTC === todayUTC;
     });
 
     if (todayAssignments.length > 0) {
@@ -306,10 +315,8 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       });
       
       setTodayAssignment(todayAssignments[0]);
-      console.log('✅ Found today assignment for current user:', todayAssignments[0].dueDate);
     } else {
       setTodayAssignment(null);
-      console.log('❌ No assignment due today for current user');
     }
   };
 
@@ -324,10 +331,10 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
 
     const now = new Date();
     const assignmentDate = new Date(taskData.userAssignment.dueDate);
-    const today = now.toDateString();
-    const assignmentDay = assignmentDate.toDateString();
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
     
-    if (today !== assignmentDay) {
+    if (todayUTC !== assignmentUTC) {
       setIsSubmittable(false);
       setCurrentTimeSlot(null);
       setSubmissionStatus('wrong_day');
@@ -335,7 +342,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
 
     if (taskData.userAssignment.timeSlot || (taskData.timeSlots && taskData.timeSlots.length > 0)) {
-      const currentInMinutes = now.getHours() * 60 + now.getMinutes();
+      const currentInMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
       
       let activeSlot = null;
       let slotFound = false;
@@ -399,32 +406,19 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         const processedTask = processTaskData(result.task);
         setTask(processedTask);
         
-        // Find today's assignment for current user
         findTodayAssignment(processedTask);
         checkTimeValidity(processedTask);
         
         const currentWeek = processedTask.group?.currentRotationWeek || 1;
         
-        // ✅ Get ALL assignments for current user this week (both completed AND pending)
         const myAllAssignments = processedTask.assignments?.filter((a: any) => 
           a.userId === currentUserId && a.rotationWeek === currentWeek
         ) || [];
         
-        // Separate completed vs pending
         const completedAssignments = myAllAssignments.filter((a: any) => a.completed === true);
-        const pendingAssignments = myAllAssignments.filter((a: any) => a.completed !== true);
         
-        console.log('📊 User assignments:', {
-          total: myAllAssignments.length,
-          completed: completedAssignments.length,
-          pending: pendingAssignments.length,
-          todayAssignment: todayAssignment?.id
-        });
-        
-        // Set completed submissions for history section
         setCurrentWeekSubmissions(completedAssignments);
         
-        // Get others' assignments (exclude current user)
         const othersAssignments = processedTask.assignments?.filter((a: any) => 
           a.rotationWeek === currentWeek && a.userId !== currentUserId
         ) || [];
@@ -527,8 +521,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
 
   const handleViewAssignmentDetails = (assignment?: any) => {
     const assignmentId = assignment?.id || task?.userAssignment?.id;
-    console.log('🔍 Navigating to AssignmentDetails:', assignmentId);
-    
     if (!assignmentId) {
       Alert.alert('Error', 'No assignment found');
       return;
@@ -590,7 +582,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
           borderColor: theme.border,
           icon: 'calendar',
           description: task?.userAssignment 
-            ? `Due on ${new Date(task.userAssignment.dueDate).toLocaleDateString()}`
+            ? `Due on ${formatUTCDate(task.userAssignment.dueDate)}`
             : 'Not due today',
           buttonText: 'Not Due',
           canSubmit: false
@@ -622,10 +614,9 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
 
   const getVerificationStatus = (assignment: any) => {
     if (!assignment?.completed) {
-      const today = new Date().toDateString();
-      const dueDate = new Date(assignment.dueDate).toDateString();
+      const dueToday = isDueTodayUTC(assignment.dueDate);
       
-      if (today === dueDate) {
+      if (dueToday) {
         return { 
           status: 'not_completed',
           color: theme.error,
@@ -734,7 +725,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             <MaterialCommunityIcons name="calendar-range" size={16} color={theme.textMuted} />
             <Text style={styles.weekInfoLabel}>Dates:</Text>
             <Text style={styles.weekInfoValue}>
-              {new Date(task.group.weekStart).toLocaleDateString()} - {new Date(task.group.weekEnd).toLocaleDateString()}
+              {formatUTCDate(task.group.weekStart)} - {formatUTCDate(task.group.weekEnd)}
             </Text>
           </View>
         )}
@@ -742,11 +733,138 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     </View>
   );
 
-  // ✅ UPDATED: Shows pending assignments for week swaps
+  // ===== RENDER ALL ASSIGNMENTS FOR CURRENT WEEK - GROUPED BY DAY =====
+  const renderAllWeekAssignments = () => {
+    const currentWeek = task?.group?.currentRotationWeek || 1;
+    
+    const allWeekAssignments = task?.assignments?.filter((a: any) => 
+      a.rotationWeek === currentWeek
+    ) || [];
+    
+    if (allWeekAssignments.length === 0) return null;
+    
+    // Group assignments by day
+    const groupedByDay = new Map();
+    
+    allWeekAssignments.forEach((assignment: any) => {
+      const dueDate = new Date(assignment.dueDate);
+      const dayKey = formatUTCDate(assignment.dueDate);
+      const dayName = dueDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+      
+      if (!groupedByDay.has(dayKey)) {
+        groupedByDay.set(dayKey, {
+          date: dayKey,
+          dayName: dayName,
+          assignments: []
+        });
+      }
+      
+      groupedByDay.get(dayKey).assignments.push(assignment);
+    });
+    
+    // Convert to array and sort by date
+    const groupedDays = Array.from(groupedByDay.values()).sort((a, b) => {
+      return new Date(a.date).getTime() - new Date(b.date).getTime();
+    });
+    
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.sectionIcon}>
+            <MaterialCommunityIcons name="format-list-checks" size={16} color={theme.textSecondary} />
+          </LinearGradient>
+          <Text style={styles.sectionTitle}>All Assignments (Current Week)</Text>
+        </View>
+        
+        {groupedDays.map((dayGroup: any, dayIndex: number) => {
+          const isToday = isDueTodayUTC(dayGroup.assignments[0].dueDate);
+          
+          return (
+            <View key={dayIndex} style={styles.dayGroupContainer}>
+              <View style={styles.dayGroupHeader}>
+                <LinearGradient
+                  colors={isToday ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
+                  style={[styles.dayGroupBadge, isToday && styles.todayDayGroupBadge]}
+                >
+                  <Text style={[styles.dayGroupTitle, isToday && { color: theme.primary }]}>
+                    {dayGroup.dayName}
+                  </Text>
+                  <Text style={[styles.dayGroupDate, isToday && { color: theme.primary }]}>
+                    {dayGroup.date}
+                  </Text>
+                </LinearGradient>
+              </View>
+              
+              {dayGroup.assignments.map((assignment: any, idx: number) => {
+                const isCurrentUser = assignment.userId === currentUserId;
+                const status = getVerificationStatus(assignment);
+                
+                return (
+                  <TouchableOpacity
+                    key={assignment.id || idx}
+                    style={[
+                      styles.weekAssignmentCard,
+                      isCurrentUser && styles.currentUserAssignmentCard
+                    ]}
+                    onPress={() => handleViewAssignmentDetails(assignment)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.weekAssignmentHeader}>
+                      <View style={styles.weekAssignmentUser}>
+                        <LinearGradient
+                          colors={[theme.bgSecondary, theme.bgTertiary]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={[styles.weekAssignmentAvatar, isCurrentUser && styles.currentUserAvatar]}
+                        >
+                          <Text style={[styles.weekAssignmentAvatarText, { color: theme.textSecondary }]}>
+                            {assignment.user?.fullName?.charAt(0) || '?'}
+                          </Text>
+                        </LinearGradient>
+                        <View>
+                          <Text style={[styles.weekAssignmentUserName, { color: theme.text }]}>
+                            {assignment.user?.fullName || 'Unknown'}
+                            {isCurrentUser && <Text style={[styles.currentUserLabel, { color: theme.primary }]}> (You)</Text>}
+                          </Text>
+                          <Text style={[styles.weekAssignmentTime, { color: theme.textMuted }]}>
+                            {assignment.timeSlot?.startTime} - {assignment.timeSlot?.endTime}
+                          </Text>
+                        </View>
+                      </View>
+                      <LinearGradient
+                        colors={[status.color + '20', status.color + '10']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.weekAssignmentStatus}
+                      >
+                        <MaterialCommunityIcons name={status.icon as any} size={12} color={status.color} />
+                        <Text style={[styles.weekAssignmentStatusText, { color: status.color }]}>{status.text}</Text>
+                      </LinearGradient>
+                    </View>
+                    <View style={styles.weekAssignmentFooter}>
+                      <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.weekAssignmentPoints}>
+                        <MaterialCommunityIcons name="star" size={10} color={theme.primary} />
+                        <Text style={[styles.weekAssignmentPointsText, { color: theme.primary }]}>{assignment.points} pts</Text>
+                      </LinearGradient>
+                      {assignment.completed && assignment.completedAt && (
+                        <Text style={[styles.weekAssignmentCompleted, { color: theme.textMuted }]}>
+                          Completed: {formatUTCDate(assignment.completedAt)}
+                        </Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          );
+        })}
+      </View>
+    );
+  };
+
   const renderMemberAssignmentSection = () => {
     const currentWeek = task?.group?.currentRotationWeek || 1;
     
-    // Get ALL assignments for current user this week
     const myAllAssignments = task?.assignments?.filter((a: any) => 
       a.userId === currentUserId && a.rotationWeek === currentWeek
     ) || [];
@@ -754,7 +872,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     const completedAssignments = myAllAssignments.filter((a: any) => a.completed === true);
     const pendingAssignments = myAllAssignments.filter((a: any) => a.completed !== true);
     
-    // If no assignments at all
     if (myAllAssignments.length === 0) {
       return (
         <View style={styles.section}>
@@ -767,7 +884,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       );
     }
     
-    // If has today's assignment - show it prominently
     if (todayAssignment) {
       const now = new Date();
       const dueDate = new Date(todayAssignment.dueDate);
@@ -831,7 +947,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
               <View style={styles.assignmentInfo}>
                 <Text style={styles.todayAssignmentTitle}>{task.title}</Text>
                 <Text style={styles.assignmentDate}>
-                  Due: {new Date(todayAssignment.dueDate).toLocaleDateString()}
+                  Due: {formatUTCDate(todayAssignment.dueDate)}
                   {todayAssignment.timeSlot && ` • ${todayAssignment.timeSlot.startTime} - ${todayAssignment.timeSlot.endTime}`}
                 </Text>
               </View>
@@ -891,7 +1007,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                 <View style={styles.overdueInfoText}>
                   <Text style={styles.overdueTitle}>Overdue</Text>
                   <Text style={styles.overdueDate}>
-                    Was due on {new Date(todayAssignment.dueDate).toLocaleDateString()}
+                    Was due on {formatUTCDate(todayAssignment.dueDate)}
                   </Text>
                   {todayAssignment.notes?.includes('NEGLECTED') && (
                     <Text style={styles.neglectedText}>⚠️ Point deduction applied</Text>
@@ -906,7 +1022,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                 <View style={styles.completedInfoText}>
                   <Text style={styles.completedTitle}>Already Completed</Text>
                   <Text style={styles.completedDate}>
-                    Submitted: {new Date(todayAssignment.completedAt).toLocaleDateString()}
+                    Submitted: {formatUTCDate(todayAssignment.completedAt)}
                   </Text>
                   {todayAssignment.notes?.includes('LATE') && (
                     <Text style={styles.lateText}>⚠️ Late submission (points reduced)</Text>
@@ -924,9 +1040,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       );
     }
     
-    // ✅ No today assignment - show all pending assignments (important for week swaps)
     if (pendingAssignments.length > 0) {
-      // Sort by due date (closest first)
       const sortedPending = [...pendingAssignments].sort((a, b) => 
         new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
       );
@@ -942,7 +1056,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
           
           {sortedPending.map((assignment, index) => {
             const dueDate = new Date(assignment.dueDate);
-            const isToday = dueDate.toDateString() === new Date().toDateString();
+            const isToday = isDueTodayUTC(assignment.dueDate);
             const isPast = dueDate < new Date() && !assignment.completed;
             
             return (
@@ -978,7 +1092,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                       isToday && styles.todayPendingText,
                       isPast && styles.overduePendingText
                     ]}>
-                      {isToday ? 'Due Today' : dueDate.toLocaleDateString()}
+                      {isToday ? 'Due Today' : formatUTCDate(assignment.dueDate)}
                       {assignment.timeSlot && ` at ${assignment.timeSlot.startTime}`}
                     </Text>
                   </View>
@@ -997,7 +1111,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       );
     }
     
-    // All assignments completed
     if (completedAssignments.length > 0 && pendingAssignments.length === 0) {
       return (
         <View style={styles.section}>
@@ -1011,7 +1124,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       );
     }
     
-    // No pending, no today - show next upcoming
     const futureAssignments = myAllAssignments.filter((a: any) => 
       new Date(a.dueDate) > new Date()
     ).sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
@@ -1027,7 +1139,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
           {nextAssignment ? (
             <TouchableOpacity onPress={() => handleViewAssignmentDetails(nextAssignment)}>
               <Text style={styles.notAssignedSubtext}>
-                Next: {new Date(nextAssignment.dueDate).toLocaleDateString()} →
+                Next: {formatUTCDate(nextAssignment.dueDate)} →
               </Text>
             </TouchableOpacity>
           ) : (
@@ -1052,8 +1164,8 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
 
     const sortedSubmissions = [...currentWeekSubmissions].sort((a: any, b: any) => {
-      const isAToday = isDueToday(a.dueDate);
-      const isBToday = isDueToday(b.dueDate);
+      const isAToday = isDueTodayUTC(a.dueDate);
+      const isBToday = isDueTodayUTC(b.dueDate);
       
       if (isAToday && !isBToday) return -1;
       if (!isAToday && isBToday) return 1;
@@ -1070,7 +1182,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         <Text style={styles.sectionTitle}>My Submissions This Week</Text>
         {sortedSubmissions.map((submission: any, index: number) => {
           const status = getVerificationStatus(submission);
-          const dueToday = isDueToday(submission.dueDate);
+          const dueToday = isDueTodayUTC(submission.dueDate);
           
           return (
             <TouchableOpacity
@@ -1093,7 +1205,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                 <View style={styles.submissionHistoryInfo}>
                   <Text style={[styles.submissionHistoryStatus, { color: status.color }]}>{status.text}</Text>
                   <Text style={styles.submissionHistoryDate}>
-                    {new Date(submission.dueDate).toLocaleDateString()}
+                    {formatUTCDate(submission.dueDate)}
                     {submission.timeSlot && ` • ${submission.timeSlot.startTime} - ${submission.timeSlot.endTime}`}
                     {dueToday && <Text style={styles.todayText}> (Today)</Text>}
                   </Text>
@@ -1102,7 +1214,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
 
               {submission.completedAt && (
                 <Text style={styles.submittedDate}>
-                  Submitted: {new Date(submission.completedAt).toLocaleDateString()}
+                  Submitted: {formatUTCDate(submission.completedAt)}
                 </Text>
               )}
 
@@ -1151,7 +1263,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
           <Text style={styles.sectionTitle}>Others' Tasks This Week</Text>
         </View>
         {othersAssignments.slice(0, 5).map((assignment: any) => {
-          const dueToday = isDueToday(assignment.dueDate);
+          const dueToday = isDueTodayUTC(assignment.dueDate);
           const status = getVerificationStatus(assignment);
           
           return (
@@ -1187,7 +1299,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                 <View style={styles.upcomingDetailRow}>
                   <MaterialCommunityIcons name="calendar" size={12} color={theme.textMuted} />
                   <Text style={styles.upcomingDetailText}>
-                    Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                    Due: {formatUTCDate(assignment.dueDate)}
                     {assignment.timeSlot && ` at ${assignment.timeSlot.startTime}`}
                   </Text>
                 </View>
@@ -1222,48 +1334,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         </View>
       </LinearGradient>
 
-      {task.currentAssignee && (
-        <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.assigneeInfo}>
-          <Text style={styles.assigneeLabel}>Current Assignee:</Text>
-          <Text style={styles.assigneeValue}>
-            {task.assignments?.[0]?.user?.fullName || 'Unknown'} (Week {task.group?.currentRotationWeek || 1})
-          </Text>
-        </LinearGradient>
-      )}
-
-      {task.rotationMembers && Array.isArray(task.rotationMembers) && (
-        <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.rotationInfo}>
-          <Text style={styles.rotationLabel}>Rotation Members:</Text>
-          <View style={styles.rotationMembersList}>
-            {task.rotationMembers.map((member: any, index: number) => (
-              <View key={member.userId} style={styles.rotationMemberItem}>
-                <LinearGradient
-                  colors={member.userId === task.currentAssignee ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
-                  style={[
-                    styles.rotationMemberAvatar,
-                    member.userId === task.currentAssignee && styles.currentAssigneeAvatar
-                  ]}
-                >
-                  <Text style={[
-                    styles.rotationMemberInitial,
-                    { color: member.userId === task.currentAssignee ? '#fff' : theme.textSecondary }
-                  ]}>
-                    {member.fullName?.charAt(0) || '?'}
-                  </Text>
-                </LinearGradient>
-                <Text style={[
-                  styles.rotationMemberName,
-                  member.userId === task.currentAssignee && styles.currentAssigneeName
-                ]}>
-                  {member.fullName}
-                  {member.userId === task.currentAssignee && ' (Current)'}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </LinearGradient>
-      )}
-
       {task.assignments?.length > 0 ? (
         <View style={styles.assignmentsContainer}>
           <Text style={styles.assignmentsSubtitle}>All Assignments (Current Week):</Text>
@@ -1272,7 +1342,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
             .slice(0, 5)
             .map((assignment: any, index: number) => {
               const status = getVerificationStatus(assignment);
-              const dueToday = isDueToday(assignment.dueDate);
+              const dueToday = isDueTodayUTC(assignment.dueDate);
               
               return (
                 <TouchableOpacity
@@ -1302,7 +1372,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                       <View style={styles.userDetails}>
                         <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
                         <Text style={styles.assignmentDateSmall}>
-                          Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                          Due: {formatUTCDate(assignment.dueDate)}
                           {assignment.rotationWeek && ` • Week ${assignment.rotationWeek}`}
                           {dueToday && <Text style={styles.todaySmallText}> (Today)</Text>}
                         </Text>
@@ -1317,7 +1387,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                   {assignment.completed && (
                     <View style={styles.adminAssignmentDetails}>
                       <Text style={styles.completedText}>
-                        Submitted: {new Date(assignment.completedAt).toLocaleDateString()}
+                        Submitted: {formatUTCDate(assignment.completedAt)}
                       </Text>
                       {assignment.photoUrl && (
                         <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.hasPhotoBadge}>
@@ -1342,11 +1412,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
                 </TouchableOpacity>
               );
             })}
-          {task.assignments.filter((a: any) => a.rotationWeek === (task.group?.currentRotationWeek || 1)).length > 5 && (
-            <Text style={styles.moreAssignments}>
-              +{task.assignments.filter((a: any) => a.rotationWeek === (task.group?.currentRotationWeek || 1)).length - 5} more
-            </Text>
-          )}
         </View>
       ) : (
         <Text style={styles.noAssignments}>No assignments yet</Text>
@@ -1445,13 +1510,18 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
           
           {!isAdmin && renderMySubmissionsSection()}
           {!isAdmin && renderUpcomingAssignments()}
+          {!isAdmin && renderAllWeekAssignments()}
+          
+          {isAdmin && renderAdminView()}
 
           {task.executionFrequency === 'WEEKLY' && task.selectedDays?.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Scheduled Days</Text>
               <View style={styles.daysContainer}>
                 {task.selectedDays.map((day: string, index: number) => {
-                  const isToday = day === new Date().toLocaleDateString('en-US', { weekday: 'long' });
+                  const today = new Date();
+                  const todayDay = today.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+                  const isToday = day === todayDay;
                   return (
                     <LinearGradient
                       key={index}
@@ -1510,8 +1580,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
               <Text style={styles.timeSlotNote}>ⓘ Submit within 30 minutes before/after time slot end</Text>
             </View>
           )}
-
-          {isAdmin && renderAdminView()}
 
           {isAdmin && (
             <TouchableOpacity 

@@ -1,4 +1,5 @@
-// src/styles/taskDetails.styles.ts - Dark Mode Version
+// src/styles/taskDetails.styles.ts - COMPLETE WITH DARK MODE
+
 import { StyleSheet } from 'react-native';
 import { Theme } from '../context/ThemeContext';
 
@@ -1190,76 +1191,213 @@ export const makeTaskDetailsStyles = (theme: Theme) => StyleSheet.create({
     color: theme.textMuted,
     fontWeight: '500',
   },
-  // Add these styles to your taskDetails.styles.ts file
-
-// ===== PENDING ASSIGNMENTS STYLES (for week swaps) =====
-pendingAssignmentCard: {
-  backgroundColor: theme.card,
-  borderRadius: 12,
-  padding: 14,
-  marginBottom: 10,
-  borderWidth: 1,
-  borderColor: theme.border,
-  position: 'relative',
-},
-todayPendingCard: {
-  borderColor: theme.primary,
-  borderWidth: 2,
-  backgroundColor: theme.primaryLight,
-},
-overduePendingCard: {
-  borderColor: theme.error,
-  borderWidth: 2,
-  backgroundColor: theme.errorBg,
-},
-pendingCardHeader: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  gap: 12,
-},
-pendingIcon: {
-  width: 40,
-  height: 40,
-  borderRadius: 20,
-  justifyContent: 'center',
-  alignItems: 'center',
-},
-pendingInfo: {
-  flex: 1,
-},
-pendingTitle: {
-  fontSize: 14,
-  fontWeight: '600',
-  color: theme.text,
-  marginBottom: 2,
-},
-pendingDate: {
-  fontSize: 12,
-  color: theme.textMuted,
-},
-todayPendingText: {
-  color: theme.primary,
-  fontWeight: '600',
-},
-overduePendingText: {
-  color: theme.error,
-  fontWeight: '600',
-},
-pendingPointsBadge: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  alignSelf: 'flex-start',
-  paddingHorizontal: 8,
-  paddingVertical: 2,
-  borderRadius: 12,
-  marginTop: 8,
-  marginLeft: 52,
-  gap: 4,
-},
-pendingPointsText: {
-  fontSize: 11,
-  fontWeight: '600',
-  color: theme.primary,
-},
-
+  // ===== PENDING ASSIGNMENTS STYLES =====
+  pendingAssignmentCard: {
+    backgroundColor: theme.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+    position: 'relative',
+  },
+  todayPendingCard: {
+    borderColor: theme.primary,
+    borderWidth: 2,
+    backgroundColor: theme.primaryLight,
+  },
+  overduePendingCard: {
+    borderColor: theme.error,
+    borderWidth: 2,
+    backgroundColor: theme.errorBg,
+  },
+  pendingCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  pendingIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pendingInfo: {
+    flex: 1,
+  },
+  pendingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.text,
+    marginBottom: 2,
+  },
+  pendingDate: {
+    fontSize: 12,
+    color: theme.textMuted,
+  },
+  todayPendingText: {
+    color: theme.primary,
+    fontWeight: '600',
+  },
+  overduePendingText: {
+    color: theme.error,
+    fontWeight: '600',
+  },
+  pendingPointsBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginTop: 8,
+    marginLeft: 52,
+    gap: 4,
+  },
+  pendingPointsText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.primary,
+  },
+  // ===== GROUPED BY DAY STYLES =====
+  dayGroupContainer: {
+    marginBottom: 16,
+  },
+  dayGroupHeader: {
+    marginBottom: 8,
+  },
+  dayGroupBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    backgroundColor: theme.bgSecondary,
+  },
+  todayDayGroupBadge: {
+    borderWidth: 1,
+    borderColor: theme.primaryBorder,
+    backgroundColor: theme.primaryLight,
+  },
+  dayGroupTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.text,
+    marginRight: 8,
+  },
+  dayGroupDate: {
+    fontSize: 11,
+    color: theme.textMuted,
+  },
+  weekAssignmentTime: {
+    fontSize: 12,
+    color: theme.textSecondary,
+  },
+  weekAssignmentCard: {
+    backgroundColor: theme.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  currentUserAssignmentCard: {
+    borderColor: theme.primary,
+    borderWidth: 2,
+    backgroundColor: theme.primaryLight,
+  },
+  dueTodayAssignmentCard: {
+    borderColor: theme.error,
+    borderWidth: 2,
+    backgroundColor: theme.errorBg,
+  },
+  dueTodayLabel: {
+    fontWeight: '600',
+    color: theme.error,
+  },
+  weekAssignmentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  weekAssignmentUser: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  weekAssignmentAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.bgSecondary,
+  },
+  currentUserAvatar: {
+    borderColor: theme.primary,
+    borderWidth: 2,
+    backgroundColor: theme.primaryLight,
+  },
+  weekAssignmentAvatarText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: theme.textSecondary,
+  },
+  weekAssignmentUserName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: theme.text,
+    marginBottom: 2,
+  },
+  currentUserLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: theme.primary,
+  },
+  weekAssignmentStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  weekAssignmentStatusText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  weekAssignmentFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  weekAssignmentPoints: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    gap: 4,
+    backgroundColor: theme.primaryLight,
+  },
+  weekAssignmentPointsText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: theme.primary,
+  },
+  weekAssignmentCompleted: {
+    fontSize: 11,
+    color: theme.textMuted,
+  },
 });

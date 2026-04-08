@@ -1,6 +1,6 @@
-// src/screens/TaskAssignmentScreen.tsx - Dark Mode Added + Fixed Fully Scrollable Modal
+// src/screens/TaskAssignmentScreen.tsx - FULLY UPDATED with Swap Support
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTaskAssignment } from '../taskHook/useTaskAssignment';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
+import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
+import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 
 export default function TaskAssignmentScreen({ navigation, route }: any) {
   const { theme } = useTheme();
@@ -38,6 +40,38 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [showAssigneeModal, setShowAssigneeModal] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
+
+  // ===== REAL-TIME UPDATES =====
+  const { events: taskEvents, clearTaskUpdated } = useRealtimeTasks(groupId);
+  const { events: swapEvents, clearSwapResponded, clearSwapCreated } = useRealtimeSwapRequests(groupId, '');
+
+  // Refresh when tasks are updated
+  useEffect(() => {
+    if (taskEvents.taskUpdated) {
+      console.log('🔄 Task updated in real-time, refreshing assignments...');
+      loadData(true);
+      clearTaskUpdated();
+    }
+  }, [taskEvents.taskUpdated, loadData, clearTaskUpdated]);
+
+  // Refresh when swaps happen
+  useEffect(() => {
+    if (swapEvents.swapResponded || swapEvents.swapCreated) {
+      console.log('🔄 Swap event detected, refreshing assignments...');
+      loadData(true);
+      if (swapEvents.swapResponded) clearSwapResponded();
+      if (swapEvents.swapCreated) clearSwapCreated();
+    }
+  }, [swapEvents.swapResponded, swapEvents.swapCreated, loadData, clearSwapResponded, clearSwapCreated]);
+
+  // Refresh on focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('📱 TaskAssignmentScreen focused, refreshing data...');
+      loadData(true);
+    });
+    return unsubscribe;
+  }, [navigation, loadData]);
 
   // ===== FILTER MEMBERS: Only those in rotation (exclude admins) =====
   const membersInRotation = useMemo(() => {
@@ -69,7 +103,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   }, [authError, navigation]);
 
   // Get members already assigned to tasks for current week
-  const getAssignedMembersForWeek = () => {
+  const getAssignedMembersForWeek = useCallback(() => {
     const assignedMemberIds = new Set<string>();
     
     tasks.forEach((task: any) => {
@@ -87,19 +121,19 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     });
     
     return assignedMemberIds;
-  };
+  }, [tasks]);
 
   // Check if a task is assigned to a member
-  const isTaskAssigned = (task: any) => {
+  const isTaskAssigned = useCallback((task: any) => {
     return task.currentAssignee !== null && task.currentAssignee !== undefined;
-  };
+  }, []);
 
-  const handleOpenAssigneeModal = (task: any) => {
+  const handleOpenAssigneeModal = useCallback((task: any) => {
     setSelectedTask(task);
     setShowAssigneeModal(true);
-  };
+  }, []);
 
-  const handleAssignToMember = async (memberId: string, memberName: string) => {
+  const handleAssignToMember = useCallback(async (memberId: string, memberName: string) => {
     if (!selectedTask) return;
 
     if (selectedTask.currentAssignee === memberId) {
@@ -133,16 +167,41 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
               setIsReassigning(false);
             }
           }
-        }
+        } 
       ]
     );
-  };
+  }, [selectedTask, reassignTask, loadData]);
 
-  const renderTask = ({ item }: any) => {
+  const renderTask = useCallback(({ item }: any) => {
     const currentAssignee = membersInRotation.find(m => m.userId === item.currentAssignee);
     const isRecurring = item.isRecurring;
     const hasTimeSlots = item.timeSlots && item.timeSlots.length > 0;
     const taskAssigned = isTaskAssigned(item);
+    
+    // ✅ Check if this task was acquired via swap
+    // The swap info could be in different places depending on API response
+    const isAcquiredViaSwap = 
+      item.acquiredViaSwap === true ||
+      (item.assignment?.acquiredViaSwap === true) ||
+      (item.userAssignment?.acquiredViaSwap === true);
+    
+    const swappedFromName = 
+      item.swappedFromName ||
+      item.assignment?.swappedFromName ||
+      item.userAssignment?.swappedFromName ||
+      null;
+    
+    const swapScope = 
+      item.swapScope ||
+      item.assignment?.swapScope ||
+      item.userAssignment?.swapScope ||
+      null;
+    
+    const swapDay = 
+      item.swapDay ||
+      item.assignment?.swapDay ||
+      item.userAssignment?.swapDay ||
+      null;
 
     return (
       <TouchableOpacity
@@ -160,7 +219,11 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
           colors={[theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.taskCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
+          style={[
+            styles.taskCard, 
+            { borderColor: theme.border, shadowColor: theme.shadow },
+            isAcquiredViaSwap && styles.swappedTaskCard
+          ]}
         >
           <View style={styles.taskHeader}>
             <View style={styles.taskTitleContainer}>
@@ -188,6 +251,22 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
               <Text style={[styles.pointsText, { color: theme.primary }]}>{item.points} pts</Text>
             </LinearGradient>
           </View>
+
+          {/* ✅ Swap Badge */}
+          {isAcquiredViaSwap && (
+            <LinearGradient
+              colors={['#F59E0B', '#F59E0B']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.swapBadge}
+            >
+              <MaterialCommunityIcons name="swap-horizontal" size={12} color="#fff" />
+              <Text style={styles.swapBadgeText}>
+                {swapScope === 'week' ? 'Week Swap' : `${swapDay || 'Day'} Swap`}
+                {swappedFromName && ` from ${swappedFromName}`}
+              </Text>
+            </LinearGradient>
+          )}
 
           {item.description && (
             <Text style={[styles.taskDescription, { color: theme.textMuted }]} numberOfLines={2}>
@@ -233,6 +312,11 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                     <Text style={[styles.assigneeName, { color: theme.text }]}>
                       {currentAssignee.fullName}
                     </Text>
+                    {isAcquiredViaSwap && (
+                      <Text style={[styles.swapNote, { color: theme.primary }]}>
+                        (Acquired via swap)
+                      </Text>
+                    )}
                     <View style={styles.assigneeMeta}>
                       {currentAssignee.rotationOrder && (
                         <LinearGradient
@@ -292,7 +376,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
         </LinearGradient>
       </TouchableOpacity>
     );
-  };
+  }, [membersInRotation, theme, navigation, groupId, userRole, isTaskAssigned, handleOpenAssigneeModal]);
 
   if (loading && !refreshing) {
     return (
@@ -753,6 +837,10 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
   },
+  swappedTaskCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#F59E0B',
+  },
   taskHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -789,6 +877,26 @@ const styles = StyleSheet.create({
   pointsText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  swapBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 10,
+    gap: 6,
+  },
+  swapBadgeText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  swapNote: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginBottom: 2,
   },
   taskDescription: {
     fontSize: 14,
@@ -909,12 +1017,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end'
   },
- modalContent: {
-  borderTopLeftRadius: 24,
-  borderTopRightRadius: 24,
-  height: '92%',
-  overflow: 'hidden',
-},
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '92%',
+    overflow: 'hidden',
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1020,7 +1128,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
   },
-  currentAssigneeAvatar: {
+  currentAssigneeAvatar: { 
     borderWidth: 2,
   },
   disabledAvatar: {
@@ -1028,7 +1136,7 @@ const styles = StyleSheet.create({
   },
   memberInitial: {
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 16, 
   },
   disabledInitial: {},
   memberDetails: {

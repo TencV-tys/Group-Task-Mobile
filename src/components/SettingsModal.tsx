@@ -1,4 +1,4 @@
-// src/components/SettingsModal.tsx - COMPLETE FIXED VERSION
+// src/components/SettingsModal.tsx - ADDED LOGOUT BUTTON
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
@@ -18,6 +18,7 @@ import { GroupMembersService } from '../services/GroupMemberService';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { TokenUtils } from '../utils/tokenUtils';
 import { useTheme } from '../context/ThemeContext';
+import { AuthService } from '../services/AuthService'; // ✅ Add this import
 
 interface SettingsModalProps {
   visible: boolean;
@@ -57,6 +58,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [firstTaskDate, setFirstTaskDate] = useState<Date | null>(null);
   const [authError, setAuthError] = useState(false);
   const [recurringTasks, setRecurringTasks] = useState<any[]>([]);
+  const [loggingOut, setLoggingOut] = useState(false); // ✅ Add logout loading state
   
   const { createSwapRequest, loading: swapLoading } = useSwapRequests();
 
@@ -90,6 +92,44 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       );
     }
   }, [authError, visible, navigation, onClose]);
+
+  // ✅ Add logout handler
+  const handleLogout = useCallback(() => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive', 
+          onPress: performLogout 
+        }
+      ]
+    );
+  }, []);
+
+  const performLogout = useCallback(async () => {
+    setLoggingOut(true);
+    try {
+      const result = await AuthService.logout();
+      if (result.success) {
+        onClose();
+        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      } else {
+        // Even if logout fails, try to clear local state
+        onClose();
+        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Still navigate to login on error
+      onClose();
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    } finally {
+      setLoggingOut(false);
+    }
+  }, [navigation, onClose]);
 
   // ===== FIXED: Get the earliest recurring task's creation date =====
   const getEarliestRecurringTaskDate = async (): Promise<Date | null> => {
@@ -782,6 +822,46 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
+
+            {/* ✅ LOGOUT BUTTON - For ALL Users */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <LinearGradient
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.sectionIcon}
+                >
+                  <MaterialCommunityIcons name="logout" size={16} color={theme.error} />
+                </LinearGradient>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Account</Text>
+              </View>
+
+              <TouchableOpacity 
+                onPress={handleLogout} 
+                disabled={loggingOut}
+                style={styles.logoutMenuItem}
+              >
+                <LinearGradient
+                  colors={[theme.errorBg, theme.errorBg]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.logoutGradient}
+                >
+                  <View style={styles.menuItemLeft}>
+                    <MaterialCommunityIcons name="logout" size={20} color={theme.error} />
+                    <Text style={[styles.logoutText, { color: theme.error }]}>
+                      {loggingOut ? 'Logging out...' : 'Logout'}
+                    </Text>
+                  </View>
+                  {loggingOut ? (
+                    <ActivityIndicator size="small" color={theme.error} />
+                  ) : (
+                    <MaterialCommunityIcons name="chevron-right" size={20} color={theme.error} />
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
 
           {/* Footer */}
@@ -1113,7 +1193,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 10,
     fontWeight: '600',
-  },
+  }, 
   swapHistoryNote: {
     fontSize: 12,
     marginTop: 8,
@@ -1121,4 +1201,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     fontStyle: 'italic',
   },
-}); 
+  // ✅ New logout styles
+  logoutMenuItem: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#ffc9c9',
+  },
+  logoutGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

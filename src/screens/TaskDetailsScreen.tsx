@@ -1,4 +1,5 @@
-// src/screens/TaskDetailsScreen.tsx - FULLY FIXED WITH DARK MODE
+// src/screens/TaskDetailsScreen.tsx - FULLY UPDATED
+
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
@@ -8,8 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   StatusBar,
-  Image,
-  Linking
+  Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons'; 
@@ -26,7 +26,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const { theme, isDark } = useTheme();
   const styles = useMemo(() => makeTaskDetailsStyles(theme), [theme]);
   
-  const { taskId, groupId, userRole } = route.params || {};
+  const { taskId, groupId, userRole, onRefresh } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [task, setTask] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,12 +41,13 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   const [authError, setAuthError] = useState(false);
   const isAdmin = userRole === 'ADMIN';
 
-  // ===== LOAD USER ID USING TOKENUTILS =====
+  // ===== LOAD USER ID =====
   useEffect(() => {
     const loadUserId = async () => {
       const user = await TokenUtils.getUser();
       if (user) {
         setCurrentUserId(user.id);
+        console.log('✅ Current user ID loaded:', user.id);
       }
     };
     loadUserId();
@@ -72,8 +73,10 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   }, [authError, navigation]);
 
   useEffect(() => {
-    if (taskId) fetchTaskDetails();
-  }, [taskId]);
+    if (taskId && currentUserId) {
+      fetchTaskDetails();
+    }
+  }, [taskId, currentUserId]);
 
   // ===== REAL-TIME HOOKS =====
   const {
@@ -116,18 +119,13 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   }, [taskEvents.taskDeleted]);
 
   useEffect(() => {
-    if (assignmentEvents.assignmentCompleted) {
+    if (assignmentEvents.assignmentCompleted || assignmentEvents.assignmentVerified || assignmentEvents.assignmentUpdated) {
       fetchTaskDetails();
       clearAssignmentCompleted();
-    }
-  }, [assignmentEvents.assignmentCompleted]);
-
-  useEffect(() => {
-    if (assignmentEvents.assignmentVerified) {
-      fetchTaskDetails();
       clearAssignmentVerified();
+      clearAssignmentUpdated();
     }
-  }, [assignmentEvents.assignmentVerified]);
+  }, [assignmentEvents.assignmentCompleted, assignmentEvents.assignmentVerified, assignmentEvents.assignmentUpdated]);
 
   useEffect(() => {
     if (task?.userAssignment && !task.userAssignment.completed) {
@@ -136,93 +134,68 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   }, [task, timeLeft]);
 
-  const fetchTaskDetails = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await TaskService.getTaskDetails(taskId);
-      if (result.success) {
-        const processedTask = processTaskData(result.task);
-        setTask(processedTask);
-        
-        findTodayAssignment(processedTask);
-        checkTimeValidity(processedTask);
-        
-        const currentWeek = processedTask.group?.currentRotationWeek || 1;
-        
-        if (processedTask.assignments) {
-          const upcoming = processedTask.assignments.filter(
-            (a: any) => 
-              a.rotationWeek === currentWeek &&
-              a.userId !== processedTask.userId
-          );
-          setUpcomingAssignments(upcoming);
-        }
-        
-        if (processedTask.assignments && processedTask.userId) {
-          const myCurrentWeekSubmissions = processedTask.assignments.filter(
-            (a: any) => 
-              a.userId === processedTask.userId && 
-              a.rotationWeek === currentWeek &&
-              a.completed === true
-          );
-          setCurrentWeekSubmissions(myCurrentWeekSubmissions);
-        }
-      } else {
-        setError(result.message || 'Failed to load task details');
-      }
-    } catch (err: any) {
-      console.error('Error fetching task details:', err);
-      setError(err.message || 'Network error');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  useEffect(() => {
-    if (assignmentEvents.assignmentUpdated && 
-        assignmentEvents.assignmentUpdated.assignmentId === task?.userAssignment?.id) {
-      console.log('🔄 Current assignment updated (swap), refreshing...');
-      fetchTaskDetails();
-      clearAssignmentUpdated();
-    }
-  }, [assignmentEvents.assignmentUpdated, task?.userAssignment?.id, fetchTaskDetails, clearAssignmentUpdated]);
-  
-  const findTodayAssignment = (taskData: any) => {
-    if (!taskData.assignments || !taskData.userId) {
-      setTodayAssignment(null);
-      return;
-    }
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  // ===== HELPER FUNCTIONS =====
+  const convertTimeToMinutes = (time: string) => {
+    if (!time) return 0;
     
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    const todayAssignments = taskData.assignments.filter((a: any) => {
-      if (a.userId !== taskData.userId) return false;
+    const timeLower = time.toLowerCase();
+    let hours = 0;
+    let minutes = 0;
+    
+    if (timeLower.includes('am') || timeLower.includes('pm')) {
+      const isPM = timeLower.includes('pm');
+      const timeWithoutSuffix = time.replace(/[ap]m/gi, '').trim();
+      const [hourStr, minuteStr] = timeWithoutSuffix.split(':');
+      hours = parseInt(hourStr || '0', 10);
+      minutes = parseInt(minuteStr || '0', 10);
       
-      const dueDate = new Date(a.dueDate);
-      dueDate.setHours(0, 0, 0, 0);
-      
-      return dueDate.getTime() === today.getTime();
-    });
-
-    if (todayAssignments.length > 0) {
-      todayAssignments.sort((a: any, b: any) => {
-        const timeA = new Date(a.dueDate).getTime();
-        const timeB = new Date(b.dueDate).getTime();
-        return timeA - timeB;
-      });
-      
-      setTodayAssignment(todayAssignments[0]);
+      if (isPM && hours !== 12) hours += 12;
+      if (!isPM && hours === 12) hours = 0;
     } else {
-      setTodayAssignment(null);
+      const [hourStr, minuteStr] = time.split(':');
+      hours = parseInt(hourStr || '0', 10);
+      minutes = parseInt(minuteStr || '0', 10);
+    }
+    
+    return hours * 60 + minutes;
+  };
+
+  const formatTimeLeft = (seconds: number) => {
+    if (seconds >= 3600) {
+      const hours = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      return `${hours}h ${mins}m`;
+    } else if (seconds >= 60) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins}m ${secs}s`;
+    } else {
+      return `${seconds}s`;
     }
   };
 
+  const startCountdownTimer = () => {
+    const timer = setInterval(() => {
+      if (timeLeft !== null && timeLeft > 0) {
+        setTimeLeft(prev => (prev !== null ? prev - 1 : null));
+      } else if (timeLeft === 0) {
+        setIsSubmittable(false);
+        setSubmissionStatus('expired');
+        clearInterval(timer);
+      }
+    }, 1000);
+    return timer;
+  };
+
+  const isDueToday = (dueDate: string) => {
+    const today = new Date().toDateString();
+    const due = new Date(dueDate).toDateString();
+    return today === due;
+  };
+
+  // ===== PROCESS TASK DATA - CRITICAL FOR SWAP =====
   const processTaskData = (taskData: any) => {
+    // Sort time slots
     if (taskData.timeSlots && taskData.timeSlots.length > 0) {
       taskData.timeSlots.sort((a: any, b: any) => {
         const timeA = convertTimeToMinutes(a.startTime);
@@ -231,6 +204,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       });
     }
     
+    // Sort selected days
     if (taskData.selectedDays && taskData.selectedDays.length > 0) {
       const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       taskData.selectedDays.sort((a: string, b: string) => 
@@ -238,6 +212,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       );
     }
     
+    // Sort assignments
     if (taskData.assignments && taskData.assignments.length > 0) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -278,34 +253,67 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
       });
     }
     
+    // ✅ CRITICAL: Find assignment for CURRENT logged-in user (for swapped tasks)
+    if (taskData.assignments && currentUserId) {
+      const currentWeek = taskData.group?.currentRotationWeek || 1;
+      
+      // Find the assignment that belongs to the current user for this week
+      const userAssignmentForCurrentUser = taskData.assignments.find(
+        (a: any) => a.userId === currentUserId && a.rotationWeek === currentWeek
+      );
+      
+      // Set userAssignment to the current user's assignment
+      taskData.userAssignment = userAssignmentForCurrentUser || null;
+      
+      console.log('📊 ProcessTaskData:', {
+        currentUserId,
+        currentWeek,
+        hasUserAssignment: !!userAssignmentForCurrentUser,
+        assignmentDueDate: userAssignmentForCurrentUser?.dueDate,
+        allAssignmentsCount: taskData.assignments.length,
+        isSwappedTask: userAssignmentForCurrentUser?.acquiredViaSwap || false
+      });
+    }
+    
     return taskData;
   };
 
-  const convertTimeToMinutes = (time: string) => {
-    if (!time) return 0;
-    
-    const timeLower = time.toLowerCase();
-    let hours = 0;
-    let minutes = 0;
-    
-    if (timeLower.includes('am') || timeLower.includes('pm')) {
-      const isPM = timeLower.includes('pm');
-      const timeWithoutSuffix = time.replace(/[ap]m/gi, '').trim();
-      const [hourStr, minuteStr] = timeWithoutSuffix.split(':');
-      hours = parseInt(hourStr || '0', 10);
-      minutes = parseInt(minuteStr || '0', 10);
-      
-      if (isPM && hours !== 12) hours += 12;
-      if (!isPM && hours === 12) hours = 0;
-    } else {
-      const [hourStr, minuteStr] = time.split(':');
-      hours = parseInt(hourStr || '0', 10);
-      minutes = parseInt(minuteStr || '0', 10);
+  // ===== FIND TODAY'S ASSIGNMENT FOR CURRENT USER =====
+  const findTodayAssignment = (taskData: any) => {
+    if (!taskData.assignments || !currentUserId) {
+      setTodayAssignment(null);
+      return;
     }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    return hours * 60 + minutes;
+    // Find assignment for CURRENT USER that is due today
+    const todayAssignments = taskData.assignments.filter((a: any) => {
+      if (a.userId !== currentUserId) return false;
+      
+      const dueDate = new Date(a.dueDate);
+      dueDate.setHours(0, 0, 0, 0);
+      
+      return dueDate.getTime() === today.getTime();
+    });
+
+    if (todayAssignments.length > 0) {
+      todayAssignments.sort((a: any, b: any) => {
+        const timeA = new Date(a.dueDate).getTime();
+        const timeB = new Date(b.dueDate).getTime();
+        return timeA - timeB;
+      });
+      
+      setTodayAssignment(todayAssignments[0]);
+      console.log('✅ Found today assignment for current user:', todayAssignments[0].dueDate);
+    } else {
+      setTodayAssignment(null);
+      console.log('❌ No assignment due today for current user');
+    }
   };
 
+  // ===== CHECK TIME VALIDITY =====
   const checkTimeValidity = (taskData: any) => {
     if (!taskData?.userAssignment || taskData.userAssignment.completed) {
       setIsSubmittable(false);
@@ -381,33 +389,162 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  const startCountdownTimer = () => {
-    const timer = setInterval(() => {
-      if (timeLeft !== null && timeLeft > 0) {
-        setTimeLeft(prev => (prev !== null ? prev - 1 : null));
-      } else if (timeLeft === 0) {
-        setIsSubmittable(false);
-        setSubmissionStatus('expired');
-        clearInterval(timer);
+  // ===== FETCH TASK DETAILS =====
+  const fetchTaskDetails = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await TaskService.getTaskDetails(taskId);
+      if (result.success) {
+        const processedTask = processTaskData(result.task);
+        setTask(processedTask);
+        
+        // Find today's assignment for current user
+        findTodayAssignment(processedTask);
+        checkTimeValidity(processedTask);
+        
+        const currentWeek = processedTask.group?.currentRotationWeek || 1;
+        
+        // ✅ Get ALL assignments for current user this week (both completed AND pending)
+        const myAllAssignments = processedTask.assignments?.filter((a: any) => 
+          a.userId === currentUserId && a.rotationWeek === currentWeek
+        ) || [];
+        
+        // Separate completed vs pending
+        const completedAssignments = myAllAssignments.filter((a: any) => a.completed === true);
+        const pendingAssignments = myAllAssignments.filter((a: any) => a.completed !== true);
+        
+        console.log('📊 User assignments:', {
+          total: myAllAssignments.length,
+          completed: completedAssignments.length,
+          pending: pendingAssignments.length,
+          todayAssignment: todayAssignment?.id
+        });
+        
+        // Set completed submissions for history section
+        setCurrentWeekSubmissions(completedAssignments);
+        
+        // Get others' assignments (exclude current user)
+        const othersAssignments = processedTask.assignments?.filter((a: any) => 
+          a.rotationWeek === currentWeek && a.userId !== currentUserId
+        ) || [];
+        setUpcomingAssignments(othersAssignments);
+        
+      } else {
+        setError(result.message || 'Failed to load task details');
       }
-    }, 1000);
-    return timer;
-  };
-
-  const formatTimeLeft = (seconds: number) => {
-    if (seconds >= 3600) {
-      const hours = Math.floor(seconds / 3600);
-      const mins = Math.floor((seconds % 3600) / 60);
-      return `${hours}h ${mins}m`;
-    } else if (seconds >= 60) {
-      const mins = Math.floor(seconds / 60);
-      const secs = seconds % 60;
-      return `${mins}m ${secs}s`;
-    } else {
-      return `${seconds}s`;
+    } catch (err: any) {
+      console.error('Error fetching task details:', err);
+      setError(err.message || 'Network error');
+    } finally {
+      setLoading(false);
     }
   };
 
+  // ===== NAVIGATION HANDLERS =====
+  const handleBack = () => navigation.goBack();
+  
+  const isTaskAssigned = () => {
+    if (task?.currentAssignee) return true;
+    if (task?.assignments?.some((a: any) => a.rotationWeek === task.group?.currentRotationWeek)) return true;
+    return false;
+  };
+
+  const handleEdit = () => {
+    if (!task) return;
+    
+    if (isTaskAssigned()) {
+      Alert.alert(
+        'Cannot Edit Task',
+        'This task is already assigned to members. Editing assigned tasks could break the rotation system.\n\n' +
+        'Consider creating a new task instead, or wait until the rotation week ends.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    navigation.navigate('UpdateTask', {
+      task,
+      groupId: task.groupId || groupId,
+      groupName: task.group?.name,
+      onTaskUpdated: fetchTaskDetails
+    });
+  };
+
+  const handleDelete = async () => {
+    if (!task) return;
+
+    Alert.alert(
+      'Delete Task',
+      `Are you sure you want to delete "${task.title}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await TaskService.deleteTask(task.id);
+              if (result.success) {
+                Alert.alert('Success', 'Task deleted successfully');
+                navigation.goBack();
+              } else {
+                Alert.alert('Error', result.message || 'Failed to delete task');
+              }
+            } catch (err: any) {
+              console.error('Error deleting task:', err);
+              Alert.alert('Error', err.message || 'Failed to delete task');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleCompleteAssignment = () => {
+    if (!task?.userAssignment || !isSubmittable) {
+      const statusInfo = getSubmissionStatusInfo();
+      Alert.alert(
+        'Cannot Submit',
+        statusInfo.description,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    navigation.navigate('CompleteAssignment', {
+      assignmentId: task.userAssignment.id,
+      taskTitle: task.title,
+      dueDate: task.userAssignment.dueDate,
+      timeSlot: currentTimeSlot || task.userAssignment.timeSlot,
+      onCompleted: () => {
+        fetchTaskDetails();
+        if (onRefresh) onRefresh();
+        Alert.alert('Success', 'Assignment submitted successfully!');
+      }
+    });
+  };
+
+  const handleViewAssignmentDetails = (assignment?: any) => {
+    const assignmentId = assignment?.id || task?.userAssignment?.id;
+    console.log('🔍 Navigating to AssignmentDetails:', assignmentId);
+    
+    if (!assignmentId) {
+      Alert.alert('Error', 'No assignment found');
+      return;
+    }
+
+    navigation.navigate('AssignmentDetails', {
+      assignmentId,
+      isAdmin: isAdmin,
+      onVerified: () => {
+        fetchTaskDetails();
+        if (onRefresh) onRefresh();
+      }
+    });
+  };
+
+  // ===== UI HELPER FUNCTIONS =====
   const getSubmissionStatusInfo = () => {
     switch (submissionStatus) {
       case 'available':
@@ -527,127 +664,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     };
   };
 
-  const isDueToday = (dueDate: string) => {
-    const today = new Date().toDateString();
-    const due = new Date(dueDate).toDateString();
-    return today === due;
-  };
-
-  const handleBack = () => navigation.goBack();
-  
-  // Check if task is assigned before allowing edit
-  const isTaskAssigned = () => {
-    if (task?.currentAssignee) return true;
-    if (task?.assignments?.some((a: any) => a.rotationWeek === task.group?.currentRotationWeek)) return true;
-    return false;
-  };
-
-  const handleEdit = () => {
-    if (!task) return;
-    
-    if (isTaskAssigned()) {
-      Alert.alert(
-        'Cannot Edit Task',
-        'This task is already assigned to members. Editing assigned tasks could break the rotation system.\n\n' +
-        'Consider creating a new task instead, or wait until the rotation week ends.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-    
-    navigation.navigate('UpdateTask', {
-      task,
-      groupId: task.groupId || groupId,
-      groupName: task.group?.name,
-      onTaskUpdated: fetchTaskDetails
-    });
-  };
-
-  const handleDelete = async () => {
-    if (!task) return;
-
-    Alert.alert(
-      'Delete Task',
-      `Are you sure you want to delete "${task.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await TaskService.deleteTask(task.id);
-              if (result.success) {
-                Alert.alert('Success', 'Task deleted successfully');
-                navigation.goBack();
-              } else {
-                Alert.alert('Error', result.message || 'Failed to delete task');
-              }
-            } catch (err: any) {
-              console.error('Error deleting task:', err);
-              Alert.alert('Error', err.message || 'Failed to delete task');
-            }
-          }
-        }
-      ]
-    );
-  };
-
-  const handleCompleteAssignment = () => {
-    if (!task?.userAssignment || !isSubmittable) {
-      const statusInfo = getSubmissionStatusInfo();
-      Alert.alert(
-        'Cannot Submit',
-        statusInfo.description,
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-    
-    navigation.navigate('CompleteAssignment', {
-      assignmentId: task.userAssignment.id,
-      taskTitle: task.title,
-      dueDate: task.userAssignment.dueDate,
-      timeSlot: currentTimeSlot || task.userAssignment.timeSlot,
-      onCompleted: () => {
-        fetchTaskDetails();
-        Alert.alert('Success', 'Assignment submitted successfully!');
-      }
-    });
-  };
-
-  const handleViewAssignmentDetails = (assignment?: any) => {
-    const assignmentId = assignment?.id || task?.userAssignment?.id;
-    if (!assignmentId) return;
-
-    if (!assignment) {
-      navigation.navigate('AssignmentDetails', {
-        assignmentId,
-        isAdmin: isAdmin,
-        onVerified: fetchTaskDetails
-      });
-      return;
-    }
-
-    const isOwner = assignment.userId === currentUserId;
-    const isCompleted = assignment.completed === true;
-
-    if (!isAdmin && !isOwner && !isCompleted) {
-      Alert.alert(
-        'Access Restricted',
-        'You can only view your own pending assignments.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    navigation.navigate('AssignmentDetails', {
-      assignmentId,
-      isAdmin: isAdmin,
-      onVerified: fetchTaskDetails
-    });
-  };
-
+  // ===== RENDER FUNCTIONS =====
   const renderHeader = () => {
     const assigned = isTaskAssigned();
     
@@ -676,7 +693,6 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     );
   };
 
-  // Add a warning banner for assigned tasks
   const renderAssignedWarning = () => {
     if (!isAdmin) return null;
     if (!isTaskAssigned()) return null;
@@ -726,8 +742,20 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     </View>
   );
 
+  // ✅ UPDATED: Shows pending assignments for week swaps
   const renderMemberAssignmentSection = () => {
-    if (!task?.userAssignment) {
+    const currentWeek = task?.group?.currentRotationWeek || 1;
+    
+    // Get ALL assignments for current user this week
+    const myAllAssignments = task?.assignments?.filter((a: any) => 
+      a.userId === currentUserId && a.rotationWeek === currentWeek
+    ) || [];
+    
+    const completedAssignments = myAllAssignments.filter((a: any) => a.completed === true);
+    const pendingAssignments = myAllAssignments.filter((a: any) => a.completed !== true);
+    
+    // If no assignments at all
+    if (myAllAssignments.length === 0) {
       return (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Assignment</Text>
@@ -738,187 +766,278 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
         </View>
       );
     }
+    
+    // If has today's assignment - show it prominently
+    if (todayAssignment) {
+      const now = new Date();
+      const dueDate = new Date(todayAssignment.dueDate);
+      const isOverdue = now > dueDate && !todayAssignment.completed;
+      const submissionStatusInfo = getSubmissionStatusInfo();
 
-    if (!todayAssignment) {
-      const futureAssignments = task?.assignments?.filter((a: any) => 
-        a.userId === task?.userId && new Date(a.dueDate) > new Date()
-      ).sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      return (
+        <TouchableOpacity 
+          style={styles.section}
+          onPress={() => handleViewAssignmentDetails(todayAssignment)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Today's Assignment</Text>
+            <LinearGradient
+              colors={
+                todayAssignment.completed ? [theme.primary, theme.primaryDark] :
+                isOverdue ? [theme.error, theme.error] : [theme.error, theme.error]
+              }
+              style={styles.todayAssignmentBadge}
+            >
+              <MaterialCommunityIcons 
+                name={
+                  todayAssignment.completed ? "check-circle" :
+                  isOverdue ? "alert-circle" : "clock-alert"
+                } 
+                size={12} 
+                color="#fff" 
+              />
+              <Text style={styles.todayAssignmentBadgeText}>
+                {todayAssignment.completed ? 'Completed' : 
+                 isOverdue ? 'Overdue' : 'Due Today'}
+              </Text>
+            </LinearGradient>
+          </View>
+          
+          <LinearGradient
+            colors={
+              todayAssignment.completed ? [theme.primaryLight, theme.primaryLight] :
+              isOverdue ? [theme.errorBg, theme.errorBg] : [theme.errorBg, theme.errorBg]
+            }
+            style={[
+              styles.assignmentCard, 
+              styles.todayAssignmentCard,
+              isOverdue && styles.overdueCard,
+              todayAssignment.completed && styles.completedCard
+            ]}
+          >
+            <View style={styles.assignmentHeader}>
+              <MaterialCommunityIcons 
+                name={
+                  todayAssignment.completed ? "check-circle" :
+                  isOverdue ? "alert-circle" : "clock-alert"
+                } 
+                size={24} 
+                color={
+                  todayAssignment.completed ? theme.primary :
+                  isOverdue ? theme.error : theme.error
+                } 
+              />
+              <View style={styles.assignmentInfo}>
+                <Text style={styles.todayAssignmentTitle}>{task.title}</Text>
+                <Text style={styles.assignmentDate}>
+                  Due: {new Date(todayAssignment.dueDate).toLocaleDateString()}
+                  {todayAssignment.timeSlot && ` • ${todayAssignment.timeSlot.startTime} - ${todayAssignment.timeSlot.endTime}`}
+                </Text>
+              </View>
+            </View>
+            
+            {!todayAssignment.completed && !isOverdue && (
+              <LinearGradient
+                colors={[submissionStatusInfo.bgColor, submissionStatusInfo.bgColor]}
+                style={[styles.submissionStatusCard, { borderColor: submissionStatusInfo.borderColor }]}
+              >
+                <View style={styles.submissionStatusHeader}>
+                  <View style={[styles.statusIconContainer, { backgroundColor: submissionStatusInfo.color + '20' }]}>
+                    <MaterialCommunityIcons name={submissionStatusInfo.icon as any} size={22} color={submissionStatusInfo.color} />
+                  </View>
+                  <View style={styles.statusTextContainer}>
+                    <Text style={[styles.submissionStatusLabel, { color: submissionStatusInfo.color }]}>
+                      {submissionStatusInfo.label}
+                    </Text>
+                    <Text style={[styles.submissionStatusDescription, { color: submissionStatusInfo.color }]}>
+                      {submissionStatusInfo.description}
+                    </Text>
+                  </View>
+                </View>
+                
+                {submissionStatus === 'available' && timeLeft !== null && (
+                  <View style={styles.timerContainer}>
+                    <LinearGradient
+                      colors={timeLeft < 300 ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]}
+                      style={[styles.timerBadge, timeLeft < 300 && styles.urgentTimerBadge]}
+                    >
+                      <MaterialCommunityIcons name={timeLeft < 300 ? "timer-alert" : "timer"} size={16} 
+                        color={timeLeft < 300 ? theme.error : theme.primary} />
+                      <Text style={[styles.timerText, { color: timeLeft < 300 ? theme.error : theme.primary }]}>
+                        {formatTimeLeft(timeLeft)} remaining
+                      </Text>
+                    </LinearGradient>
+                    {timeLeft < 300 && (
+                      <Text style={styles.urgentMessage}>Submit now! Grace period ending soon.</Text>
+                    )}
+                  </View>
+                )}
+                
+                {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
+                  <View style={styles.waitingContainer}>
+                    <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.waitingBadge}>
+                      <MaterialCommunityIcons name="clock-start" size={16} color={theme.primary} />
+                      <Text style={styles.waitingText}>Opens in {formatTimeLeft(timeLeft)}</Text>
+                    </LinearGradient>
+                  </View>
+                )}
+              </LinearGradient>
+            )}
 
-      const nextAssignment = futureAssignments?.[0];
-
+            {isOverdue && !todayAssignment.completed && (
+              <LinearGradient colors={[theme.errorBg, theme.errorBg]} style={styles.overdueInfoCard}>
+                <MaterialCommunityIcons name="alert-circle" size={20} color={theme.error} />
+                <View style={styles.overdueInfoText}>
+                  <Text style={styles.overdueTitle}>Overdue</Text>
+                  <Text style={styles.overdueDate}>
+                    Was due on {new Date(todayAssignment.dueDate).toLocaleDateString()}
+                  </Text>
+                  {todayAssignment.notes?.includes('NEGLECTED') && (
+                    <Text style={styles.neglectedText}>⚠️ Point deduction applied</Text>
+                  )}
+                </View>
+              </LinearGradient>
+            )}
+            
+            {todayAssignment.completed && (
+              <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.completedInfoCard}>
+                <MaterialCommunityIcons name="check-circle" size={20} color={theme.primary} />
+                <View style={styles.completedInfoText}>
+                  <Text style={styles.completedTitle}>Already Completed</Text>
+                  <Text style={styles.completedDate}>
+                    Submitted: {new Date(todayAssignment.completedAt).toLocaleDateString()}
+                  </Text>
+                  {todayAssignment.notes?.includes('LATE') && (
+                    <Text style={styles.lateText}>⚠️ Late submission (points reduced)</Text>
+                  )}
+                </View>
+              </LinearGradient>
+            )}
+            
+            <View style={styles.viewDetailsIndicator}>
+              <Text style={styles.viewDetailsText}>Tap to view full details</Text>
+              <MaterialCommunityIcons name="chevron-right" size={16} color={theme.textMuted} />
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+      );
+    }
+    
+    // ✅ No today assignment - show all pending assignments (important for week swaps)
+    if (pendingAssignments.length > 0) {
+      // Sort by due date (closest first)
+      const sortedPending = [...pendingAssignments].sort((a, b) => 
+        new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
+      );
+      
+      return (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>My Pending Assignments</Text>
+            <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pendingBadge}>
+              <Text style={styles.pendingBadgeText}>{sortedPending.length} pending</Text>
+            </LinearGradient>
+          </View>
+          
+          {sortedPending.map((assignment, index) => {
+            const dueDate = new Date(assignment.dueDate);
+            const isToday = dueDate.toDateString() === new Date().toDateString();
+            const isPast = dueDate < new Date() && !assignment.completed;
+            
+            return (
+              <TouchableOpacity
+                key={assignment.id || index}
+                style={[
+                  styles.pendingAssignmentCard,
+                  isToday && styles.todayPendingCard,
+                  isPast && styles.overduePendingCard
+                ]}
+                onPress={() => handleViewAssignmentDetails(assignment)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.pendingCardHeader}>
+                  <LinearGradient
+                    colors={isToday ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
+                    style={styles.pendingIcon}
+                  >
+                    <MaterialCommunityIcons 
+                      name={isToday ? "clock-alert" : "calendar-clock"} 
+                      size={16} 
+                      color={isToday ? "#fff" : theme.textSecondary} 
+                    />
+                  </LinearGradient>
+                  <View style={styles.pendingInfo}>
+                    <Text style={styles.pendingTitle}>
+                      {assignment.timeSlot 
+                        ? `${assignment.timeSlot.startTime} - ${assignment.timeSlot.endTime}`
+                        : 'Time slot assignment'}
+                    </Text>
+                    <Text style={[
+                      styles.pendingDate,
+                      isToday && styles.todayPendingText,
+                      isPast && styles.overduePendingText
+                    ]}>
+                      {isToday ? 'Due Today' : dueDate.toLocaleDateString()}
+                      {assignment.timeSlot && ` at ${assignment.timeSlot.startTime}`}
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={theme.textMuted} />
+                </View>
+                
+                {assignment.points && (
+                  <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pendingPointsBadge}>
+                    <Text style={styles.pendingPointsText}>{assignment.points} pts</Text>
+                  </LinearGradient>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      );
+    }
+    
+    // All assignments completed
+    if (completedAssignments.length > 0 && pendingAssignments.length === 0) {
       return (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Assignment</Text>
           <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.notAssignedCard}>
-            <MaterialCommunityIcons name="calendar" size={24} color={theme.textMuted} />
-            <Text style={styles.notAssignedText}>No assignment due today</Text>
-            {nextAssignment ? (
-              <Text style={styles.notAssignedSubtext}>
-                Next: {new Date(nextAssignment.dueDate).toLocaleDateString()}
-              </Text>
-            ) : (
-              <Text style={styles.notAssignedSubtext}>No upcoming assignments</Text>
-            )}
+            <MaterialCommunityIcons name="check-circle" size={24} color={theme.primary} />
+            <Text style={styles.notAssignedText}>All assignments completed for this week!</Text>
+            <Text style={styles.notAssignedSubtext}>Great job! 🎉</Text>
           </LinearGradient>
         </View>
       );
     }
+    
+    // No pending, no today - show next upcoming
+    const futureAssignments = myAllAssignments.filter((a: any) => 
+      new Date(a.dueDate) > new Date()
+    ).sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
 
-    const now = new Date();
-    const dueDate = new Date(todayAssignment.dueDate);
-    const isOverdue = now > dueDate && !todayAssignment.completed;
-    const submissionStatusInfo = getSubmissionStatusInfo();
+    const nextAssignment = futureAssignments?.[0];
 
     return (
-      <TouchableOpacity 
-        style={styles.section}
-        onPress={() => handleViewAssignmentDetails(todayAssignment)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Today's Assignment</Text>
-          <LinearGradient
-            colors={
-              todayAssignment.completed ? [theme.primary, theme.primaryDark] :
-              isOverdue ? [theme.error, theme.error] : [theme.error, theme.error]
-            }
-            style={styles.todayAssignmentBadge}
-          >
-            <MaterialCommunityIcons 
-              name={
-                todayAssignment.completed ? "check-circle" :
-                isOverdue ? "alert-circle" : "clock-alert"
-              } 
-              size={12} 
-              color="#fff" 
-            />
-            <Text style={styles.todayAssignmentBadgeText}>
-              {todayAssignment.completed ? 'Completed' : 
-               isOverdue ? 'Overdue' : 'Due Today'}
-            </Text>
-          </LinearGradient>
-        </View>
-        
-        <LinearGradient
-          colors={
-            todayAssignment.completed ? [theme.primaryLight, theme.primaryLight] :
-            isOverdue ? [theme.errorBg, theme.errorBg] : [theme.errorBg, theme.errorBg]
-          }
-          style={[
-            styles.assignmentCard, 
-            styles.todayAssignmentCard,
-            isOverdue && styles.overdueCard,
-            todayAssignment.completed && styles.completedCard
-          ]}
-        >
-          <View style={styles.assignmentHeader}>
-            <MaterialCommunityIcons 
-              name={
-                todayAssignment.completed ? "check-circle" :
-                isOverdue ? "alert-circle" : "clock-alert"
-              } 
-              size={24} 
-              color={
-                todayAssignment.completed ? theme.primary :
-                isOverdue ? theme.error : theme.error
-              } 
-            />
-            <View style={styles.assignmentInfo}>
-              <Text style={styles.todayAssignmentTitle}>{task.title}</Text>
-              <Text style={styles.assignmentDate}>
-                Due: {new Date(todayAssignment.dueDate).toLocaleDateString()}
-                {todayAssignment.timeSlot && ` • ${todayAssignment.timeSlot.startTime} - ${todayAssignment.timeSlot.endTime}`}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>My Assignment</Text>
+        <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.notAssignedCard}>
+          <MaterialCommunityIcons name="calendar" size={24} color={theme.textMuted} />
+          <Text style={styles.notAssignedText}>No assignment due today</Text>
+          {nextAssignment ? (
+            <TouchableOpacity onPress={() => handleViewAssignmentDetails(nextAssignment)}>
+              <Text style={styles.notAssignedSubtext}>
+                Next: {new Date(nextAssignment.dueDate).toLocaleDateString()} →
               </Text>
-            </View>
-          </View>
-          
-          {!todayAssignment.completed && !isOverdue && (
-            <LinearGradient
-              colors={[submissionStatusInfo.bgColor, submissionStatusInfo.bgColor]}
-              style={[styles.submissionStatusCard, { borderColor: submissionStatusInfo.borderColor }]}
-            >
-              <View style={styles.submissionStatusHeader}>
-                <View style={[styles.statusIconContainer, { backgroundColor: submissionStatusInfo.color + '20' }]}>
-                  <MaterialCommunityIcons name={submissionStatusInfo.icon as any} size={22} color={submissionStatusInfo.color} />
-                </View>
-                <View style={styles.statusTextContainer}>
-                  <Text style={[styles.submissionStatusLabel, { color: submissionStatusInfo.color }]}>
-                    {submissionStatusInfo.label}
-                  </Text>
-                  <Text style={[styles.submissionStatusDescription, { color: submissionStatusInfo.color }]}>
-                    {submissionStatusInfo.description}
-                  </Text>
-                </View>
-              </View>
-              
-              {submissionStatus === 'available' && timeLeft !== null && (
-                <View style={styles.timerContainer}>
-                  <LinearGradient
-                    colors={timeLeft < 300 ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]}
-                    style={[styles.timerBadge, timeLeft < 300 && styles.urgentTimerBadge]}
-                  >
-                    <MaterialCommunityIcons name={timeLeft < 300 ? "timer-alert" : "timer"} size={16} 
-                      color={timeLeft < 300 ? theme.error : theme.primary} />
-                    <Text style={[styles.timerText, { color: timeLeft < 300 ? theme.error : theme.primary }]}>
-                      {formatTimeLeft(timeLeft)} remaining
-                    </Text>
-                  </LinearGradient>
-                  {timeLeft < 300 && (
-                    <Text style={styles.urgentMessage}>Submit now! Grace period ending soon.</Text>
-                  )}
-                </View>
-              )}
-              
-              {submissionStatus === 'waiting' && timeLeft !== null && timeLeft > 0 && (
-                <View style={styles.waitingContainer}>
-                  <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.waitingBadge}>
-                    <MaterialCommunityIcons name="clock-start" size={16} color={theme.primary} />
-                    <Text style={styles.waitingText}>Opens in {formatTimeLeft(timeLeft)}</Text>
-                  </LinearGradient>
-                </View>
-              )}
-            </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <Text style={styles.notAssignedSubtext}>No upcoming assignments</Text>
           )}
-
-          {isOverdue && !todayAssignment.completed && (
-            <LinearGradient colors={[theme.errorBg, theme.errorBg]} style={styles.overdueInfoCard}>
-              <MaterialCommunityIcons name="alert-circle" size={20} color={theme.error} />
-              <View style={styles.overdueInfoText}>
-                <Text style={styles.overdueTitle}>Overdue</Text>
-                <Text style={styles.overdueDate}>
-                  Was due on {new Date(todayAssignment.dueDate).toLocaleDateString()}
-                </Text>
-                {todayAssignment.notes?.includes('NEGLECTED') && (
-                  <Text style={styles.neglectedText}>⚠️ Point deduction applied</Text>
-                )}
-              </View>
-            </LinearGradient>
-          )}
-          
-          {todayAssignment.completed && (
-            <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.completedInfoCard}>
-              <MaterialCommunityIcons name="check-circle" size={20} color={theme.primary} />
-              <View style={styles.completedInfoText}>
-                <Text style={styles.completedTitle}>Already Completed</Text>
-                <Text style={styles.completedDate}>
-                  Submitted: {new Date(todayAssignment.completedAt).toLocaleDateString()}
-                </Text>
-                {todayAssignment.notes?.includes('LATE') && (
-                  <Text style={styles.lateText}>⚠️ Late submission (points reduced)</Text>
-                )}
-              </View>
-            </LinearGradient>
-          )}
-          
-          <View style={styles.viewDetailsIndicator}>
-            <Text style={styles.viewDetailsText}>Tap to view full details</Text>
-            <MaterialCommunityIcons name="chevron-right" size={16} color={theme.textMuted} />
-          </View>
         </LinearGradient>
-      </TouchableOpacity>
-    ); 
+      </View>
+    );
   };
- 
+
   const renderMySubmissionsSection = () => {
     if (currentWeekSubmissions.length === 0) {
       return (
@@ -1017,7 +1136,11 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
   };
 
   const renderUpcomingAssignments = () => {
-    if (upcomingAssignments.length === 0) return null;
+    const othersAssignments = upcomingAssignments.filter(
+      (a: any) => a.userId !== currentUserId
+    );
+    
+    if (othersAssignments.length === 0) return null;
 
     return (
       <View style={styles.section}>
@@ -1027,7 +1150,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
           </LinearGradient>
           <Text style={styles.sectionTitle}>Others' Tasks This Week</Text>
         </View>
-        {upcomingAssignments.slice(0, 5).map((assignment: any) => {
+        {othersAssignments.slice(0, 5).map((assignment: any) => {
           const dueToday = isDueToday(assignment.dueDate);
           const status = getVerificationStatus(assignment);
           
@@ -1231,6 +1354,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     </View>
   );
 
+  // ===== LOADING AND ERROR STATES =====
   if (loading) {
     return (
       <ScreenWrapper style={styles.container}>
@@ -1272,6 +1396,7 @@ export default function TaskDetailsScreen({ navigation, route }: any) {
     );
   }
 
+  // ===== MAIN RENDER =====
   return (
     <ScreenWrapper style={styles.container}>
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.card} />

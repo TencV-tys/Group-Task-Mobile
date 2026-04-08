@@ -16,6 +16,7 @@ export interface CreateSwapRequestData {
   selectedTimeSlotId?: string;
 }
  
+// In services/SwapRequestService.ts - UPDATE the SwapRequest interface
 
 export interface SwapRequest {
   id: string;
@@ -25,7 +26,7 @@ export interface SwapRequest {
   requestedBy: string;
   targetUserId?: string;
   expiresAt?: string;
-  createdAt: string;  // ✅ Add this
+  createdAt: string;
   updatedAt: string;
   scope: 'week' | 'day';
   selectedDay?: string;
@@ -37,6 +38,7 @@ export interface SwapRequest {
   adminApprovedBy?: string;
   adminApprovedAt?: string;
   adminRejectionReason?: string;
+  adminNotes?: string;  // ✅ ADD THIS - admin notes when approving
   autoApproved: boolean;
   acceptedBy?: string;
   acceptedAt?: string;
@@ -50,7 +52,7 @@ export interface SwapRequest {
       id: string;
       title: string;
       executionFrequency: string;
-      points: number;  // ✅ Add points here
+      points: number;
       group?: {
         id: string;
         name: string;
@@ -83,7 +85,7 @@ export interface SwapRequest {
     id: string;
     fullName: string;
     avatarUrl?: string;
-  };
+  }; 
   selectedTimeSlot?: {
     id: string;
     startTime: string;
@@ -91,6 +93,7 @@ export interface SwapRequest {
     label?: string;
   };
 }
+
 
 export interface SwapRequestFilters {
   status?: string;

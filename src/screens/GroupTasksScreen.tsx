@@ -88,7 +88,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     clearTaskCreated,
     clearTaskUpdated,
     clearTaskDeleted,
-    clearTaskAssigned
+    clearTaskAssigned 
   } = useRealtimeTasks(groupId);
 
   const {
@@ -398,6 +398,16 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       }
       
       const myTasksResult = await TaskService.getMyTasks(groupId);
+
+      // In the fetchTasks function, after getting myTasksResult:
+console.log('🔍🔍🔍 MY TASKS DEBUG 🔍🔍🔍');
+myTasksResult.tasks?.forEach((task: any) => {
+  console.log(`Task: ${task.title}`);
+  console.log(`  acquiredViaSwap: ${task.acquiredViaSwap}`);
+  console.log(`  swappedFromName: ${task.swappedFromName}`);
+  console.log(`  swapScope: ${task.swapScope}`);
+  console.log(`  assignment?.acquiredViaSwap: ${task.assignment?.acquiredViaSwap}`);
+});
       
       if (myTasksResult.success && myTasksResult.tasks && isMounted.current) {
         const enhancedTasks = myTasksResult.tasks.map((task: any) => ({
@@ -425,28 +435,36 @@ export default function GroupTasksScreen({ navigation, route }: any) {
 
   const refreshTasks = useCallback(() => fetchTasks(true), [fetchTasks]);
 
-  // ===== HANDLE TASK CLICK - REDIRECT SWAPPED TASKS TO ASSIGNMENT DETAILS =====
-  const handleViewTaskDetails = async (item: any) => {
-    if (!await checkToken()) return;
-    
-    // ✅ If this is a swapped task in "My Tasks" tab, go directly to Assignment Details
-    const isMyTasksView = selectedTab === 'my';
-    const isAcquiredViaSwap = item.acquiredViaSwap === true;
-    const assignmentId = item.userAssignment?.id;
-    
-    if (isMyTasksView && isAcquiredViaSwap && assignmentId) {
-      console.log('🔄 Swapped task detected, navigating to Assignment Details:', assignmentId);
-      navigation.navigate('AssignmentDetails', { 
-        assignmentId, 
-        isAdmin: false,
-        onVerified: refreshTasks
-      });
-      return;
-    }
-    
-    // Otherwise go to Task Details
-    navigation.navigate('TaskDetails', { taskId: item.id, groupId, userRole });
-  };
+// In GroupTasksScreen.tsx - REPLACE the handleViewTaskDetails function with this:
+
+const handleViewTaskDetails = async (item: any) => {
+  if (!await checkToken()) return;
+  
+  const isMyTasksView = selectedTab === 'my';
+  const isAcquiredViaSwap = item.acquiredViaSwap === true;
+  const swapScope = item.swapScope || item.assignment?.swapScope;
+  const assignmentId = item.userAssignment?.id;
+  
+  // ✅ DAY SWAP ONLY - redirect to Assignment Details
+  // Week swap should go to normal Task Details (like original task)
+  if (isMyTasksView && isAcquiredViaSwap && swapScope === 'day' && assignmentId) {
+    console.log('🔄 Day swap task detected, navigating to Assignment Details:', assignmentId);
+    navigation.navigate('AssignmentDetails', { 
+      assignmentId, 
+      isAdmin: false,
+      onVerified: refreshTasks
+    });
+    return;
+  }
+  
+  // ✅ WEEK SWAP or normal task - go to Task Details (normal flow)
+  console.log('📋 Navigating to Task Details:', item.id, 'swapScope:', swapScope);
+  navigation.navigate('TaskDetails', { 
+    taskId: item.id, 
+    groupId, 
+    userRole 
+  });
+};
 
   // ===== useEffect HOOKS =====
   useEffect(() => {
@@ -1169,31 +1187,33 @@ export default function GroupTasksScreen({ navigation, route }: any) {
             </View>
           </View>
           
-          {/* ✅ SWAP INFO TOOLTIP */}
-          {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
-            <LinearGradient
-              colors={[theme.primaryLight, theme.primaryLight]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.swapInfoTooltip, { borderColor: theme.primaryBorder }]}
-            >
-              <MaterialCommunityIcons name="information" size={14} color={theme.primary} />
-              <Text style={[styles.swapInfoText, { color: theme.primary }]}>
-                Received from {swappedFromName}
-                {swapScope === 'week' ? ' (Full week swap)' : swapDay ? ` (${swapDay})` : ''}
-              </Text>
-              {swapRequestId && (
-                <TouchableOpacity 
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    navigation.navigate('SwapRequestDetails', { requestId: swapRequestId });
-                  }}
-                >
-                  <Text style={[styles.viewSwapLink, { color: theme.primary }]}>View →</Text>
-                </TouchableOpacity>
-              )}
-            </LinearGradient>
-          )}
+            {/* ✅ SWAP INFO TOOLTIP - Different messages for week vs day swap */}
+{isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
+  <LinearGradient
+    colors={[theme.primaryLight, theme.primaryLight]}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={[styles.swapInfoTooltip, { borderColor: theme.primaryBorder }]}
+  >
+    <MaterialCommunityIcons name="information" size={14} color={theme.primary} />
+    <Text style={[styles.swapInfoText, { color: theme.primary }]}>
+      {swapScope === 'week' 
+        ? `Full week swap with ${swappedFromName} - you exchanged all your tasks` 
+        : `Day swap from ${swappedFromName} for ${swapDay || 'this day'}`
+      }
+    </Text>
+    {swapRequestId && (
+      <TouchableOpacity 
+        onPress={(e) => {
+          e.stopPropagation();
+          navigation.navigate('SwapRequestDetails', { requestId: swapRequestId });
+        }}
+      >
+        <Text style={[styles.viewSwapLink, { color: theme.primary }]}>View →</Text>
+      </TouchableOpacity>
+    )}
+  </LinearGradient>
+)}
           
           {renderAssignmentInfo(item)}
           

@@ -135,7 +135,7 @@ const getSuggestedPoints = useCallback(() => {
     nextPosition,
     suggested,
     expected: `${11 - nextPosition} pts`
-  });
+  });  
 
   return {
     suggested,
@@ -389,36 +389,39 @@ const getSuggestedPoints = useCallback(() => {
     }
   };
 
-  const handleSubmit = async () => {
-    Keyboard.dismiss();
-    if (!groupId) return Alert.alert('Error', 'Group ID is missing');
-    if (!form.title.trim()) return Alert.alert('Error', 'Please enter a task title');
 
-    const result = await createTask(groupId, buildTaskPayload());
-    if (result.success) {
-      if (createFromDraft && currentDraftId) {
-        await TaskDraftService.deleteDraft(currentDraftId);
-      }
-      Alert.alert('Success!', 'Task created successfully', [
-        {
-          text: 'OK',
-          onPress: () => {
-            reset();
-            setForm(DEFAULT_FORM);
-            setCurrentDraftId(null);
-            if (route.params?.onTaskCreated) route.params.onTaskCreated(result.task);
-            navigation.navigate('GroupTasks', {
-              groupId,
-              groupName,
-              userRole: 'ADMIN',
-              switchToAllTasks: true,
-              refreshTasks: true,
-            });
-          },
-        },
-      ]);
+const handleSubmit = async () => {
+  Keyboard.dismiss();
+  if (!groupId) return Alert.alert('Error', 'Group ID is missing');
+  if (!form.title.trim()) return Alert.alert('Error', 'Please enter a task title');
+
+  const result = await createTask(groupId, buildTaskPayload());
+  
+  if (result.success) {
+    if (createFromDraft && currentDraftId) {
+      await TaskDraftService.deleteDraft(currentDraftId);
     }
-  };
+    
+    reset();
+    setForm(DEFAULT_FORM);
+    setCurrentDraftId(null);
+    
+    if (route.params?.onTaskCreated) route.params.onTaskCreated(result.task);
+    
+    // ✅ Pass the task ID to suppress the real-time Alert
+    navigation.replace('GroupTasks', {
+      groupId,
+      groupName,
+      userRole: 'ADMIN',
+      switchToAllTasks: true,
+      refreshTasks: true,
+      justCreatedTaskId: result.task?.id,  // ✅ Pass the ID
+      justCreatedTaskTitle: form.title,
+    });
+  } else {
+    Alert.alert('Error', result.message || error || 'Failed to create task');
+  }
+};
 
   const recommendation = getTaskRecommendation();
   const pointsSuggestion = getSuggestedPoints();

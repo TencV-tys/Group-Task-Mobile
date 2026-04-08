@@ -1190,4 +1190,76 @@ export const makeTaskDetailsStyles = (theme: Theme) => StyleSheet.create({
     color: theme.textMuted,
     fontWeight: '500',
   },
+  // Add these styles to your taskDetails.styles.ts file
+
+// ===== PENDING ASSIGNMENTS STYLES (for week swaps) =====
+pendingAssignmentCard: {
+  backgroundColor: theme.card,
+  borderRadius: 12,
+  padding: 14,
+  marginBottom: 10,
+  borderWidth: 1,
+  borderColor: theme.border,
+  position: 'relative',
+},
+todayPendingCard: {
+  borderColor: theme.primary,
+  borderWidth: 2,
+  backgroundColor: theme.primaryLight,
+},
+overduePendingCard: {
+  borderColor: theme.error,
+  borderWidth: 2,
+  backgroundColor: theme.errorBg,
+},
+pendingCardHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 12,
+},
+pendingIcon: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+pendingInfo: {
+  flex: 1,
+},
+pendingTitle: {
+  fontSize: 14,
+  fontWeight: '600',
+  color: theme.text,
+  marginBottom: 2,
+},
+pendingDate: {
+  fontSize: 12,
+  color: theme.textMuted,
+},
+todayPendingText: {
+  color: theme.primary,
+  fontWeight: '600',
+},
+overduePendingText: {
+  color: theme.error,
+  fontWeight: '600',
+},
+pendingPointsBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  alignSelf: 'flex-start',
+  paddingHorizontal: 8,
+  paddingVertical: 2,
+  borderRadius: 12,
+  marginTop: 8,
+  marginLeft: 52,
+  gap: 4,
+},
+pendingPointsText: {
+  fontSize: 11,
+  fontWeight: '600',
+  color: theme.primary,
+},
+
 });

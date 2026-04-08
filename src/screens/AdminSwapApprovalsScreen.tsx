@@ -1,4 +1,4 @@
-// screens/AdminSwapApprovalsScreen.tsx - WITH SWAP HISTORY ICON
+// screens/AdminSwapApprovalsScreen.tsx - WITH INFINITE SCROLL
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -12,6 +12,7 @@ import {
   Alert,
   Modal,
   TextInput,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,6 +22,10 @@ import { SwapRequestService, SwapRequest } from '../services/SwapRequestService'
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { TokenUtils } from '../utils/tokenUtils';
 import { useTheme } from '../context/ThemeContext';
+
+type FilterType = 'pending' | 'accepted' | 'rejected';
+
+const PAGE_SIZE = 20;
 
 export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
   const { theme } = useTheme();
@@ -41,6 +46,17 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  
+  // Filter state
+  const [activeFilter, setActiveFilter] = useState<FilterType>('pending');
+  const [acceptedRequests, setAcceptedRequests] = useState<SwapRequest[]>([]);
+  const [rejectedRequests, setRejectedRequests] = useState<SwapRequest[]>([]);
+  const [loadingProcessed, setLoadingProcessed] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [acceptedPage, setAcceptedPage] = useState(0);
+  const [rejectedPage, setRejectedPage] = useState(0);
+  const [hasMoreAccepted, setHasMoreAccepted] = useState(true);
+  const [hasMoreRejected, setHasMoreRejected] = useState(true);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -53,21 +69,88 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
   useFocusEffect(
     useCallback(() => {
       if (groupId) {
-        loadPendingForAdmin(groupId);
+        loadAllData();
       }
-    }, [groupId, loadPendingForAdmin])
+    }, [groupId])
   );
+
+  const loadAllData = async () => {
+    await Promise.all([
+      loadPendingForAdmin(groupId),
+      loadProcessedRequests(true)
+    ]);
+  };
+
+  const loadProcessedRequests = async (reset = true) => {
+    if (reset) {
+      setLoadingProcessed(true);
+      setAcceptedPage(0);
+      setRejectedPage(0);
+      setHasMoreAccepted(true);
+      setHasMoreRejected(true);
+    } else {
+      setLoadingMore(true);
+    }
+    
+    try {
+      const currentPage = reset ? 0 : (activeFilter === 'accepted' ? acceptedPage : rejectedPage);
+      const offset = currentPage * PAGE_SIZE;
+      
+      const response = await SwapRequestService.getGroupSwapRequests(groupId, {
+        limit: PAGE_SIZE,
+        offset: offset
+      });
+      
+      if (response.success && response.data?.requests) {
+        const allRequests = response.data.requests;
+        const accepted = allRequests.filter((req: SwapRequest) => req.adminApproved === true);
+        const rejected = allRequests.filter((req: SwapRequest) => req.adminApproved === false);
+        
+        if (reset) {
+          setAcceptedRequests(accepted);
+          setRejectedRequests(rejected);
+          setAcceptedPage(1);
+          setRejectedPage(1);
+          setHasMoreAccepted(accepted.length === PAGE_SIZE);
+          setHasMoreRejected(rejected.length === PAGE_SIZE);
+        } else {
+          if (activeFilter === 'accepted') {
+            setAcceptedRequests(prev => [...prev, ...accepted]);
+            setAcceptedPage(prev => prev + 1);
+            setHasMoreAccepted(accepted.length === PAGE_SIZE);
+          } else if (activeFilter === 'rejected') {
+            setRejectedRequests(prev => [...prev, ...rejected]);
+            setRejectedPage(prev => prev + 1);
+            setHasMoreRejected(rejected.length === PAGE_SIZE);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading processed requests:', error);
+    } finally {
+      setLoadingProcessed(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const loadMore = () => {
+    if (activeFilter === 'accepted' && hasMoreAccepted && !loadingProcessed && !loadingMore) {
+      loadProcessedRequests(false);
+    } else if (activeFilter === 'rejected' && hasMoreRejected && !loadingProcessed && !loadingMore) {
+      loadProcessedRequests(false);
+    }
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadPendingForAdmin(groupId);
+    await loadAllData();
     setRefreshing(false);
   };
 
   const handleApprove = async (requestId: string) => {
     Alert.alert(
       'Approve Swap Request',
-      'Are you sure you want to approve this swap request? The requester will be notified and can then share it with members.',
+      'Approve this swap request? The requester will be notified and can then share it with members.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -79,8 +162,8 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
             setProcessingId(null);
 
             if (result.success) {
-              Alert.alert('Success', 'Swap request approved');
-              await loadPendingForAdmin(groupId);
+              Alert.alert('Success', 'Swap request approved. It is now available for members to accept.');
+              await loadAllData();
             } else {
               Alert.alert('Error', result.message);
             }
@@ -111,7 +194,7 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
 
     if (result.success) {
       Alert.alert('Success', 'Swap request rejected');
-      await loadPendingForAdmin(groupId);
+      await loadAllData();
     } else {
       Alert.alert('Error', result.message);
     }
@@ -121,6 +204,61 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
     navigation.navigate('GroupSwapHistory', { groupId, groupName });
   };
 
+  const getFilteredRequests = () => {
+    if (activeFilter === 'pending') {
+      return pendingForAdmin;
+    } else if (activeFilter === 'accepted') {
+      return acceptedRequests;
+    } else {
+      return rejectedRequests;
+    }
+  };
+
+  const getFilterCount = (filter: FilterType) => {
+    if (filter === 'pending') return totalPendingForAdmin;
+    if (filter === 'accepted') return acceptedRequests.length;
+    return rejectedRequests.length;
+  };
+
+  const renderFilterButton = (filter: FilterType, label: string, color: string) => {
+    const count = getFilterCount(filter);
+    const isActive = activeFilter === filter;
+    
+    return (
+      <TouchableOpacity
+        key={filter}
+        style={[
+          styles.filterButton,
+          isActive && styles.filterButtonActive,
+          { borderColor: theme.border }
+        ]}
+        onPress={() => setActiveFilter(filter)}
+      >
+        <LinearGradient
+          colors={isActive ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.filterButtonGradient}
+        >
+          <MaterialCommunityIcons 
+            name={filter === 'pending' ? 'clock-outline' : filter === 'accepted' ? 'check-circle' : 'close-circle'} 
+            size={14} 
+            color={isActive ? '#fff' : color} 
+          />
+          <Text
+            style={[
+              styles.filterButtonText,
+              isActive && styles.filterButtonTextActive,
+              { color: isActive ? '#fff' : color }
+            ]}
+          >
+            {label} ({count})
+          </Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
+
   const renderSwapRequest = ({ item }: { item: SwapRequest }) => {
     const isProcessing = processingId === item.id;
     const requesterName = item.requester?.fullName || 'Unknown';
@@ -128,6 +266,15 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
     const points = item.assignment?.task?.points || 0;
     const targetName = item.targetUser?.fullName || (item.targetUserId ? 'Specific user' : 'Anyone');
     const currentAssignee = item.assignment?.user?.fullName || 'Unknown';
+    
+    const isAccepted = item.adminApproved === true;
+    const isRejected = item.adminApproved === false;
+    const statusColor = isAccepted ? '#10B981' : isRejected ? '#EF4444' : '#F59E0B';
+    const statusIcon = isAccepted ? 'check-circle' : isRejected ? 'close-circle' : 'clock-outline';
+    const statusLabel = isAccepted ? 'Approved' : isRejected ? 'Rejected' : 'Pending Approval';
+    
+    const memberAccepted = item.status === 'ACCEPTED';
+    const waitingForMember = isAccepted && !memberAccepted;
 
     return (
       <LinearGradient
@@ -154,11 +301,11 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
             </View>
           </View>
           <LinearGradient
-            colors={[theme.primaryLight, theme.primaryLight]}
-            style={styles.pendingBadge}
+            colors={[`${statusColor}20`, `${statusColor}10`]}
+            style={[styles.statusBadge, { borderColor: statusColor }]}
           >
-            <MaterialCommunityIcons name="clock-outline" size={12} color={theme.primary} />
-            <Text style={[styles.pendingBadgeText, { color: theme.primary }]}>Awaiting Approval</Text>
+            <MaterialCommunityIcons name={statusIcon as any} size={12} color={statusColor} />
+            <Text style={[styles.statusBadgeText, { color: statusColor }]}>{statusLabel}</Text>
           </LinearGradient>
         </View>
 
@@ -186,6 +333,24 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
             </Text>
           </View>
 
+          {waitingForMember && (
+            <View style={[styles.detailRow, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="clock" size={14} color={theme.primary} />
+              <Text style={[styles.detailText, { color: theme.primary }]}>
+                Waiting for member to accept
+              </Text>
+            </View>
+          )}
+
+          {memberAccepted && isAccepted && (
+            <View style={[styles.detailRow, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="check-circle" size={14} color="#10B981" />
+              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+                Member accepted this swap
+              </Text>
+            </View>
+          )}
+
           <View style={[styles.detailRow, { backgroundColor: theme.bgSecondary }]}>
             <MaterialCommunityIcons name="star" size={14} color="#e67700" />
             <Text style={[styles.detailText, { color: theme.textSecondary }]}>{points} pts</Text>
@@ -202,50 +367,105 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
           </LinearGradient>
         )}
 
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.approveButton, { borderColor: theme.primaryBorder }]}
-            onPress={() => handleApprove(item.id)}
-            disabled={isProcessing}
+        {item.adminRejectionReason && isRejected && (
+          <LinearGradient
+            colors={[theme.errorBg, theme.errorBg]}
+            style={[styles.rejectionContainer, { borderColor: theme.errorBorder }]}
           >
-            <LinearGradient
-              colors={[theme.primary, theme.primaryDark]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.actionButtonGradient}
-            >
-              {isProcessing ? (
-                <ActivityIndicator size="small" color="white" />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="check" size={18} color="white" />
-                  <Text style={styles.actionButtonText}>Approve</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+            <MaterialCommunityIcons name="alert-circle" size={14} color={theme.error} />
+            <View style={styles.rejectionContent}>
+              <Text style={[styles.rejectionLabel, { color: theme.error }]}>Rejection Reason:</Text>
+              <Text style={[styles.rejectionText, { color: theme.textSecondary }]}>{item.adminRejectionReason}</Text>
+            </View>
+          </LinearGradient>
+        )}
 
-          <TouchableOpacity
-            style={[styles.actionButton, styles.rejectButton, { borderColor: theme.errorBorder ?? '#ffc9c9' }]}
-            onPress={() => openRejectModal(item.id)}
-            disabled={isProcessing}
+        {item.adminNotes && isAccepted && (
+          <LinearGradient
+            colors={[theme.primaryLight, theme.primaryLight]}
+            style={[styles.adminNotesContainer, { borderColor: theme.primaryBorder }]}
           >
-            <LinearGradient
-              colors={['#fa5252', '#e03131']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.actionButtonGradient}
+            <MaterialCommunityIcons name="note-text" size={14} color={theme.primary} />
+            <Text style={[styles.adminNotesText, { color: theme.primary }]}>{item.adminNotes}</Text>
+          </LinearGradient>
+        )}
+
+        {activeFilter === 'pending' && (
+          <View style={styles.actionButtons}>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.approveButton, { borderColor: theme.primaryBorder }]}
+              onPress={() => handleApprove(item.id)}
+              disabled={isProcessing}
             >
-              <MaterialCommunityIcons name="close" size={18} color="white" />
-              <Text style={styles.actionButtonText}>Reject</Text>
-            </LinearGradient>
+              <LinearGradient
+                colors={[theme.primary, theme.primaryDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.actionButtonGradient}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="check" size={18} color="white" />
+                    <Text style={styles.actionButtonText}>Approve</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionButton, styles.rejectButton, { borderColor: theme.errorBorder ?? '#ffc9c9' }]}
+              onPress={() => openRejectModal(item.id)}
+              disabled={isProcessing}
+            >
+              <LinearGradient
+                colors={['#fa5252', '#e03131']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.actionButtonGradient}
+              >
+                <MaterialCommunityIcons name="close" size={18} color="white" />
+                <Text style={styles.actionButtonText}>Reject</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        {(isAccepted || isRejected) && (
+          <TouchableOpacity
+            style={[styles.viewDetailsButton, { borderColor: theme.border }]}
+            onPress={() => navigation.navigate('SwapRequestDetails', { requestId: item.id })}
+          >
+            <Text style={[styles.viewDetailsText, { color: theme.primary }]}>View Details</Text>
+            <MaterialCommunityIcons name="chevron-right" size={16} color={theme.primary} />
           </TouchableOpacity>
-        </View>
+        )}
       </LinearGradient>
     );
   };
 
-  if (loading && !refreshing && pendingForAdmin.length === 0) {
+  const renderFooter = () => {
+    if (activeFilter === 'pending') return null;
+    if (!loadingMore) return null;
+    
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color={theme.primary} />
+        <Text style={[styles.footerLoaderText, { color: theme.textMuted }]}>Loading more...</Text>
+      </View>
+    );
+  };
+
+  const isLoading = () => {
+    if (activeFilter === 'pending') {
+      return loading && !refreshing && pendingForAdmin.length === 0;
+    } else {
+      return loadingProcessed && !refreshing && getFilteredRequests().length === 0;
+    }
+  };
+
+  if (isLoading()) {
     return (
       <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
@@ -255,16 +475,19 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
           >
             <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>Pending Approvals</Text>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Swap Approvals</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading pending approvals...</Text>
+          <Text style={[styles.loadingText, { color: theme.textMuted }]}>Loading...</Text>
         </View>
       </ScreenWrapper>
     );
   }
+
+  const filteredRequests = getFilteredRequests();
+  const showEmptyMessage = filteredRequests.length === 0 && !refreshing;
 
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
@@ -277,7 +500,6 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>{groupName || 'Swap Approvals'}</Text>
         
-        {/* ✅ NEW: Swap History Icon Button */}
         <TouchableOpacity
           onPress={handleViewSwapHistory}
           style={[styles.historyButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
@@ -286,7 +508,18 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
       </View>
 
-      {totalPendingForAdmin > 0 && (
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterContainer}
+        contentContainerStyle={styles.filterContent}
+      >
+        {renderFilterButton('pending', 'Pending', theme.primary)}
+        {renderFilterButton('accepted', 'Approved', '#10B981')}
+        {renderFilterButton('rejected', 'Rejected', '#EF4444')}
+      </ScrollView>
+
+      {activeFilter === 'pending' && totalPendingForAdmin > 0 && (
         <View style={[styles.infoBanner, { backgroundColor: theme.primaryLight }]}>
           <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
           <Text style={[styles.infoText, { color: theme.primary }]}>
@@ -296,7 +529,7 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
       )}
 
       <FlatList
-        data={pendingForAdmin}
+        data={filteredRequests}
         renderItem={renderSwapRequest}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
@@ -308,23 +541,37 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
             tintColor={theme.primary}
           />
         }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={renderFooter}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <LinearGradient
-              colors={[theme.bgSecondary, theme.bgTertiary]}
-              style={[styles.emptyIconContainer, { borderColor: theme.border }]}
-            >
-              <MaterialCommunityIcons name="check-circle" size={48} color={theme.primary} />
-            </LinearGradient>
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>No Pending Approvals</Text>
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              All swap requests have been processed. New requests will appear here.
-            </Text>
-          </View>
+          showEmptyMessage ? (
+            <View style={styles.emptyContainer}>
+              <LinearGradient
+                colors={[theme.bgSecondary, theme.bgTertiary]}
+                style={[styles.emptyIconContainer, { borderColor: theme.border }]}
+              >
+                <MaterialCommunityIcons 
+                  name={activeFilter === 'pending' ? 'clock-outline' : activeFilter === 'accepted' ? 'check-circle' : 'close-circle'} 
+                  size={48} 
+                  color={activeFilter === 'pending' ? theme.primary : activeFilter === 'accepted' ? '#10B981' : '#EF4444'} 
+                />
+              </LinearGradient>
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                No {activeFilter} requests
+              </Text>
+              <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                {activeFilter === 'pending' 
+                  ? 'All swap requests have been processed.'
+                  : activeFilter === 'accepted'
+                    ? 'No swap requests have been approved by admin yet.'
+                    : 'No swap requests have been rejected by admin yet.'}
+              </Text>
+            </View>
+          ) : null
         }
       />
 
-      {/* Rejection Modal */}
       <Modal
         visible={rejectModalVisible}
         transparent
@@ -418,6 +665,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  filterContainer: {
+    maxHeight: 50,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+  },
+  filterContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  filterButton: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    borderWidth: 1,
+  },
+  filterButtonActive: {
+    borderWidth: 2,
+  },
+  filterButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    gap: 6,
+  },
+  filterButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  filterButtonTextActive: {},
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -444,6 +721,8 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
+    flexGrow: 1,
+    paddingBottom: 20,
   },
   requestCard: {
     borderRadius: 16,
@@ -486,15 +765,16 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 2,
   },
-  pendingBadge: {
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
     gap: 4,
+    borderWidth: 1,
   },
-  pendingBadgeText: {
+  statusBadgeText: {
     fontSize: 11,
     fontWeight: '600',
   },
@@ -533,6 +813,41 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
   },
+  rejectionContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    gap: 8,
+    borderWidth: 1,
+  },
+  rejectionContent: {
+    flex: 1,
+  },
+  rejectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  rejectionText: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  adminNotesContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 10,
+    marginBottom: 12,
+    gap: 8,
+    borderWidth: 1,
+  },
+  adminNotesText: {
+    flex: 1,
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
   actionButtons: {
     flexDirection: 'row',
     gap: 12,
@@ -559,6 +874,30 @@ const styles = StyleSheet.create({
   },
   rejectButton: {
     borderWidth: 1,
+  },
+  viewDetailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    gap: 4,
+  },
+  viewDetailsText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  footerLoader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 8,
+  },
+  footerLoaderText: {
+    fontSize: 13,
   },
   emptyContainer: {
     flex: 1,

@@ -193,14 +193,14 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
   },
   errorText: {
     color: theme.error,
-    fontSize: 12,
+    fontSize: 10,
     marginTop: 2,
   },
 
   // ─── Points Suggestion Banner ─────────────────────────────────────────────
   suggestionBanner: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center', 
     gap: 10,
     borderRadius: 10,
     padding: 12,

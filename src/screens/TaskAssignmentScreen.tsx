@@ -1,4 +1,4 @@
-// src/screens/TaskAssignmentScreen.tsx - Dark Mode Added
+// src/screens/TaskAssignmentScreen.tsx - Dark Mode Added + Fixed Fully Scrollable Modal
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -7,7 +7,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
   Modal,
@@ -90,7 +89,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     return assignedMemberIds;
   };
 
-  // Check if a task is assigned to a member (has any assignment for current week)
+  // Check if a task is assigned to a member
   const isTaskAssigned = (task: any) => {
     return task.currentAssignee !== null && task.currentAssignee !== undefined;
   };
@@ -429,7 +428,13 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.modalBody}
+              contentContainerStyle={styles.modalBodyContent}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={true}
+            >
               <Text style={[styles.modalSubtitle, { color: theme.textMuted }]}>
                 Select a member to assign this task for this week:
               </Text>
@@ -447,8 +452,10 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 </Text>
               </LinearGradient>
 
-              {/* Available Members Section - ONLY members in rotation */}
-              <Text style={[styles.sectionHeader, { color: theme.text, borderBottomColor: theme.border }]}>Available Members</Text>
+              {/* Available Members Section */}
+              <Text style={[styles.sectionHeader, { color: theme.text, borderBottomColor: theme.border }]}>
+                Available Members
+              </Text>
               
               {(() => {
                 const assignedMemberIds = getAssignedMembersForWeek();
@@ -550,7 +557,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 });
               })()}
 
-              {/* Already Assigned Members Section - Only members in rotation */}
+              {/* Already Assigned Members */}
               {(() => {
                 const assignedMemberIds = getAssignedMembersForWeek();
                 const assignedMembers = membersInRotation.filter(member => 
@@ -562,7 +569,9 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 
                 return (
                   <>
-                    <Text style={[styles.sectionHeader, { color: theme.text, borderBottomColor: theme.border }]}>Already Assigned</Text>
+                    <Text style={[styles.sectionHeader, { color: theme.text, borderBottomColor: theme.border }]}>
+                      Already Assigned
+                    </Text>
                     {assignedMembers.map(member => {
                       const assignedTask = tasks.find((task: any) => 
                         task.currentAssignee === member.userId
@@ -637,7 +646,6 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   );
 }
 
-// Updated styles - keep all original style properties
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
@@ -901,11 +909,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end'
   },
-  modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '80%'
-  },
+ modalContent: {
+  borderTopLeftRadius: 24,
+  borderTopRightRadius: 24,
+  height: '92%',
+  overflow: 'hidden',
+},
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -932,7 +941,12 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   modalBody: {
-    padding: 20
+    flex: 1,
+  },
+  modalBodyContent: {
+    padding: 20,
+    paddingBottom: 30,
+    flexGrow: 1,
   },
   modalFooter: {
     padding: 20,
@@ -1082,5 +1096,5 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-  }
+  } 
 });

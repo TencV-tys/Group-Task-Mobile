@@ -1,4 +1,5 @@
-// screens/AdminSwapApprovalsScreen.tsx - Dark Mode Added
+// screens/AdminSwapApprovalsScreen.tsx - WITH SWAP HISTORY ICON
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -114,6 +115,10 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
     } else {
       Alert.alert('Error', result.message);
     }
+  };
+
+  const handleViewSwapHistory = () => {
+    navigation.navigate('GroupSwapHistory', { groupId, groupName });
   };
 
   const renderSwapRequest = ({ item }: { item: SwapRequest }) => {
@@ -271,7 +276,14 @@ export const AdminSwapApprovalsScreen = ({ navigation, route }: any) => {
           <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>{groupName || 'Swap Approvals'}</Text>
-        <View style={{ width: 40 }} />
+        
+        {/* ✅ NEW: Swap History Icon Button */}
+        <TouchableOpacity
+          onPress={handleViewSwapHistory}
+          style={[styles.historyButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
+        >
+          <MaterialCommunityIcons name="history" size={22} color={theme.primary} />
+        </TouchableOpacity>
       </View>
 
       {totalPendingForAdmin > 0 && (
@@ -381,6 +393,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  historyButton: {
     width: 40,
     height: 40,
     borderRadius: 20,

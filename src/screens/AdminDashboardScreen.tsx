@@ -712,6 +712,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
         </View>
  
        {/* Task Stats - 2x4 Grid (8 cards) */}
+        {/* Task Stats - 2x4 Grid (8 cards) */}
 {stats && (
   <>
     <Text style={styles.sectionTitle}>Task Statistics</Text>
@@ -734,7 +735,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
       />
       <StatCard
         title="Completed"
-        value={stats.weeklyCompletion?.completed || 0}  // ✅ FIXED
+        value={stats.weeklyCompletion?.completed || 0}
         icon="check-circle"
         color={theme.primary}
         subtitle={`${stats.points?.earned || 0} pts`}
@@ -742,21 +743,22 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
         navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
       />
       <StatCard
-  title="This Week"
-  value={stats.weeklyCompletion?.total || 0}
-  icon="calendar-week"
-  color={theme.primary}
-  navigateTo="DetailedStatistics"
-  navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-/>
-       <StatCard
-  title="Pending"
-  value={(stats.weeklyCompletion?.total || 0) - (stats.weeklyCompletion?.completed || 0)}
-  icon="clock-outline"
-  color={theme.primary}
-  navigateTo="DetailedStatistics"
-  navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
-/>
+        title="This Week"
+        value={stats.weeklyCompletion?.total || 0}
+        icon="calendar-week"
+        color={theme.primary}
+        navigateTo="DetailedStatistics"
+        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+      />
+      {/* ✅ FIXED: Use API pending value */}
+      <StatCard
+        title="Pending"
+        value={stats.weeklyCompletion?.pending || 0}
+        icon="clock-outline"
+        color={theme.primary}
+        navigateTo="DetailedStatistics"
+        navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
+      />
       <StatCard
         title="Team Overview"
         value={members.length}
@@ -775,7 +777,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
       />
       <StatCard
         title="Completion Rate"
-        value={`${stats.weeklyCompletion?.percentage || 0}%`}  // ✅ FIXED
+        value={`${stats.weeklyCompletion?.percentage || 0}%`}
         icon="percent"
         color={theme.primary}
         navigateTo="TaskCompletionHistory"
@@ -783,7 +785,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
       />
     </View>
 
-    {/* Completion Progress */}
+    {/* Completion Progress - Updated to show active tasks */}
     <TouchableOpacity
       onPress={() => navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole: 'ADMIN' })}
       activeOpacity={0.7}
@@ -793,7 +795,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.progressCard}
-      >
+      > 
         <View style={styles.progressHeader}>
           <Text style={styles.progressTitle}>Weekly Completion</Text>
           <Text style={styles.progressPercentage}>
@@ -813,7 +815,7 @@ export const AdminDashboardScreen = ({ navigation, route }: any) => {
         </View>
         <View style={styles.progressStats}>
           <Text style={styles.progressStatsText}>
-            {stats.weeklyCompletion?.completed || 0} of {stats.weeklyCompletion?.total || 0} tasks
+            {stats.weeklyCompletion?.completed || 0} of {stats.weeklyCompletion?.activeTotal || stats.weeklyCompletion?.total || 0} active tasks
           </Text>
           <Text style={styles.progressStatsText}>
             {stats.points?.earned || 0} pts earned

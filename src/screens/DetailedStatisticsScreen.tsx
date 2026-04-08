@@ -1,4 +1,5 @@
-// src/screens/DetailedStatisticsScreen.tsx - Dark Mode Added
+// src/screens/DetailedStatisticsScreen.tsx - UPDATED to show correct pending and neglected
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -11,7 +12,6 @@ import {
   Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
 import { TokenUtils } from '../utils/tokenUtils';
@@ -28,7 +28,6 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [authError, setAuthError] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'all'>('week');
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
@@ -74,7 +73,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     
     try {
       const result = await TaskService.getTaskStatistics(groupId);
-      console.log('statistics:',result)
+      console.log('statistics:', result);
       if (result.success) {
         setStats(result.statistics);
       } else {
@@ -109,6 +108,12 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
 
   const currentWeek = stats?.currentWeek || {};
   const userStats = stats?.userStats || {};
+  
+  // Calculate completion rate based on active tasks (excluding neglected)
+  const activeTotal = (currentWeek?.totalAssignments || 0) - (currentWeek?.neglectedAssignments || 0);
+  const completionRate = activeTotal > 0 
+    ? ((currentWeek?.completedAssignments || 0) / activeTotal) * 100 
+    : 0;
 
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
@@ -181,8 +186,8 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             <View style={[styles.iconContainer, { backgroundColor: theme.errorBg }]}>
               <MaterialCommunityIcons name="alert-circle" size={22} color={theme.error} />
             </View>
-            <Text style={[styles.summaryNumber, { color: theme.text }]}>{stats?.overdueTasks || 0}</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Overdue</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{currentWeek?.neglectedAssignments || 0}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Neglected</Text>
           </LinearGradient>
         </View>
 
@@ -196,7 +201,11 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             style={[styles.pointsCard, { borderColor: theme.border }]}
           >
             <View style={styles.pointsRow}>
-              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Total Points Earned:</Text>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Total Points:</Text>
+              <Text style={[styles.pointsValue, { color: theme.text }]}>{currentWeek?.totalPoints || 0}</Text>
+            </View>
+            <View style={styles.pointsRow}>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Points Earned:</Text>
               <Text style={[styles.pointsValue, { color: theme.primary }]}>{currentWeek?.completedPoints || 0}</Text>
             </View>
             <View style={styles.pointsRow}>
@@ -205,19 +214,25 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
                 {currentWeek?.pendingPoints || 0}
               </Text>
             </View>
+            <View style={styles.pointsRow}>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Neglected Points:</Text>
+              <Text style={[styles.pointsValue, { color: theme.error }]}>
+                {currentWeek?.neglectedPoints || 0}
+              </Text>
+            </View>
             <View style={[styles.progressBar, { backgroundColor: theme.bgTertiary }]}>
               <LinearGradient
                 colors={[
-                  getCompletionRateColor(currentWeek?.completionRate || 0),
-                  getCompletionRateColor(currentWeek?.completionRate || 0) + 'dd'
+                  getCompletionRateColor(completionRate),
+                  getCompletionRateColor(completionRate) + 'dd'
                 ]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={[styles.progressFill, { width: `${currentWeek?.completionRate || 0}%` }]} 
+                style={[styles.progressFill, { width: `${completionRate}%` }]} 
               />
             </View>
             <Text style={[styles.completionRate, { color: theme.textMuted }]}>
-              {currentWeek?.completionRate || 0}% Completion Rate
+              {completionRate.toFixed(0)}% Completion Rate (based on active tasks)
             </Text>
           </LinearGradient>
         </View>
@@ -281,6 +296,14 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
                   {userStats.pending || 0}
                 </Text>
               </View>
+              {(userStats.neglected || 0) > 0 && (
+                <View style={styles.performanceRow}>
+                  <Text style={[styles.performanceLabel, { color: theme.textSecondary }]}>Neglected:</Text>
+                  <Text style={[styles.performanceNumber, { color: theme.error }]}>
+                    {userStats.neglected || 0}
+                  </Text>
+                </View>
+              )}
               <View style={styles.performanceRow}>
                 <Text style={[styles.performanceLabel, { color: theme.textSecondary }]}>Your Points:</Text>
                 <Text style={[styles.performanceNumber, { color: '#4F46E5' }]}>

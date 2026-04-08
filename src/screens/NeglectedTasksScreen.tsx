@@ -1,4 +1,5 @@
-// src/screens/NeglectedTasksScreen.tsx - Dark Mode Added
+// src/screens/NeglectedTasksScreen.tsx - FIXED with direct navigation to AssignmentDetails
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -127,10 +128,20 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
     }
   }, []);
 
+  // ✅ FIXED: Navigate directly to AssignmentDetails
+  const handleTaskPress = (task: any) => {
+    console.log('📋 Navigating to AssignmentDetails for neglected task:', task.id);
+    navigation.navigate('AssignmentDetails', {
+      assignmentId: task.id,
+      isAdmin: isAdmin,
+      onVerified: () => loadNeglectedTasks(true)
+    });
+  };
+
   const renderTaskItem = ({ item }: any) => (
     <TouchableOpacity
       style={[styles.taskCard, { borderColor: theme.errorBorder ?? '#ffc9c9' }]}
-      onPress={() => navigation.navigate('TaskDetails', { taskId: item.taskId })}
+      onPress={() => handleTaskPress(item)}
       activeOpacity={0.7}
     >
       <LinearGradient
@@ -198,6 +209,14 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
             </Text>
           </LinearGradient>
         )}
+        
+        {/* ✅ Add indicator that this is a neglected task */}
+        <View style={styles.neglectedFooter}>
+          <MaterialCommunityIcons name="timer-off" size={12} color={theme.error} />
+          <Text style={[styles.neglectedFooterText, { color: theme.error }]}>
+            Task was missed - No points awarded
+          </Text>
+        </View>
       </LinearGradient>
     </TouchableOpacity>
   );
@@ -245,6 +264,13 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
             })}
           </View>
         )}
+        
+        <View style={[styles.infoRow, { marginTop: 8 }]}>
+          <MaterialCommunityIcons name="information" size={14} color={theme.error} />
+          <Text style={[styles.infoText, { color: theme.error }]}>
+            Tap on any task to view full details
+          </Text>
+        </View>
       </LinearGradient>
     );
   };
@@ -459,6 +485,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginLeft: 4,
   },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  infoText: {
+    fontSize: 12,
+  },
   taskCard: {
     marginBottom: 12,
     borderRadius: 12,
@@ -537,6 +571,19 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontStyle: 'italic',
   },
+  neglectedFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+  },
+  neglectedFooterText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -563,4 +610,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     lineHeight: 20,
   },
-});
+}); 

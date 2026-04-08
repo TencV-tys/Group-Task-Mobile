@@ -214,6 +214,18 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return 'none';
   }, []);
 
+
+  useEffect(() => {
+  // Check if route params specify which tab to show
+  if (route.params?.tab === 'my') {
+    console.log('📱 [GroupTasks] Setting tab to "my" from navigation params');
+    setSelectedTab('my');
+  } else if (route.params?.tab === 'all') {
+    console.log('📱 [GroupTasks] Setting tab to "all" from navigation params');
+    setSelectedTab('all');
+  }
+}, [route.params?.tab]);
+
   const validateTaskTime = useCallback((task: any) => {
     const result = {
       isSubmittableNow: false,

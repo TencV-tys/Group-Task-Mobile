@@ -1,4 +1,4 @@
-// src/screens/MemberDashboardScreen.tsx - COMPLETE UPDATED VERSION
+// src/screens/MemberDashboardScreen.tsx - COMPLETE FIXED VERSION
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -46,7 +46,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   
   // State for my swap requests count (requests I created)
   const [mySwapRequestsCount, setMySwapRequestsCount] = useState(0);
-  // ✅ NEW: State for pending requests for me (requests I need to respond to)
+  // State for pending requests for me (requests I need to respond to)
   const [pendingForMeCount, setPendingForMeCount] = useState(0);
   const [loadingSwaps, setLoadingSwaps] = useState(false);
   
@@ -131,36 +131,36 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     }
   }, [currentUserId]);
 
- const fetchPendingForMeCount = useCallback(async () => {
-  console.log('🔍 [MemberDashboard] fetchPendingForMeCount called');
-  
-  if (!currentUserId) {
-    console.log('⚠️ No currentUserId');
-    return;
-  }
-  
-  try {
-    const headers = await TokenUtils.getAuthHeaders(false);
-    const response = await fetch(`${API_BASE_URL}/api/swap-requests/pending-for-me?limit=100`, {
-      headers
-    });
+  const fetchPendingForMeCount = useCallback(async () => {
+    console.log('🔍 [MemberDashboard] fetchPendingForMeCount called');
     
-    const data = await response.json();
-    console.log('📊 Pending for me FULL response:', JSON.stringify(data, null, 2));
+    if (!currentUserId) {
+      console.log('⚠️ No currentUserId');
+      return;
+    }
     
-    if (data.success && data.data) {
-      const pendingCount = data.data.total || data.data.requests?.length || 0;
-      console.log(`✅ Pending requests for me: ${pendingCount}`);
-      setPendingForMeCount(pendingCount);
-    } else {
-      console.log('⚠️ No pending requests or API error:', data.message);
+    try {
+      const headers = await TokenUtils.getAuthHeaders(false);
+      const response = await fetch(`${API_BASE_URL}/api/swap-requests/pending-for-me?limit=100`, {
+        headers
+      });
+      
+      const data = await response.json();
+      console.log('📊 Pending for me FULL response:', JSON.stringify(data, null, 2));
+      
+      if (data.success && data.data) {
+        const pendingCount = data.data.total || data.data.requests?.length || 0;
+        console.log(`✅ Pending requests for me: ${pendingCount}`);
+        setPendingForMeCount(pendingCount);
+      } else {
+        console.log('⚠️ No pending requests or API error:', data.message);
+        setPendingForMeCount(0);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching pending for me:', error);
       setPendingForMeCount(0);
     }
-  } catch (error) {
-    console.error('❌ Error fetching pending for me:', error);
-    setPendingForMeCount(0);
-  }
-}, [currentUserId]);
+  }, [currentUserId]);
 
   // ===== LOG STATE CHANGES =====
   useEffect(() => {
@@ -470,8 +470,10 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     setShowSettingsModal(true);
   };
 
-  // Calculate tasks due today for display
-  const pendingTasks = dashboardData?.tasks?.upcoming || myTasks.filter(t => !t.assignment?.completed);
+  // ===== FIXED: Calculate pending tasks = dueToday + upcoming =====
+  const dueTodayTasks = dashboardData?.tasks?.dueToday || [];
+  const upcomingTasks = dashboardData?.tasks?.upcoming || [];
+  const allPendingTasks = [...dueTodayTasks, ...upcomingTasks];
   const completedTasks = dashboardData?.stats?.completedTasks || myTasks.filter(t => t.assignment?.completed).length;
   
   // Calculate tasks due today
@@ -494,7 +496,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     console.log(`📅 [MemberDashboard] Calculated due today: ${tasksDueToday.length}`);
   }
   
-  console.log(`📊 [MemberDashboard] Final Stats - Pending: ${pendingTasks.length}, Completed: ${completedTasks}, Due Today: ${tasksDueToday.length}, My Swaps: ${mySwapRequestsCount}, Requests for Me: ${pendingForMeCount}`);
+  console.log(`📊 [MemberDashboard] Final Stats - Pending: ${allPendingTasks.length}, Completed: ${completedTasks}, Due Today: ${tasksDueToday.length}, My Swaps: ${mySwapRequestsCount}, Requests for Me: ${pendingForMeCount}`);
 
   const StatCard = ({ 
     title, 
@@ -744,9 +746,9 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             <Text style={[styles.pointsValue, { color: theme.primary }]}>{points.thisWeek}</Text>
             <Text style={[styles.pointsSubtext, { color: theme.textPlaceholder }]}>points earned</Text>
           </LinearGradient>
-          <LinearGradient
+          <LinearGradient 
             colors={[theme.card, theme.bgSecondary]}
-            start={{ x: 0, y: 0 }}
+            start={{ x: 0, y: 0 }} 
             end={{ x: 1, y: 1 }}
             style={[styles.pointsCard, { borderColor: theme.border }]}
           >
@@ -759,15 +761,21 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         {/* Quick Stats - CLICKABLE */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Stats</Text>
         <View style={styles.statsGrid}>
+          {/* ✅ FIXED: Pending Tasks shows combined dueToday + upcoming */}
           <StatCard
-            title="Pending Tasks"
-            value={pendingTasks.length}
+            title="Pending Tasks" 
+            value={allPendingTasks.length}
             icon="clock-outline"
             color={theme.primary}
             navigateTo="GroupTasks"
-            navigationParams={{ groupId, groupName, userRole: 'MEMBER', tab: 'my' }}
+            navigationParams={{ 
+              groupId, 
+              groupName, 
+              userRole: 'MEMBER', 
+              tab: 'my' 
+            }}
           />
-          <StatCard
+          <StatCard 
             title="Completed"
             value={typeof completedTasks === 'number' ? completedTasks : completedTasks.length}
             icon="check-circle"
@@ -791,7 +799,6 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             navigateTo="MySwapRequests"
             navigationParams={{ groupId, groupName }}
           />
-          {/* ✅ NEW: Requests for You - pending swap requests that need your response */}
           <StatCard
             title="Requests for You"
             value={pendingForMeCount}
@@ -827,11 +834,11 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
           </>
         )}
 
-        {/* Pending Tasks */}
-        {pendingTasks.length > 0 && (
+        {/* Pending Tasks (Upcoming) */}
+        {upcomingTasks.length > 0 && (
           <>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Upcoming Tasks</Text>
-            {pendingTasks.slice(0, 3).map((task: any) => (
+            {upcomingTasks.slice(0, 3).map((task: any) => (
               <TaskCard key={task.id} task={task} />
             ))}
           </>
@@ -917,7 +924,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         </View>
       </ScrollView>
 
-      <SettingsModal
+      <SettingsModal 
         visible={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
         groupId={groupId}
@@ -928,4 +935,4 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
       />
     </ScreenWrapper>
   );
-}; 
+};

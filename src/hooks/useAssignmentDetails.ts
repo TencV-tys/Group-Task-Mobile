@@ -250,159 +250,166 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     }
   }, []);
 
-  // ✅ FIXED: Check time validity using UTC
+
   const checkTimeValidity = useCallback((assignmentData: any) => {
-    if (isAdmin && !isOwner) {
+  if (isAdmin && !isOwner) {
+    setIsSubmittable(false);
+    setSubmissionStatus('waiting');
+    return;
+  }
+  
+  if (isTaskDeleted) {
+    setIsSubmittable(false);
+    setSubmissionStatus('completed');
+    return;
+  }
+  
+  if (!assignmentData || assignmentData.completed) {
+    setIsSubmittable(false);
+    setSubmissionStatus('completed');
+    return;
+  }
+
+  const now = new Date();
+  const assignmentDate = new Date(assignmentData.dueDate);
+  
+  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
+  
+  if (todayUTC !== assignmentUTC) {
+    setIsSubmittable(false);
+    setSubmissionStatus('wrong_day');
+    return;
+  }
+
+  if (assignmentData.timeSlot) {
+    const [endHour, endMinute] = assignmentData.timeSlot.endTime.split(':').map(Number);
+    
+    // ✅ Convert PHT to UTC by subtracting 8 hours
+    const endTime = new Date(Date.UTC(
+      assignmentDate.getUTCFullYear(),
+      assignmentDate.getUTCMonth(),
+      assignmentDate.getUTCDate(),
+      endHour - 8, endMinute, 0, 0
+    ));
+    
+    const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
+    const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
+    
+    const currentTime = now.getTime();
+    const endTimeMs = endTime.getTime();
+    const lateThresholdMs = lateThreshold.getTime();
+    const graceEndMs = gracePeriodEnd.getTime();
+    
+    if (currentTime < endTimeMs) {
       setIsSubmittable(false);
       setSubmissionStatus('waiting');
-      return;
-    }
-    
-    if (isTaskDeleted) {
-      setIsSubmittable(false);
-      setSubmissionStatus('completed');
-      return;
-    }
-    
-    if (!assignmentData || assignmentData.completed) {
-      setIsSubmittable(false);
-      setSubmissionStatus('completed');
-      return;
-    }
-
-    const now = new Date();
-    const assignmentDate = new Date(assignmentData.dueDate);
-    
-    // ✅ FIXED: Compare UTC dates properly
-    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
-    
-    if (todayUTC !== assignmentUTC) {
-      setIsSubmittable(false);
-      setSubmissionStatus('wrong_day');
-      return;
-    }
-
-    if (assignmentData.timeSlot) {
-      const [endHour, endMinute] = assignmentData.timeSlot.endTime.split(':').map(Number);
-      
-      // ✅ FIXED: Use UTC hours
-      const endTime = new Date(assignmentDate);
-      endTime.setUTCHours(endHour, endMinute, 0, 0);
-      
-      const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
-      const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
-      
-      const currentTime = now.getTime();
-      const endTimeMs = endTime.getTime();
-      const lateThresholdMs = lateThreshold.getTime();
-      const graceEndMs = gracePeriodEnd.getTime();
-      
-      if (currentTime < endTimeMs) {
-        setIsSubmittable(false);
-        setSubmissionStatus('waiting');
-        setIsLate(false);
-        setPenaltyInfo(null);
-        const timeUntilEnd = Math.floor((endTimeMs - currentTime) / 1000);
-        setTimeLeft(timeUntilEnd);
-      }
-      else if (currentTime >= endTimeMs && currentTime <= graceEndMs) {
-        const isLateSubmission = currentTime > lateThresholdMs;
-        setIsSubmittable(true);
-        setSubmissionStatus('available');
-        setIsLate(isLateSubmission);
-        
-        if (isLateSubmission && assignmentData.points) {
-          const penaltyAmount = Math.floor(assignmentData.points * 0.5);
-          setPenaltyInfo({
-            originalPoints: assignmentData.points,
-            finalPoints: assignmentData.points - penaltyAmount,
-            penaltyAmount
-          });
-        } else {
-          setPenaltyInfo(null);
-        }
-        
-        const timeLeftMs = graceEndMs - currentTime;
-        setTimeLeft(Math.floor(timeLeftMs / 1000));
-      }
-      else {
-        setIsSubmittable(false);
-        setSubmissionStatus('expired');
-        setIsLate(false);
-        setPenaltyInfo(null);
-        setTimeLeft(0);
-      }
-    } else {
-      setIsSubmittable(true);
-      setSubmissionStatus('available');
-      setTimeLeft(null);
       setIsLate(false);
       setPenaltyInfo(null);
+      const timeUntilEnd = Math.floor((endTimeMs - currentTime) / 1000);
+      setTimeLeft(timeUntilEnd);
     }
-  }, [isTaskDeleted, isAdmin, isOwner]);
-
-  // Check time validity with server
-  const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
-    if (isAdmin && !isOwner) {
-      setIsSubmittable(false);
-      setSubmissionStatus('waiting');
-      return;
-    }
-    
-    if (isTaskDeleted) {
-      setIsSubmittable(false);
-      setSubmissionStatus('completed');
-      return;
-    }
-    
-    try {
-      const result = await AssignmentService.checkSubmissionTime(assignmentData.id);
+    else if (currentTime >= endTimeMs && currentTime <= graceEndMs) {
+      const isLateSubmission = currentTime > lateThresholdMs;
+      setIsSubmittable(true);
+      setSubmissionStatus('available');
+      setIsLate(isLateSubmission);
       
-      if (result.success && result.data) {
-        setIsSubmittable(result.data.canSubmit);
-        setTimeLeft(result.data.timeLeft || null);
-        
-        const now = new Date();
-        const dueDate = new Date(assignmentData.dueDate);
-        const [endHour, endMinute] = assignmentData.timeSlot?.endTime.split(':').map(Number) || [0, 0];
-        
-        // ✅ FIXED: Use UTC for late check
-        const endTime = new Date(dueDate);
-        endTime.setUTCHours(endHour, endMinute, 0, 0);
-        
-        const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
-        const isLateSubmission = now.getTime() > lateThreshold.getTime();
-        setIsLate(isLateSubmission);
-        
-        if (isLateSubmission && assignmentData.points) {
-          const penaltyAmount = Math.floor(assignmentData.points * 0.5);
-          setPenaltyInfo({
-            originalPoints: assignmentData.points,
-            finalPoints: assignmentData.points - penaltyAmount,
-            penaltyAmount
-          });
-        } else {
-          setPenaltyInfo(null);
-        }
-        
-        if (result.data.canSubmit) {
-          setSubmissionStatus('available');
-        } else if (result.data.reason === 'Not due date') {
-          setSubmissionStatus('wrong_day');
-        } else if (result.data.reason === 'Submission not open yet') {
-          setSubmissionStatus('waiting');
-        } else {
-          setSubmissionStatus('expired');
-        }
+      if (isLateSubmission && assignmentData.points) {
+        const penaltyAmount = Math.floor(assignmentData.points * 0.5);
+        setPenaltyInfo({
+          originalPoints: assignmentData.points,
+          finalPoints: assignmentData.points - penaltyAmount,
+          penaltyAmount
+        });
       } else {
-        checkTimeValidity(assignmentData);
+        setPenaltyInfo(null);
       }
-    } catch (error) {
-      console.error(`❌ Server check failed, falling back to local:`, error);
+      
+      const timeLeftMs = graceEndMs - currentTime;
+      setTimeLeft(Math.floor(timeLeftMs / 1000));
+    }
+    else {
+      setIsSubmittable(false);
+      setSubmissionStatus('expired');
+      setIsLate(false);
+      setPenaltyInfo(null);
+      setTimeLeft(0);
+    }
+  } else {
+    setIsSubmittable(true);
+    setSubmissionStatus('available');
+    setTimeLeft(null);
+    setIsLate(false);
+    setPenaltyInfo(null);
+  }
+}, [isTaskDeleted, isAdmin, isOwner]);
+
+
+const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
+  if (isAdmin && !isOwner) {
+    setIsSubmittable(false);
+    setSubmissionStatus('waiting');
+    return;
+  }
+  
+  if (isTaskDeleted) {
+    setIsSubmittable(false);
+    setSubmissionStatus('completed');
+    return;
+  }
+  
+  try {
+    const result = await AssignmentService.checkSubmissionTime(assignmentData.id);
+    
+    if (result.success && result.data) {
+      setIsSubmittable(result.data.canSubmit);
+      setTimeLeft(result.data.timeLeft || null);
+      
+      const now = new Date();
+      const dueDate = new Date(assignmentData.dueDate);
+      const [endHour, endMinute] = assignmentData.timeSlot?.endTime.split(':').map(Number) || [0, 0];
+      
+      // ✅ Convert PHT to UTC
+      const endTime = new Date(Date.UTC(
+        dueDate.getUTCFullYear(),
+        dueDate.getUTCMonth(),
+        dueDate.getUTCDate(),
+        endHour - 8, endMinute, 0, 0
+      ));
+      
+      const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
+      const isLateSubmission = now.getTime() > lateThreshold.getTime();
+      setIsLate(isLateSubmission);
+      
+      if (isLateSubmission && assignmentData.points) {
+        const penaltyAmount = Math.floor(assignmentData.points * 0.5);
+        setPenaltyInfo({
+          originalPoints: assignmentData.points,
+          finalPoints: assignmentData.points - penaltyAmount,
+          penaltyAmount
+        });
+      } else {
+        setPenaltyInfo(null);
+      }
+      
+      if (result.data.canSubmit) {
+        setSubmissionStatus('available');
+      } else if (result.data.reason === 'Not due date') {
+        setSubmissionStatus('wrong_day');
+      } else if (result.data.reason === 'Submission not open yet') {
+        setSubmissionStatus('waiting');
+      } else {
+        setSubmissionStatus('expired');
+      }
+    } else {
       checkTimeValidity(assignmentData);
     }
-  }, [checkTimeValidity, isTaskDeleted, isAdmin, isOwner]);
+  } catch (error) {
+    console.error(`❌ Server check failed, falling back to local:`, error);
+    checkTimeValidity(assignmentData);
+  }
+}, [checkTimeValidity, isTaskDeleted, isAdmin, isOwner]);
 
   // ✅ FIXED: Get UTC day name helper
   const getUTCDayNameFromDate = useCallback((dateString: string): string => {
@@ -804,4 +811,4 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     handleViewPhoto,
     clearAuthError: () => setAuthError(false)
   };
-};
+}; 

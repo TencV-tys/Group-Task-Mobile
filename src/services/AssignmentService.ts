@@ -899,83 +899,92 @@ static async getTodayAssignments(groupId?: string) {
 
  
 // services/AssignmentService.ts - FIXED validateLocalSubmissionTime
-
- // ========== LOCAL TIME VALIDATION HELPER ==========
-  static validateLocalSubmissionTime(
-    dueDate: string,
-    timeSlot?: { startTime: string; endTime: string },
-    currentTime: Date = new Date()
-  ) {
-    const due = new Date(dueDate);
-    const current = currentTime;
-    const isToday = due.toDateString() === current.toDateString();
-    
-    if (!isToday) {
-      return { canSubmit: false, reason: 'Not due date', timeLeft: 0, isToday: false, willBePenalized: false };
-    }
-    
-    if (!timeSlot) {
-      return { canSubmit: true, isToday: true, willBePenalized: false };
-    }
-    
-    const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
-    const endTime = new Date(due);
-    endTime.setHours(endHour, endMinute, 0, 0);
-    
-    // ✅ Match backend timing: opens AT end time, on-time for 25 mins, late for next 5 mins
-    const submissionStart = endTime;
-    const onTimeEnd = new Date(endTime.getTime() + 25 * 60000);
-    const lateWindowEnd = new Date(endTime.getTime() + 30 * 60000);
-    
-    console.log(`⏰ [validateLocalSubmissionTime]`, {
-      current: current.toLocaleTimeString(),
-      submissionStart: submissionStart.toLocaleTimeString(),
-      onTimeEnd: onTimeEnd.toLocaleTimeString(),
-      lateWindowEnd: lateWindowEnd.toLocaleTimeString()
-    });
-    
-    if (current < submissionStart) {
-      const timeUntilStart = submissionStart.getTime() - current.getTime();
-      return {
-        canSubmit: false,
-        reason: 'Submission not open yet',
-        timeLeft: Math.ceil(timeUntilStart / 1000),
-        timeLeftText: this.formatTimeLeft(Math.ceil(timeUntilStart / 1000)),
-        isToday: true,
-        willBePenalized: false
-      };
-    }
-    
-    if (current <= onTimeEnd) {
-      const timeLeft = onTimeEnd.getTime() - current.getTime();
-      return {
-        canSubmit: true,
-        timeLeft: Math.ceil(timeLeft / 1000),
-        timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
-        isToday: true,
-        willBePenalized: false
-      };
-    }
-    
-    if (current <= lateWindowEnd) {
-      const timeLeft = lateWindowEnd.getTime() - current.getTime();
-      return {
-        canSubmit: true,
-        timeLeft: Math.ceil(timeLeft / 1000),
-        timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
-        isToday: true,
-        willBePenalized: true
-      };
-    }
-    
+static validateLocalSubmissionTime(
+  dueDate: string,
+  timeSlot?: { startTime: string; endTime: string },
+  currentTime: Date = new Date()
+) {
+  const due = new Date(dueDate);
+  const current = currentTime;
+  
+  // ✅ Use UTC date comparison
+  const isDueToday =
+    due.getUTCFullYear() === current.getUTCFullYear() &&
+    due.getUTCMonth() === current.getUTCMonth() &&
+    due.getUTCDate() === current.getUTCDate();
+  
+  if (!isDueToday) {
+    return { canSubmit: false, reason: 'Not due date', timeLeft: 0, isToday: false, willBePenalized: false };
+  }
+  
+  if (!timeSlot) {
+    return { canSubmit: true, isToday: true, willBePenalized: false };
+  }
+  
+  const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
+  
+  // ✅ Convert PHT (UTC+8) to UTC
+  const endTime = new Date(Date.UTC(
+    due.getUTCFullYear(),
+    due.getUTCMonth(),
+    due.getUTCDate(),
+    endHour - 8, endMinute, 0, 0
+  ));
+  
+  const submissionStart = endTime;
+  const onTimeEnd = new Date(endTime.getTime() + 25 * 60000);
+  const lateWindowEnd = new Date(endTime.getTime() + 30 * 60000);
+  
+  console.log(`⏰ [validateLocalSubmissionTime]`, {
+    current: current.toISOString(),
+    submissionStart: submissionStart.toISOString(),
+    onTimeEnd: onTimeEnd.toISOString(),
+    lateWindowEnd: lateWindowEnd.toISOString()
+  });
+  
+  if (current < submissionStart) {
+    const timeUntilStart = submissionStart.getTime() - current.getTime();
     return {
       canSubmit: false,
-      reason: 'Submission window closed',
-      timeLeft: 0,
+      reason: 'Submission not open yet',
+      timeLeft: Math.ceil(timeUntilStart / 1000),
+      timeLeftText: this.formatTimeLeft(Math.ceil(timeUntilStart / 1000)),
+      isToday: true,
+      willBePenalized: false
+    };
+  }
+  
+  if (current <= onTimeEnd) {
+    const timeLeft = onTimeEnd.getTime() - current.getTime();
+    return {
+      canSubmit: true,
+      timeLeft: Math.ceil(timeLeft / 1000),
+      timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
+      isToday: true,
+      willBePenalized: false
+    };
+  }
+  
+  if (current <= lateWindowEnd) {
+    const timeLeft = lateWindowEnd.getTime() - current.getTime();
+    return {
+      canSubmit: true,
+      timeLeft: Math.ceil(timeLeft / 1000),
+      timeLeftText: this.formatTimeLeft(Math.ceil(timeLeft / 1000)),
       isToday: true,
       willBePenalized: true
     };
   }
+  
+  return {
+    canSubmit: false,
+    reason: 'Submission window closed',
+    timeLeft: 0,
+    isToday: true,
+    willBePenalized: true
+  };
+}
+
 
   // ========== FORMAT TIME LEFT ==========
   private static formatTimeLeft(seconds: number): string {

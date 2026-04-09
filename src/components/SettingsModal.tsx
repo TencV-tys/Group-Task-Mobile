@@ -199,9 +199,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     }
   };
-// In SettingsModal.tsx - Update the loadGroupData function
-
-// In SettingsModal.tsx - Update loadGroupData to also get verified stats
 
 const loadGroupData = async () => {
   if (!visible) return;
@@ -219,31 +216,24 @@ const loadGroupData = async () => {
   try {
     setLoadingStats(true);
     
-    // ✅ Get group stats from TaskService
     const statsResult = await TaskService.getTaskStatistics(groupId);
     
-    // ✅ Get verified points from GroupActivityService
     const leaderboardResult = await GroupActivityService.getLeaderboard(groupId);
     
-    // Calculate total verified points from leaderboard
     let totalVerifiedPoints = 0;
     if (leaderboardResult.success && leaderboardResult.data?.leaderboard) {
       totalVerifiedPoints = leaderboardResult.data.leaderboard.reduce(
         (sum: number, member: any) => sum + (member.points || 0), 0
       );
-      
-      // Take top 5 for the modal preview
       const top5 = leaderboardResult.data.leaderboard.slice(0, 5);
       setLeaderboard(top5);
     }
     
-    // Merge stats with verified points
     if (statsResult.success) {
       const mergedStats = {
         ...statsResult.statistics,
         currentWeek: {
           ...statsResult.statistics?.currentWeek,
-          // ✅ Override with verified points from leaderboard
           earnedPoints: totalVerifiedPoints,
           verifiedPoints: totalVerifiedPoints
         }
@@ -251,29 +241,27 @@ const loadGroupData = async () => {
       setGroupStats(mergedStats);
     }
 
-    // Get group info for rotation week
     const groupResult = await GroupMembersService.getGroupInfo(groupId);
     if (groupResult.success) {
       setRotationWeek(groupResult.group?.currentRotationWeek || 1);
     }
 
-    // Get members
     const membersResult = await GroupMembersService.getGroupMembers(groupId);
     if (membersResult.success) {
       setMembers(membersResult.members || []);
     }
 
-    // Get earliest recurring task date for week swap
     const earliestTaskDate = await getEarliestRecurringTaskDate();
     setFirstTaskDate(earliestTaskDate);
     
     if (earliestTaskDate) {
+      // ✅ Use UTC to avoid timezone shifting the date
       const weekStart = new Date(earliestTaskDate);
-      weekStart.setHours(0, 0, 0, 0);
+      weekStart.setUTCHours(0, 0, 0, 0);
       
       const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
+      weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+      weekEnd.setUTCHours(23, 59, 59, 999);
       
       setWeekStartDate(weekStart);
       setWeekEndDate(weekEnd);
@@ -286,7 +274,6 @@ const loadGroupData = async () => {
       setWeekEndDate(null);
     }
 
-    // Load user's tasks
     setLoadingMyTasks(true);
     const myTasksResult = await TaskService.getMyTasks(groupId);
     if (myTasksResult.success && myTasksResult.tasks) {
@@ -304,7 +291,7 @@ const loadGroupData = async () => {
 
 
   useEffect(() => {
-    if (visible) {
+    if (visible) { 
       loadGroupData();
     }
   }, [visible, groupId]);
@@ -489,18 +476,19 @@ const renderLeaderboardItem = (item: any, index: number) => {
     t.assignment && !t.assignment.completed
   ).length;
 
-  const getHoursLeftText = () => {
-    if (!weekStartDate || !canSwapWeek) return '';
-    const now = new Date();
-    const weekStart = new Date(weekStartDate);
-    weekStart.setHours(0, 0, 0, 0);
-    const hoursSinceWeekStart = (now.getTime() - weekStart.getTime()) / (1000 * 60 * 60);
-    const hoursLeft = Math.max(0, 24 - hoursSinceWeekStart);
-    
-    if (hoursLeft <= 0) return '';
-    if (hoursLeft < 1) return `${Math.round(hoursLeft * 60)}m left`;
-    return `${Math.ceil(hoursLeft)}h left`;
-  };
+const getHoursLeftText = () => {
+  if (!weekStartDate || !canSwapWeek) return '';
+  const now = new Date();
+  const weekStart = new Date(weekStartDate);
+  // ✅ Use UTC to avoid timezone shifting
+  weekStart.setUTCHours(0, 0, 0, 0);
+  const hoursSinceWeekStart = (now.getTime() - weekStart.getTime()) / (1000 * 60 * 60);
+  const hoursLeft = Math.max(0, 24 - hoursSinceWeekStart);
+  
+  if (hoursLeft <= 0) return '';
+  if (hoursLeft < 1) return `${Math.round(hoursLeft * 60)}m left`;
+  return `${Math.ceil(hoursLeft)}h left`;
+};
 
   return (
     <Modal

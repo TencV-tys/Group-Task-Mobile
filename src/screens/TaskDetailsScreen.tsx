@@ -320,81 +320,83 @@ const isDueTodayUTC = (dueDate: string) => {
     }
   };
 
-  // ===== CHECK TIME VALIDITY =====
-  const checkTimeValidity = (taskData: any) => {
-    if (!taskData?.userAssignment || taskData.userAssignment.completed) {
-      setIsSubmittable(false);
-      setCurrentTimeSlot(null);
-      setSubmissionStatus('completed');
-      return;
-    }
+ const checkTimeValidity = (taskData: any) => {
+  if (!taskData?.userAssignment || taskData.userAssignment.completed) {
+    setIsSubmittable(false);
+    setCurrentTimeSlot(null);
+    setSubmissionStatus('completed');
+    return;
+  }
 
-    const now = new Date();
-    const assignmentDate = new Date(taskData.userAssignment.dueDate);
-    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
+  const now = new Date();
+  const assignmentDate = new Date(taskData.userAssignment.dueDate);
+  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
+  
+  if (todayUTC !== assignmentUTC) {
+    setIsSubmittable(false);
+    setCurrentTimeSlot(null);
+    setSubmissionStatus('wrong_day');
+    return;
+  }
+
+  if (taskData.userAssignment.timeSlot || (taskData.timeSlots && taskData.timeSlots.length > 0)) {
+    // ✅ Convert UTC now to PHT (UTC+8) minutes for comparison against slot times
+    const phtHours = (now.getUTCHours() + 8) % 24;
+    const currentInMinutes = phtHours * 60 + now.getUTCMinutes();
     
-    if (todayUTC !== assignmentUTC) {
+    let activeSlot = null;
+    let slotFound = false;
+    
+    const slotsToCheck = taskData.timeSlots || [taskData.userAssignment.timeSlot].filter(Boolean);
+    
+    for (const slot of slotsToCheck) {
+      if (!slot) continue;
+      
+      const slotStart = convertTimeToMinutes(slot.startTime);
+      const slotEnd = convertTimeToMinutes(slot.endTime);
+      const graceEnd = slotEnd + 30;
+      
+      if (currentInMinutes >= slotStart && currentInMinutes <= graceEnd) {
+        activeSlot = slot;
+        slotFound = true;
+        
+        const canSubmitStart = slotEnd;  // ✅ opens AT end time (not 30 mins before)
+        const canSubmit = currentInMinutes >= canSubmitStart && currentInMinutes <= graceEnd;
+        
+        setIsSubmittable(canSubmit);
+        setSubmissionStatus(canSubmit ? 'available' : 'waiting');
+        
+        const timeLeftMs = (graceEnd - currentInMinutes) * 60000;
+        setTimeLeft(Math.max(0, Math.floor(timeLeftMs / 1000)));
+        break;
+      }
+    }
+    
+    setCurrentTimeSlot(activeSlot || taskData.userAssignment.timeSlot);
+    
+    if (!slotFound) {
       setIsSubmittable(false);
-      setCurrentTimeSlot(null);
-      setSubmissionStatus('wrong_day');
-      return;
+      setSubmissionStatus('expired');
+      setTimeLeft(0);
+      
+      if (slotsToCheck.length > 0) {
+        const firstSlotStart = convertTimeToMinutes(slotsToCheck[0].startTime);
+        if (currentInMinutes < firstSlotStart) {
+          setSubmissionStatus('waiting');
+          const timeUntilFirstSlot = (firstSlotStart - currentInMinutes) * 60000;
+          setTimeLeft(Math.floor(timeUntilFirstSlot / 1000));
+        }
+      }
     }
+  } else {
+    setIsSubmittable(true);
+    setSubmissionStatus('available');
+    setCurrentTimeSlot(null);
+    setTimeLeft(null);
+  }
+};
 
-    if (taskData.userAssignment.timeSlot || (taskData.timeSlots && taskData.timeSlots.length > 0)) {
-      const currentInMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-      
-      let activeSlot = null;
-      let slotFound = false;
-      
-      const slotsToCheck = taskData.timeSlots || [taskData.userAssignment.timeSlot].filter(Boolean);
-      
-      for (const slot of slotsToCheck) {
-        if (!slot) continue;
-        
-        const slotStart = convertTimeToMinutes(slot.startTime);
-        const slotEnd = convertTimeToMinutes(slot.endTime);
-        const graceEnd = slotEnd + 30;
-        
-        if (currentInMinutes >= slotStart && currentInMinutes <= graceEnd) {
-          activeSlot = slot;
-          slotFound = true;
-          
-          const canSubmitStart = slotEnd - 30;
-          const canSubmit = currentInMinutes >= canSubmitStart && currentInMinutes <= graceEnd;
-          
-          setIsSubmittable(canSubmit);
-          setSubmissionStatus(canSubmit ? 'available' : 'waiting');
-          
-          const timeLeftMs = (graceEnd - currentInMinutes) * 60000;
-          setTimeLeft(Math.max(0, Math.floor(timeLeftMs / 1000)));
-          break;
-        }
-      }
-      
-      setCurrentTimeSlot(activeSlot || taskData.userAssignment.timeSlot);
-      
-      if (!slotFound) {
-        setIsSubmittable(false);
-        setSubmissionStatus('expired');
-        setTimeLeft(0);
-        
-        if (slotsToCheck.length > 0) {
-          const firstSlotStart = convertTimeToMinutes(slotsToCheck[0].startTime);
-          if (currentInMinutes < firstSlotStart) {
-            setSubmissionStatus('waiting');
-            const timeUntilFirstSlot = (firstSlotStart - currentInMinutes) * 60000;
-            setTimeLeft(Math.floor(timeUntilFirstSlot / 1000));
-          }
-        }
-      }
-    } else {
-      setIsSubmittable(true);
-      setSubmissionStatus('available');
-      setCurrentTimeSlot(null);
-      setTimeLeft(null);
-    }
-  };
 
   // ===== FETCH TASK DETAILS =====
   const fetchTaskDetails = async () => {
@@ -704,7 +706,7 @@ const getVerificationStatus = (assignment: any) => {
   
   // ✅ 9. Default - PENDING (future assignment)
   return { 
-    status: 'pending', 
+    status: 'pending',  
     color: theme.textSecondary, 
     icon: 'clock-outline',
     text: 'Pending'

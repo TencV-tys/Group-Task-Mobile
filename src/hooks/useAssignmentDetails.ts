@@ -206,26 +206,56 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     }
   }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft, isTaskDeleted, isAdmin, isOwner]);
 
-  const getStatusColor = useCallback(() => {
-    if (isTaskDeleted) return '#868e96';
-    switch (verificationStatus) {
-      case 'verified': return '#2b8a3e';
-      case 'rejected': return '#fa5252';
-      default: return '#e67700';
-    }
-  }, [verificationStatus, isTaskDeleted]);
+const getStatusColor = useCallback(() => {
+  if (isTaskDeleted) return '#868e96';
+  
+  // ✅ Expired/Missed status - red color
+  if (assignment?.expired === true) return '#fa5252';
+  
+  const missedSlotIds = assignment?.missedTimeSlotIds || [];
+  const currentTimeSlotId = assignment?.timeSlot?.id;
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
+    return '#fa5252';
+  }
+  
+  switch (verificationStatus) {
+    case 'verified': return '#2b8a3e';
+    case 'rejected': return '#fa5252';
+    default: return '#e67700';
+  }
+}, [verificationStatus, isTaskDeleted, assignment]);
 
-  const getStatusIcon = useCallback(() => {
-    if (isTaskDeleted) return 'delete';
-    switch (verificationStatus) {
-      case 'verified': return 'check-circle';
-      case 'rejected': return 'close-circle';
-      default: return assignment?.completed ? 'clock-check' : 'clock-outline';
-    }
-  }, [verificationStatus, assignment, isTaskDeleted]);
-
- const getStatusText = useCallback(() => {
+const getStatusIcon = useCallback(() => {
+  if (isTaskDeleted) return 'delete';
+  
+  // ✅ Expired/Missed status - timer-off icon
+  if (assignment?.expired === true) return 'timer-off';
+  
+  const missedSlotIds = assignment?.missedTimeSlotIds || [];
+  const currentTimeSlotId = assignment?.timeSlot?.id;
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
+    return 'timer-off';
+  }
+  
+  switch (verificationStatus) {
+    case 'verified': return 'check-circle';
+    case 'rejected': return 'close-circle';
+    default: return assignment?.completed ? 'clock-check' : 'clock-outline';
+  }
+}, [verificationStatus, assignment, isTaskDeleted]);
+ 
+  const getStatusText = useCallback(() => {
   if (isTaskDeleted) return 'Task Deleted';
+  
+  // ✅ Check if assignment is expired/missed
+  if (assignment?.expired === true) return 'Expired';
+  
+  // Check if this specific time slot is missed
+  const missedSlotIds = assignment?.missedTimeSlotIds || [];
+  const currentTimeSlotId = assignment?.timeSlot?.id;
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
+    return 'Missed';
+  }
   
   // ✅ Check this specific assignment's status
   if (assignment?.verified === true) return 'Verified';

@@ -15,6 +15,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
+import { GroupActivityService } from '../services/GroupActivityService';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { TokenUtils } from '../utils/tokenUtils';
 import { useTheme } from '../context/ThemeContext';
@@ -198,90 +199,109 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
     }
   };
+// In SettingsModal.tsx - Update the loadGroupData function
 
-  // ===== FIXED: Load group data with proper week reset =====
-  const loadGroupData = async () => {
-    if (!visible) return;
+// In SettingsModal.tsx - Update loadGroupData to also get verified stats
 
-    const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert(
-        'Authentication Error',
-        'Please log in again',
-        [{ text: 'OK', onPress: onClose }]
+const loadGroupData = async () => {
+  if (!visible) return;
+
+  const hasToken = await checkToken();
+  if (!hasToken) {
+    Alert.alert(
+      'Authentication Error',
+      'Please log in again',
+      [{ text: 'OK', onPress: onClose }]
+    );
+    return;
+  }
+
+  try {
+    setLoadingStats(true);
+    
+    // ✅ Get group stats from TaskService
+    const statsResult = await TaskService.getTaskStatistics(groupId);
+    
+    // ✅ Get verified points from GroupActivityService
+    const leaderboardResult = await GroupActivityService.getLeaderboard(groupId);
+    
+    // Calculate total verified points from leaderboard
+    let totalVerifiedPoints = 0;
+    if (leaderboardResult.success && leaderboardResult.data?.leaderboard) {
+      totalVerifiedPoints = leaderboardResult.data.leaderboard.reduce(
+        (sum: number, member: any) => sum + (member.points || 0), 0
       );
-      return;
-    }
-
-    try {
-      setLoadingStats(true);
       
-      // Get group stats
-      const statsResult = await TaskService.getTaskStatistics(groupId);
-      if (statsResult.success) {
-        setGroupStats(statsResult.statistics);
-        
-        if (statsResult.statistics?.pointsByUser) {
-          const sortedUsers = Object.values(statsResult.statistics.pointsByUser)
-            .sort((a: any, b: any) => b.totalPoints - a.totalPoints)
-            .slice(0, 5);
-          setLeaderboard(sortedUsers);
+      // Take top 5 for the modal preview
+      const top5 = leaderboardResult.data.leaderboard.slice(0, 5);
+      setLeaderboard(top5);
+    }
+    
+    // Merge stats with verified points
+    if (statsResult.success) {
+      const mergedStats = {
+        ...statsResult.statistics,
+        currentWeek: {
+          ...statsResult.statistics?.currentWeek,
+          // ✅ Override with verified points from leaderboard
+          earnedPoints: totalVerifiedPoints,
+          verifiedPoints: totalVerifiedPoints
         }
-      }
-
-      // Get group info for rotation week
-      const groupResult = await GroupMembersService.getGroupInfo(groupId);
-      if (groupResult.success) {
-        setRotationWeek(groupResult.group?.currentRotationWeek || 1);
-      }
-
-      // Get members
-      const membersResult = await GroupMembersService.getGroupMembers(groupId);
-      if (membersResult.success) {
-        setMembers(membersResult.members || []);
-      }
-
-      // ===== KEY FIX: Get earliest recurring task date for week swap =====
-      const earliestTaskDate = await getEarliestRecurringTaskDate();
-      setFirstTaskDate(earliestTaskDate);
-      
-      if (earliestTaskDate) {
-        // Calculate week boundaries based on earliest task creation date
-        const weekStart = new Date(earliestTaskDate);
-        weekStart.setHours(0, 0, 0, 0);
-        
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
-        weekEnd.setHours(23, 59, 59, 999);
-        
-        setWeekStartDate(weekStart);
-        setWeekEndDate(weekEnd);
-        
-        // Check if week swap is available
-        checkWeekSwapAvailability(earliestTaskDate);
-      } else {
-        // No recurring tasks - cannot swap week
-        setCanSwapWeek(false);
-        setWeekSwapReason('No recurring tasks found. Create a task first to enable week swaps.');
-        setWeekStartDate(null);
-        setWeekEndDate(null);
-      }
-
-      // Load user's tasks
-      setLoadingMyTasks(true);
-      const myTasksResult = await TaskService.getMyTasks(groupId);
-      if (myTasksResult.success && myTasksResult.tasks) {
-        setMyAssignments(myTasksResult.tasks);
-      }
-      setLoadingMyTasks(false);
-
-    } catch (error) {
-      console.error('Error loading group data:', error);
-    } finally {
-      setLoadingStats(false);
-      setLoadingLeaderboard(false);
+      };
+      setGroupStats(mergedStats);
     }
-  };
+
+    // Get group info for rotation week
+    const groupResult = await GroupMembersService.getGroupInfo(groupId);
+    if (groupResult.success) {
+      setRotationWeek(groupResult.group?.currentRotationWeek || 1);
+    }
+
+    // Get members
+    const membersResult = await GroupMembersService.getGroupMembers(groupId);
+    if (membersResult.success) {
+      setMembers(membersResult.members || []);
+    }
+
+    // Get earliest recurring task date for week swap
+    const earliestTaskDate = await getEarliestRecurringTaskDate();
+    setFirstTaskDate(earliestTaskDate);
+    
+    if (earliestTaskDate) {
+      const weekStart = new Date(earliestTaskDate);
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      
+      setWeekStartDate(weekStart);
+      setWeekEndDate(weekEnd);
+      
+      checkWeekSwapAvailability(earliestTaskDate);
+    } else {
+      setCanSwapWeek(false);
+      setWeekSwapReason('No recurring tasks found. Create a task first to enable week swaps.');
+      setWeekStartDate(null);
+      setWeekEndDate(null);
+    }
+
+    // Load user's tasks
+    setLoadingMyTasks(true);
+    const myTasksResult = await TaskService.getMyTasks(groupId);
+    if (myTasksResult.success && myTasksResult.tasks) {
+      setMyAssignments(myTasksResult.tasks);
+    }
+    setLoadingMyTasks(false);
+
+  } catch (error) {
+    console.error('Error loading group data:', error);
+  } finally {
+    setLoadingStats(false);
+    setLoadingLeaderboard(false);
+  }
+};
+
 
   useEffect(() => {
     if (visible) {
@@ -406,63 +426,64 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return [theme.bgSecondary, theme.bgTertiary];
   };
 
-  const renderLeaderboardItem = (item: any, index: number) => {
-    const isFirst = index === 0;
-    const isSecond = index === 1;
-    const isThird = index === 2;
+const renderLeaderboardItem = (item: any, index: number) => {
+  const isFirst = index === 0;
+  const isSecond = index === 1;
+  const isThird = index === 2;
 
-    return (
+  return (
+    <LinearGradient
+      key={item.userId}
+      colors={getLeaderboardGradientColors(index)}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[
+        styles.leaderboardItem,
+        isFirst && styles.firstPlace,
+        isSecond && styles.secondPlace,
+        isThird && styles.thirdPlace
+      ].filter(Boolean)}
+    >
+      <View style={styles.leaderboardRank}>
+        {isFirst ? (
+          <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
+        ) : isSecond ? (
+          <MaterialCommunityIcons name="trophy" size={18} color="#C0C0C0" />
+        ) : isThird ? (
+          <MaterialCommunityIcons name="trophy" size={16} color="#CD7F32" />
+        ) : (
+          <Text style={styles.rankNumber}>{index + 1}</Text>
+        )}
+      </View>
+      
+      <View style={styles.leaderboardUser}>
+        <View style={styles.userAvatar}>
+          <Text style={styles.userInitial}>
+            {item.fullName?.charAt(0) || '?'}
+          </Text>
+        </View>
+        <View style={styles.userInfo}>
+          <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
+            {item.fullName}
+          </Text>
+          <Text style={[styles.userStats, { color: theme.textMuted }]}>
+            {item.points} points
+          </Text>
+        </View>
+      </View>
+      
       <LinearGradient
-        key={item.userId}
-        colors={getLeaderboardGradientColors(index)}
+        colors={[theme.primaryLight, theme.primaryLight]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[
-          styles.leaderboardItem,
-          isFirst && styles.firstPlace,
-          isSecond && styles.secondPlace,
-          isThird && styles.thirdPlace
-        ].filter(Boolean)}
+        style={styles.pointsBadge}
       >
-        <View style={styles.leaderboardRank}>
-          {isFirst ? (
-            <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
-          ) : isSecond ? (
-            <MaterialCommunityIcons name="trophy" size={18} color="#C0C0C0" />
-          ) : isThird ? (
-            <MaterialCommunityIcons name="trophy" size={16} color="#CD7F32" />
-          ) : (
-            <Text style={styles.rankNumber}>{index + 1}</Text>
-          )}
-        </View>
-        
-        <View style={styles.leaderboardUser}>
-          <View style={styles.userAvatar}>
-            <Text style={styles.userInitial}>
-              {item.userName?.charAt(0) || '?'}
-            </Text>
-          </View>
-          <View style={styles.userInfo}>
-            <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
-              {item.userName}
-            </Text>
-            <Text style={[styles.userStats, { color: theme.textMuted }]}>
-              {item.assignments?.length || 0} tasks • {item.totalPoints} pts
-            </Text>
-          </View>
-        </View>
-        
-        <LinearGradient
-          colors={[theme.primaryLight, theme.primaryLight]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.pointsBadge}
-        >
-          <Text style={[styles.pointsText, { color: theme.primary }]}>{item.totalPoints}</Text>
-        </LinearGradient>
+        <Text style={[styles.pointsText, { color: theme.primary }]}>{item.points}</Text>
       </LinearGradient>
-    );
-  };
+    </LinearGradient>
+  );
+};
+
 
   const incompleteCount = myAssignments.filter((t: any) => 
     t.assignment && !t.assignment.completed
@@ -741,54 +762,54 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </TouchableOpacity>
               </View>
             )}
+              {/* Statistics Section - Update the points stat */}
+<View style={styles.section}>
+  <View style={styles.sectionHeader}>
+    <LinearGradient
+      colors={[theme.bgSecondary, theme.bgTertiary]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.sectionIcon}
+    >
+      <MaterialCommunityIcons name="chart-bar" size={16} color={theme.primary} />
+    </LinearGradient>
+    <Text style={[styles.sectionTitle, { color: theme.text }]}>Stats</Text>
+  </View>
 
-            {/* Statistics */}
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <LinearGradient
-                  colors={[theme.bgSecondary, theme.bgTertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.sectionIcon}
-                >
-                  <MaterialCommunityIcons name="chart-bar" size={16} color={theme.primary} />
-                </LinearGradient>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Stats</Text>
-              </View>
+  {loadingStats ? (
+    <ActivityIndicator size="small" color={theme.primary} style={styles.loader} />
+  ) : groupStats ? (
+    <View style={styles.statsGrid}>
+      <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+        <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.totalTasks || 0}</Text>
+        <Text style={[styles.statLabel, { color: theme.textMuted }]}>Tasks</Text>
+      </View>
+      <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+        <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.currentWeek?.totalAssignments || 0}</Text>
+        <Text style={[styles.statLabel, { color: theme.textMuted }]}>This Week</Text>
+      </View>
+      <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+        <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.recurringTasks || 0}</Text>
+        <Text style={[styles.statLabel, { color: theme.textMuted }]}>Recurring</Text>
+      </View>
+      {/* ✅ UPDATE: Show VERIFIED points instead of completed points */}
+      <View style={[styles.statItem, styles.pointsStat, { backgroundColor: theme.primaryLight, borderColor: theme.primaryBorder }]}>
+        <Text style={[styles.statNumber, { color: theme.primary }]}>{groupStats.currentWeek?.earnedPoints || groupStats.currentWeek?.completedPoints || 0}</Text>
+        <Text style={[styles.statLabel, { color: theme.primary }]}>Verified Pts</Text>
+      </View>
+    </View>
+  ) : (
+    <Text style={[styles.noDataText, { color: theme.textPlaceholder }]}>No stats available</Text>
+  )}
 
-              {loadingStats ? (
-                <ActivityIndicator size="small" color={theme.primary} style={styles.loader} />
-              ) : groupStats ? (
-                <View style={styles.statsGrid}>
-                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
-                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.totalTasks || 0}</Text>
-                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Tasks</Text>
-                  </View>
-                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
-                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.currentWeek?.totalAssignments || 0}</Text>
-                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>This Week</Text>
-                  </View>
-                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
-                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.recurringTasks || 0}</Text>
-                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Recurring</Text>
-                  </View>
-                  <View style={[styles.statItem, styles.pointsStat, { backgroundColor: theme.primaryLight, borderColor: theme.primaryBorder }]}>
-                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.currentWeek?.completedPoints || 0}</Text>
-                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Points</Text>
-                  </View>
-                </View>
-              ) : (
-                <Text style={[styles.noDataText, { color: theme.textPlaceholder }]}>No stats available</Text>
-              )}
-
-              <TouchableOpacity onPress={handleTaskStatistics} style={styles.menuItem}>
-                <View style={styles.menuItemLeft}>
-                  <MaterialCommunityIcons name="chart-box" size={18} color={theme.primary} />
-                  <Text style={[styles.menuItemText, { color: theme.text }]}>Detailed Statistics</Text>
-                </View>
-                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
-              </TouchableOpacity>
-            </View>
+  <TouchableOpacity onPress={handleTaskStatistics} style={styles.menuItem}>
+    <View style={styles.menuItemLeft}>
+      <MaterialCommunityIcons name="chart-box" size={18} color={theme.primary} />
+      <Text style={[styles.menuItemText, { color: theme.text }]}>Detailed Statistics</Text>
+    </View>
+    <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
+  </TouchableOpacity>
+</View>
 
             {/* Leaderboard */}
             <View style={styles.section}>

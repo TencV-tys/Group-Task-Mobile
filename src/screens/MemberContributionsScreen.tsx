@@ -1,4 +1,4 @@
-// src/screens/MemberContributionsScreen.tsx - Fixed Weekly Breakdown Card Colors
+// src/screens/MemberContributionsScreen.tsx - Complete Fixed Version
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   StatusBar,
@@ -14,7 +13,8 @@ import {
   Image,
   LayoutAnimation,
   UIManager, 
-  Platform
+  Platform,
+  Dimensions
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +22,8 @@ import { GroupActivityService } from '../services/GroupActivityService';
 import { TokenUtils } from '../utils/tokenUtils'; 
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -39,37 +41,25 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
   const [authError, setAuthError] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  // Debug: Log the params
   useEffect(() => {
     console.log('📥 MemberContributionsScreen params:', { groupId, groupName, memberId, userRole });
   }, [groupId, groupName, memberId, userRole]);
 
-  // ===== Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
-    
     setAuthError(!hasToken);
     return hasToken;
   }, []);
 
-  // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
       Alert.alert(
         'Session Expired',
         'Please log in again',
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              setAuthError(false);
-              navigation.navigate('Login');
-            }
-          }
-        ]
+        [{ text: 'OK', onPress: () => { setAuthError(false); navigation.navigate('Login'); } }]
       );
     }
   }, [authError, navigation]);
@@ -92,27 +82,22 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
       return;
     }
 
-    if (isRefreshing) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    if (isRefreshing) setRefreshing(true);
+    else setLoading(true);
+    
     setError(null);
     setAuthError(false);
 
     try {
       console.log(`📥 Fetching contributions for member ${memberId} in group ${groupId}`);
-      
       const result = await GroupActivityService.getMemberContributions(groupId, memberId);
-      
       console.log('📦 API Response:', result);
       
       if (result.success) {
         setData(result.data);
       } else {
         setError(result.message || 'Failed to load member data');
-        if (result.message?.toLowerCase().includes('token') || 
-            result.message?.toLowerCase().includes('auth')) {
+        if (result.message?.toLowerCase().includes('token') || result.message?.toLowerCase().includes('auth')) {
           setAuthError(true);
         }
       }
@@ -126,56 +111,14 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString();
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  // Helper function for status badge gradient
-  const getStatusGradient = (assignment: any): [string, string] => {
-    if (!assignment.completed) return [theme.bgSecondary, theme.bgTertiary];
-    if (assignment.verified === true) return [theme.primaryLight, theme.primaryLight];
-    if (assignment.verified === false) return [theme.errorBg, theme.errorBg];
-    return [theme.primaryLight, theme.primaryLight];
-  };
-
-  // Helper function for status icon color
-  const getStatusIconColor = (assignment: any): string => {
-    if (!assignment.completed) return theme.textMuted;
-    if (assignment.verified === true) return theme.primary;
-    if (assignment.verified === false) return theme.error;
-    return theme.primary;
-  };
- 
-  // Helper function for status icon name
-  const getStatusIcon = (assignment: any): string => {
-    if (!assignment.completed) return 'clock-outline';
-    if (assignment.verified === true) return 'check-circle';
-    if (assignment.verified === false) return 'close-circle';
-    return 'clock-check';
-  };
-
-  // Helper function for status text
-  const getStatusText = (assignment: any): string => {
-    if (!assignment.completed) return 'Not Completed';
-    if (assignment.verified === true) return 'Verified';
-    if (assignment.verified === false) return 'Rejected';
-    return 'Pending';
-  };
-
-  // Helper function for status text color
-  const getStatusTextColor = (assignment: any): string => {
-    if (!assignment.completed) return theme.textMuted;
-    if (assignment.verified === true) return theme.primary;
-    if (assignment.verified === false) return theme.error;
-    return theme.primary;
-  };
-
-  // Handle week press with animation
   const handleWeekPress = (weekNumber: number) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setSelectedWeek(selectedWeek === weekNumber ? null : weekNumber);
   };
 
-  // ===== Profile Card (centered like Profile Screen) =====
   const renderProfileCard = () => {
     if (!data?.member) return null;
 
@@ -190,46 +133,34 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         end={{ x: 1, y: 1 }}
         style={[styles.profileCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
       >
-        {/* Centered Avatar */}
         <View style={styles.avatarContainer}>
           {member.avatarUrl ? (
-            <Image 
-              source={{ uri: member.avatarUrl }} 
-              style={[styles.avatarImage, { borderColor: theme.card, shadowColor: theme.shadow }]}
-              onError={(e) => {
-                console.log('Avatar load error:', e.nativeEvent.error);
-              }}
-            />
+            <Image source={{ uri: member.avatarUrl }} style={[styles.avatarImage, { borderColor: theme.card }]} />
           ) : (
             <LinearGradient
               colors={isAdmin ? [theme.primary, theme.primaryDark] : [theme.textSecondary, theme.textMuted]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.avatarPlaceholder, { borderColor: theme.card, shadowColor: theme.shadow }]}
+              style={styles.avatarPlaceholder}
             >
               <Text style={styles.avatarText}>{initial}</Text>
             </LinearGradient>
           )}
         </View>
         
-        {/* Centered Name */}
         <Text style={[styles.userName, { color: theme.text }]}>{member.fullName || 'User'}</Text>
         <Text style={[styles.userEmail, { color: theme.textMuted }]}>{member.email || ''}</Text>
         
-        {/* User Stats Row */}
         <View style={styles.userStats}>
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="shield-account" size={14} color={theme.textMuted} />
             <Text style={[styles.statText, { color: theme.textSecondary }]}>{member.role || 'Member'}</Text>
           </View>
-          
           <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          
           <View style={styles.statItem}>
             <MaterialCommunityIcons name="account-group" size={14} color={theme.textMuted} />
-            <Text style={[styles.statText, { color: theme.textSecondary }]}>{groupName}</Text>
+            <Text style={[styles.statText, { color: theme.textSecondary }]} numberOfLines={1}>{groupName}</Text>
           </View>
-          
           {member.joinedAt && (
             <>
               <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
@@ -243,7 +174,6 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
           )}
         </View>
 
-        {/* Admin Note if applicable */}
         {isAdmin && data.roleInfo && (
           <View style={[styles.adminNote, { backgroundColor: theme.primaryLight }]}>
             <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
@@ -254,76 +184,102 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     );
   };
 
-  // ===== Overall Statistics (separate card) =====
-  const renderOverallStats = () => {
+    const renderOverallStats = () => {
     if (!data?.summary) return null;
 
     const summary = data.summary;
+    const weeks = data?.weeks || [];
+    
+    let activeAssignmentsCount = 0;
+    let verifiedSlotsCount = 0;
+    let expiredSlotsCount = 0;
+    let pendingSlotsCount = 0;
+    let rejectedSlotsCount = 0;
+    
+    weeks.forEach((week: any) => {
+      week.assignments.forEach((assignment: any) => {
+        if (assignment.verified === true) verifiedSlotsCount++;
+        else if (assignment.verified === false) rejectedSlotsCount++;
+        else if (assignment.completed === true && assignment.verified === null) pendingSlotsCount++;
+        
+        const isExpired = assignment.isMissed === true || assignment.expired === true;
+        if (isExpired) expiredSlotsCount++;
+        else activeAssignmentsCount++;
+      });
+    });
+    
+    const completionRate = activeAssignmentsCount > 0 
+      ? Math.round((verifiedSlotsCount / activeAssignmentsCount) * 100) : 0;
 
     return (
       <LinearGradient
         colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.statsCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
+        style={[styles.statsCard, { borderColor: theme.border }]}
       >
-        <Text style={[styles.statsTitle, { color: theme.text }]}>Overall Statistics</Text>
+        <Text style={[styles.statsTitle, { color: theme.text }]}>Performance Overview</Text>
         
         <View style={styles.statsGrid}>
-          <TouchableOpacity style={styles.statBox} activeOpacity={0.7} onPress={() => {}}>
-            <LinearGradient
-              colors={[theme.bgSecondary, theme.bgTertiary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.statCircle}
-            >
-              <Text style={[styles.statNumber, { color: theme.text }]}>{summary.totalAssignments || 0}</Text>
+          <View style={styles.statBox}>
+            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
+              <Text style={[styles.statNumber, { color: theme.primary }]}>{verifiedSlotsCount}</Text>
             </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Total Tasks</Text>
-          </TouchableOpacity>
+            <Text style={[styles.statLabel, { color: theme.primary }]}>Verified</Text>
+          </View>
           
-          <TouchableOpacity style={styles.statBox} activeOpacity={0.7} onPress={() => {}}>
-            <LinearGradient
-              colors={[theme.primaryLight, theme.primaryLight]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.statCircle}
-            >
-              <Text style={[styles.statNumber, { color: theme.primary }]}>{summary.completedAssignments || 0}</Text>
+          <View style={styles.statBox}>
+            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
+              <Text style={[styles.statNumber, { color: theme.textSecondary }]}>{pendingSlotsCount}</Text>
             </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Completed</Text>
-          </TouchableOpacity>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Pending</Text>
+          </View>
           
-          <TouchableOpacity style={styles.statBox} activeOpacity={0.7} onPress={() => {}}>
-            <LinearGradient
-              colors={[theme.primaryLight, theme.primaryLight]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.statCircle}
-            >
-              <Text style={[styles.statNumber, { color: theme.primary }]}>{Math.round(summary.completionRate || 0)}%</Text>
+          <View style={styles.statBox}>
+            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
+              <Text style={[styles.statNumber, { color: theme.error }]}>{rejectedSlotsCount}</Text>
             </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Completion</Text>
-          </TouchableOpacity>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Rejected</Text>
+          </View>
           
-          <TouchableOpacity style={styles.statBox} activeOpacity={0.7} onPress={() => {}}>
-            <LinearGradient
-              colors={[theme.primaryLight, theme.primaryLight]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.statCircle}
-            >
-              <Text style={[styles.statNumber, { color: theme.primary }]}>{summary.earnedPoints || 0}</Text>
+          <View style={styles.statBox}>
+            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
+              <Text style={[styles.statNumber, { color: theme.textMuted }]}>{expiredSlotsCount}</Text>
             </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Points</Text>
-          </TouchableOpacity>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Missed</Text>
+          </View>
+        </View>
+
+        <View style={styles.statsDivider} />
+
+        <View style={styles.statsRow}>
+          <View style={styles.statsRowItem}>
+            <Text style={[styles.statsRowValue, { color: theme.text }]}>{summary.earnedPoints || 0}</Text>
+            <Text style={[styles.statsRowLabel, { color: theme.textMuted }]}>Total Points</Text>
+          </View>
+          <View style={[styles.statsDividerVertical, { backgroundColor: theme.border }]} />
+          <View style={styles.statsRowItem}>
+            <Text style={[styles.statsRowValue, { color: theme.text }]}>{completionRate}%</Text>
+            <Text style={[styles.statsRowLabel, { color: theme.textMuted }]}>Completion Rate</Text>
+          </View>
+          <View style={[styles.statsDividerVertical, { backgroundColor: theme.border }]} />
+          <View style={styles.statsRowItem}>
+            <Text style={[styles.statsRowValue, { color: theme.text }]}>{activeAssignmentsCount}</Text>
+            <Text style={[styles.statsRowLabel, { color: theme.textMuted }]}>Active Slots</Text>
+          </View>
         </View>
       </LinearGradient>
     );
   };
-
+ 
   const renderWeekDetails = (week: any) => {
     const isExpanded = selectedWeek === week.week;
+    
+    const verifiedCount = week.assignments.filter((a: any) => a.verified === true).length;
+    const pendingCount = week.assignments.filter((a: any) => a.completed === true && a.verified === null).length;
+    const rejectedCount = week.assignments.filter((a: any) => a.verified === false).length;
+    const expiredCount = week.assignments.filter((a: any) => (a.isMissed === true || a.expired === true) && a.verified !== true).length;
+    const notStartedCount = week.assignments.filter((a: any) => !a.completed && !a.isMissed && !a.expired).length;
 
     return (
       <LinearGradient
@@ -331,118 +287,146 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.weekCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
+        style={[styles.weekCard, { borderColor: theme.border }]}
       >
-        <TouchableOpacity
-          style={[styles.weekHeader, { backgroundColor: theme.bgSecondary }]}
-          onPress={() => handleWeekPress(week.week)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.weekTitleContainer}>
-            <LinearGradient
-              colors={[theme.bgSecondary, theme.bgTertiary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.weekIcon}
-            >
-              <MaterialCommunityIcons name="calendar-week" size={16} color={theme.textSecondary} />
-            </LinearGradient>
-            <Text style={[styles.weekTitle, { color: theme.text }]}>Week {week.week}</Text>
+        <TouchableOpacity onPress={() => handleWeekPress(week.week)} activeOpacity={0.7}>
+          <View style={[styles.weekHeader, { backgroundColor: theme.bgSecondary }]}>
+            <View style={styles.weekTitleContainer}>
+              <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.weekIcon}>
+                <MaterialCommunityIcons name="calendar-week" size={18} color="#fff" />
+              </LinearGradient>
+              <Text style={[styles.weekTitle, { color: theme.text }]}>Week {week.week}</Text>
+            </View>
+            <MaterialCommunityIcons name={isExpanded ? "chevron-up" : "chevron-down"} size={24} color={theme.textMuted} />
           </View>
-          
-          <View style={styles.weekStats}>
-            <View style={styles.weekStat}>
-              <Text style={[styles.weekStatValue, { color: theme.text }]}>{week.completedAssignments}/{week.totalAssignments}</Text>
-              <Text style={[styles.weekStatLabel, { color: theme.textMuted }]}>Tasks</Text>
+
+          <View style={styles.statusChipsContainer}>
+            <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
+              <Text style={[styles.statusChipText, { color: theme.primary }]}>{verifiedCount}</Text>
             </View>
-            <View style={styles.weekStat}>
-              <Text style={[styles.weekStatValue, { color: theme.primary }]}>{week.earnedPoints}</Text>
-              <Text style={[styles.weekStatLabel, { color: theme.textMuted }]}>Points</Text>
+            {pendingCount > 0 && (
+              <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
+                <MaterialCommunityIcons name="clock-check" size={12} color={theme.textSecondary} />
+                <Text style={[styles.statusChipText, { color: theme.textSecondary }]}>{pendingCount}</Text>
+              </View>
+            )}
+            {rejectedCount > 0 && (
+              <View style={[styles.statusChip, { backgroundColor: theme.errorBg }]}>
+                <MaterialCommunityIcons name="close-circle" size={12} color={theme.error} />
+                <Text style={[styles.statusChipText, { color: theme.error }]}>{rejectedCount}</Text>
+              </View>
+            )}
+            {expiredCount > 0 && (
+              <View style={[styles.statusChip, { backgroundColor: theme.bgTertiary }]}>
+                <MaterialCommunityIcons name="clock-alert" size={12} color={theme.textMuted} />
+                <Text style={[styles.statusChipText, { color: theme.textMuted }]}>{expiredCount}</Text>
+              </View>
+            )}
+            {notStartedCount > 0 && (
+              <View style={[styles.statusChip, { backgroundColor: theme.bgTertiary }]}>
+                <MaterialCommunityIcons name="clock-outline" size={12} color={theme.textMuted} />
+                <Text style={[styles.statusChipText, { color: theme.textMuted }]}>{notStartedCount}</Text>
+              </View>
+            )}
+            <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+              <Text style={[styles.statusChipText, { color: theme.primary }]}>{week.earnedPoints}</Text>
             </View>
-            <MaterialCommunityIcons 
-              name={isExpanded ? "chevron-up" : "chevron-down"} 
-              size={20} 
-              color={theme.textMuted} 
-            />
           </View>
         </TouchableOpacity>
 
         {isExpanded && (
           <View style={[styles.weekDetails, { borderTopColor: theme.border }]}>
-            {week.assignments.map((assignment: any, index: number) => (
-              <TouchableOpacity
-                key={assignment.id}
-                style={[
-                  styles.assignmentItem,
-                  index === week.assignments.length - 1 && styles.lastItem,
-                  { borderBottomColor: theme.border }
-                ]}
-                onPress={() => {
-                  console.log('👆 Navigating to AssignmentDetails:', assignment.id);
-                  navigation.navigate('AssignmentDetails', {
+            {week.assignments.map((assignment: any, index: number) => {
+              const isExpired = assignment.isMissed === true || assignment.expired === true;
+              const isVerified = assignment.verified === true;
+              const isRejected = assignment.verified === false;
+              const isPending = assignment.completed === true && assignment.verified === null;
+              
+              let statusGradient: [string, string];
+              let statusIcon: string;
+              let statusText: string;
+              let statusColor: string;
+              
+              if (isExpired) {
+                statusGradient = [theme.bgTertiary, theme.bgTertiary];
+                statusIcon = 'clock-alert';
+                statusText = 'Missed';
+                statusColor = theme.textMuted;
+              } else if (isVerified) {
+                statusGradient = [theme.primaryLight, theme.primaryLight];
+                statusIcon = 'check-circle';
+                statusText = 'Verified';
+                statusColor = theme.primary;
+              } else if (isRejected) {
+                statusGradient = [theme.errorBg, theme.errorBg];
+                statusIcon = 'close-circle';
+                statusText = 'Rejected';
+                statusColor = theme.error;
+              } else if (isPending) {
+                statusGradient = [theme.primaryLight, theme.primaryLight];
+                statusIcon = 'clock-check';
+                statusText = 'Pending';
+                statusColor = theme.textSecondary;
+              } else {
+                statusGradient = [theme.bgSecondary, theme.bgTertiary];
+                statusIcon = 'clock-outline';
+                statusText = 'Not Started';
+                statusColor = theme.textMuted;
+              }
+              
+              return (
+                <TouchableOpacity
+                  key={assignment.id}
+                  style={[
+                    styles.assignmentItem,
+                    index === week.assignments.length - 1 && styles.lastItem,
+                    { borderBottomColor: theme.border }
+                  ]}
+                  onPress={() => navigation.navigate('AssignmentDetails', {
                     assignmentId: assignment.id,
                     isAdmin: userRole === 'ADMIN'
-                  });
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={styles.assignmentInfo}>
-                  <Text style={[styles.assignmentTitle, { color: theme.text }]}>{assignment.taskTitle}</Text>
-                  <Text style={[styles.assignmentDate, { color: theme.textMuted }]}>
-                    Due: {formatDate(assignment.dueDate)}
-                    {assignment.completed && assignment.completedAt && 
-                      ` • Completed: ${formatDate(assignment.completedAt)}`}
-                  </Text>
-                  
-                  <View style={styles.assignmentMeta}>
-                    <LinearGradient
-                      colors={getStatusGradient(assignment)}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.statusBadge}
-                    >
-                      <MaterialCommunityIcons 
-                        name={getStatusIcon(assignment) as any}
-                        size={12} 
-                        color={getStatusIconColor(assignment)} 
-                      />
-                      <Text style={[styles.statusText, { color: getStatusTextColor(assignment) }]}>
-                        {getStatusText(assignment)}
+                  })}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.assignmentContent}>
+                    <View style={styles.assignmentHeader}>
+                      <Text style={[styles.assignmentTitle, { color: isExpired ? theme.textMuted : theme.text }]}>
+                        {assignment.taskTitle}
                       </Text>
-                    </LinearGradient>
-
-                    <LinearGradient
-                      colors={[theme.primaryLight, theme.primaryLight]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.pointsBadge}
-                    >
-                      <Text style={[styles.pointsText, { color: theme.primary }]}>+{assignment.points} pts</Text>
-                    </LinearGradient>
-                    
-                    {assignment.isLate && (
-                      <LinearGradient
-                        colors={[theme.primaryLight, theme.primaryLight]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.lateBadge}
-                      >
-                        <MaterialCommunityIcons name="timer-alert" size={10} color={theme.primary} />
-                        <Text style={[styles.lateText, { color: theme.primary }]}>Late</Text>
+                      <LinearGradient colors={statusGradient} style={styles.statusBadge}>
+                        <MaterialCommunityIcons name={statusIcon as any} size={10} color={statusColor} />
+                        <Text style={[styles.statusBadgeText, { color: statusColor }]}>{statusText}</Text>
                       </LinearGradient>
-                    )}
-                  </View>
-
-                  {assignment.notes && (
-                    <Text style={[styles.assignmentNotes, { color: theme.textMuted }]} numberOfLines={1}>
-                      📝 {assignment.notes}
+                    </View>
+                    
+                    <Text style={[styles.assignmentDate, { color: theme.textMuted }]}>
+                      Due: {formatDate(assignment.dueDate)}
                     </Text>
-                  )}
-                </View>
-                <MaterialCommunityIcons name="chevron-right" size={20} color={theme.textMuted} />
-              </TouchableOpacity>
-            ))}
-          </View>
+                    
+                    <View style={styles.assignmentFooter}>
+                      {!isExpired && !isRejected && assignment.points > 0 && (
+                        <View style={styles.pointsContainer}>
+                          <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                          <Text style={[styles.pointsText, { color: theme.primary }]}>
+                            {isVerified ? '+' : ''}{assignment.points} pts
+                          </Text>
+                        </View>
+                      )}
+                      {assignment.isLate && !isExpired && !isVerified && (
+                        <View style={styles.lateContainer}>
+                          <MaterialCommunityIcons name="timer-alert" size={10} color={theme.textSecondary} />
+                          <Text style={[styles.lateText, { color: theme.textSecondary }]}>Late</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={20} color={theme.textMuted} />
+                </TouchableOpacity>
+              );
+            })}
+          </View> 
         )}
       </LinearGradient>
     );
@@ -456,24 +440,11 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
       style={[styles.header, { borderBottomColor: theme.border }]}
     >
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
+        <MaterialCommunityIcons name="arrow-left" size={24} color={theme.text} />
       </TouchableOpacity>
-      <View style={styles.titleContainer}>
-        <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
-          Member Profile
-        </Text>
-      </View>
-      <TouchableOpacity 
-        onPress={() => fetchData(true)} 
-        style={styles.refreshButton}
-        disabled={refreshing}
-      >
-        <MaterialCommunityIcons 
-          name="refresh" 
-          size={24} 
-          color={theme.textMuted} 
-          style={refreshing && styles.rotating} 
-        />
+      <Text style={[styles.headerTitle, { color: theme.text }]}>Member Profile</Text>
+      <TouchableOpacity onPress={() => fetchData(true)} style={styles.refreshButton} disabled={refreshing}>
+        <MaterialCommunityIcons name="refresh" size={22} color={theme.text} style={refreshing && styles.rotating} />
       </TouchableOpacity>
     </LinearGradient>
   );
@@ -496,16 +467,8 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
           <MaterialCommunityIcons name="lock-alert" size={64} color={theme.error} />
           <Text style={[styles.errorText, { color: theme.error }]}>Authentication Error</Text>
           <Text style={[styles.errorSubtext, { color: theme.textMuted }]}>Please log in again</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={() => navigation.navigate('Login')}
-          >
-            <LinearGradient
-              colors={[theme.error, theme.error]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.retryButtonGradient}
-            >
+          <TouchableOpacity style={styles.retryButton} onPress={() => navigation.navigate('Login')}>
+            <LinearGradient colors={[theme.error, theme.error]} style={styles.retryButtonGradient}>
               <Text style={styles.retryButtonText}>Go to Login</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -523,31 +486,15 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         ref={scrollViewRef}
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={true}
-        nestedScrollEnabled={true}
-        refreshControl={
-          <RefreshControl 
-            refreshing={refreshing} 
-            onRefresh={() => fetchData(true)}
-            colors={[theme.primary]}
-            tintColor={theme.primary}
-          />
-        }
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => fetchData(true)} colors={[theme.primary]} tintColor={theme.primary} />}
       >
         {error ? (
           <View style={styles.errorContainer}>
             <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
             <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
-            <Text style={[styles.errorSubtext, { color: theme.textMuted }]}>
-              {error.includes('member') ? 'The member might not exist or have no data' : 'Please try again'}
-            </Text>
             <TouchableOpacity style={styles.retryButton} onPress={() => fetchData()}>
-              <LinearGradient
-                colors={[theme.primary, theme.primaryDark]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.retryButtonGradient}
-              >
+              <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.retryButtonGradient}>
                 <Text style={[styles.retryButtonText, { color: '#fff' }]}>Retry</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -556,19 +503,13 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
           <View style={styles.errorContainer}>
             <MaterialCommunityIcons name="account-question" size={48} color={theme.textMuted} />
             <Text style={[styles.errorText, { color: theme.text }]}>No Data Found</Text>
-            <Text style={[styles.errorSubtext, { color: theme.textMuted }]}>
-              This member hasn't completed any tasks yet
-            </Text>
+            <Text style={[styles.errorSubtext, { color: theme.textMuted }]}>This member hasn't completed any tasks yet</Text>
           </View>
         ) : (
           <>
-            {/* Profile Card */}
             {renderProfileCard()}
-            
-            {/* Overall Statistics */}
             {renderOverallStats()}
             
-            {/* Weekly Breakdown */}
             <View style={styles.weeksContainer}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Weekly Breakdown</Text>
               {data?.weeks?.length > 0 ? (
@@ -578,7 +519,6 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
               )}
             </View>
             
-            {/* Extra padding at bottom for better scrolling */}
             <View style={styles.bottomPadding} />
           </>
         )}
@@ -596,7 +536,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
   backButton: {
@@ -605,11 +545,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
+  headerTitle: {
     fontSize: 18,
     fontWeight: '600',
   },
@@ -629,6 +565,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
+    fontSize: 14,
   },
   content: {
     flex: 1,
@@ -639,7 +576,7 @@ const styles = StyleSheet.create({
   },
   errorContainer: {
     alignItems: 'center',
-    padding: 20,
+    padding: 40,
     marginTop: 40,
   },
   errorText: {
@@ -651,27 +588,28 @@ const styles = StyleSheet.create({
   errorSubtext: {
     textAlign: 'center',
     marginBottom: 20,
+    fontSize: 14,
   },
   retryButton: {
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     marginTop: 8,
   },
   retryButtonGradient: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 28,
     paddingVertical: 12,
   },
   retryButtonText: {
     fontWeight: '600',
     fontSize: 16,
   },
-  // Profile Card Styles
+  // Profile Card
   profileCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 24,
     marginBottom: 16,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 4,
     borderWidth: 1,
@@ -685,10 +623,6 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   avatarPlaceholder: {
     width: 100,
@@ -697,10 +631,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderColor: '#fff',
   },
   avatarText: {
     fontSize: 40,
@@ -741,7 +672,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 12,
     marginTop: 16,
     gap: 8,
   },
@@ -751,57 +682,76 @@ const styles = StyleSheet.create({
   },
   // Statistics Card
   statsCard: {
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 16,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
     borderWidth: 1,
   },
   statsTitle: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: 20,
     textAlign: 'center',
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-  },
-  statBox: {
-    width: '48%',
-    alignItems: 'center',
     marginBottom: 16,
   },
+  statBox: {
+    width: '23%',
+    alignItems: 'center',
+  },
   statCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   statNumber: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 10,
+    fontWeight: '500',
   },
+  statsDivider: {
+    height: 1,
+    marginVertical: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  statsRowItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statsRowValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statsRowLabel: {
+    fontSize: 11,
+  },
+  statsDividerVertical: {
+    width: 1,
+    height: 30,
+  },
+  // Weeks Section
   weeksContainer: {
     marginTop: 8,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   noWeeksText: {
     textAlign: 'center',
@@ -810,13 +760,9 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   weekCard: {
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
     overflow: 'hidden',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
     borderWidth: 1,
   },
   weekHeader: {
@@ -828,35 +774,38 @@ const styles = StyleSheet.create({
   weekTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flex: 1,
+    gap: 10,
   },
   weekIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
   },
   weekTitle: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    flex: 1,
   },
-  weekStats: {
+  statusChipsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
   },
-  weekStat: {
+  statusChip: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
-  weekStatValue: {
-    fontSize: 14,
+  statusChipText: {
+    fontSize: 12,
     fontWeight: '600',
-  },
-  weekStatLabel: {
-    fontSize: 10,
   },
   weekDetails: {
     padding: 12,
@@ -867,72 +816,70 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     borderBottomWidth: 1,
   },
   lastItem: {
     borderBottomWidth: 0,
   },
-  assignmentInfo: {
+  assignmentContent: {
     flex: 1,
     marginRight: 12,
+  },
+  assignmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   assignmentTitle: {
     fontSize: 15,
     fontWeight: '500',
-    marginBottom: 4,
-  },
-  assignmentDate: {
-    fontSize: 12,
-    marginBottom: 8,
-  },
-  assignmentMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 4,
-    flexWrap: 'wrap',
+    flex: 1,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 12,
     gap: 4,
   },
-  statusText: {
-    fontSize: 11,
+  statusBadgeText: {
+    fontSize: 10,
     fontWeight: '600',
   },
-  pointsBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  assignmentDate: {
+    fontSize: 12,
+    marginBottom: 8,
   },
-  pointsText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  lateBadge: {
+  assignmentFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
+    gap: 12,
+  },
+  pointsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pointsText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  lateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 3,
   },
   lateText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '600',
   },
-  assignmentNotes: {
-    fontSize: 11,
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
   bottomPadding: {
-    height: 20,
+    height: 40,
   },
 });

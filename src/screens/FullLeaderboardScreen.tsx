@@ -1,4 +1,4 @@
-// src/screens/FullLeaderboardScreen.tsx - Dark Mode Added
+// src/screens/FullLeaderboardScreen.tsx - UPDATED with getLeaderboard
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { TaskService } from '../services/TaskService';
+import { GroupActivityService } from '../services/GroupActivityService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
@@ -24,6 +24,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [totalPoints, setTotalPoints] = useState(0);
   const [authError, setAuthError] = useState(false);
 
   const checkToken = useCallback(async (): Promise<boolean> => {
@@ -67,12 +68,16 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     }
 
     try {
-      const result = await TaskService.getTaskStatistics(groupId);
-      if (result.success && result.statistics?.pointsByUser) {
-        const sortedUsers = Object.values(result.statistics.pointsByUser)
-          .sort((a: any, b: any) => b.totalPoints - a.totalPoints);
-        setLeaderboard(sortedUsers);
+      // ✅ Use the new getLeaderboard method for all-time cumulative points
+      const result = await GroupActivityService.getLeaderboard(groupId);
+      console.log('fullleaderboard:',result)
+      if (result.success && result.data?.leaderboard) {
+        console.log('fullleaderboard:',result.data?.leaderboard)
+        setLeaderboard(result.data.leaderboard);
+        setTotalPoints(result.data.totalPoints || 0);
       } else {
+        setLeaderboard([]);
+        setTotalPoints(0);
         if (result.message?.toLowerCase().includes('token') || 
             result.message?.toLowerCase().includes('auth')) {
           setAuthError(true);
@@ -80,6 +85,8 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
       }
     } catch (error) {
       console.error('Error loading leaderboard:', error);
+      setLeaderboard([]);
+      setTotalPoints(0);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -94,65 +101,81 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const getRankIcon = (index: number) => {
     switch (index) {
       case 0:
-        return <MaterialCommunityIcons name="trophy" size={24} color="#FFD700" />;
+        return <MaterialCommunityIcons name="trophy" size={28} color="#FFD700" />;
       case 1:
-        return <MaterialCommunityIcons name="trophy" size={22} color="#C0C0C0" />;
+        return <MaterialCommunityIcons name="trophy" size={24} color="#C0C0C0" />;
       case 2:
-        return <MaterialCommunityIcons name="trophy" size={20} color="#CD7F32" />;
+        return <MaterialCommunityIcons name="trophy" size={22} color="#CD7F32" />;
       default:
-        return <Text style={[styles.rankNumber, { color: theme.textMuted }]}>{index + 1}</Text>;
+        return (
+          <LinearGradient
+            colors={[theme.bgSecondary, theme.bgTertiary]}
+            style={styles.rankCircle}
+          >
+            <Text style={[styles.rankNumber, { color: theme.textMuted }]}>{index + 1}</Text>
+          </LinearGradient>
+        );
     }
   };
 
-  const renderLeaderboardItem = ({ item, index }: { item: any; index: number }) => (
-    <LinearGradient
-      colors={[theme.card, theme.bgSecondary]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[
-        styles.leaderboardItem,
-        { borderColor: theme.border },
-        index === 0 && styles.firstPlace,
-        index === 1 && styles.secondPlace,
-        index === 2 && styles.thirdPlace,
-      ]}
-    >
-      <View style={styles.rankContainer}>
-        {getRankIcon(index)}
-      </View>
-
-      <View style={styles.userContainer}>
-        <LinearGradient
-          colors={[theme.bgSecondary, theme.bgTertiary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.avatar, { borderColor: theme.border }]}
-        >
-          {item.avatarUrl ? (
-            <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
-          ) : (
-            <Text style={[styles.avatarText, { color: theme.textSecondary }]}>
-              {item.userName?.charAt(0).toUpperCase() || '?'}
-            </Text>
-          )}
-        </LinearGradient>
-        
-        <View style={styles.userInfo}>
-          <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
-            {item.userName}
-          </Text>
-          <Text style={[styles.userStats, { color: theme.textMuted }]}>
-            {item.assignments?.length || 0} tasks
-          </Text>
+  const renderLeaderboardItem = ({ item, index }: { item: any; index: number }) => {
+    const isTop3 = index < 3;
+    const points = item.points || 0;
+    
+    return (
+      <LinearGradient
+        colors={[theme.card, theme.bgSecondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          styles.leaderboardItem,
+          { borderColor: theme.border },
+          isTop3 && styles.topRankItem,
+          index === 0 && { borderColor: '#FFD700', borderWidth: 1.5 },
+          index === 1 && { borderColor: '#C0C0C0', borderWidth: 1.5 },
+          index === 2 && { borderColor: '#CD7F32', borderWidth: 1.5 },
+        ]}
+      >
+        <View style={styles.rankContainer}>
+          {getRankIcon(index)}
         </View>
-      </View>
 
-      <View style={styles.pointsContainer}>
-        <Text style={[styles.pointsValue, { color: theme.primary }]}>{item.totalPoints}</Text>
-        <Text style={[styles.pointsLabel, { color: theme.textMuted }]}>points</Text>
-      </View>
-    </LinearGradient>
-  );
+        <View style={styles.userContainer}>
+          <LinearGradient
+            colors={[theme.bgSecondary, theme.bgTertiary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.avatar, { borderColor: theme.border }]}
+          >
+            {item.avatarUrl ? (
+              <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <Text style={[styles.avatarText, { color: theme.textSecondary }]}>
+                {item.fullName?.charAt(0).toUpperCase() || '?'}
+              </Text>
+            )}
+          </LinearGradient>
+          
+          <View style={styles.userInfo}>
+            <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
+              {item.fullName || 'Unknown'}
+            </Text>
+            <View style={styles.userStatsRow}>
+              <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+              <Text style={[styles.userStats, { color: theme.textMuted }]}>
+                Rank #{item.rank}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.pointsContainer}>
+          <Text style={[styles.pointsValue, { color: theme.primary }]}>{points}</Text>
+          <Text style={[styles.pointsLabel, { color: theme.textMuted }]}>pts</Text>
+        </View>
+      </LinearGradient>
+    );
+  };
 
   if (loading && !refreshing) {
     return (
@@ -165,26 +188,46 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     );
   }
 
+  if (authError) {
+    return (
+      <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
+        <View style={styles.errorContainer}>
+          <MaterialCommunityIcons name="lock-alert" size={64} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>Authentication Error</Text>
+          <Text style={[styles.errorSubtext, { color: theme.textMuted }]}>Please log in again</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <LinearGradient colors={[theme.error, theme.error]} style={styles.retryButtonGradient}>
+              <Text style={styles.retryButtonText}>Go to Login</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </ScreenWrapper>
+    );
+  }
+
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
+          style={[styles.backButton, { backgroundColor: theme.card }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Leaderboard</Text>
         <TouchableOpacity 
           onPress={handleRefresh} 
-          style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
+          style={[styles.refreshButton, { backgroundColor: theme.card }]}
           disabled={refreshing}
         >
           {refreshing ? (
             <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
+            <MaterialCommunityIcons name="refresh" size={20} color={theme.text} />
           )}
         </TouchableOpacity>
       </View>
@@ -203,7 +246,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
       <FlatList
         data={leaderboard}
         renderItem={renderLeaderboardItem}
-        keyExtractor={(item, index) => `${item.userId}-${index}`}
+        keyExtractor={(item, index) => `${item.userId || index}`}
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl 
@@ -215,9 +258,15 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
         }
         ListHeaderComponent={
           <View style={styles.statsHeader}>
-            <Text style={[styles.statsTitle, { color: theme.text }]}>Top Performers</Text>
+            <View style={styles.statsHeaderRow}>
+              <Text style={[styles.statsTitle, { color: theme.text }]}>Top Performers</Text>
+              <View style={[styles.totalPointsBadge, { backgroundColor: theme.primaryLight }]}>
+                <Text style={[styles.totalPointsText, { color: theme.primary }]}>{totalPoints}</Text>
+                <Text style={[styles.totalPointsLabel, { color: theme.primary }]}>total pts</Text>
+              </View>
+            </View>
             <Text style={[styles.statsSubtitle, { color: theme.textMuted }]}>
-              {leaderboard.length} members • Based on points earned
+              {leaderboard.length} members • Based on verified points only
             </Text>
           </View>
         }
@@ -233,7 +282,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
             </LinearGradient>
             <Text style={[styles.emptyTitle, { color: theme.text }]}>No Data Yet</Text>
             <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              Complete tasks to earn points and appear on the leaderboard
+              Complete tasks and get them verified to earn points and appear on the leaderboard
             </Text>
           </View>
         }
@@ -260,35 +309,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    minHeight: 60,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   headerTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
   },
   refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
   groupBanner: {
     flexDirection: 'row',
@@ -306,12 +346,30 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   statsHeader: {
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  statsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
   statsTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 4,
+  },
+  totalPointsBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  totalPointsText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  totalPointsLabel: {
+    fontSize: 9,
   },
   statsSubtitle: {
     fontSize: 13,
@@ -319,30 +377,31 @@ const styles = StyleSheet.create({
   leaderboardItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
   },
-  firstPlace: {
-    borderColor: '#ffd43b',
-    borderWidth: 2,
-  },
-  secondPlace: {
-    borderColor: '#ced4da',
-    borderWidth: 2,
-  },
-  thirdPlace: {
-    borderColor: '#d97706',
-    borderWidth: 2,
+  topRankItem: {
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   rankContainer: {
-    width: 40,
+    width: 50,
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 8,
+  },
+  rankCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   rankNumber: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
   },
   userContainer: {
@@ -352,17 +411,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
   },
   avatarImage: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
   },
   avatarText: {
     fontSize: 18,
@@ -372,39 +431,44 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 3,
+  },
+  userStatsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   userStats: {
     fontSize: 11,
   },
   pointsContainer: {
     alignItems: 'center',
-    minWidth: 60,
+    minWidth: 65,
   },
   pointsValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
   },
   pointsLabel: {
-    fontSize: 9,
+    fontSize: 10,
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 48,
+    paddingVertical: 60,
   },
   emptyIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
     borderWidth: 1,
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     marginTop: 16,
     marginBottom: 8,
@@ -414,5 +478,34 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 32,
     lineHeight: 20,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    padding: 40,
+    marginTop: 40,
+  },
+  errorText: {
+    textAlign: 'center',
+    marginVertical: 12,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  errorSubtext: {
+    textAlign: 'center',
+    marginBottom: 20,
+    fontSize: 14,
+  },
+  retryButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  retryButtonGradient: {
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+  }, 
+  retryButtonText: {
+    fontWeight: '600',
+    fontSize: 16,
+    color: '#fff',
   },
 });

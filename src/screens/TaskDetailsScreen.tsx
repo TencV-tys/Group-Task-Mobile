@@ -612,48 +612,105 @@ const isDueTodayUTC = (dueDate: string) => {
     }
   };
 
-  const getVerificationStatus = (assignment: any) => {
-    if (!assignment?.completed) {
-      const dueToday = isDueTodayUTC(assignment.dueDate);
-      
-      if (dueToday) {
-        return { 
-          status: 'not_completed',
-          color: theme.error,
-          icon: 'alert-circle',
-          text: 'Not Completed'
-        };
-      } else {
-        return { 
-          status: 'pending',
-          color: theme.primary,
-          icon: 'clock-outline',
-          text: 'Pending'
-        };
-      }
-    }
-    
-    if (assignment.verified === true) return { 
+// In TaskDetailsScreen.tsx - COMPLETE getVerificationStatus function
+
+const getVerificationStatus = (assignment: any) => {
+  // ✅ 1. Check if VERIFIED (admin approved)
+  if (assignment.verified === true) {
+    return { 
       status: 'verified', 
       color: theme.primary, 
       icon: 'check-circle',
       text: 'Verified'
     };
-    
-    if (assignment.verified === false) return { 
+  }
+  
+  // ✅ 2. Check if REJECTED (admin rejected)
+  if (assignment.verified === false) {
+    return { 
       status: 'rejected', 
       color: theme.error, 
       icon: 'close-circle',
       text: 'Rejected'
     };
-    
+  }
+  
+  // ✅ 3. Check if EXPIRED (submission window closed, never submitted)
+  if (assignment.expired === true) {
+    return { 
+      status: 'expired', 
+      color: theme.error, 
+      icon: 'timer-off',
+      text: 'Expired'
+    };
+  }
+  
+  // ✅ 4. Check if MISSED (specific time slot was missed)
+  const missedSlotIds = assignment.missedTimeSlotIds || [];
+  const currentTimeSlotId = assignment.timeSlot?.id;
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
+    return { 
+      status: 'missed', 
+      color: theme.error, 
+      icon: 'close-circle',
+      text: 'Missed'
+    };
+  }
+  
+  // ✅ 5. Check if SUBMITTED but not yet verified (PENDING VERIFICATION)
+  if (assignment.completed === true && assignment.verified === null) {
     return { 
       status: 'pending_verification', 
       color: theme.primary, 
       icon: 'clock-check',
       text: 'Pending Verification'
     };
+  }
+  
+  // ✅ 6. Check if COMPLETED (fully done - for single slot tasks)
+  if (assignment.completed === true) {
+    return { 
+      status: 'completed', 
+      color: theme.primary, 
+      icon: 'check-circle',
+      text: 'Completed'
+    };
+  }
+  
+  // ✅ 7. Check if OVERDUE (due date passed but not completed)
+  const dueDate = new Date(assignment.dueDate);
+  const now = new Date();
+  const isOverdue = dueDate < now;
+  
+  if (isOverdue) {
+    return { 
+      status: 'overdue', 
+      color: theme.error, 
+      icon: 'alert-circle',
+      text: 'Overdue'
+    };
+  }
+  
+  // ✅ 8. Check if DUE TODAY
+  const dueToday = isDueTodayUTC(assignment.dueDate);
+  if (dueToday) {
+    return { 
+      status: 'due_today', 
+      color: theme.primary, 
+      icon: 'clock-alert',
+      text: 'Due Today'
+    };
+  }
+  
+  // ✅ 9. Default - PENDING (future assignment)
+  return { 
+    status: 'pending', 
+    color: theme.textSecondary, 
+    icon: 'clock-outline',
+    text: 'Pending'
   };
+};
+  
 
   // ===== RENDER FUNCTIONS =====
   const renderHeader = () => {

@@ -143,4 +143,23 @@ export class GroupActivityService {
       return { success: false, message: error.message };
     }
   }
+
+// Add this to services/GroupActivityService.ts
+
+// Get leaderboard (All-time cumulative points)
+static async getLeaderboard(groupId: string) {
+  try {
+    // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
+    const headers = await TokenUtils.getAuthHeaders(false);
+    const response = await fetch(`${API_URL}/${groupId}/leaderboard`, {
+      method: 'GET',
+      headers,
+    });
+    return await response.json();
+  } catch (error: any) {
+    console.error('GroupActivityService.getLeaderboard error:', error);
+    return { success: false, message: error.message };
+  }
+}
+
 }

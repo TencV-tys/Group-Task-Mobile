@@ -112,74 +112,100 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return false;
   }, []);
 
-  // ===== useMemo HOOKS - PRESERVE SWAP INFO =====
-  const groupedMyTasks = useMemo(() => {
-    if (selectedTab !== 'my') return [];
+// In GroupTasksScreen.tsx - Add debug before groupedMyTasks
+
+const groupedMyTasks = useMemo(() => {
+  if (selectedTab !== 'my') return [];
+  
+  // ✅ DEBUG: Log the structure of myTasks
+  console.log('📊 [GroupTasks] myTasks sample (first item):', myTasks[0]);
+  console.log('📊 [GroupTasks] myTasks structure:', {
+    hasId: !!myTasks[0]?.id,
+    hasTaskId: !!myTasks[0]?.taskId,
+    hasAssignment: !!myTasks[0]?.assignment,
+    assignmentId: myTasks[0]?.assignment?.id,
+    taskIdFromAssignment: myTasks[0]?.assignment?.taskId,
+    itemKeys: myTasks[0] ? Object.keys(myTasks[0]) : []
+  });
+  
+  const taskMap = new Map();
+  
+  myTasks.forEach((item: any) => {
+    // ✅ FIXED: Get the correct task ID
+    // The item might have taskId directly, or inside assignment, or item.id might be task ID
+    const taskId = item.taskId || item.assignment?.taskId || item.id;
     
-    const taskMap = new Map();
-    myTasks.forEach((item: any) => {
-      const taskId = item.id;
-      if (!taskMap.has(taskId)) {
-        const originalTask = tasks.find(t => t.id === taskId);
-        const isDeletedTask = !originalTask && item.assignment?.isHistorical === true;
-        
-        taskMap.set(taskId, {
-          id: taskId,
-          title: originalTask?.title 
-            || item.title 
-            || item.taskTitle 
-            || (isDeletedTask ? '🗑️ Deleted Task' : 'Unknown Task'),
-          description: originalTask?.description || item.description,
-          points: originalTask?.points || item.points || item.assignment?.points || 0,
-          executionFrequency: originalTask?.executionFrequency || item.executionFrequency,
-          timeFormat: originalTask?.timeFormat || item.timeFormat,
-          timeSlots: originalTask?.timeSlots || item.timeSlots || [],
-          selectedDays: originalTask?.selectedDays || item.selectedDays,
-          dayOfWeek: originalTask?.dayOfWeek || item.dayOfWeek,
-          isRecurring: originalTask?.isRecurring ?? item.isRecurring ?? true,
-          category: originalTask?.category || item.category,
-          rotationOrder: originalTask?.rotationOrder || item.rotationOrder,
-          currentAssignee: originalTask?.currentAssignee || item.currentAssignee,
-          lastAssignedAt: originalTask?.lastAssignedAt || item.lastAssignedAt,
-          createdAt: originalTask?.createdAt || item.createdAt || new Date(),
-          creator: originalTask?.creator || item.creator,
-          userAssignment: item.assignment,
-          assignmentsCount: 0,
-          completedCount: 0,
-          totalPoints: 0,
-          earnedPoints: 0,
-          isFullyCompleted: false,
-          hasAnyCompleted: false,
-          isDeleted: isDeletedTask,
-          // ✅ PRESERVE SWAP INFO
-          acquiredViaSwap: item.assignment?.acquiredViaSwap || false,
-          swappedFromName: item.assignment?.swappedFromName || null,
-          swapRequestId: item.assignment?.swapRequestId || null,
-          swapScope: item.assignment?.swapScope || null,
-          swapDay: item.assignment?.swapDay || null
-        });
-      }
-      
-      const taskData = taskMap.get(taskId);
-      taskData.assignmentsCount++;
-      
-      const isCompleted = item.assignment?.completed === true;
-      
-      if (isCompleted) {
-        taskData.completedCount++;
-        taskData.earnedPoints += item.assignment?.points || 0;
-        taskData.hasAnyCompleted = true;
-      }
-      taskData.totalPoints += item.assignment?.points || 0;
+    console.log(`📊 [GroupTasks] Processing item:`, {
+      title: item.title,
+      taskId: taskId,
+      originalId: item.id,
+      hasAssignment: !!item.assignment,
+      assignmentTaskId: item.assignment?.taskId
     });
     
-    const result = Array.from(taskMap.values()).map(task => ({
-      ...task,
-      isFullyCompleted: task.assignmentsCount > 0 && task.completedCount === task.assignmentsCount
-    }));
+    if (!taskMap.has(taskId)) {
+      // Get the original task for title, points, etc.
+      const originalTask = tasks.find(t => t.id === taskId);
+      
+      taskMap.set(taskId, {
+        id: taskId,
+        title: originalTask?.title || item.title || 'Unknown Task',
+        points: originalTask?.points || item.points || 0,
+        executionFrequency: originalTask?.executionFrequency || item.executionFrequency,
+        timeSlots: originalTask?.timeSlots || item.timeSlots || [],
+        // Initialize counters
+        totalAssignments: 0,
+        completedAssignments: 0,
+        verifiedAssignments: 0,
+        totalPoints: 0,
+        earnedPoints: 0,
+        assignments: []
+      });
+    }
     
-    return result;
-  }, [selectedTab, myTasks, tasks]);
+    const taskData = taskMap.get(taskId);
+    
+    // Get points from the assignment
+    const assignmentPoints = item.assignment?.points || item.points || 0;
+    const isCompleted = item.assignment?.completed === true || item.completed === true;
+    const isVerified = item.assignment?.verified === true || item.verified === true;
+    
+    // Count this assignment
+    taskData.totalAssignments++;
+    taskData.totalPoints += assignmentPoints;
+    taskData.assignments.push(item);
+    
+    if (isCompleted) {
+      taskData.completedAssignments++;
+    }
+    
+    if (isVerified) {
+      taskData.verifiedAssignments++;
+      taskData.earnedPoints += assignmentPoints;
+    }
+    
+    console.log(`  📌 Task ${taskData.title}: Assignment #${taskData.totalAssignments}, points: ${assignmentPoints}, completed: ${isCompleted}, verified: ${isVerified}`);
+  });
+  
+  const result = Array.from(taskMap.values()).map(task => ({
+    ...task,
+    isFullyCompleted: task.totalAssignments > 0 && task.completedAssignments === task.totalAssignments,
+    progressPercentage: task.totalAssignments > 0 
+      ? (task.completedAssignments / task.totalAssignments) * 100 
+      : 0,
+    displayText: `${task.completedAssignments}/${task.totalAssignments} slots • ${task.earnedPoints}/${task.totalPoints} pts`
+  }));
+  
+  console.log('📊 [GroupTasks] Final grouped result:', result.map(t => ({
+    title: t.title,
+    totalAssignments: t.totalAssignments,
+    completedAssignments: t.completedAssignments,
+    earnedPoints: t.earnedPoints,
+    totalPoints: t.totalPoints
+  })));
+  
+  return result;
+}, [selectedTab, myTasks, tasks]);
 
   // ===== useCallback HOOKS =====
   const checkToken = useCallback(async (): Promise<boolean> => {
@@ -365,74 +391,135 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     }
   }, [groupId, checkToken]);
 
-  // ===== FETCH TASKS FUNCTION =====
-  const fetchTasks = useCallback(async (isRefreshing = false) => {
-    const hasToken = await checkToken();
-    if (!hasToken) {
+ // ===== FETCH TASKS FUNCTION =====
+const fetchTasks = useCallback(async (isRefreshing = false) => {
+  const hasToken = await checkToken();
+  if (!hasToken) {
+    setLoading(false);
+    setRefreshing(false);
+    return;
+  }
+
+  if (isRefreshing) setRefreshing(true);
+  else if (!initialLoadDone.current) setLoading(true);
+  setError(null);
+
+  try {
+    console.log('\n📊📊📊 [FETCH TASKS] START 📊📊📊');
+    
+    // Fetch all tasks
+    const allTasksResult = await TaskService.getGroupTasks(groupId);
+    console.log('📊 [All Tasks] Result:', {
+      success: allTasksResult.success,
+      tasksCount: allTasksResult.tasks?.length
+    });
+    
+    if (allTasksResult.success && isMounted.current) {
+      const processedTasks = (allTasksResult.tasks || []).map((task: any) => {
+        const userAssignment = task.assignments?.find((a: any) => a.user?.id);
+        return {
+          ...task,
+          isAssignedToUser: !!userAssignment || !!task.userAssignment,
+          userAssignment: userAssignment || task.userAssignment,
+        };
+      });
+      setTasks(processedTasks);
+      analyzeTaskCreationDays(processedTasks);
+      initialLoadDone.current = true;
+      console.log('✅ [All Tasks] Set', processedTasks.length, 'tasks');
+    } else {
+      setError(allTasksResult.message || 'Failed to load tasks');
+    }
+    
+    // Fetch my tasks
+    const myTasksResult = await TaskService.getMyTasks(groupId);
+    
+    // ===== COMPLETE DEBUG LOGS =====
+    console.log('\n🔍🔍🔍 [MY TASKS] FULL DEBUG 🔍🔍🔍');
+    console.log('📦 myTasksResult.success:', myTasksResult.success);
+    console.log('📦 myTasksResult.message:', myTasksResult.message);
+    console.log('📦 myTasksResult keys:', Object.keys(myTasksResult));
+    console.log('📦 myTasksResult.tasks length:', myTasksResult.tasks?.length);
+    console.log('📦 myTasksResult.data?.tasks length:', myTasksResult.data?.tasks?.length);
+    console.log('📦 myTasksResult.assignments length:', myTasksResult.assignments?.length);
+    
+    // Try to get tasks from different possible paths
+    let myTasksArray = [];
+    if (myTasksResult.tasks && Array.isArray(myTasksResult.tasks)) {
+      myTasksArray = myTasksResult.tasks;
+      console.log('✅ Using myTasksResult.tasks');
+    } else if (myTasksResult.data?.tasks && Array.isArray(myTasksResult.data?.tasks)) {
+      myTasksArray = myTasksResult.data.tasks;
+      console.log('✅ Using myTasksResult.data.tasks');
+    } else if (myTasksResult.assignments && Array.isArray(myTasksResult.assignments)) {
+      myTasksArray = myTasksResult.assignments;
+      console.log('✅ Using myTasksResult.assignments');
+    } else if (Array.isArray(myTasksResult)) {
+      myTasksArray = myTasksResult;
+      console.log('✅ Using myTasksResult as array');
+    }
+    
+    console.log('📊 myTasksArray length:', myTasksArray.length);
+    
+    if (myTasksArray.length > 0) {
+      const firstItem = myTasksArray[0];
+      console.log('\n📋 First item structure:');
+      console.log('  - id:', firstItem.id);
+      console.log('  - title:', firstItem.title);
+      console.log('  - taskId:', firstItem.taskId);
+      console.log('  - points:', firstItem.points);
+      console.log('  - executionFrequency:', firstItem.executionFrequency);
+      console.log('  - has assignment:', !!firstItem.assignment);
+      if (firstItem.assignment) {
+        console.log('  - assignment.id:', firstItem.assignment.id);
+        console.log('  - assignment.completed:', firstItem.assignment.completed);
+        console.log('  - assignment.verified:', firstItem.assignment.verified);
+        console.log('  - assignment.points:', firstItem.assignment.points);
+        console.log('  - assignment.dueDate:', firstItem.assignment.dueDate);
+        console.log('  - assignment.timeSlot:', firstItem.assignment.timeSlot);
+      }
+      console.log('  - All keys:', Object.keys(firstItem));
+      
+      // Log first 5 items summary
+      console.log('\n📋 First 5 items summary:');
+      myTasksArray.slice(0, 5).forEach((item: any, idx: number) => {
+        console.log(`  ${idx + 1}. ID: ${item.id}, Title: ${item.title}, Completed: ${item.assignment?.completed}, Verified: ${item.assignment?.verified}, Points: ${item.assignment?.points || item.points}`);
+      });
+    } else {
+      console.log('❌ No tasks found in myTasksResult!');
+    }
+    
+    if (myTasksResult.success && myTasksArray.length > 0 && isMounted.current) {
+      const enhancedTasks = myTasksArray.map((task: any) => ({
+        ...task,
+        ...validateTaskTime(task),
+        urgencyLevel: getTaskUrgency(task)
+      }));
+      setMyTasks(enhancedTasks);
+      console.log('✅ [My Tasks] Set', enhancedTasks.length, 'enhanced tasks');
+      
+      const todayTasks = findTodayAssignments(enhancedTasks);
+      setTodayAssignments(todayTasks);
+      setShowTodaySection(todayTasks.length > 0);
+      setNextActiveTime(calculateNextActiveTime(todayTasks));
+      console.log('📅 Today tasks:', todayTasks.length);
+    } else {
+      console.log('⚠️ [My Tasks] No valid tasks to set');
+      setMyTasks([]);
+    }
+    
+    console.log('📊📊📊 [FETCH TASKS] END 📊📊📊\n');
+    
+  } catch (err: any) {
+    console.error('❌ Error in fetchTasks:', err);
+    if (isMounted.current) setError(err.message || 'Network error');
+  } finally {
+    if (isMounted.current) {
       setLoading(false);
       setRefreshing(false);
-      return;
     }
-
-
-    if (isRefreshing) setRefreshing(true);
-    else if (!initialLoadDone.current) setLoading(true);
-    setError(null);
-
-    try {
-      const allTasksResult = await TaskService.getGroupTasks(groupId);
-      
-      if (allTasksResult.success && isMounted.current) {
-        const processedTasks = (allTasksResult.tasks || []).map((task: any) => {
-          const userAssignment = task.assignments?.find((a: any) => a.user?.id);
-          return {
-            ...task,
-            isAssignedToUser: !!userAssignment || !!task.userAssignment,
-            userAssignment: userAssignment || task.userAssignment,
-          };
-        });
-        setTasks(processedTasks);
-        analyzeTaskCreationDays(processedTasks);
-        initialLoadDone.current = true;
-      } else {
-        setError(allTasksResult.message || 'Failed to load tasks');
-      }
-      
-      const myTasksResult = await TaskService.getMyTasks(groupId);
-
-      // In the fetchTasks function, after getting myTasksResult:
-console.log('🔍🔍🔍 MY TASKS DEBUG 🔍🔍🔍');
-myTasksResult.tasks?.forEach((task: any) => {
-  console.log(`Task: ${task.title}`);
-  console.log(`  acquiredViaSwap: ${task.acquiredViaSwap}`);
-  console.log(`  swappedFromName: ${task.swappedFromName}`);
-  console.log(`  swapScope: ${task.swapScope}`);
-  console.log(`  assignment?.acquiredViaSwap: ${task.assignment?.acquiredViaSwap}`);
-});
-      
-      if (myTasksResult.success && myTasksResult.tasks && isMounted.current) {
-        const enhancedTasks = myTasksResult.tasks.map((task: any) => ({
-          ...task,
-          ...validateTaskTime(task),
-          urgencyLevel: getTaskUrgency(task)
-        }));
-        setMyTasks(enhancedTasks);
-        
-        const todayTasks = findTodayAssignments(enhancedTasks);
-        setTodayAssignments(todayTasks);
-        setShowTodaySection(todayTasks.length > 0);
-        setNextActiveTime(calculateNextActiveTime(todayTasks));
-      }
-      
-    } catch (err: any) {
-      if (isMounted.current) setError(err.message || 'Network error');
-    } finally {
-      if (isMounted.current) {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }
-  }, [groupId, checkToken, analyzeTaskCreationDays, validateTaskTime, getTaskUrgency, findTodayAssignments, calculateNextActiveTime]);
+  }
+}, [groupId, checkToken, analyzeTaskCreationDays, validateTaskTime, getTaskUrgency, findTodayAssignments, calculateNextActiveTime]);
 
   const refreshTasks = useCallback(() => fetchTasks(true), [fetchTasks]);
 
@@ -1024,7 +1111,8 @@ useEffect(() => {
     );
   };
 
- const renderTask = ({ item }: any) => {
+ 
+  const renderTask = ({ item }: any) => {
   const isMyTasksView = selectedTab === 'my';
   const taskIsAssigned = isTaskAssigned(item);
   
@@ -1050,65 +1138,63 @@ useEffect(() => {
   let totalPoints = 0;
   let displayText = '';
   
-  // ✅ UNIFIED LOGIC - Same for both "My Tasks" and "All Tasks"
-  if (item.executionFrequency === 'DAILY') {
-    // For DAILY tasks: Show total slots for the week (7 days × number of weeks in rotation)
-    if (item.assignments && item.assignments.length > 0) {
-      // Calculate total slots and completed slots
-      totalCount = item.assignments.length;
-      const completedAssignments = item.assignments.filter((a: any) => a.completed === true);
-      completedCount = completedAssignments.length;
-      earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-      totalPoints = item.assignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-      isFullyCompleted = totalCount > 0 && completedCount === totalCount;
-      completionPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-      displayText = `${completedCount}/${totalCount} slots • ${earnedPoints}/${totalPoints} pts`;
-    } else if (item.assignmentsCount && item.assignmentsCount > 0) {
-      // Fallback to assignmentsCount if assignments array not available
-      totalCount = item.assignmentsCount;
-      completedCount = item.completedCount || 0;
-      earnedPoints = item.earnedPoints || 0;
-      totalPoints = item.totalPoints || 0;
-      isFullyCompleted = completedCount === totalCount;
-      completionPercentage = (completedCount / totalCount) * 100;
-      displayText = `${completedCount}/${totalCount} slots • ${earnedPoints}/${totalPoints} pts`;
-    } else {
-      // No assignments yet - show placeholder
-      totalCount = 0;
-      completedCount = 0;
-      earnedPoints = 0;
-      totalPoints = item.points * 7; // Assume 7 slots per week
-      displayText = `0/0 slots • ${item.points} pts`;
+  // ✅ For "My Tasks" tab - use pre-calculated values
+  if (isMyTasksView) {
+    totalCount = item.totalAssignments || 0;
+    completedCount = item.completedAssignments || 0;
+    earnedPoints = item.earnedPoints || 0;
+    totalPoints = item.totalPoints || 0;
+    isFullyCompleted = item.isFullyCompleted || false;
+    completionPercentage = item.progressPercentage || 0;
+    displayText = item.displayText || `${completedCount}/${totalCount} slots • ${earnedPoints}/${totalPoints} pts`;
+  } 
+  // ✅ For "All Tasks" tab (Admin view) - calculate from assignments properly
+ // For "All Tasks" tab (Admin view)
+else {
+  const allAssignments = item.assignments || [];
+  const relevantAssignments = allAssignments;
+  
+  totalCount = relevantAssignments.length;
+  
+  let completedAssignments = 0;
+  let verifiedAssignments = 0;
+  let totalPointsSum = 0;
+  let earnedPointsSum = 0;
+  
+  relevantAssignments.forEach((assignment: any) => {
+    const points = assignment.points || 0;
+    totalPointsSum += points;
+    
+    if (assignment.completed === true) {
+      completedAssignments++;
     }
-  } else {
-    // For WEEKLY or other frequencies: Show total progress across all assignments
-    if (item.assignments && item.assignments.length > 0) {
-      totalCount = item.assignments.length;
-      const completedAssignments = item.assignments.filter((a: any) => a.completed === true);
-      completedCount = completedAssignments.length;
-      earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-      totalPoints = item.assignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-      isFullyCompleted = totalCount > 0 && completedCount === totalCount;
-      completionPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-      displayText = `${completedCount}/${totalCount} slots • ${earnedPoints}/${totalPoints} pts`;
-    } else if (item.assignmentsCount && item.assignmentsCount > 0) {
-      // Fallback to assignmentsCount
-      totalCount = item.assignmentsCount;
-      completedCount = item.completedCount || 0;
-      earnedPoints = item.earnedPoints || 0;
-      totalPoints = item.totalPoints || 0;
-      isFullyCompleted = completedCount === totalCount;
-      completionPercentage = (completedCount / totalCount) * 100;
-      displayText = `${completedCount}/${totalCount} slots • ${earnedPoints}/${totalPoints} pts`;
-    } else {
-      // No assignments yet
-      totalCount = 0;
-      completedCount = 0;
-      earnedPoints = 0;
-      totalPoints = item.points || 0;
-      displayText = `0/0 slots • ${item.points} pts`;
+    
+    if (assignment.verified === true) {
+      verifiedAssignments++;
+      earnedPointsSum += points;
     }
-  }
+  });
+  
+  // ✅ Use verifiedAssignments for display, not completedAssignments
+  completedCount = verifiedAssignments;  // ← CHANGE THIS
+  totalCount = relevantAssignments.length;
+  totalPoints = totalPointsSum;
+  earnedPoints = earnedPointsSum;
+  
+  isFullyCompleted = totalCount > 0 && verifiedAssignments === totalCount;
+  completionPercentage = totalCount > 0 ? (verifiedAssignments / totalCount) * 100 : 0;
+  displayText = `${verifiedAssignments}/${totalCount} slots • ${earnedPoints}/${totalPoints} pts`;
+  
+  console.log(`📊 [All Tasks] Task: ${item.title}`, {
+    totalCount,
+    verifiedAssignments,
+    completedAssignments,
+    totalPoints,
+    earnedPoints,
+    displayText
+  });
+}
+
   
   const validation = validateTaskTime(item);
   
@@ -1279,6 +1365,7 @@ useEffect(() => {
     </TouchableOpacity>
   ); 
 };
+
 
   const renderContent = () => {
     let currentTasks = [];

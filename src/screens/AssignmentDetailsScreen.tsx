@@ -41,7 +41,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     adminNotes,
     verificationStatus,
     timeLeft,
-    isSubmittable,
+    isSubmittable, 
     submissionStatus, 
     isLate,
     penaltyInfo,
@@ -454,84 +454,100 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
   };
 
   // ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) =====
-  const renderVerificationControls = () => {
-    if (!isAdmin) return null;
-    if (!assignment?.completed || assignment.verified !== null) return null;
+ // In AssignmentDetailsScreen.tsx - UPDATE renderVerificationControls
 
-    return (
-      <View style={styles.verificationSection}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Admin Verification</Text>
-        
-        <LinearGradient
-          colors={[theme.bgSecondary, theme.bgTertiary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.notesInputGradient, { borderColor: theme.border }]}
+// ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) =====
+const renderVerificationControls = () => {
+  if (!isAdmin) return null; 
+  
+  // ✅ FIXED: Show verification controls if:
+  // 1. Assignment has a submission (photoUrl not null)
+  // 2. Not yet verified (verified === null)
+  // 3. Either completed OR partially completed (has photo)
+  const hasSubmission = assignment?.photoUrl !== null && assignment?.photoUrl !== undefined;
+  const notVerified = assignment?.verified === null;
+  
+  // For multi-slot tasks, also show if partially completed
+  const isMultiSlot = assignment?.task?.timeSlots?.length > 1;
+  const isPartial = !assignment?.completed && isMultiSlot && hasSubmission;
+  
+  if ((!hasSubmission || !notVerified) && !isPartial) return null;
+
+  return (
+    <View style={styles.verificationSection}>
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Admin Verification</Text>
+      
+      <LinearGradient
+        colors={[theme.bgSecondary, theme.bgTertiary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.notesInputGradient, { borderColor: theme.border }]}
+      >
+        <TextInput
+          style={[styles.notesInput, { color: theme.text }]}
+          value={adminNotes}
+          onChangeText={setAdminNotes}
+          placeholder="Add notes for the user (optional)..."
+          placeholderTextColor={theme.textPlaceholder}
+          multiline
+          numberOfLines={3}
+          maxLength={500}
+          selectionColor={theme.primary}
+        />
+      </LinearGradient>
+      <Text style={[styles.charCount, { color: theme.textMuted }]}>
+        {adminNotes.length}/500 characters
+      </Text>
+
+      <View style={styles.verificationButtons}>
+        <TouchableOpacity
+          style={[styles.verifyButton, styles.rejectButton]}
+          onPress={() => handleVerify(false)}
+          disabled={verifying}
         >
-          <TextInput
-            style={[styles.notesInput, { color: theme.text }]}
-            value={adminNotes}
-            onChangeText={setAdminNotes}
-            placeholder="Add notes for the user (optional)..."
-            placeholderTextColor={theme.textPlaceholder}
-            multiline
-            numberOfLines={3}
-            maxLength={500}
-            selectionColor={theme.primary}
-          />
-        </LinearGradient>
-        <Text style={[styles.charCount, { color: theme.textMuted }]}>
-          {adminNotes.length}/500 characters
-        </Text>
-
-        <View style={styles.verificationButtons}>
-          <TouchableOpacity
-            style={[styles.verifyButton, styles.rejectButton]}
-            onPress={() => handleVerify(false)}
-            disabled={verifying}
+          <LinearGradient
+            colors={[theme.error, theme.error]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.verifyButtonGradient}
           >
-            <LinearGradient
-              colors={[theme.error, theme.error]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.verifyButtonGradient}
-            >
-              {verifying ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="close-circle" size={20} color="#fff" />
-                  <Text style={styles.verifyButtonText}>Reject</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+            {verifying ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="close-circle" size={20} color="#fff" />
+                <Text style={styles.verifyButtonText}>Reject</Text>
+              </>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.verifyButton, styles.approveButton]}
-            onPress={() => handleVerify(true)}
-            disabled={verifying}
+        <TouchableOpacity
+          style={[styles.verifyButton, styles.approveButton]}
+          onPress={() => handleVerify(true)}
+          disabled={verifying}
+        >
+          <LinearGradient
+            colors={[theme.primary, theme.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.verifyButtonGradient}
           >
-            <LinearGradient
-              colors={[theme.primary, theme.primaryDark]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.verifyButtonGradient}
-            >
-              {verifying ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <MaterialCommunityIcons name="check-circle" size={20} color="#fff" />
-                  <Text style={styles.verifyButtonText}>Approve</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+            {verifying ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="check-circle" size={20} color="#fff" />
+                <Text style={styles.verifyButtonText}>Approve</Text>
+              </>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
-    );
-  };
+    </View>
+  );
+};
+  
 
   // ===== RENDER ADMIN INFO BANNER =====
   const renderAdminInfoBanner = () => {

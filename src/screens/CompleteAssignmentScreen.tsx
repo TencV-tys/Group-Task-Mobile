@@ -11,7 +11,7 @@ import {
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
+  Platform, 
   Dimensions
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -55,10 +55,10 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     authError,
     setNotes,
     setPhoto,
-    formatTime,
+    formatTime,  
     getTimeStatusMessage,
     pickImage,
-    takePhoto,
+    takePhoto, 
     submitCompletion,
     clearAuthError
   } = useCompleteAssignment(assignmentId, taskTitle, dueDate, timeSlot, onCompleted);

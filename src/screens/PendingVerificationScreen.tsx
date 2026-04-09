@@ -42,7 +42,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   // ✅ FIXED: Use ref for current page to avoid stale closures
   const currentPageRef = useRef(0);
   const isLoadingRef = useRef(false);
-  
+   
   const isAdmin = userRole === 'ADMIN';
 
   // ✅ FIXED: Reset everything when filter changes
@@ -64,140 +64,166 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     fetchSubmissions(0, true); // Fetch first page with reset
   }, [groupId, filter]);
 
-  const fetchStats = async () => {
-    const hasToken = await TokenUtils.checkToken({
-      showAlert: false,
-      onAuthError: () => setAuthError(true)
+ // In PendingVerificationsScreen.tsx - REPLACE fetchStats with this
+
+const fetchStats = async () => {
+  const hasToken = await TokenUtils.checkToken({
+    showAlert: false,
+    onAuthError: () => setAuthError(true)
+  });
+  
+  if (!hasToken) return;
+
+  try {
+    // ✅ Get pending count from dedicated endpoint
+    const pendingResult = await AssignmentService.getPendingVerifications(groupId, {
+      limit: 1,
+      offset: 0
     });
     
-    if (!hasToken) return;
-
-    try {
-      const result = await AssignmentService.getAssignmentStats(groupId);
-      if (result.success && result.data) {
-        setStats(result.data.summary);
-      }
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-    }
-  };
-
-  // ✅ FIXED: Proper fetch function with page parameter
-  const fetchSubmissions = async (page: number, reset = false) => {
-    // Prevent duplicate requests
-    if (isLoadingRef.current && !reset) return;
+    // Get verified/rejected counts from existing stats
+    const statsResult = await AssignmentService.getAssignmentStats(groupId);
     
-    const hasToken = await TokenUtils.checkToken({
-      showAlert: false,
-      onAuthError: () => setAuthError(true)
+    console.log('📊 Stats results:', {
+      pendingCount: pendingResult.data?.total || 0,
+      verifiedCount: statsResult.data?.summary?.verifiedAssignments || 0,
+      rejectedCount: statsResult.data?.summary?.rejectedAssignments || 0
     });
     
-    if (!hasToken) {
-      setLoading(false);
-      setRefreshing(false);
-      setIsLoadingMore(false);
-      return;
+    if (pendingResult.success && statsResult.success) {
+      setStats({
+        pendingVerification: pendingResult.data?.total || 0,
+        verifiedAssignments: statsResult.data?.summary?.verifiedAssignments || 0,
+        rejectedAssignments: statsResult.data?.summary?.rejectedAssignments || 0
+      });
     }
+  } catch (err) {
+    console.error('Error fetching stats:', err);
+  }
+};
 
-    isLoadingRef.current = true;
+   // In PendingVerificationsScreen.tsx - UPDATE fetchSubmissions function
+
+const fetchSubmissions = async (page: number, reset = false) => {
+  // Prevent duplicate requests
+  if (isLoadingRef.current && !reset) return;
+  
+  const hasToken = await TokenUtils.checkToken({
+    showAlert: false,
+    onAuthError: () => setAuthError(true)
+  });
+  
+  if (!hasToken) {
+    setLoading(false);
+    setRefreshing(false);
+    setIsLoadingMore(false);
+    return;
+  }
+
+  isLoadingRef.current = true;
+  
+  if (reset) {
+    setLoading(true);
+  } else {
+    setIsLoadingMore(true);
+  }
+  
+  setError(null); 
+  
+  try {
+    const offset = page * PAGE_SIZE;
     
-    if (reset) {
-      setLoading(true);
-    } else {
-      setIsLoadingMore(true);
-    }
+    console.log(`📥 Fetching ${filter} submissions for group: ${groupId}, page: ${page}, offset: ${offset}`);
     
-    setError(null);
+    let result;
     
-    try {
-      const offset = page * PAGE_SIZE;
-      
-      console.log(`📥 Fetching ${filter} submissions for group: ${groupId}, page: ${page}, offset: ${offset}`);
-      
-      let statusParam: string | undefined;
-      if (filter === 'pending') {
-        statusParam = 'submitted';
-      } else if (filter === 'verified') {
-        statusParam = 'verified';
-      } else if (filter === 'rejected') {
-        statusParam = 'rejected';
-      }
-      
-      const result = await AssignmentService.getGroupAssignments(groupId, {
-        status: statusParam,
+    // ✅ USE DEDICATED ENDPOINT FOR PENDING
+    if (filter === 'pending') {
+      result = await AssignmentService.getPendingVerifications(groupId, {
+        limit: PAGE_SIZE,
+        offset: offset 
+      });
+    } else if (filter === 'verified') {
+      result = await AssignmentService.getGroupAssignments(groupId, {
+        status: 'verified',
         limit: PAGE_SIZE,
         offset: offset
       });
+    } else if (filter === 'rejected') {
+      result = await AssignmentService.getGroupAssignments(groupId, {
+        status: 'rejected',
+        limit: PAGE_SIZE,
+        offset: offset
+      });
+    }
+    
+    console.log('📥 API Response:', {
+      success: result.success,
+      total: result.data?.total || result.total,
+      assignmentsCount: result.data?.assignments?.length || result.assignments?.length
+    });
+    
+    if (result.success) {
+      // Handle both response formats
+      let assignments = result.data?.assignments || result.assignments || [];
       
-      console.log('📥 API Response:', {
-        success: result.success,
-        total: result.total,
-        assignmentsCount: result.assignments?.length
+      const processed = assignments.map((assignment: any) => {
+        const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
+        const taskTitle = assignment.task?.title || assignment.taskTitle || 'Unknown Task';
+        const isDeletedTask = assignment.isHistorical === true || (isTaskDeleted && assignment.taskTitle);
+        
+        return {
+          ...assignment,
+          id: assignment.id,
+          userName: assignment.user?.fullName || assignment.userName || 'Unknown User',
+          userAvatar: assignment.user?.avatarUrl || assignment.userAvatar,
+          userId: assignment.user?.id || assignment.userId,
+          taskId: assignment.task?.id || assignment.taskId,
+          taskTitle: isDeletedTask ? `🗑️ ${taskTitle} (Deleted)` : taskTitle,
+          taskPoints: assignment.task?.points || assignment.taskPoints || 0,
+          submittedAt: assignment.submittedAt ? new Date(assignment.submittedAt) : 
+                      (assignment.completedAt ? new Date(assignment.completedAt) : null),
+          dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
+          completed: assignment.completed || false,
+          verified: assignment.verified,
+          photoUrl: assignment.photoUrl,
+          notes: assignment.notes,
+          adminNotes: assignment.adminNotes,
+          timeSlot: assignment.timeSlot,
+          isTaskDeleted: isDeletedTask,
+          isPartial: assignment.isPartial || false,
+          slotsCompleted: assignment.slotsCompleted || 0,
+          totalSlots: assignment.totalSlots || 1
+        };
       });
       
-      if (result.success) {
-        let assignments = result.assignments || result.data?.assignments || [];
-        
-        if (filter === 'pending') {
-          assignments = assignments.filter((a: any) => 
-            a.completed === true && a.verified === null
-          );
-        }
-        
-        const processed = assignments.map((assignment: any) => {
-          const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
-          const taskTitle = assignment.task?.title || assignment.taskTitle || 'Unknown Task';
-          const isDeletedTask = assignment.isHistorical === true || (isTaskDeleted && assignment.taskTitle);
-          
-          return {
-            ...assignment,
-            id: assignment.id,
-            userName: assignment.user?.fullName || assignment.user?.name || 'Unknown User',
-            userAvatar: assignment.user?.avatarUrl,
-            userId: assignment.user?.id,
-            taskId: assignment.task?.id || assignment.taskId,
-            taskTitle: isDeletedTask ? `🗑️ ${taskTitle} (Deleted)` : taskTitle,
-            taskPoints: assignment.task?.points || assignment.points || 0,
-            submittedAt: assignment.completedAt ? new Date(assignment.completedAt) : null,
-            dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
-            completed: assignment.completed || false,
-            verified: assignment.verified,
-            photoUrl: assignment.photoUrl,
-            notes: assignment.notes,
-            adminNotes: assignment.adminNotes,
-            timeSlot: assignment.timeSlot,
-            isTaskDeleted: isDeletedTask
-          };
-        });
-        
-        // ✅ FIXED: Update total count from API
-        const total = result.total || result.data?.total || 0;
-        setTotalCount(total);
-        
-        // ✅ FIXED: Calculate hasMore based on actual total
-        const newHasMore = (offset + processed.length) < total;
-        setHasMore(newHasMore);
-        
-        if (reset) {
-          setSubmissions(processed);
-        } else {
-          setSubmissions(prev => [...prev, ...processed]);
-        }
-        
-        console.log(`✅ Loaded ${processed.length} items. Total: ${total}, HasMore: ${newHasMore}`);
+      const total = result.data?.total || result.total || 0;
+      setTotalCount(total);
+      
+      const newHasMore = (offset + processed.length) < total;
+      setHasMore(newHasMore);
+      
+      if (reset) {
+        setSubmissions(processed);
       } else {
-        setError(result.message || 'Failed to load submissions');
+        setSubmissions(prev => [...prev, ...processed]);
       }
-    } catch (err: any) {
-      console.error('Error fetching submissions:', err);
-      setError(err.message || 'Network error');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setIsLoadingMore(false);
-      isLoadingRef.current = false;
+      
+      console.log(`✅ Loaded ${processed.length} items. Total: ${total}, HasMore: ${newHasMore}`);
+    } else {
+      setError(result.message || 'Failed to load submissions');
     }
-  };
+  } catch (err: any) {
+    console.error('Error fetching submissions:', err);
+    setError(err.message || 'Network error');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+    setIsLoadingMore(false);
+    isLoadingRef.current = false;
+  }
+};
+
 
   // ✅ FIXED: Load more function
   const handleLoadMore = useCallback(() => {

@@ -376,7 +376,7 @@ static async completeAssignment(
       const response = await fetch(`${API_URL}/${assignmentId}/verify`, {
         method: 'POST',
         headers,
-        body: JSON.stringify(data),
+        body: JSON.stringify(data), 
       });
 
       const result = await response.json();
@@ -1051,4 +1051,43 @@ static validateLocalSubmissionTime(
     }
     return `[NEGLECTED] Missed submission on ${new Date(assignment.dueDate).toLocaleDateString()}`;
   }
+
+  // In AssignmentService.ts (frontend) - ADD THIS METHOD
+
+static async getPendingVerifications(groupId: string, options?: { limit?: number; offset?: number }) {
+  try {
+    const { limit = 20, offset = 0 } = options || {};
+    const url = `${API_URL}/group/${groupId}/pending-verifications?limit=${limit}&offset=${offset}`;
+    
+    console.log('📥 [getPendingVerifications] Fetching from:', url);
+    
+    const headers = await TokenUtils.getAuthHeaders(false);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const result = await response.json();
+    console.log('✅ [getPendingVerifications] Response:', {
+      success: result.success,
+      total: result.data?.total,
+      assignmentsCount: result.data?.assignments?.length
+    });
+    
+    return result;
+    
+  } catch (error: any) {
+    console.error('❌ [getPendingVerifications] Error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to load pending verifications',
+      data: { assignments: [], total: 0, hasMore: false }
+    };
+  }
+}
 }

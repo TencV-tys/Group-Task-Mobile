@@ -224,16 +224,18 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     }
   }, [verificationStatus, assignment, isTaskDeleted]);
 
-  const getStatusText = useCallback(() => {
-    if (isTaskDeleted) return 'Task Deleted';
-    if (!assignment?.completed) return 'Not Completed';
-    
-    switch (verificationStatus) {
-      case 'verified': return 'Verified';
-      case 'rejected': return 'Rejected';
-      default: return 'Pending Verification';
-    }
-  }, [assignment, verificationStatus, isTaskDeleted]);
+ const getStatusText = useCallback(() => {
+  if (isTaskDeleted) return 'Task Deleted';
+  
+  // ✅ Check this specific assignment's status
+  if (assignment?.verified === true) return 'Verified';
+  if (assignment?.verified === false) return 'Rejected';
+  if (assignment?.completed === true && assignment?.verified === null) return 'Pending Verification';
+  if (assignment?.completed === true) return 'Completed';
+  
+  return 'Not Completed';
+}, [assignment, isTaskDeleted]);
+
 
   const getTimeDifference = useCallback((dueDate: string, completedAt: string) => {
     const due = new Date(dueDate);
@@ -577,7 +579,7 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
         { text: 'Cancel', style: 'cancel' },
         { text: 'Submit Anyway', onPress: navigateToComplete }
       ]
-    );
+    ); 
   } else {
     navigateToComplete();
   }

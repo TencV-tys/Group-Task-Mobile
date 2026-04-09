@@ -453,17 +453,18 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     );
   };
 
-  // ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) =====
- // In AssignmentDetailsScreen.tsx - UPDATE renderVerificationControls
+// In AssignmentDetailsScreen.tsx - UPDATE renderVerificationControls
 
 // ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) =====
 const renderVerificationControls = () => {
-  if (!isAdmin) return null; 
+  if (!isAdmin) return null;
   
-  // ✅ FIXED: Show verification controls if:
-  // 1. Assignment has a submission (photoUrl not null)
-  // 2. Not yet verified (verified === null)
-  // 3. Either completed OR partially completed (has photo)
+  // ✅ If already verified, don't show controls
+  if (assignment?.verified === true) return null;
+  
+  // ✅ If fully completed, don't show controls
+  if (assignment?.completed === true) return null;
+  
   const hasSubmission = assignment?.photoUrl !== null && assignment?.photoUrl !== undefined;
   const notVerified = assignment?.verified === null;
   
@@ -547,6 +548,7 @@ const renderVerificationControls = () => {
     </View>
   );
 };
+
   
 
   // ===== RENDER ADMIN INFO BANNER =====

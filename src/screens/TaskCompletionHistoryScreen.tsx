@@ -411,7 +411,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
               {taskGroup.completions.length} completion{taskGroup.completions.length !== 1 ? 's' : ''}
             </Text>
           </LinearGradient>
-        </View>
+        </View> 
 
         {taskGroup.completions.map((completion: any, index: number) => (
           <TouchableOpacity

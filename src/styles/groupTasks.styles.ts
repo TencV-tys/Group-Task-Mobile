@@ -690,4 +690,9 @@ export const makeGroupTasksStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  dueDateText: {
+  fontSize: 11,
+  marginTop: 4,
+  marginLeft: 28,
+},
 });

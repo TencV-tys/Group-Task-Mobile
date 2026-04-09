@@ -1,4 +1,4 @@
-// src/screens/DetailedStatisticsScreen.tsx - UPDATED to show correct pending and neglected
+// src/screens/DetailedStatisticsScreen.tsx - COMPLETE FIXED VERSION
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -14,6 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TaskService } from '../services/TaskService';
+import { GroupActivityService } from '../services/GroupActivityService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext'; 
@@ -27,6 +28,8 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
 
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
+  const [activityData, setActivityData] = useState<any>(null);
+  const [leaderboardData, setLeaderboardData] = useState<any>(null);
   const [authError, setAuthError] = useState(false);
 
   const checkToken = useCallback(async (): Promise<boolean> => {
@@ -72,16 +75,29 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     setAuthError(false);
     
     try {
-      const result = await TaskService.getTaskStatistics(groupId);
-      console.log('statistics:', result);
-      if (result.success) {
-        setStats(result.statistics);
-      } else {
-        if (result.message?.toLowerCase().includes('token') || 
-            result.message?.toLowerCase().includes('auth')) {
-          setAuthError(true);
-        }
+      // Fetch all data sources
+      const [taskStatsResult, activityResult, leaderboardResult] = await Promise.all([
+        TaskService.getTaskStatistics(groupId),
+        GroupActivityService.getGroupActivitySummary(groupId),
+        GroupActivityService.getLeaderboard(groupId)
+      ]);
+      
+      console.log('Task Stats:', taskStatsResult);
+      console.log('Activity Data:', activityResult);
+      console.log('Leaderboard:', leaderboardResult);
+      
+      if (taskStatsResult.success) {
+        setStats(taskStatsResult.statistics);
       }
+      
+      if (activityResult.success) {
+        setActivityData(activityResult.data);
+      }
+      
+      if (leaderboardResult.success) {
+        setLeaderboardData(leaderboardResult.data);
+      }
+      
     } catch (error) {
       console.error('Error loading statistics:', error);
     } finally {
@@ -106,14 +122,28 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     );
   }
 
-  const currentWeek = stats?.currentWeek || {};
+  // Get data from activityData (more accurate for current week)
+  const currentWeekActivity = activityData?.summary || {};
+  const assignments = currentWeekActivity.assignments || {};
+  const points = currentWeekActivity.points || {};
+  
+  // Get all-time points from leaderboard
+  const allTimePoints = leaderboardData?.totalPoints || 0;
+  
+  // Calculate completion rate based on VERIFIED POINTS (matching AdminDashboard)
+  const totalPointsPossible = points.total || 0;
+  const earnedPoints = points.earned || 0;
+  const completionRate = totalPointsPossible > 0 
+    ? Math.round((earnedPoints / totalPointsPossible) * 100) 
+    : 0;
+  
+  // Get user stats from taskStats
   const userStats = stats?.userStats || {};
   
-  // Calculate completion rate based on active tasks (excluding neglected)
-  const activeTotal = (currentWeek?.totalAssignments || 0) - (currentWeek?.neglectedAssignments || 0);
-  const completionRate = activeTotal > 0 
-    ? ((currentWeek?.completedAssignments || 0) / activeTotal) * 100 
-    : 0;
+  // Get member count from activityData
+  const memberCount = activityData?.summary?.totalMembers || 0;
+  const totalTasks = activityData?.summary?.totalTasks || 0;
+  const membersInRotation = activityData?.summary?.membersInRotation || 0;
 
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
@@ -145,10 +175,23 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             style={[styles.summaryCard, { borderColor: theme.border }]}
           >
             <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
-              <MaterialCommunityIcons name="format-list-checks" size={22} color="#4F46E5" />
+              <MaterialCommunityIcons name="account-group" size={22} color="#4F46E5" />
             </View>
-            <Text style={[styles.summaryNumber, { color: theme.text }]}>{stats?.totalTasks || 0}</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Total Tasks</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{memberCount}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Members</Text>
+          </LinearGradient>
+
+          <LinearGradient
+            colors={[theme.card, theme.bgSecondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.summaryCard, { borderColor: theme.border }]}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="format-list-checks" size={22} color={theme.primary} />
+            </View>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{totalTasks}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Tasks</Text>
           </LinearGradient>
 
           <LinearGradient
@@ -160,21 +203,8 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             <View style={[styles.iconContainer, { backgroundColor: theme.primaryLight }]}>
               <MaterialCommunityIcons name="check-circle" size={22} color={theme.primary} />
             </View>
-            <Text style={[styles.summaryNumber, { color: theme.text }]}>{currentWeek?.completedAssignments || 0}</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Completed</Text>
-          </LinearGradient>
-
-          <LinearGradient
-            colors={[theme.card, theme.bgSecondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.summaryCard, { borderColor: theme.border }]}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: theme.primaryLight }]}>
-              <MaterialCommunityIcons name="clock-outline" size={22} color={theme.primary} />
-            </View>
-            <Text style={[styles.summaryNumber, { color: theme.text }]}>{currentWeek?.pendingAssignments || 0}</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Pending</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{assignments.verified || 0}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Verified</Text>
           </LinearGradient>
 
           <LinearGradient
@@ -186,12 +216,12 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             <View style={[styles.iconContainer, { backgroundColor: theme.errorBg }]}>
               <MaterialCommunityIcons name="alert-circle" size={22} color={theme.error} />
             </View>
-            <Text style={[styles.summaryNumber, { color: theme.text }]}>{currentWeek?.neglectedAssignments || 0}</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{assignments.neglected || 0}</Text>
             <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Neglected</Text>
           </LinearGradient>
         </View>
 
-        {/* Points Overview */}
+        {/* Points Overview - Based on VERIFIED POINTS */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Points Overview</Text>
           <LinearGradient
@@ -201,25 +231,31 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             style={[styles.pointsCard, { borderColor: theme.border }]}
           >
             <View style={styles.pointsRow}>
-              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Total Points:</Text>
-              <Text style={[styles.pointsValue, { color: theme.text }]}>{currentWeek?.totalPoints || 0}</Text>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Total Points Possible:</Text>
+              <Text style={[styles.pointsValue, { color: theme.text }]}>{totalPointsPossible}</Text>
             </View>
             <View style={styles.pointsRow}>
-              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Points Earned:</Text>
-              <Text style={[styles.pointsValue, { color: theme.primary }]}>{currentWeek?.completedPoints || 0}</Text>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Verified Points Earned:</Text>
+              <Text style={[styles.pointsValue, { color: theme.primary }]}>{earnedPoints}</Text>
             </View>
             <View style={styles.pointsRow}>
-              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Pending Points:</Text>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>All-Time Verified Points:</Text>
+              <Text style={[styles.pointsValue, { color: theme.primary }]}>{allTimePoints}</Text>
+            </View>
+            <View style={styles.pointsRow}>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Pending Verification:</Text>
               <Text style={[styles.pointsValue, { color: theme.primary }]}>
-                {currentWeek?.pendingPoints || 0}
+                {assignments.pendingVerification || 0} tasks
               </Text>
             </View>
             <View style={styles.pointsRow}>
-              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Neglected Points:</Text>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Rejected:</Text>
               <Text style={[styles.pointsValue, { color: theme.error }]}>
-                {currentWeek?.neglectedPoints || 0}
+                {assignments.rejected || 0} tasks
               </Text>
             </View>
+            
+            {/* Completion Rate Bar - Based on Verified Points */}
             <View style={[styles.progressBar, { backgroundColor: theme.bgTertiary }]}>
               <LinearGradient
                 colors={[
@@ -232,8 +268,55 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
               />
             </View>
             <Text style={[styles.completionRate, { color: theme.textMuted }]}>
-              {completionRate.toFixed(0)}% Completion Rate (based on active tasks)
+              {completionRate}% Completion Rate ({earnedPoints}/{totalPointsPossible} points verified)
             </Text>
+          </LinearGradient>
+        </View>
+
+        {/* Weekly Assignment Stats */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Weekly Assignment Status</Text>
+          <LinearGradient
+            colors={[theme.card, theme.bgSecondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.distributionCard, { borderColor: theme.border }]}
+          >
+            <View style={styles.distributionRow}>
+              <View style={styles.distributionLabel}>
+                <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Total Assignments</Text>
+              </View>
+              <Text style={[styles.distributionNumber, { color: theme.text }]}>{assignments.total || 0}</Text>
+            </View>
+            <View style={styles.distributionRow}>
+              <View style={styles.distributionLabel}>
+                <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Verified</Text>
+              </View>
+              <Text style={[styles.distributionNumber, { color: theme.primary }]}>{assignments.verified || 0}</Text>
+            </View>
+            <View style={styles.distributionRow}>
+              <View style={styles.distributionLabel}>
+                <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Pending Verification</Text>
+              </View>
+              <Text style={[styles.distributionNumber, { color: theme.primary }]}>{assignments.pendingVerification || 0}</Text>
+            </View>
+            <View style={styles.distributionRow}>
+              <View style={styles.distributionLabel}>
+                <View style={[styles.dot, { backgroundColor: theme.error }]} />
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Rejected</Text>
+              </View>
+              <Text style={[styles.distributionNumber, { color: theme.error }]}>{assignments.rejected || 0}</Text>
+            </View>
+            <View style={styles.distributionRow}>
+              <View style={styles.distributionLabel}>
+                <View style={[styles.dot, { backgroundColor: theme.error }]} />
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Neglected/Missed</Text>
+              </View>
+              <Text style={[styles.distributionNumber, { color: theme.error }]}>{assignments.neglected || 0}</Text>
+            </View>
           </LinearGradient>
         </View>
 
@@ -266,6 +349,13 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
                 <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Recurring Tasks</Text>
               </View>
               <Text style={[styles.distributionNumber, { color: theme.text }]}>{stats?.recurringTasks || 0}</Text>
+            </View>
+            <View style={styles.distributionRow}>
+              <View style={styles.distributionLabel}>
+                <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Members in Rotation</Text>
+              </View>
+              <Text style={[styles.distributionNumber, { color: theme.text }]}>{membersInRotation}</Text>
             </View>
           </LinearGradient>
         </View>
@@ -305,8 +395,8 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
                 </View>
               )}
               <View style={styles.performanceRow}>
-                <Text style={[styles.performanceLabel, { color: theme.textSecondary }]}>Your Points:</Text>
-                <Text style={[styles.performanceNumber, { color: '#4F46E5' }]}>
+                <Text style={[styles.performanceLabel, { color: theme.textSecondary }]}>Your Points (Verified):</Text>
+                <Text style={[styles.performanceNumber, { color: theme.primary }]}>
                   {userStats.userPoints || 0}
                 </Text>
               </View>

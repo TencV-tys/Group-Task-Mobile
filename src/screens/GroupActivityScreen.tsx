@@ -1,4 +1,4 @@
-// src/screens/GroupActivityScreen.tsx - Dark Mode Added
+// src/screens/GroupActivityScreen.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   StatusBar,
@@ -27,14 +26,13 @@ export default function GroupActivityScreen({ navigation, route }: any) {
   const [activityData, setActivityData] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
+  const [leaderboardData, setLeaderboardData] = useState<any>(null);
 
-  // ✅ UPDATED: Use TokenUtils.checkToken()
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
-    
     setAuthError(!hasToken);
     return hasToken;
   }, []);
@@ -43,27 +41,17 @@ export default function GroupActivityScreen({ navigation, route }: any) {
     fetchActivityData();
   }, [groupId]);
 
-  // ✅ Auth error handler
   useEffect(() => {
     if (authError) {
       Alert.alert(
         'Session Expired',
         'Please log in again',
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              setAuthError(false);
-              navigation.navigate('Login');
-            }
-          }
-        ]
+        [{ text: 'OK', onPress: () => { setAuthError(false); navigation.navigate('Login'); } }]
       );
     }
   }, [authError, navigation]);
 
   const fetchActivityData = async (isRefreshing = false) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -71,25 +59,31 @@ export default function GroupActivityScreen({ navigation, route }: any) {
       return;
     }
 
-    if (isRefreshing) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    if (isRefreshing) setRefreshing(true);
+    else setLoading(true);
+    
     setError(null);
     setAuthError(false);
 
     try {
-      const result = await GroupActivityService.getGroupActivitySummary(groupId);
+      // ✅ Fetch both summary and leaderboard for all-time points
+      const [summaryResult, leaderboardResult] = await Promise.all([
+        GroupActivityService.getGroupActivitySummary(groupId),
+        GroupActivityService.getLeaderboard(groupId)
+      ]);
       
-      if (result.success) {
-        setActivityData(result.data);
+      if (summaryResult.success) {
+        setActivityData(summaryResult.data);
       } else {
-        setError(result.message || 'Failed to load activity data');
-        if (result.message?.toLowerCase().includes('token') || 
-            result.message?.toLowerCase().includes('auth')) {
+        setError(summaryResult.message || 'Failed to load activity data');
+        if (summaryResult.message?.toLowerCase().includes('token') || 
+            summaryResult.message?.toLowerCase().includes('auth')) {
           setAuthError(true);
         }
+      }
+      
+      if (leaderboardResult.success && leaderboardResult.data) {
+        setLeaderboardData(leaderboardResult.data);
       }
     } catch (err: any) {
       console.error('Error fetching activity data:', err);
@@ -121,9 +115,24 @@ export default function GroupActivityScreen({ navigation, route }: any) {
     navigation.navigate('FullLeaderboard', { groupId, groupName });
   };
 
+  // ✅ Summary Cards with ALL-TIME points from leaderboard
   const renderSummaryCards = () => {
     const summary = activityData?.summary;
     if (!summary) return null;
+
+    // ✅ Use leaderboard for all-time verified points (matches MemberContributionsScreen)
+    const allTimePoints = leaderboardData?.totalPoints || 0;
+    
+    // ✅ Total verified assignments from memberContributions (all weeks)
+    const memberContributions = activityData?.memberContributions || [];
+    const totalVerifiedAssignments = memberContributions.reduce((sum: number, m: any) => sum + (m.verifiedAssignments || 0), 0);
+    
+    // ✅ Completion rate based on points (matches AdminDashboardScreen)
+    const currentWeekTotalPoints = summary.points?.total || 0;
+    const currentWeekEarnedPoints = summary.points?.earned || 0;
+    const completionRate = currentWeekTotalPoints > 0 
+      ? Math.round((currentWeekEarnedPoints / currentWeekTotalPoints) * 100) 
+      : 0;
 
     const cards = [
       {
@@ -141,15 +150,15 @@ export default function GroupActivityScreen({ navigation, route }: any) {
         iconColor: theme.primary
       },
       {
-        title: 'Completion',
-        value: `${Math.round(summary.points?.completionRate || 0)}%`,
-        icon: 'percent',
+        title: 'Verified',
+        value: totalVerifiedAssignments,
+        icon: 'check-circle',
         gradient: [theme.primaryLight, theme.primaryLight] as [string, string],
         iconColor: theme.primary
       },
       {
         title: 'Points',
-        value: summary.points?.earned || 0,
+        value: allTimePoints,
         icon: 'star',
         gradient: [theme.primaryLight, theme.primaryLight] as [string, string],
         iconColor: theme.primary
@@ -157,29 +166,79 @@ export default function GroupActivityScreen({ navigation, route }: any) {
     ];
 
     return (
-      <View style={styles.cardsGrid}>
-        {cards.map((card, index) => (
-          <LinearGradient
-            key={index}
-            colors={card.gradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.statCard, { shadowColor: theme.shadow }]}
-          >
-            <View style={[styles.cardIcon, { backgroundColor: 'rgba(255,255,255,0.5)' }]}>
-              <MaterialCommunityIcons name={card.icon as any} size={24} color={card.iconColor} />
+      <>
+        <View style={styles.cardsGrid}>
+          {cards.map((card, index) => (
+            <LinearGradient
+              key={index}
+              colors={card.gradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.statCard, { shadowColor: theme.shadow }]}
+            >
+              <View style={[styles.cardIcon, { backgroundColor: 'rgba(255,255,255,0.5)' }]}>
+                <MaterialCommunityIcons name={card.icon as any} size={24} color={card.iconColor} />
+              </View>
+              <Text style={[styles.cardValue, { color: theme.text }]}>{card.value}</Text>
+              <Text style={[styles.cardTitle, { color: theme.textMuted }]}>{card.title}</Text>
+            </LinearGradient>
+          ))}
+        </View>
+        
+        {/* ✅ Completion Rate Card - matches MemberContributionsScreen style */}
+        <LinearGradient
+          colors={[theme.card, theme.bgSecondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.completionCard, { borderColor: theme.border, shadowColor: theme.shadow }]}
+        >
+          <Text style={[styles.completionTitle, { color: theme.text }]}>Overall Completion</Text>
+          
+          <View style={styles.completionRow}>
+            <View style={styles.completionStat}>
+              <Text style={[styles.completionStatValue, { color: theme.primary }]}>{completionRate}%</Text>
+              <Text style={[styles.completionStatLabel, { color: theme.textMuted }]}>Rate</Text>
             </View>
-            <Text style={[styles.cardValue, { color: theme.text }]}>{card.value}</Text>
-            <Text style={[styles.cardTitle, { color: theme.textMuted }]}>{card.title}</Text>
-          </LinearGradient>
-        ))}
-      </View>
+            <View style={[styles.completionDivider, { backgroundColor: theme.border }]} />
+            <View style={styles.completionStat}>
+              <Text style={[styles.completionStatValue, { color: theme.text }]}>{currentWeekEarnedPoints}</Text>
+              <Text style={[styles.completionStatLabel, { color: theme.textMuted }]}>Earned</Text>
+            </View>
+            <View style={[styles.completionDivider, { backgroundColor: theme.border }]} />
+            <View style={styles.completionStat}>
+              <Text style={[styles.completionStatValue, { color: theme.text }]}>{currentWeekTotalPoints}</Text>
+              <Text style={[styles.completionStatLabel, { color: theme.textMuted }]}>Total</Text>
+            </View>
+          </View>
+          
+          <View style={styles.completionBarContainer}>
+            <View style={[styles.completionBar, { backgroundColor: theme.bgTertiary }]}>
+              <LinearGradient
+                colors={[theme.primary, theme.primaryDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.completionBarFill, { width: `${completionRate}%` }]}
+              />
+            </View>
+          </View>
+          
+          <Text style={[styles.completionSubtext, { color: theme.textMuted }]}>
+            Based on verified points this week
+          </Text>
+        </LinearGradient>
+      </>
     );
   };
 
+  // ✅ Current Week Progress - matches AdminDashboardScreen
   const renderAssignmentStats = () => {
-    const assignments = activityData?.summary?.assignments;
-    if (!assignments) return null;
+    const summary = activityData?.summary;
+    if (!summary) return null;
+    
+    const assignments = summary.assignments;
+    const points = summary.points;
+    
+    const pointsProgress = points?.total > 0 ? (points.earned / points.total) * 100 : 0;
 
     return (
       <LinearGradient
@@ -196,55 +255,32 @@ export default function GroupActivityScreen({ navigation, route }: any) {
               colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[
-                styles.progressFill, 
-                { width: `${(assignments.completed / assignments.total) * 100}%` }
-              ]} 
+              style={[styles.progressFill, { width: `${pointsProgress}%` }]} 
             />
           </View>
           <Text style={[styles.progressText, { color: theme.textMuted }]}>
-            {assignments.completed}/{assignments.total} completed
+            {points?.earned || 0}/{points?.total || 0} points earned ({Math.round(pointsProgress)}%)
           </Text>
         </View>
 
         <View style={styles.statsRow}>
-          <LinearGradient
-            colors={[theme.primaryLight, theme.primaryLight]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.statBox}
-          >
-            <Text style={[styles.statBoxValue, { color: theme.primary }]}>{assignments.verified}</Text>
+          <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.statBox}>
+            <Text style={[styles.statBoxValue, { color: theme.primary }]}>{assignments?.verified || 0}</Text>
             <Text style={[styles.statBoxLabel, { color: theme.textMuted }]}>Verified</Text>
           </LinearGradient>
           
-          <LinearGradient
-            colors={[theme.primaryLight, theme.primaryLight]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.statBox}
-          >
-            <Text style={[styles.statBoxValue, { color: theme.primary }]}>{assignments.pendingVerification}</Text>
+          <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.statBox}>
+            <Text style={[styles.statBoxValue, { color: theme.primary }]}>{assignments?.pendingVerification || 0}</Text>
             <Text style={[styles.statBoxLabel, { color: theme.textMuted }]}>Pending</Text>
           </LinearGradient>
           
-          <LinearGradient
-            colors={[theme.errorBg, theme.errorBg]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.statBox}
-          >
-            <Text style={[styles.statBoxValue, { color: theme.error }]}>{assignments.rejected}</Text>
+          <LinearGradient colors={[theme.errorBg, theme.errorBg]} style={styles.statBox}>
+            <Text style={[styles.statBoxValue, { color: theme.error }]}>{assignments?.rejected || 0}</Text>
             <Text style={[styles.statBoxLabel, { color: theme.textMuted }]}>Rejected</Text>
           </LinearGradient>
           
-          <LinearGradient
-            colors={[theme.errorBg, theme.errorBg]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.statBox}
-          >
-            <Text style={[styles.statBoxValue, { color: theme.error }]}>{assignments.neglected}</Text>
+          <LinearGradient colors={[theme.errorBg, theme.errorBg]} style={styles.statBox}>
+            <Text style={[styles.statBoxValue, { color: theme.error }]}>{assignments?.neglected || 0}</Text>
             <Text style={[styles.statBoxLabel, { color: theme.textMuted }]}>Neglected</Text>
           </LinearGradient>
         </View>
@@ -252,16 +288,10 @@ export default function GroupActivityScreen({ navigation, route }: any) {
     );
   };
 
+  // ✅ Member Contributions - shows correct earned points from all weeks
   const renderMemberContributions = () => {
     const members = activityData?.memberContributions || [];
     if (members.length === 0) return null;
-
-    const getMemberGradient = (index: number): [string, string] => {
-      if (index === 0) return [theme.primaryLight, theme.primaryLight];
-      if (index === 1) return [theme.bgSecondary, theme.bgTertiary];
-      if (index === 2) return [theme.bgSecondary, theme.bgTertiary];
-      return [theme.card, theme.bgSecondary];
-    };
 
     return (
       <LinearGradient
@@ -271,19 +301,18 @@ export default function GroupActivityScreen({ navigation, route }: any) {
         style={[styles.section, { shadowColor: theme.shadow }]}
       >
         <View style={styles.sectionHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Top Contributors</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Member Contributions</Text>
           <TouchableOpacity onPress={handleViewFullLeaderboard}>
             <Text style={[styles.viewAllText, { color: theme.primary }]}>View All</Text>
           </TouchableOpacity>
         </View>
 
         {members.slice(0, 5).map((member: any, index: number) => {
-          const getRankStyle = () => {
-            if (index === 0) return styles.firstPlace;
-            if (index === 1) return styles.secondPlace;
-            if (index === 2) return styles.thirdPlace;
-            return null;
-          };
+          // ✅ Use earnedPoints from memberContributions (0 for current week)
+          // This matches what MemberContributionsScreen shows for current week
+          const earnedPoints = member.earnedPoints || 0;
+          const verifiedCount = member.verifiedAssignments || 0;
+          const totalCount = member.totalAssignments || 0;
 
           return (
             <TouchableOpacity
@@ -292,32 +321,18 @@ export default function GroupActivityScreen({ navigation, route }: any) {
               activeOpacity={0.7}
             >
               <LinearGradient
-                colors={getMemberGradient(index)}
+                colors={index === 0 ? [theme.primaryLight, theme.primaryLight] : [theme.card, theme.bgSecondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={[
-                  styles.memberCard,
-                  getRankStyle(),
-                  { borderColor: theme.border }
-                ].filter(Boolean)}
+                style={[styles.memberCard, { borderColor: theme.border }]}
               >
                 <View style={styles.memberRank}>
-                  {index === 0 ? (
-                    <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
-                  ) : index === 1 ? (
-                    <MaterialCommunityIcons name="trophy" size={18} color="#C0C0C0" />
-                  ) : index === 2 ? (
-                    <MaterialCommunityIcons name="trophy" size={16} color="#CD7F32" />
-                  ) : (
-                    <Text style={[styles.rankNumber, { color: theme.textMuted }]}>{index + 1}</Text>
-                  )}
+                  <Text style={[styles.rankNumber, { color: theme.textMuted }]}>{index + 1}</Text>
                 </View>
 
                 <View style={styles.memberInfo}>
                   <LinearGradient
                     colors={[theme.bgSecondary, theme.bgTertiary]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
                     style={styles.memberAvatar}
                   >
                     <Text style={[styles.memberInitial, { color: theme.textSecondary }]}>
@@ -327,21 +342,16 @@ export default function GroupActivityScreen({ navigation, route }: any) {
                   <View style={styles.memberDetails}>
                     <Text style={[styles.memberName, { color: theme.text }]}>{member.fullName}</Text>
                     <Text style={[styles.memberStats, { color: theme.textMuted }]}>
-                      {member.completedAssignments || 0}/{member.totalAssignments || 0} • {member.earnedPoints || 0} pts
+                      ✅ {verifiedCount}/{totalCount} verified • ⭐ {earnedPoints} pts this week
                     </Text>
                   </View>
                 </View>
 
                 <LinearGradient
                   colors={[theme.primaryLight, theme.primaryLight]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
                   style={styles.memberBadge}
                 >
-                  <Text style={[styles.memberPercentage, { color: theme.primary }]}>
-                    {member.totalAssignments ? 
-                      Math.round((member.completedAssignments / member.totalAssignments) * 100) : 0}%
-                  </Text>
+                  <Text style={[styles.memberPercentage, { color: theme.primary }]}>{earnedPoints} pts</Text>
                 </LinearGradient>
               </LinearGradient>
             </TouchableOpacity>
@@ -390,16 +400,8 @@ export default function GroupActivityScreen({ navigation, route }: any) {
           <MaterialCommunityIcons name="lock-alert" size={64} color={theme.error} />
           <Text style={[styles.errorText, { color: theme.error }]}>Authentication Error</Text>
           <Text style={[styles.errorSubtext, { color: theme.textMuted }]}>Please log in again</Text>
-          <TouchableOpacity 
-            style={styles.retryButton}
-            onPress={() => navigation.navigate('Login')}
-          >
-            <LinearGradient
-              colors={[theme.error, theme.error]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.retryButtonGradient}
-            >
+          <TouchableOpacity style={styles.retryButton} onPress={() => navigation.navigate('Login')}>
+            <LinearGradient colors={[theme.error, theme.error]} style={styles.retryButtonGradient}>
               <Text style={styles.retryButtonText}>Go to Login</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -424,13 +426,8 @@ export default function GroupActivityScreen({ navigation, route }: any) {
             <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
             <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={() => fetchActivityData()}>
-              <LinearGradient
-                colors={[theme.bgSecondary, theme.bgTertiary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.retryButtonGradient}
-              >
-                <Text style={[styles.retryButtonText, { color: theme.textSecondary }]}>Retry</Text>
+              <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.retryButtonGradient}>
+                <Text style={[styles.retryButtonText, { color: '#fff' }]}>Retry</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -447,9 +444,7 @@ export default function GroupActivityScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -458,218 +453,62 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  historyButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  errorContainer: {
-    alignItems: 'center',
-    padding: 20,
-    marginTop: 40,
-  },
-  errorText: {
-    textAlign: 'center',
-    marginVertical: 12,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  errorSubtext: {
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  retryButtonGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  retryButtonText: {
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  cardsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  statCard: {
-    width: '48%',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  cardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  cardValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  cardTitle: {
-    fontSize: 14,
-  },
-  section: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  viewAllText: {
-    fontWeight: '500',
-  },
-  progressContainer: {
-    marginBottom: 16,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 14,
-    textAlign: 'right',
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 8,
-  },
-  statBox: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  statBoxValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statBoxLabel: {
-    fontSize: 11,
-  },
-  memberCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-  },
-  firstPlace: {
-    borderWidth: 2,
-  },
-  secondPlace: {
-    borderWidth: 2,
-  },
-  thirdPlace: {
-    borderWidth: 2,
-  },
-  memberRank: {
-    width: 30,
-    alignItems: 'center',
-  },
-  rankNumber: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  memberInfo: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  memberInitial: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  memberDetails: {
-    flex: 1,
-  },
-  memberName: {
-    fontSize: 15,
-    fontWeight: '500',
-    marginBottom: 4,
-  },
-  memberStats: {
-    fontSize: 12,
-  },
-  memberBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  memberPercentage: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
+  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  titleContainer: { flex: 1, alignItems: 'center' },
+  title: { fontSize: 18, fontWeight: '600' },
+  historyButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12 },
+  content: { flex: 1, padding: 16 },
+  errorContainer: { alignItems: 'center', padding: 20, marginTop: 40 },
+  errorText: { textAlign: 'center', marginVertical: 12, fontSize: 16, fontWeight: '600' },
+  errorSubtext: { textAlign: 'center', marginBottom: 20 },
+  retryButton: { borderRadius: 8, overflow: 'hidden', marginTop: 8 },
+  retryButtonGradient: { paddingHorizontal: 24, paddingVertical: 12 },
+  retryButtonText: { fontWeight: '600', fontSize: 16 },
+  
+  cardsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 16 },
+  statCard: { width: '48%', borderRadius: 12, padding: 16, marginBottom: 12, alignItems: 'center', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  cardIcon: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  cardValue: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
+  cardTitle: { fontSize: 14 },
+  
+  completionCard: { borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  completionTitle: { fontSize: 16, fontWeight: '600', textAlign: 'center', marginBottom: 16 },
+  completionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 16 },
+  completionStat: { alignItems: 'center', flex: 1 },
+  completionStatValue: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
+  completionStatLabel: { fontSize: 11 },
+  completionDivider: { width: 1, height: 30 },
+  completionBarContainer: { width: '100%', marginBottom: 8 },
+  completionBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
+  completionBarFill: { height: '100%', borderRadius: 4 },
+  completionSubtext: { fontSize: 11, textAlign: 'center' },
+  
+  section: { borderRadius: 12, padding: 16, marginBottom: 16, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  sectionTitle: { fontSize: 16, fontWeight: '600' },
+  viewAllText: { fontWeight: '500' },
+  
+  progressContainer: { marginBottom: 16 },
+  progressBar: { height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 8 },
+  progressFill: { height: '100%', borderRadius: 4 },
+  progressText: { fontSize: 14, textAlign: 'right' },
+  
+  statsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 8 },
+  statBox: { flex: 1, padding: 12, borderRadius: 8, alignItems: 'center' },
+  statBoxValue: { fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
+  statBoxLabel: { fontSize: 11 },
+  
+  memberCard: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 12, marginBottom: 8, borderWidth: 1 },
+  memberRank: { width: 30, alignItems: 'center' },
+  rankNumber: { fontSize: 14, fontWeight: '600' },
+  memberInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 8 },
+  memberAvatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  memberInitial: { fontSize: 16, fontWeight: 'bold' },
+  memberDetails: { flex: 1 },
+  memberName: { fontSize: 15, fontWeight: '500', marginBottom: 4 },
+  memberStats: { fontSize: 12 },
+  memberBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  memberPercentage: { fontSize: 12, fontWeight: '600' },
 });

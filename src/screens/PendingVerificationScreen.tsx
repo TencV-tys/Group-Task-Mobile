@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  StatusBar,
+  StatusBar, 
   Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,7 +20,7 @@ import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 20; 
 
 export default function PendingVerificationsScreen({ navigation, route }: any) {
   const { theme, isDark } = useTheme();
@@ -104,6 +104,8 @@ const fetchStats = async () => {
 
    // In PendingVerificationsScreen.tsx - UPDATE fetchSubmissions function
 
+   // In PendingVerificationsScreen.tsx - FIXED fetchSubmissions function
+
 const fetchSubmissions = async (page: number, reset = false) => {
   // Prevent duplicate requests
   if (isLoadingRef.current && !reset) return;
@@ -143,13 +145,28 @@ const fetchSubmissions = async (page: number, reset = false) => {
         limit: PAGE_SIZE,
         offset: offset 
       });
-    } else if (filter === 'verified') {
-      result = await AssignmentService.getGroupAssignments(groupId, {
-        status: 'verified',
-        limit: PAGE_SIZE,
-        offset: offset
+      console.log('📥 Pending result structure:', {
+        hasData: !!result.data,
+        assignmentsCount: result.data?.assignments?.length,
+        total: result.data?.total
       });
-    } else if (filter === 'rejected') {
+    } else if (filter === 'verified') {
+  result = await AssignmentService.getGroupAssignments(groupId, {
+    status: 'verified',
+    limit: PAGE_SIZE,
+    offset: offset
+  });
+  console.log('📥 Verified result:', {
+    success: result.success,
+    total: result.total,
+    assignmentsCount: result.assignments?.length,
+    firstAssignment: result.assignments?.[0] ? {
+      id: result.assignments[0].id,
+      verified: result.assignments[0].verified,
+      completed: result.assignments[0].completed
+    } : null
+  });
+} else if (filter === 'rejected') {
       result = await AssignmentService.getGroupAssignments(groupId, {
         status: 'rejected',
         limit: PAGE_SIZE,
@@ -157,15 +174,22 @@ const fetchSubmissions = async (page: number, reset = false) => {
       });
     }
     
-    console.log('📥 API Response:', {
-      success: result.success,
-      total: result.data?.total || result.total,
-      assignmentsCount: result.data?.assignments?.length || result.assignments?.length
-    });
-    
     if (result.success) {
-      // Handle both response formats
-      let assignments = result.data?.assignments || result.assignments || [];
+      // ✅ CORRECT response structure handling
+      let assignments = [];
+      let total = 0;
+      
+      if (filter === 'pending') {
+        // Pending endpoint returns data.assignments
+        assignments = result.data?.assignments || [];
+        total = result.data?.total || 0;
+      } else {
+        // Other endpoints return assignments directly
+        assignments = result.assignments || [];
+        total = result.total || 0;
+      }
+      
+      console.log(`📥 Got ${assignments.length} assignments, total: ${total}`);
       
       const processed = assignments.map((assignment: any) => {
         const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
@@ -197,9 +221,7 @@ const fetchSubmissions = async (page: number, reset = false) => {
         };
       });
       
-      const total = result.data?.total || result.total || 0;
       setTotalCount(total);
-      
       const newHasMore = (offset + processed.length) < total;
       setHasMore(newHasMore);
       
@@ -223,7 +245,6 @@ const fetchSubmissions = async (page: number, reset = false) => {
     isLoadingRef.current = false;
   }
 };
-
 
   // ✅ FIXED: Load more function
   const handleLoadMore = useCallback(() => {
@@ -513,30 +534,30 @@ const fetchSubmissions = async (page: number, reset = false) => {
     );
   };
 
-  // ✅ FIXED: Empty component
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <MaterialCommunityIcons 
-        name={
-          filter === 'pending' ? 'clock-check-outline' : 
-          filter === 'verified' ? 'check-circle-outline' : 
-          'close-circle-outline'
-        } 
-        size={64} 
-        color={theme.border} 
-      />
-      <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-        {filter === 'pending' ? 'No pending submissions' : 
-         filter === 'verified' ? 'No verified submissions' : 
-         'No rejected submissions'}
-      </Text>
-      <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
-        {filter === 'pending' 
-          ? 'When members submit assignments, they will appear here'
-          : 'No submissions in this category'}
-      </Text>
-    </View>
-  );
+ const renderEmpty = () => (
+  <View style={styles.emptyContainer}>
+    <MaterialCommunityIcons 
+      name={
+        filter === 'pending' ? 'clock-check-outline' : 
+        filter === 'verified' ? 'check-circle-outline' : 
+        'close-circle-outline'
+      } 
+      size={64} 
+      color={theme.border} 
+    />
+    <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+      {filter === 'pending' ? 'No pending submissions' : 
+       filter === 'verified' ? 'No verified submissions' : 
+       'No rejected submissions'}
+    </Text>
+    <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
+      {filter === 'pending' 
+        ? 'When members submit assignments, they will appear here'
+        : 'No submissions in this category'}
+    </Text>
+  </View>
+);
+
 
   const renderSubmissionItem = ({ item }: any) => {
     const isPending = filter === 'pending';

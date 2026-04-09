@@ -18,7 +18,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
-import { SettingsModal } from '../components/SettingsModal';
+import { SettingsModal } from '../components/SettingsModal'; 
 import { ScreenWrapper } from '../components/ScreenWrapper'; 
 import { useRotationStatus } from '../hooks/useRotationStatus';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests'; 
@@ -374,6 +374,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       return;
     }
 
+
     if (isRefreshing) setRefreshing(true);
     else if (!initialLoadDone.current) setLoading(true);
     setError(null);
@@ -434,6 +435,7 @@ myTasksResult.tasks?.forEach((task: any) => {
   }, [groupId, checkToken, analyzeTaskCreationDays, validateTaskTime, getTaskUrgency, findTodayAssignments, calculateNextActiveTime]);
 
   const refreshTasks = useCallback(() => fetchTasks(true), [fetchTasks]);
+
 
 // In GroupTasksScreen.tsx - REPLACE the handleViewTaskDetails function with this:
 
@@ -566,12 +568,17 @@ const handleViewTaskDetails = async (item: any) => {
     }
   }, [groupId, loadingUser, fetchTasks, fetchMembers, loadPendingForMe]);
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      if (groupId && !loadingUser) refreshTasks();
-    });
-    return unsubscribe;
-  }, [navigation, groupId, loadingUser, refreshTasks]);
+ // ===== NAVIGATION FOCUS EFFECT - Combined =====
+useEffect(() => {
+  const unsubscribe = navigation.addListener('focus', () => {
+    if (groupId && !loadingUser) {
+      console.log('🔄 Screen focused - refreshing tasks and swap counts');
+      refreshTasks();
+      loadPendingForMe(groupId, true);
+    }
+  });
+  return unsubscribe;
+}, [navigation, groupId, loadingUser, refreshTasks, loadPendingForMe]);
 
   useEffect(() => {
     if (swapEvents.swapResponded) {
@@ -1017,255 +1024,261 @@ const handleViewTaskDetails = async (item: any) => {
     );
   };
 
-  const renderTask = ({ item }: any) => {
-    const isMyTasksView = selectedTab === 'my';
-    const taskIsAssigned = isTaskAssigned(item);
-    
-    // ✅ Get swap info from the task level (preserved in groupedMyTasks)
-    const isAcquiredViaSwap = item.acquiredViaSwap === true;
-    const swappedFromName = item.swappedFromName || 'another member';
-    const swapRequestId = item.swapRequestId;
-    const swapScope = item.swapScope;
-    const swapDay = item.swapDay;
-    
-    const isAssignedToCurrentUser = 
-      item.isAssignedToUser === true || 
-      !!item.userAssignment || 
-      (item.assignments && item.assignments.some((a: any) => a.userId === currentUserId));
-    
-    const isClickable = isAdmin || isMyTasksView || isAssignedToCurrentUser;
-    
-    let isFullyCompleted = false;
-    let completionPercentage = 0;
-    let completedCount = 0;
-    let totalCount = 0;
-    let earnedPoints = 0;
-    let totalPoints = 0;
-    
-    if (isMyTasksView) {
-      if (item.assignmentsCount && item.assignmentsCount > 1) {
-        totalCount = item.assignmentsCount;
-        completedCount = item.completedCount || 0;
-        isFullyCompleted = completedCount === totalCount;
-        completionPercentage = (completedCount / totalCount) * 100;
-        earnedPoints = item.earnedPoints || 0;
-        totalPoints = item.totalPoints || 0;
-      } else {
-        isFullyCompleted = item.userAssignment?.completed || false;
-        completionPercentage = isFullyCompleted ? 100 : 0;
-        completedCount = isFullyCompleted ? 1 : 0;
-        totalCount = 1;
-        earnedPoints = isFullyCompleted ? (item.points || 0) : 0;
-        totalPoints = item.points || 0;
-      }
+ const renderTask = ({ item }: any) => {
+  const isMyTasksView = selectedTab === 'my';
+  const taskIsAssigned = isTaskAssigned(item);
+  
+  // Get swap info
+  const isAcquiredViaSwap = item.acquiredViaSwap === true;
+  const swappedFromName = item.swappedFromName || 'another member';
+  const swapRequestId = item.swapRequestId;
+  const swapScope = item.swapScope;
+  const swapDay = item.swapDay;
+  
+  const isAssignedToCurrentUser = 
+    item.isAssignedToUser === true || 
+    !!item.userAssignment || 
+    (item.assignments && item.assignments.some((a: any) => a.userId === currentUserId));
+  
+  const isClickable = isAdmin || isMyTasksView || isAssignedToCurrentUser;
+  
+  let isFullyCompleted = false;
+  let completionPercentage = 0;
+  let completedCount = 0;
+  let totalCount = 0;
+  let earnedPoints = 0;
+  let totalPoints = 0;
+  let displayText = '';
+  
+  // ✅ UNIFIED LOGIC - Same for both "My Tasks" and "All Tasks"
+  if (item.executionFrequency === 'DAILY') {
+    // For DAILY tasks: Show total slots for the week (7 days × number of weeks in rotation)
+    if (item.assignments && item.assignments.length > 0) {
+      // Calculate total slots and completed slots
+      totalCount = item.assignments.length;
+      const completedAssignments = item.assignments.filter((a: any) => a.completed === true);
+      completedCount = completedAssignments.length;
+      earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+      totalPoints = item.assignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+      isFullyCompleted = totalCount > 0 && completedCount === totalCount;
+      completionPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+      displayText = `${completedCount}/${totalCount} slots • ${earnedPoints}/${totalPoints} pts`;
+    } else if (item.assignmentsCount && item.assignmentsCount > 0) {
+      // Fallback to assignmentsCount if assignments array not available
+      totalCount = item.assignmentsCount;
+      completedCount = item.completedCount || 0;
+      earnedPoints = item.earnedPoints || 0;
+      totalPoints = item.totalPoints || 0;
+      isFullyCompleted = completedCount === totalCount;
+      completionPercentage = (completedCount / totalCount) * 100;
+      displayText = `${completedCount}/${totalCount} slots • ${earnedPoints}/${totalPoints} pts`;
     } else {
-      if (item.assignments && item.assignments.length > 0) {
-        const allAssignments = item.assignments;
-        
-        if (item.executionFrequency === 'DAILY') {
-          const currentAssigneeId = item.currentAssignee;
-          const assigneeAssignments = currentAssigneeId 
-            ? allAssignments.filter((a: any) => a.userId === currentAssigneeId)
-            : allAssignments;
-          
-          totalCount = assigneeAssignments.length;
-          const completedAssignments = assigneeAssignments.filter((a: any) => a.completed === true);
-          completedCount = completedAssignments.length;
-          earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-          totalPoints = assigneeAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-        } else {
-          totalCount = allAssignments.length;
-          const completedAssignments = allAssignments.filter((a: any) => a.completed === true);
-          completedCount = completedAssignments.length;
-          earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-          totalPoints = allAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-        }
-        
-        isFullyCompleted = totalCount > 0 && completedCount === totalCount;
-        completionPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-      }
+      // No assignments yet - show placeholder
+      totalCount = 0;
+      completedCount = 0;
+      earnedPoints = 0;
+      totalPoints = item.points * 7; // Assume 7 slots per week
+      displayText = `0/0 slots • ${item.points} pts`;
     }
-    
-    const validation = validateTaskTime(item);
-    
-    const getGradientColors = (): [string, string] => {
-      if (!isClickable) return [theme.bgSecondary, theme.bgTertiary];
-      if (isFullyCompleted) return [theme.bgSecondary, theme.bgTertiary];
-      if (isMyTasksView && validation.isSubmittableNow) {
-        return validation.willBePenalized ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight];
-      }
-      return [theme.card, theme.bgSecondary];
-    };
+  } else {
+    // For WEEKLY or other frequencies: Show total progress across all assignments
+    if (item.assignments && item.assignments.length > 0) {
+      totalCount = item.assignments.length;
+      const completedAssignments = item.assignments.filter((a: any) => a.completed === true);
+      completedCount = completedAssignments.length;
+      earnedPoints = completedAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+      totalPoints = item.assignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
+      isFullyCompleted = totalCount > 0 && completedCount === totalCount;
+      completionPercentage = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+      displayText = `${completedCount}/${totalCount} slots • ${earnedPoints}/${totalPoints} pts`;
+    } else if (item.assignmentsCount && item.assignmentsCount > 0) {
+      // Fallback to assignmentsCount
+      totalCount = item.assignmentsCount;
+      completedCount = item.completedCount || 0;
+      earnedPoints = item.earnedPoints || 0;
+      totalPoints = item.totalPoints || 0;
+      isFullyCompleted = completedCount === totalCount;
+      completionPercentage = (completedCount / totalCount) * 100;
+      displayText = `${completedCount}/${totalCount} slots • ${earnedPoints}/${totalPoints} pts`;
+    } else {
+      // No assignments yet
+      totalCount = 0;
+      completedCount = 0;
+      earnedPoints = 0;
+      totalPoints = item.points || 0;
+      displayText = `0/0 slots • ${item.points} pts`;
+    }
+  }
+  
+  const validation = validateTaskTime(item);
+  
+  const getGradientColors = (): [string, string] => {
+    if (!isClickable) return [theme.bgSecondary, theme.bgTertiary];
+    if (isFullyCompleted) return [theme.bgSecondary, theme.bgTertiary];
+    if (isMyTasksView && validation.isSubmittableNow) {
+      return validation.willBePenalized ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight];
+    }
+    return [theme.card, theme.bgSecondary];
+  };
 
-    return (
-      <TouchableOpacity
-        onPress={() => handleViewTaskDetails(item)}
-        onLongPress={() => {
-          if (!isAdmin || isMyTasksView) return;
+  return (
+    <TouchableOpacity
+      onPress={() => handleViewTaskDetails(item)}
+      onLongPress={() => {
+        if (!isAdmin || isMyTasksView) return;
 
-          if (!taskIsAssigned) {
-            Alert.alert('Task Options', `"${item.title}"`, [
-              { text: 'Edit', onPress: () => handleEditTask(item) },
-              { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item) },
-              { text: 'Cancel', style: 'cancel' }
-            ]);
-          } else {
-            Alert.alert('Task Options', `"${item.title}"`, [
-              { 
-                text: 'Edit ⚠️', 
-                onPress: () => Alert.alert(
-                  'Cannot Edit Assigned Task',
-                  'This task is already assigned. Editing could break the rotation system.\n\nConsider creating a new task instead.',
-                  [{ text: 'OK' }]
-                )
-              },
-              { 
-                text: 'Delete', 
-                style: 'destructive', 
-                onPress: () => handleDeleteTask(item) 
-              },
-              { text: 'Cancel', style: 'cancel' }
-            ]);
-          }
-        }}
-        activeOpacity={isClickable ? 0.7 : 1}
-      > 
-        <LinearGradient 
-          colors={getGradientColors()} 
-          style={[
-            styles.taskCard,
-            !isClickable && styles.disabledTaskCard,
-            // ✅ Orange left border for swapped tasks
-            isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && styles.swappedTaskCard
-          ]}
-        >
-          <View style={styles.taskHeader}>
-            <LinearGradient 
-              colors={isFullyCompleted ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]} 
-              style={styles.taskIcon}
-            >
-              <MaterialCommunityIcons 
-                name={isFullyCompleted ? "check" : "format-list-checks"} 
-                size={20} 
-                color={isFullyCompleted ? "#fff" : theme.textMuted} 
-              />
-            </LinearGradient>
-            <View style={styles.taskInfo}>
-              <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
-                {item.title}
-              </Text>
-              <View style={styles.taskMeta}>
-                <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pointsBadge}>
-                  <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
-                  <Text style={styles.taskPoints}>
-                    {isMyTasksView 
-                      ? (item.assignmentsCount > 1 
-                          ? `${earnedPoints}/${totalPoints} pts` 
-                          : `${item.points} pts`)
-                      : item.executionFrequency === 'DAILY'
-                        ? `${completedCount}/${totalCount} days completed`
-                        : `${earnedPoints}/${totalPoints} pts (${completedCount}/${totalCount} completed)`
-                    }
+        if (!taskIsAssigned) {
+          Alert.alert('Task Options', `"${item.title}"`, [
+            { text: 'Edit', onPress: () => handleEditTask(item) },
+            { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item) },
+            { text: 'Cancel', style: 'cancel' }
+          ]);
+        } else {
+          Alert.alert('Task Options', `"${item.title}"`, [
+            { 
+              text: 'Edit ⚠️', 
+              onPress: () => Alert.alert(
+                'Cannot Edit Assigned Task',
+                'This task is already assigned. Editing could break the rotation system.\n\nConsider creating a new task instead.',
+                [{ text: 'OK' }]
+              )
+            },
+            { 
+              text: 'Delete', 
+              style: 'destructive', 
+              onPress: () => handleDeleteTask(item) 
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]);
+        }
+      }}
+      activeOpacity={isClickable ? 0.7 : 1}
+    > 
+      <LinearGradient 
+        colors={getGradientColors()} 
+        style={[
+          styles.taskCard,
+          !isClickable && styles.disabledTaskCard,
+          isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && styles.swappedTaskCard
+        ]}
+      >
+        <View style={styles.taskHeader}>
+          <LinearGradient 
+            colors={isFullyCompleted ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]} 
+            style={styles.taskIcon}
+          >
+            <MaterialCommunityIcons 
+              name={isFullyCompleted ? "check" : "format-list-checks"} 
+              size={20} 
+              color={isFullyCompleted ? "#fff" : theme.textMuted} 
+            />
+          </LinearGradient>
+          <View style={styles.taskInfo}>
+            <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <View style={styles.taskMeta}>
+              <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pointsBadge}>
+                <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                <Text style={styles.taskPoints}>{displayText}</Text>
+              </LinearGradient>
+              
+              {/* SWAP INDICATOR BADGE */}
+              {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
+                <LinearGradient
+                  colors={['#F59E0B', '#F59E0B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.swapIndicatorBadge}
+                >
+                  <MaterialCommunityIcons name="swap-horizontal" size={10} color="#fff" />
+                  <Text style={styles.swapIndicatorText}>
+                    {swapScope === 'week' ? 'Week Swap' : `${swapDay || 'Day'} Swap`}
                   </Text>
                 </LinearGradient>
-                
-                {/* ✅ SWAP INDICATOR BADGE */}
-                {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
-                  <LinearGradient
-                    colors={['#F59E0B', '#F59E0B']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.swapIndicatorBadge}
-                  >
-                    <MaterialCommunityIcons name="swap-horizontal" size={10} color="#fff" />
-                    <Text style={styles.swapIndicatorText}>
-                      {swapScope === 'week' ? 'Week Swap' : `${swapDay || 'Day'} Swap`}
-                    </Text>
-                  </LinearGradient>
-                )}
-              </View>
+              )}
             </View>
           </View>
-          
-            {/* ✅ SWAP INFO TOOLTIP - Different messages for week vs day swap */}
-{isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
-  <LinearGradient
-    colors={[theme.primaryLight, theme.primaryLight]}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={[styles.swapInfoTooltip, { borderColor: theme.primaryBorder }]}
-  >
-    <MaterialCommunityIcons name="information" size={14} color={theme.primary} />
-    <Text style={[styles.swapInfoText, { color: theme.primary }]}>
-      {swapScope === 'week' 
-        ? `Full week swap with ${swappedFromName} - you exchanged all your tasks` 
-        : `Day swap from ${swappedFromName} for ${swapDay || 'this day'}`
-      }
-    </Text>
-    {swapRequestId && (
-      <TouchableOpacity 
-        onPress={(e) => {
-          e.stopPropagation();
-          navigation.navigate('SwapRequestDetails', { requestId: swapRequestId });
-        }}
-      >
-        <Text style={[styles.viewSwapLink, { color: theme.primary }]}>View →</Text>
-      </TouchableOpacity>
-    )}
-  </LinearGradient>
-)}
-          
-          {renderAssignmentInfo(item)}
-          
-          {((isMyTasksView && item.assignmentsCount && item.assignmentsCount > 1 && !isFullyCompleted) ||
-            (!isMyTasksView && totalCount > 1 && !isFullyCompleted)) && (
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
-              </View>
-              <Text style={styles.progressText}>
-                {isMyTasksView 
-                  ? `${completedCount}/${totalCount} slots completed • ${earnedPoints}/${totalPoints} pts`
-                  : `${completedCount}/${totalCount} assignments completed • ${earnedPoints}/${totalPoints} total points`
-                }
-              </Text>
-            </View>
-          )}
-          
-          {!isMyTasksView && totalCount === 1 && !isFullyCompleted && totalCount > 0 && (
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
-              </View>
-              <Text style={styles.progressText}>
-                {completedCount === 0 ? 'Not completed yet' : 'Completed'}
-              </Text>
-            </View>
-          )}
-          
-          {isMyTasksView && !isFullyCompleted && validation.isSubmittableNow && (
-            <TouchableOpacity onPress={() => handleCompleteNow(item)}>
-              <LinearGradient colors={validation.willBePenalized ? [theme.primary, theme.primaryDark] : [theme.primary, theme.primaryDark]} style={styles.completeNowButton}>
-                <View style={styles.completeNowContent}>
-                  <MaterialCommunityIcons name={validation.willBePenalized ? "timer-alert" : "check-circle"} size={20} color="white" />
-                  <Text style={styles.completeNowText}>
-                    {validation.willBePenalized ? 'Submit Late' : 'Complete Now'}
-                  </Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-          
-          <View style={styles.taskFooter}>
-            <Text style={styles.taskCreator}>
-              <MaterialCommunityIcons name="account" size={12} color={theme.textMuted} /> {item.creator?.fullName || 'Admin'}
+        </View>
+        
+        {/* SWAP INFO TOOLTIP */}
+        {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
+          <LinearGradient
+            colors={[theme.primaryLight, theme.primaryLight]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.swapInfoTooltip, { borderColor: theme.primaryBorder }]}
+          >
+            <MaterialCommunityIcons name="information" size={14} color={theme.primary} />
+            <Text style={[styles.swapInfoText, { color: theme.primary }]}>
+              {swapScope === 'week' 
+                ? `Full week swap with ${swappedFromName} - you exchanged all your tasks` 
+                : `Day swap from ${swappedFromName} for ${swapDay || 'this day'}`
+              }
             </Text>
-            <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+            {swapRequestId && (
+              <TouchableOpacity 
+                onPress={(e) => {
+                  e.stopPropagation();
+                  navigation.navigate('SwapRequestDetails', { requestId: swapRequestId });
+                }}
+              >
+                <Text style={[styles.viewSwapLink, { color: theme.primary }]}>View →</Text>
+              </TouchableOpacity>
+            )}
+          </LinearGradient>
+        )}
+        
+        {renderAssignmentInfo(item)}
+        
+        {/* PROGRESS BAR - Show for both tabs when there are multiple items */}
+        {totalCount > 1 && !isFullyCompleted && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+            </View>
+            <Text style={styles.progressText}>
+              {completedCount}/{totalCount} slots completed • {earnedPoints}/{totalPoints} pts
+            </Text>
           </View>
-        </LinearGradient>
-      </TouchableOpacity>
-    ); 
-  };
+        )}
+        
+        {/* SINGLE ASSIGNMENT PROGRESS */}
+        {totalCount === 1 && !isFullyCompleted && totalCount > 0 && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${completionPercentage}%` }]} />
+            </View>
+            <Text style={styles.progressText}>
+              {completedCount === 0 ? 'Not completed yet' : 'Completed'}
+            </Text>
+          </View>
+        )}
+        
+        {/* COMPLETE NOW BUTTON for My Tasks */}
+        {isMyTasksView && !isFullyCompleted && validation.isSubmittableNow && (
+          <TouchableOpacity onPress={() => handleCompleteNow(item)}>
+            <LinearGradient colors={validation.willBePenalized ? [theme.primary, theme.primaryDark] : [theme.primary, theme.primaryDark]} style={styles.completeNowButton}>
+              <View style={styles.completeNowContent}>
+                <MaterialCommunityIcons name={validation.willBePenalized ? "timer-alert" : "check-circle"} size={20} color="white" />
+                <Text style={styles.completeNowText}>
+                  {validation.willBePenalized ? 'Submit Late' : 'Complete Now'}
+                </Text>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+        
+        <View style={styles.taskFooter}>
+          <Text style={styles.taskCreator}>
+            <MaterialCommunityIcons name="account" size={12} color={theme.textMuted} /> {item.creator?.fullName || 'Admin'}
+          </Text>
+          <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  ); 
+};
 
   const renderContent = () => {
     let currentTasks = [];

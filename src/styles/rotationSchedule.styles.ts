@@ -1,4 +1,5 @@
-// src/styles/rotationSchedule.styles.ts - Dark Mode Version
+// src/styles/rotationSchedule.styles.ts - UPDATED with proper badge positioning
+
 import { StyleSheet, Dimensions } from 'react-native';
 import { Theme } from '../context/ThemeContext';
 
@@ -17,6 +18,19 @@ export const makeRotationScheduleStyles = (theme: Theme) => StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     minHeight: 60,
+  },
+  timeSlotBreakdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: theme.border,
+  },
+  timeSlotBreakdownText: {
+    fontSize: 11,
+    flex: 1,
   },
   backButton: {
     width: 36,
@@ -105,8 +119,11 @@ export const makeRotationScheduleStyles = (theme: Theme) => StyleSheet.create({
   },
   weeksContainer: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
     paddingVertical: 8,
+  },
+  weekTabWrapper: {
+    position: 'relative',
   },
   weekTab: {
     borderRadius: 12,
@@ -119,7 +136,6 @@ export const makeRotationScheduleStyles = (theme: Theme) => StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
   },
   weekTabSelected: {
     borderWidth: 2,
@@ -131,22 +147,26 @@ export const makeRotationScheduleStyles = (theme: Theme) => StyleSheet.create({
   weekTabTextSelected: {},
   currentIndicator: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-  },
-  taskIndicator: {
-    position: 'absolute',
-    top: -4,
+    bottom: -4,
     right: -4,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  },
+  // ✅ FIXED: Badge outside the button like notification count
+  taskCountBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: theme.error,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 4,
+    zIndex: 10,
   },
-  taskIndicatorText: {
+  taskCountText: {
     color: '#fff',
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: 'bold',
   },
   toggleContainer: {
@@ -480,12 +500,12 @@ export const makeRotationScheduleStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  taskCountBadge: {
+  taskCountBadgeHeader: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
   },
-  taskCount: {
+  taskCountHeader: {
     fontSize: 12,
     fontWeight: '600',
   },

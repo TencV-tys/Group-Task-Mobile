@@ -1,4 +1,4 @@
-// src/screens/RotationScheduleScreen.tsx - COMPLETE FIXED VERSION
+// src/screens/RotationScheduleScreen.tsx - COMPLETE UPDATED VERSION
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -124,27 +124,21 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     }
   }, [selectedWeekData]);
 
-  // Generate predictions with WEEKLY rotation (tasks rotate to next member each week)
+  // Generate predictions with WEEKLY rotation
   const generatePredictions = (memberList: any[], taskList: any[]) => {
     if (memberList.length === 0 || taskList.length === 0) return;
     
-    const memberCount = memberList.length;
     const taskCount = taskList.length;
-    
-    // Sort tasks by points (highest first) for fair distribution
     const sortedTasks = [...taskList].sort((a, b) => b.points - a.points);
     const sortedMembers = [...memberList].sort((a, b) => a.name.localeCompare(b.name));
     
     const preds = [];
     
-    // Generate predictions for the next 8 weeks (WEEKLY rotation - each week shifts by 1)
     for (let weekOffset = 0; weekOffset < 8; weekOffset++) {
       const weekNumber = currentWeek + weekOffset + 1;
       const assignments = [];
       
-      // Rotate tasks each week - each member gets a different task every week
       for (let i = 0; i < sortedMembers.length; i++) {
-        // Task index shifts by weekOffset each week (1 week rotation)
         const taskIndex = (i + weekOffset) % taskCount;
         
         assignments.push({
@@ -158,7 +152,6 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         });
       }
       
-      // Calculate fairness score for this week
       const pointsByMember: Record<string, number> = {};
       assignments.forEach(a => {
         pointsByMember[a.memberId] = (pointsByMember[a.memberId] || 0) + a.taskPoints;
@@ -186,7 +179,6 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     if (rank === 1) return theme.error;
     if (rank === total) return theme.primary;
     if (rank <= Math.ceil(total / 3)) return theme.primary;
-    if (rank >= total - Math.floor(total / 3)) return theme.primary;
     return theme.textSecondary;
   };
 
@@ -194,7 +186,6 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     if (rank === 1) return 'trophy';
     if (rank === total) return 'thumb-up';
     if (rank <= Math.ceil(total / 3)) return 'trending-up';
-    if (rank >= total - Math.floor(total / 3)) return 'trending-down';
     return 'swap-horizontal';
   };
 
@@ -395,50 +386,166 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     );
   };
 
+  // ✅ UPDATED: Week tab with badge OUTSIDE the button
   const renderWeekTab = (week: any) => {
     if (!week) return null;
     
     const isSelected = selectedWeek === week.weekNumber;
     const isCurrentWeek = currentWeek === week.weekNumber;
     const hasTasks = week.tasks && week.tasks.length > 0;
+    const taskCount = week.tasks?.length || 0;
 
     return (
+      <View key={week.weekNumber} style={styles.weekTabWrapper}>
+        <TouchableOpacity
+          style={[
+            styles.weekTab,
+            isSelected && styles.weekTabSelected,
+            { borderColor: theme.border }
+          ]}
+          onPress={() => setSelectedWeek(week.weekNumber)}
+        >
+          <LinearGradient
+            colors={isSelected ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.weekTabGradient}
+          >
+            <Text style={[
+              styles.weekTabText,
+              isSelected && styles.weekTabTextSelected,
+              { color: isSelected ? '#fff' : theme.textSecondary }
+            ]}>
+              W{week.weekNumber}
+            </Text>
+            {isCurrentWeek && (
+              <View style={styles.currentIndicator}>
+                <MaterialCommunityIcons name="circle-small" size={8} color={theme.primary} />
+              </View>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+        
+        {/* ✅ Badge OUTSIDE the button like notification count */}
+        {hasTasks && (
+          <LinearGradient
+            colors={[theme.error, theme.error]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.taskCountBadge}
+          >
+            <Text style={styles.taskCountText}>{taskCount}</Text>
+          </LinearGradient>
+        )}
+      </View>
+    );
+  };
+
+  // ✅ Render single task item
+  const renderTaskItem = (item: any, index: number) => {
+    const isCurrentWeekTask = currentWeek === item.week;
+    const totalTaskPoints = item.points || 0;
+    
+    const allTasksInWeek = getSelectedWeekTasks();
+    const allPoints = allTasksInWeek.map((t: any) => t.points || 0).sort((a: number, b: number) => b - a);
+    const rank = allPoints.indexOf(totalTaskPoints) + 1;
+    const rankColor = getTaskRankColor(rank, allPoints.length);
+    const rankIcon = getTaskRankIcon(rank, allPoints.length);
+    
+    const slotCount = item.timeSlots?.length || 0;
+    const hasMultipleSlots = slotCount > 1;
+    
+    return (
       <TouchableOpacity
-        key={week.weekNumber}
+        key={`${item.taskId}-${item.week}-${index}`}
         style={[
-          styles.weekTab,
-          isSelected && styles.weekTabSelected,
+          styles.taskCard,
+          isCurrentWeekTask && styles.currentWeekTask,
           { borderColor: theme.border }
         ]}
-        onPress={() => setSelectedWeek(week.weekNumber)}
+        onPress={() => navigation.navigate('TaskDetails', { 
+          taskId: item.taskId, 
+          groupId, 
+          userRole 
+        })}
+        activeOpacity={0.7}
       >
         <LinearGradient
-          colors={isSelected ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
+          colors={isCurrentWeekTask ? [theme.primaryLight, theme.primaryLight] : [theme.card, theme.bgSecondary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={styles.weekTabGradient}
+          style={styles.taskGradient}
         >
-          <Text style={[
-            styles.weekTabText,
-            isSelected && styles.weekTabTextSelected,
-            { color: isSelected ? '#fff' : theme.textSecondary }
-          ]}>
-            W{week.weekNumber}
-          </Text>
-          {isCurrentWeek && (
-            <View style={styles.currentIndicator}>
-              <MaterialCommunityIcons name="circle-small" size={8} color={theme.primary} />
+          <View style={styles.taskHeader}>
+            <View style={styles.taskTitleContainer}>
+              <LinearGradient
+                colors={[rankColor + '20', rankColor + '10']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.rankBadge, { borderColor: rankColor }]}
+              >
+                <MaterialCommunityIcons name={rankIcon} size={10} color={rankColor} />
+                <Text style={[styles.rankText, { color: rankColor }]}>
+                  #{rank}
+                </Text>
+              </LinearGradient>
+              <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
+                {item.taskTitle}
+              </Text>
             </View>
-          )}
-          {hasTasks && (
+            
             <LinearGradient
-              colors={[theme.error, theme.error]}
+              colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.taskIndicator}
+              style={styles.pointsBadge}
             >
-              <Text style={styles.taskIndicatorText}>{week.tasks.length}</Text>
+              <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+              <Text style={[styles.pointsText, { color: theme.primary }]}>{totalTaskPoints} pts</Text>
             </LinearGradient>
+          </View>
+          
+          {hasMultipleSlots && (
+            <View style={styles.timeSlotBreakdown}>
+              <MaterialCommunityIcons name="clock-outline" size={12} color={theme.textMuted} />
+              <Text style={[styles.timeSlotBreakdownText, { color: theme.textMuted }]}>
+                {slotCount} slot{slotCount > 1 ? 's' : ''}: 
+                {item.timeSlots.map((slot: any, idx: number) => (
+                  <Text key={idx}>
+                    {idx > 0 ? ', ' : ' '}
+                    {slot.points || 0} pts
+                  </Text>
+                ))}
+              </Text>
+            </View>
+          )}
+          
+          <View style={styles.taskDetails}>
+            <View style={styles.assigneeContainer}>
+              <MaterialCommunityIcons name="account" size={14} color={theme.textMuted} />
+              <Text style={[styles.assigneeText, { color: theme.textMuted }]} numberOfLines={1}>
+                {item.assigneeName || 'Unassigned'}
+              </Text>
+            </View>
+            
+            <View style={styles.timeContainer}>
+              {item.dayOfWeek && (
+                <>
+                  <MaterialCommunityIcons name="calendar" size={12} color={theme.textMuted} />
+                  <Text style={[styles.timeText, { color: theme.textMuted }]}>
+                    {item.dayOfWeek}
+                    {item.scheduledTime ? ` • ${item.scheduledTime}` : ''}
+                  </Text>
+                </>
+              )}
+            </View>
+          </View>
+          
+          {item.category && (
+            <View style={styles.categoryContainer}>
+              <MaterialCommunityIcons name="tag" size={10} color={theme.textMuted} />
+              <Text style={[styles.categoryText, { color: theme.textMuted }]}>{item.category}</Text>
+            </View>
           )}
         </LinearGradient>
       </TouchableOpacity>
@@ -522,7 +629,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Week Tabs */}
+        {/* Week Tabs with Badges Outside */}
         {weeks.length > 0 && (
           <ScrollView 
             horizontal 
@@ -706,101 +813,16 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
                   colors={[theme.bgSecondary, theme.bgTertiary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
-                  style={styles.taskCountBadge}
+                  style={styles.taskCountBadgeHeader}
                 >
-                  <Text style={[styles.taskCount, { color: theme.textSecondary }]}>
+                  <Text style={[styles.taskCountHeader, { color: theme.textSecondary }]}>
                     {getSelectedWeekTasks().length}
                   </Text>
                 </LinearGradient>
               </View>
 
               {getSelectedWeekTasks().length > 0 ? (
-                getSelectedWeekTasks().map((item: any, index: number) => {
-                  const isCurrentWeek = currentWeek === item.week;
-                  const taskPoints = item.points || 0;
-                  
-                  const allPoints = getSelectedWeekTasks().map((t: any) => t.points || 0).sort((a: number, b: number) => b - a);
-                  const rank = allPoints.indexOf(taskPoints) + 1;
-                  const rankColor = getTaskRankColor(rank, allPoints.length);
-                  
-                  return (
-                    <TouchableOpacity
-                      key={`${item.taskId}-${item.week}-${index}`}
-                      style={[
-                        styles.taskCard,
-                        isCurrentWeek && styles.currentWeekTask,
-                        { borderColor: theme.border }
-                      ]}
-                      onPress={() => navigation.navigate('TaskDetails', { 
-                        taskId: item.taskId, 
-                        groupId, 
-                        userRole 
-                      })}
-                      activeOpacity={0.7}
-                    >
-                      <LinearGradient
-                        colors={isCurrentWeek ? [theme.primaryLight, theme.primaryLight] : [theme.card, theme.bgSecondary]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.taskGradient}
-                      >
-                        <View style={styles.taskHeader}>
-                          <View style={styles.taskTitleContainer}>
-                            <LinearGradient
-                              colors={[rankColor + '20', rankColor + '10']}
-                              start={{ x: 0, y: 0 }}
-                              end={{ x: 1, y: 1 }}
-                              style={[styles.rankBadge, { borderColor: rankColor }]}
-                            >
-                              <Text style={[styles.rankText, { color: rankColor }]}>
-                                #{rank}
-                              </Text>
-                            </LinearGradient>
-                            <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
-                              {item.taskTitle}
-                            </Text>
-                          </View>
-                          <LinearGradient
-                            colors={[theme.primaryLight, theme.primaryLight]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.pointsBadge}
-                          >
-                            <Text style={[styles.pointsText, { color: theme.primary }]}>{taskPoints} pts</Text>
-                          </LinearGradient>
-                        </View>
-                        
-                        <View style={styles.taskDetails}>
-                          <View style={styles.assigneeContainer}>
-                            <MaterialCommunityIcons name="account" size={14} color={theme.textMuted} />
-                            <Text style={[styles.assigneeText, { color: theme.textMuted }]} numberOfLines={1}>
-                              {item.assigneeName || 'Unassigned'}
-                            </Text>
-                          </View>
-                          
-                          <View style={styles.timeContainer}>
-                            {item.dayOfWeek && (
-                              <>
-                                <MaterialCommunityIcons name="calendar" size={12} color={theme.textMuted} />
-                                <Text style={[styles.timeText, { color: theme.textMuted }]}>
-                                  {item.dayOfWeek}
-                                  {item.scheduledTime ? ` • ${item.scheduledTime}` : ''}
-                                </Text>
-                              </>
-                            )}
-                          </View>
-                        </View>
-                        
-                        {item.category && (
-                          <View style={styles.categoryContainer}>
-                            <MaterialCommunityIcons name="tag" size={10} color={theme.textMuted} />
-                            <Text style={[styles.categoryText, { color: theme.textMuted }]}>{item.category}</Text>
-                          </View>
-                        )}
-                      </LinearGradient>
-                    </TouchableOpacity>
-                  );
-                })
+                getSelectedWeekTasks().map((item: any, index: number) => renderTaskItem(item, index))
               ) : (
                 <View style={styles.emptyTasks}>
                   <MaterialCommunityIcons name="calendar-blank" size={48} color={theme.border} />

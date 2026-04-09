@@ -471,7 +471,9 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
- // useSwapRequests.ts - fix acceptSwapRequest
+ 
+  // useSwapRequests.ts - FIXED acceptSwapRequest and rejectSwapRequest
+
 const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () => void) => {
   const hasToken = await checkToken();
   if (!hasToken) return { success: false, message: 'Authentication required', authError: true };
@@ -487,7 +489,18 @@ const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () =
     if (response.success) {
       if (onSuccess) onSuccess();
 
-      // ✅ Delay refresh to avoid 429 - socket events will already trigger some reloads
+      // ✅ IMMEDIATELY update local state to remove the accepted request
+      setPendingForMe(prev => prev.filter(req => req.id !== requestId));
+      setTotalPendingForMe(prev => Math.max(0, prev - 1));
+      
+      // Also update myRequests if this was my outgoing request
+      setMyRequests(prev => prev.map(req => 
+        req.id === requestId 
+          ? { ...req, status: 'ACCEPTED' as any }
+          : req
+      ));
+
+      // ✅ Refresh from server after a short delay (but badge already updated)
       setTimeout(async () => {
         await Promise.all([
           loadMyRequests(undefined, true),
@@ -524,52 +537,69 @@ const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () =
     setLoading(false);
   }
 }, [loadMyRequests, loadPendingForMe, checkToken]);
-  // Reject swap request
-  const rejectSwapRequest = useCallback(async (requestId: string, reason?: string) => {
-    const hasToken = await checkToken();
-    if (!hasToken) {
-      return {
-        success: false,
-        message: 'Authentication required',
-        authError: true
-      };
-    }
 
-    setLoading(true);
-    setError(null);
-    setAuthError(false);
+const rejectSwapRequest = useCallback(async (requestId: string, reason?: string) => {
+  const hasToken = await checkToken();
+  if (!hasToken) {
+    return {
+      success: false,
+      message: 'Authentication required',
+      authError: true
+    };
+  }
 
-    try {
-      console.log('❌ Rejecting swap request:', requestId, 'reason:', reason);
-      const response = await SwapRequestService.rejectSwapRequest(requestId, reason);
+  setLoading(true);
+  setError(null);
+  setAuthError(false);
 
-      console.log('📦 Reject response:', response);
+  try {
+    console.log('❌ Rejecting swap request:', requestId, 'reason:', reason);
+    const response = await SwapRequestService.rejectSwapRequest(requestId, reason);
 
-      if (response.success) {
-        await loadMyRequests(undefined, true);
-        await loadPendingForMe(undefined, true);
-        Alert.alert('Success', response.message || 'Swap request rejected successfully.');
-      } else {
-        if (
-          response.message?.toLowerCase().includes('token') ||
-          response.message?.toLowerCase().includes('auth') ||
-          response.message?.toLowerCase().includes('unauthorized')
-        ) {
-          setAuthError(true);
-        }
-        Alert.alert('Error', response.message || 'Failed to reject swap request');
+    console.log('📦 Reject response:', response);
+
+    if (response.success) {
+      // ✅ IMMEDIATELY update local state to remove the rejected request
+      setPendingForMe(prev => prev.filter(req => req.id !== requestId));
+      setTotalPendingForMe(prev => Math.max(0, prev - 1));
+      
+      // Also update myRequests if this was my outgoing request
+      setMyRequests(prev => prev.map(req => 
+        req.id === requestId 
+          ? { ...req, status: 'REJECTED' as any }
+          : req
+      ));
+
+      // ✅ Refresh from server after a short delay
+      setTimeout(async () => {
+        await Promise.all([
+          loadMyRequests(undefined, true),
+          loadPendingForMe(undefined, true)
+        ]);
+      }, 1500);
+      
+      Alert.alert('Success', response.message || 'Swap request rejected successfully.');
+    } else {
+      if (
+        response.message?.toLowerCase().includes('token') ||
+        response.message?.toLowerCase().includes('auth') ||
+        response.message?.toLowerCase().includes('unauthorized')
+      ) {
+        setAuthError(true);
       }
-
-      return response;
-    } catch (err: any) {
-      console.error('❌ Error in rejectSwapRequest:', err);
-      setError(err.message || 'Failed to reject swap request');
-      Alert.alert('Error', err.message || 'Failed to reject swap request');
-      return { success: false, message: err.message };
-    } finally {
-      setLoading(false);
+      Alert.alert('Error', response.message || 'Failed to reject swap request');
     }
-  }, [loadMyRequests, loadPendingForMe, checkToken]);
+
+    return response;
+  } catch (err: any) {
+    console.error('❌ Error in rejectSwapRequest:', err);
+    setError(err.message || 'Failed to reject swap request');
+    Alert.alert('Error', err.message || 'Failed to reject swap request');
+    return { success: false, message: err.message };
+  } finally {
+    setLoading(false);
+  }
+}, [loadMyRequests, loadPendingForMe, checkToken]);
 
   // Cancel swap request
   const cancelSwapRequest = useCallback(async (requestId: string) => {

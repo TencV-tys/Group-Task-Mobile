@@ -511,63 +511,77 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
     }
   }, [assignmentId, checkTimeValidityWithServer, isAdminProp, currentUserId, getUTCDayNameFromDate]);
 
-  // Handle complete assignment - only for owner
+  
   const handleCompleteAssignment = useCallback((navigation: any, onComplete?: () => void) => {
-    if (!isOwner) {
-      Alert.alert(
-        'Cannot Submit',
-        'You can only submit your own assignments.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+  if (!isOwner) {
+    Alert.alert(
+      'Cannot Submit',
+      'You can only submit your own assignments.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  if (isTaskDeleted) {
+    Alert.alert(
+      'Cannot Submit',
+      'This assignment is for a deleted task. You cannot submit or modify it.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  if (!assignment || !isSubmittable) {
+    const statusInfo = getSubmissionStatusInfo();
+    Alert.alert(
+      'Cannot Submit',
+      statusInfo.description,
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  const navigateToComplete = () => {
+    // ✅ Pass all time slots to CompleteAssignment screen
+    const timeSlots = assignment.task?.timeSlots || [];
+    const hasMultipleSlots = timeSlots.length > 1;
     
-    if (isTaskDeleted) {
-      Alert.alert(
-        'Cannot Submit',
-        'This assignment is for a deleted task. You cannot submit or modify it.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+    console.log('🎯 [handleCompleteAssignment] Navigating to CompleteAssignment with:', {
+      assignmentId: assignment.id,
+      taskTitle: assignment.task?.title,
+      dueDate: assignment.dueDate,
+      timeSlot: assignment.timeSlot,
+      timeSlotsCount: timeSlots.length,
+      hasMultipleSlots
+    });
     
-    if (!assignment || !isSubmittable) {
-      const statusInfo = getSubmissionStatusInfo();
-      Alert.alert(
-        'Cannot Submit',
-        statusInfo.description,
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-    
-    const navigateToComplete = () => {
-      navigation.navigate('CompleteAssignment', {
-        assignmentId: assignment.id,
-        taskTitle: assignment.task?.title || 'Unknown Task',
-        dueDate: assignment.dueDate,
-        timeSlot: assignment.timeSlot,
-        onCompleted: () => {
-          fetchAssignmentDetails();
-          if (onVerified) onVerified?.();
-          if (onComplete) onComplete();
-        }
-      });
-    };
-    
-    if (isLate && penaltyInfo) {
-      Alert.alert(
-        'Late Submission',
-        `You are submitting late.\n\nYou will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}.\n\nDo you want to continue?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Submit Anyway', onPress: navigateToComplete }
-        ]
-      );
-    } else {
-      navigateToComplete();
-    }
-  }, [assignment, isSubmittable, isLate, penaltyInfo, getSubmissionStatusInfo, fetchAssignmentDetails, onVerified, isTaskDeleted, isOwner]);
+    navigation.navigate('CompleteAssignment', {
+      assignmentId: assignment.id,
+      taskTitle: assignment.task?.title || 'Unknown Task',
+      dueDate: assignment.dueDate,
+      timeSlot: assignment.timeSlot,
+      timeSlots: timeSlots,  // ✅ Pass all time slots for multi-slot tasks
+      onCompleted: () => {
+        fetchAssignmentDetails();
+        if (onVerified) onVerified?.();
+        if (onComplete) onComplete();
+      }
+    });
+  };
+  
+  if (isLate && penaltyInfo) {
+    Alert.alert(
+      'Late Submission',
+      `You are submitting late.\n\nYou will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}.\n\nDo you want to continue?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Submit Anyway', onPress: navigateToComplete }
+      ]
+    );
+  } else {
+    navigateToComplete();
+  }
+}, [assignment, isSubmittable, isLate, penaltyInfo, getSubmissionStatusInfo, fetchAssignmentDetails, onVerified, isTaskDeleted, isOwner]);
 
   // Handle request swap - only for owner
   const handleRequestSwap = useCallback((navigation: any, preSelectedScope?: 'week' | 'day') => {

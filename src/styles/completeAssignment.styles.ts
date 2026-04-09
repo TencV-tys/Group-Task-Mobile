@@ -1,4 +1,5 @@
-// src/styles/completeAssignment.styles.ts - Dark Mode Version
+// src/styles/completeAssignment.styles.ts - UPDATED with time slot selector styles
+
 import { StyleSheet, Dimensions } from 'react-native';
 import { Theme } from '../context/ThemeContext';
 
@@ -157,14 +158,17 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
+    borderTopColor: theme.border,
   },
   timeSlotLabel: {
     fontSize: 12,
     marginRight: 4,
+    color: theme.textMuted,
   },
   timeSlotValue: {
     fontSize: 12,
     fontWeight: '600',
+    color: theme.textSecondary,
   },
   submissionWindowInfo: {
     flexDirection: 'row',
@@ -174,11 +178,51 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
     marginTop: 8,
     padding: 8,
     borderRadius: 8,
+    backgroundColor: theme.bgSecondary,
   },
   submissionWindowText: {
     fontSize: 11,
     fontStyle: 'italic',
+    color: theme.textMuted,
   },
+  
+  // ===== TIME SLOT SELECTOR STYLES =====
+  timeSlotCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  timeSlotCardSelected: {
+    borderWidth: 2,
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: theme.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  radioButtonInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  timeSlotTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  timeSlotPoints: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  
   section: {
     marginBottom: 24,
   },
@@ -186,11 +230,13 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 6,
+    color: theme.text,
   },
   sectionDescription: {
     fontSize: 13,
     marginBottom: 12,
     lineHeight: 18,
+    color: theme.textMuted,
   },
   photoUploadOptions: {
     flexDirection: 'row',
@@ -212,6 +258,7 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
     fontSize: 13,
     fontWeight: '500',
     textAlign: 'center',
+    color: theme.primary,
   },
   photoPreviewContainer: {
     alignItems: 'center',
@@ -250,11 +297,15 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
   photoActionText: {
     fontSize: 12,
     fontWeight: '500',
+    color: theme.textSecondary,
   },
-  removeText: {},
+  removeText: {
+    color: theme.error,
+  },
   notesGradient: {
     borderRadius: 10,
     borderWidth: 1,
+    borderColor: theme.border,
   },
   notesInput: {
     paddingHorizontal: 12,
@@ -263,6 +314,7 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
     minHeight: 100,
     textAlignVertical: 'top',
     backgroundColor: 'transparent',
+    color: theme.text,
   },
   inputError: {
     borderColor: theme.error,
@@ -275,10 +327,12 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
   },
   charCount: {
     fontSize: 11,
+    color: theme.textMuted,
   },
   errorText: {
     fontSize: 12,
     marginTop: 4,
+    color: theme.error,
   },
   submitButton: {
     borderRadius: 12,
@@ -304,24 +358,31 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
   submitButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#fff',
   },
-  submitButtonTextDisabled: {},
+  submitButtonTextDisabled: {
+    color: theme.textMuted,
+  },
   disabledText: {
     fontSize: 13,
     textAlign: 'center',
     marginTop: 12,
     fontStyle: 'italic',
+    color: theme.textMuted,
   },
   waitingText: {
     fontSize: 13,
     textAlign: 'center',
     marginTop: 12,
     fontStyle: 'italic',
+    color: theme.primary,
   },
   expiredMessage: {
     fontSize: 13,
     textAlign: 'center',
     marginTop: 12,
     fontStyle: 'italic',
+    color: theme.error,
   },
+
 });

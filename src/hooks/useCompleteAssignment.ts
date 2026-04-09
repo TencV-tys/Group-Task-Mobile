@@ -188,7 +188,7 @@ export const useCompleteAssignment = (
         return {
           title: 'Checking...',
           message: 'Checking submission status',
-          color: '#868e96',
+          color: '#868e96', 
           icon: 'clock'
         };
     }
@@ -295,17 +295,17 @@ export const useCompleteAssignment = (
 
 
 // hooks/useCompleteAssignment.ts - ADD MORE DETAILED LOGS
+// In useCompleteAssignment.ts - Update submitCompletion to accept timeSlotId
 
-const submitCompletion = useCallback(async () => {
+const submitCompletion = useCallback(async (timeSlotId?: string | null) => {
   console.log('\n🚀🚀🚀 [SUBMIT COMPLETION] START 🚀🚀🚀');
   console.log('   isSubmittable:', isSubmittable);
   console.log('   timeStatus:', timeStatus);
   console.log('   isLate:', isLate);
   console.log('   hasPhoto:', !!photo);
-  console.log('   photo URI:', photo);
   console.log('   notes length:', notes.length);
-  console.log('   notes content:', notes);
-  
+  console.log('   timeSlotId:', timeSlotId);
+   
   // Check token first
   const hasToken = await TokenUtils.checkToken({
     showAlert: false,
@@ -333,18 +333,19 @@ const submitCompletion = useCallback(async () => {
     console.log('❌ [SUBMIT] Validation failed');
     return;
   }
-
+ 
   setSubmitting(true);
   
-  try {
+  try { 
     console.log('📤 [SUBMIT] Calling AssignmentService.completeAssignment...');
     console.log('   Assignment ID:', assignmentId);
     console.log('   Photo URI exists:', !!photo);
-    console.log('   Photo URI:', photo);
+    console.log('   timeSlotId:', timeSlotId);
     
     const result = await AssignmentService.completeAssignment(assignmentId, {
       notes: notes.trim(),
       photoUri: photo || undefined,
+      timeSlotId: timeSlotId || undefined,  // ✅ Add timeSlotId
     });
     
     console.log('📥 [SUBMIT] Result from server:', JSON.stringify(result, null, 2));
@@ -354,7 +355,6 @@ const submitCompletion = useCallback(async () => {
       console.log('   isLate:', result.isLate);
       console.log('   originalPoints:', result.originalPoints);
       console.log('   finalPoints:', result.finalPoints);
-      console.log('   assignment:', result.assignment);
       
       Alert.alert(
         'Success!',
@@ -374,9 +374,7 @@ const submitCompletion = useCallback(async () => {
       );
     } else {
       console.log('❌ [SUBMIT] Submission failed:', result.message);
-      console.log('   Validation data:', result.validation);
       
-      // Check if error is about time validation
       if (result.message?.toLowerCase().includes('late') || 
           result.message?.toLowerCase().includes('time') ||
           result.message?.toLowerCase().includes('window')) {
@@ -396,8 +394,6 @@ const submitCompletion = useCallback(async () => {
     }
   } catch (error: any) {
     console.error('❌❌❌ [SUBMIT] Error submitting assignment:', error);
-    console.error('   Error message:', error.message);
-    console.error('   Error stack:', error.stack);
     Alert.alert('Error', error.message || 'Network error. Please check your connection.');
   } finally { 
     setSubmitting(false);

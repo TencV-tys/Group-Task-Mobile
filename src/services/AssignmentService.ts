@@ -158,6 +158,7 @@ export interface UpcomingAssignment {
 export interface CompleteAssignmentParams {
   photoUri?: string;
   notes?: string;
+  timeSlotId?: string;
 }
 
 export interface CompleteAssignmentResponse {
@@ -216,6 +217,8 @@ export class AssignmentService {
   
 // services/AssignmentService.ts - ensure photo is sent with correct field name
 
+// services/AssignmentService.ts - FIXED completeAssignment method
+
 static async completeAssignment(
   assignmentId: string, 
   data: CompleteAssignmentParams 
@@ -224,6 +227,7 @@ static async completeAssignment(
     console.log('\n📸🔵 [completeAssignment] FRONTEND START 🔵📸');
     console.log('   Assignment ID:', assignmentId);
     console.log('   Photo URI:', data.photoUri);
+    console.log('   timeSlotId:', data.timeSlotId);
     
     const token = await TokenUtils.getAccessToken();
     
@@ -247,6 +251,12 @@ static async completeAssignment(
         formData.append('notes', data.notes);
       }
       
+      // ✅ ADD timeSlotId for multi-slot tasks
+      if (data.timeSlotId) {
+        formData.append('timeSlotId', data.timeSlotId);
+        console.log('⏰ Adding timeSlotId to formData:', data.timeSlotId);
+      }
+      
       // Get the file name and type from URI
       const uri = data.photoUri;
       const filename = uri.split('/').pop() || 'photo.jpg';
@@ -259,7 +269,7 @@ static async completeAssignment(
         uri: uri.substring(0, 100) + '...'
       });
       
-      // ✅ IMPORTANT: The field name must be 'photo' to match multer configuration
+      // IMPORTANT: The field name must be 'photo' to match multer configuration
       formData.append('photo', {
         uri: uri,
         name: filename,
@@ -295,6 +305,14 @@ static async completeAssignment(
       // No photo - send as JSON
       const headers = await TokenUtils.getAuthHeaders(true);
       
+      // ✅ ADD timeSlotId to JSON body
+      const requestBody: any = { notes: data.notes };
+      if (data.timeSlotId) {
+        requestBody.timeSlotId = data.timeSlotId;
+      }
+      
+      console.log('📤 Sending JSON body:', requestBody);
+      
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000);
       
@@ -302,7 +320,7 @@ static async completeAssignment(
         response = await fetch(fullUrl, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ notes: data.notes }),
+          body: JSON.stringify(requestBody),
           signal: controller.signal,
         });
         
@@ -344,7 +362,7 @@ static async completeAssignment(
       message: error.message || 'Failed to complete assignment',
     };
   }
-} 
+}
 
   // ========== VERIFY ASSIGNMENT ==========
   static async verifyAssignment(

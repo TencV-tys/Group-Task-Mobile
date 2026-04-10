@@ -206,64 +206,81 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     }
   }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft, isTaskDeleted, isAdmin, isOwner]);
 
-const getStatusColor = useCallback(() => {
-  if (isTaskDeleted) return '#868e96';
+  // In useAssignmentDetails.ts - REPLACE these three functions
+
+const getStatusText = useCallback(() => {
+  if (isTaskDeleted) return 'Task Deleted';
   
-  // ✅ Expired/Missed status - red color
-  if (assignment?.expired === true) return '#fa5252';
+  // ✅ PRIORITY 1: Check verified/rejected first (most important)
+  if (assignment?.verified === true) return 'Verified';
+  if (assignment?.verified === false) return 'Rejected';
+  
+  // ✅ PRIORITY 2: Check pending verification
+  if (assignment?.completed === true && assignment?.verified === null) return 'Pending Verification';
+  
+  // ✅ PRIORITY 3: Check expired/missed (only if not verified)
+  if (assignment?.expired === true) return 'Expired';
   
   const missedSlotIds = assignment?.missedTimeSlotIds || [];
   const currentTimeSlotId = assignment?.timeSlot?.id;
-  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
-    return '#fa5252';
-  }
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'Missed';
   
-  switch (verificationStatus) {
-    case 'verified': return '#2b8a3e';
-    case 'rejected': return '#fa5252';
-    default: return '#e67700';
-  }
-}, [verificationStatus, isTaskDeleted, assignment]);
+  // ✅ PRIORITY 4: Check completed but no verification status
+  if (assignment?.completed === true) return 'Completed';
+  
+  return 'Not Completed';
+}, [assignment, isTaskDeleted]);
+
+const getStatusColor = useCallback(() => {
+  if (isTaskDeleted) return '#868e96';
+  
+  // ✅ PRIORITY 1: Verified - green
+  if (assignment?.verified === true) return '#2b8a3e';
+  
+  // ✅ PRIORITY 2: Rejected - red
+  if (assignment?.verified === false) return '#fa5252';
+  
+  // ✅ PRIORITY 3: Pending verification - orange
+  if (assignment?.completed === true && assignment?.verified === null) return '#e67700';
+  
+  // ✅ PRIORITY 4: Expired/Missed - gray/red (only if not verified)
+  if (assignment?.expired === true) return '#868e96';
+  
+  const missedSlotIds = assignment?.missedTimeSlotIds || [];
+  const currentTimeSlotId = assignment?.timeSlot?.id;
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return '#868e96';
+  
+  // ✅ PRIORITY 5: Completed - green
+  if (assignment?.completed === true) return '#2b8a3e';
+  
+  // ✅ Default - gray
+  return '#868e96';
+}, [assignment, isTaskDeleted]);
 
 const getStatusIcon = useCallback(() => {
   if (isTaskDeleted) return 'delete';
   
-  // ✅ Expired/Missed status - timer-off icon
+  // ✅ PRIORITY 1: Verified - check circle
+  if (assignment?.verified === true) return 'check-circle';
+  
+  // ✅ PRIORITY 2: Rejected - close circle
+  if (assignment?.verified === false) return 'close-circle';
+  
+  // ✅ PRIORITY 3: Pending verification - clock check
+  if (assignment?.completed === true && assignment?.verified === null) return 'clock-check';
+  
+  // ✅ PRIORITY 4: Expired/Missed - timer off (only if not verified)
   if (assignment?.expired === true) return 'timer-off';
   
   const missedSlotIds = assignment?.missedTimeSlotIds || [];
   const currentTimeSlotId = assignment?.timeSlot?.id;
-  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
-    return 'timer-off';
-  }
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'timer-off';
   
-  switch (verificationStatus) {
-    case 'verified': return 'check-circle';
-    case 'rejected': return 'close-circle';
-    default: return assignment?.completed ? 'clock-check' : 'clock-outline';
-  }
-}, [verificationStatus, assignment, isTaskDeleted]);
- 
-  const getStatusText = useCallback(() => {
-  if (isTaskDeleted) return 'Task Deleted';
+  // ✅ PRIORITY 5: Completed - check circle
+  if (assignment?.completed === true) return 'check-circle';
   
-  // ✅ Check if assignment is expired/missed
-  if (assignment?.expired === true) return 'Expired';
-  
-  // Check if this specific time slot is missed
-  const missedSlotIds = assignment?.missedTimeSlotIds || [];
-  const currentTimeSlotId = assignment?.timeSlot?.id;
-  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
-    return 'Missed';
-  }
-  
-  // ✅ Check this specific assignment's status
-  if (assignment?.verified === true) return 'Verified';
-  if (assignment?.verified === false) return 'Rejected';
-  if (assignment?.completed === true && assignment?.verified === null) return 'Pending Verification';
-  if (assignment?.completed === true) return 'Completed';
-  
-  return 'Not Completed';
+  // ✅ Default - clock outline
+  return 'clock-outline';
 }, [assignment, isTaskDeleted]);
 
 

@@ -118,6 +118,16 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       );
     }
   }, [authError, navigation, clearAuthError]);
+  const formatTimeTo12Hour = (time24: string) => {
+  if (!time24) return '';
+  
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  const minutesStr = minutes?.toString().padStart(2, '0') || '00';
+  
+  return `${hours12}:${minutesStr} ${period}`;
+};
 
   // ===== RENDER HEADER =====
   const renderHeader = () => (
@@ -547,7 +557,7 @@ const renderVerificationControls = () => {
       </View>
     </View>
   );
-};
+}; 
 
   
 
@@ -768,14 +778,15 @@ const renderVerificationControls = () => {
                 </Text>
               </View>
 
-              {assignment.timeSlot && (
-                <View style={styles.detailItem}>
-                  <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Time Slot</Text>
-                  <Text style={[styles.detailValue, { color: theme.text }]}>
-                    {assignment.timeSlot.startTime} - {assignment.timeSlot.endTime}
-                  </Text>
-                </View>
-              )}
+  
+{assignment.timeSlot && (
+  <View style={styles.detailItem}>
+    <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Time Slot</Text>
+    <Text style={[styles.detailValue, { color: theme.text }]}>
+      {formatTimeTo12Hour(assignment.timeSlot.startTime)} - {formatTimeTo12Hour(assignment.timeSlot.endTime)}
+    </Text>
+  </View>
+)}
 
               {assignment.assignmentDay && (
                 <View style={styles.detailItem}>

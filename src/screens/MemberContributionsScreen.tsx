@@ -202,9 +202,12 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         else if (assignment.verified === false) rejectedSlotsCount++;
         else if (assignment.completed === true && assignment.verified === null) pendingSlotsCount++;
         
-        const isExpired = assignment.isMissed === true || assignment.expired === true;
-        if (isExpired) expiredSlotsCount++;
-        else activeAssignmentsCount++;
+       const isExpired = assignment.isMissed === true || assignment.expired === true;
+if (isExpired && !assignment.verified) {  // Use !assignment.verified instead
+  expiredSlotsCount++;
+} else {
+  activeAssignmentsCount++;
+}
       });
     });
     
@@ -278,7 +281,10 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     const verifiedCount = week.assignments.filter((a: any) => a.verified === true).length;
     const pendingCount = week.assignments.filter((a: any) => a.completed === true && a.verified === null).length;
     const rejectedCount = week.assignments.filter((a: any) => a.verified === false).length;
-    const expiredCount = week.assignments.filter((a: any) => (a.isMissed === true || a.expired === true) && a.verified !== true).length;
+   
+    const expiredCount = week.assignments.filter((a: any) => 
+  (a.isMissed === true || a.expired === true) && !a.verified  // !a.verified works for both null, false, and 0
+).length;
     const notStartedCount = week.assignments.filter((a: any) => !a.completed && !a.isMissed && !a.expired).length;
 
     return (
@@ -339,42 +345,42 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
         {isExpanded && (
           <View style={[styles.weekDetails, { borderTopColor: theme.border }]}>
             {week.assignments.map((assignment: any, index: number) => {
-              const isExpired = assignment.isMissed === true || assignment.expired === true;
-              const isVerified = assignment.verified === true;
-              const isRejected = assignment.verified === false;
-              const isPending = assignment.completed === true && assignment.verified === null;
-              
-              let statusGradient: [string, string];
-              let statusIcon: string;
-              let statusText: string;
-              let statusColor: string;
-              
-              if (isExpired) {
-                statusGradient = [theme.bgTertiary, theme.bgTertiary];
-                statusIcon = 'clock-alert';
-                statusText = 'Missed';
-                statusColor = theme.textMuted;
-              } else if (isVerified) {
-                statusGradient = [theme.primaryLight, theme.primaryLight];
-                statusIcon = 'check-circle';
-                statusText = 'Verified';
-                statusColor = theme.primary;
-              } else if (isRejected) {
-                statusGradient = [theme.errorBg, theme.errorBg];
-                statusIcon = 'close-circle';
-                statusText = 'Rejected';
-                statusColor = theme.error;
-              } else if (isPending) {
-                statusGradient = [theme.primaryLight, theme.primaryLight];
-                statusIcon = 'clock-check';
-                statusText = 'Pending';
-                statusColor = theme.textSecondary;
-              } else {
-                statusGradient = [theme.bgSecondary, theme.bgTertiary];
-                statusIcon = 'clock-outline';
-                statusText = 'Not Started';
-                statusColor = theme.textMuted;
-              }
+  const isExpired = (assignment.isMissed === true || assignment.expired === true) && !assignment.verified;
+  const isVerified = assignment.verified === true;
+  const isRejected = assignment.verified === false;
+  const isPending = assignment.completed === true && assignment.verified === null;
+  
+  let statusGradient: [string, string];
+  let statusIcon: string;
+  let statusText: string;
+  let statusColor: string;
+  
+  if (isExpired) {
+    statusGradient = [theme.bgTertiary, theme.bgTertiary];
+    statusIcon = 'clock-alert';
+    statusText = 'Missed';
+    statusColor = theme.textMuted;
+  } else if (isVerified) {
+    statusGradient = [theme.primaryLight, theme.primaryLight];
+    statusIcon = 'check-circle';
+    statusText = 'Verified';
+    statusColor = theme.primary;
+  } else if (isRejected) {
+    statusGradient = [theme.errorBg, theme.errorBg];
+    statusIcon = 'close-circle';
+    statusText = 'Rejected';
+    statusColor = theme.error;
+  } else if (isPending) {
+    statusGradient = [theme.primaryLight, theme.primaryLight];
+    statusIcon = 'clock-check';
+    statusText = 'Pending';
+    statusColor = theme.textSecondary;
+  } else {
+    statusGradient = [theme.bgSecondary, theme.bgTertiary];
+    statusIcon = 'clock-outline';
+    statusText = 'Not Started';
+    statusColor = theme.textMuted;
+  }
               
               return (
                 <TouchableOpacity

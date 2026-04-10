@@ -1,4 +1,5 @@
-// src/screens/TodayAssignmentsScreen.tsx - Dark Mode Added
+// src/screens/TodayAssignmentsScreen.tsx - WITH PROPER STATUS BADGES
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -6,7 +7,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   StatusBar,
@@ -18,7 +18,115 @@ import { AssignmentService, TodayAssignment } from '../services/AssignmentServic
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
- 
+
+// ✅ Status helper functions (copied from TaskDetailsScreen)
+const isDueTodayUTC = (dueDate: string) => {
+  const now = new Date();
+  const due = new Date(dueDate);
+  
+  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const dueUTC = Date.UTC(due.getUTCFullYear(), due.getUTCMonth(), due.getUTCDate());
+  
+  return todayUTC === dueUTC;
+};
+
+const getAssignmentStatus = (assignment: any, theme: any) => {
+  // 1. Verified
+  if (assignment.verified === true) {
+    return { 
+      status: 'verified', 
+      color: theme.primary, 
+      icon: 'check-circle',
+      text: 'Verified'
+    };
+  }
+  
+  // 2. Rejected
+  if (assignment.verified === false) {
+    return { 
+      status: 'rejected', 
+      color: theme.error, 
+      icon: 'close-circle',
+      text: 'Rejected'
+    };
+  }
+  
+  // 3. Expired
+  if (assignment.expired === true) {
+    return { 
+      status: 'expired', 
+      color: theme.error, 
+      icon: 'timer-off',
+      text: 'Expired'
+    };
+  }
+  
+  // 4. Missed
+  const missedSlotIds = assignment.missedTimeSlotIds || [];
+  const currentTimeSlotId = assignment.timeSlot?.id;
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
+    return { 
+      status: 'missed', 
+      color: theme.error, 
+      icon: 'close-circle',
+      text: 'Missed'
+    };
+  }
+  
+  // 5. Pending Verification (submitted but not verified)
+  if (assignment.completed === true && assignment.verified === null) {
+    return { 
+      status: 'pending_verification', 
+      color: theme.primary, 
+      icon: 'clock-check',
+      text: 'Pending'
+    };
+  }
+  
+  // 6. Completed (fully done)
+  if (assignment.completed === true) {
+    return { 
+      status: 'completed', 
+      color: theme.primary, 
+      icon: 'check-circle',
+      text: 'Completed'
+    };
+  }
+  
+  // 7. Overdue
+  const dueDate = new Date(assignment.dueDate);
+  const now = new Date();
+  const isOverdue = dueDate < now;
+  
+  if (isOverdue) {
+    return { 
+      status: 'overdue', 
+      color: theme.error, 
+      icon: 'alert-circle',
+      text: 'Overdue'
+    };
+  }
+  
+  // 8. Due Today
+  const dueToday = isDueTodayUTC(assignment.dueDate);
+  if (dueToday) {
+    return { 
+      status: 'due_today', 
+      color: theme.primary, 
+      icon: 'clock-alert',
+      text: 'Due Today'
+    };
+  }
+  
+  // 9. Default - Pending
+  return { 
+    status: 'pending', 
+    color: theme.textSecondary, 
+    icon: 'clock-outline',
+    text: 'Pending'
+  };
+};
+
 export default function TodayAssignmentsScreen({ navigation, route }: any) {
   const { theme, isDark } = useTheme();
   const { groupId, groupName } = route.params || {};
@@ -28,24 +136,18 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
 
-  console.log('📱 [TodayAssignments] Screen mounted with params:', { groupId, groupName });
-
-  // ===== CHECK TOKEN =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
     
-    console.log('🔐 [TodayAssignments] Token check result:', hasToken);
     setAuthError(!hasToken);
     return hasToken;
   }, []);
 
-  // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
-      console.log('⚠️ [TodayAssignments] Auth error detected');
       Alert.alert(
         'Session Expired',
         'Please log in again',
@@ -63,64 +165,28 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   }, [authError, navigation]);
 
   useEffect(() => {
-    console.log('🔄 [TodayAssignments] useEffect triggered, fetching assignments...');
     fetchTodayAssignments();
   }, [groupId]);
 
   const fetchTodayAssignments = async (isRefreshing = false) => {
-    console.log('📥 [TodayAssignments] fetchTodayAssignments called', { 
-      isRefreshing, 
-      groupId 
-    });
-    
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
-      console.log('❌ [TodayAssignments] No valid token, stopping fetch');
       setLoading(false);
       setRefreshing(false);
       return;
     }
 
-    if (isRefreshing) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    if (isRefreshing) setRefreshing(true);
+    else setLoading(true);
     setError(null);
-    setAuthError(false);
 
     try {
-      console.log('📡 [TodayAssignments] Calling AssignmentService.getTodayAssignments...');
       const result = await AssignmentService.getTodayAssignments(groupId);
-      
-      console.log('📦 [TodayAssignments] API Response:', JSON.stringify(result, null, 2));
       
       if (result.success) {
         const assignmentsData = result.data?.assignments || [];
-        console.log(`✅ [TodayAssignments] Successfully loaded ${assignmentsData.length} assignments`);
-        
-        // Log each assignment for debugging
-        if (assignmentsData.length > 0) {
-          assignmentsData.forEach((assignment: TodayAssignment, index: number) => {
-            console.log(`📋 [TodayAssignments] Assignment ${index + 1}:`, {
-              id: assignment.id,
-              title: assignment.taskTitle,
-              dueDate: assignment.dueDate,
-              canSubmit: assignment.canSubmit,
-              timeLeft: assignment.timeLeft,
-              willBePenalized: assignment.willBePenalized,
-              groupName: assignment.group?.name
-            });
-          });
-        } else {
-          console.log('📭 [TodayAssignments] No assignments due today');
-          console.log('🔍 [TodayAssignments] Check if there are any assignments in the system');
-        }
-        
         setAssignments(assignmentsData);
       } else {
-        console.error('❌ [TodayAssignments] API returned error:', result.message);
         setError(result.message || 'Failed to load today\'s assignments');
         if (result.message?.toLowerCase().includes('token') || 
             result.message?.toLowerCase().includes('auth')) {
@@ -128,29 +194,18 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
         }
       }
     } catch (err: any) {
-      console.error('❌ [TodayAssignments] Error fetching today\'s assignments:', err);
-      console.error('Error details:', {
-        message: err.message,
-        stack: err.stack,
-        groupId
-      });
       setError(err.message || 'Network error');
     } finally {
       setLoading(false);
       setRefreshing(false);
-      console.log('🏁 [TodayAssignments] fetch completed');
     }
   };
 
   const handleViewAssignment = (assignmentId: string) => {
-    console.log('👆 [TodayAssignments] Viewing assignment:', assignmentId);
     navigation.navigate('AssignmentDetails', {
       assignmentId,
       isAdmin: false,
-      onVerified: () => {
-        console.log('🔄 [TodayAssignments] Assignment verified, refreshing...');
-        fetchTodayAssignments(true);
-      }
+      onVerified: () => fetchTodayAssignments(true)
     });
   };
 
@@ -168,40 +223,32 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
     }
   };
 
-  // Get gradient colors based on status
-  const getGradientColors = (item: TodayAssignment): [string, string] => {
-    const isUrgent = item.timeLeft && item.timeLeft < 300;
-    const isLate = item.willBePenalized;
-    
-    if (isLate) {
-      return [theme.primaryLight, theme.primaryLight];
-    }
-    if (isUrgent) {
-      return [theme.errorBg, theme.errorBg];
-    }
-    if (item.canSubmit) {
-      return [theme.primaryLight, theme.primaryLight];
-    }
-    return [theme.card, theme.bgSecondary];
-  };
-
-  // Get status badge colors
-  const getStatusBadgeColors = (item: TodayAssignment): [string, string] => {
-    const isLate = item.willBePenalized;
-    if (isLate) return [theme.primaryLight, theme.primaryLight];
-    if (item.canSubmit) return [theme.primaryLight, theme.primaryLight];
-    return [theme.bgSecondary, theme.bgTertiary];
-  };
-
-  // Get timer gradient colors
-  const getTimerGradientColors = (isUrgent: boolean): [string, string] => {
-    return isUrgent ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight];
-  };
-
   const renderAssignment = ({ item }: { item: TodayAssignment }) => {
+    // Get status using the same function as TaskDetailsScreen
+    const status = getAssignmentStatus(item, theme);
     const timeLeft = item.timeLeft;
     const isUrgent = timeLeft ? timeLeft < 300 : false;
     const isLate = item.willBePenalized ?? false;
+    
+    // Get gradient colors based on status
+    const getGradientColors = (): [string, string] => {
+      if (status.status === 'verified' || status.status === 'completed') {
+        return [theme.primaryLight, theme.primaryLight];
+      }
+      if (status.status === 'expired' || status.status === 'missed' || status.status === 'rejected') {
+        return [theme.errorBg, theme.errorBg];
+      }
+      if (isLate) {
+        return [theme.primaryLight, theme.primaryLight];
+      }
+      if (isUrgent) {
+        return [theme.errorBg, theme.errorBg];
+      }
+      if (item.canSubmit) {
+        return [theme.primaryLight, theme.primaryLight];
+      }
+      return [theme.card, theme.bgSecondary];
+    };
 
     return (
       <TouchableOpacity
@@ -209,15 +256,13 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
         onPress={() => handleViewAssignment(item.id)}
       >
         <LinearGradient
-          colors={getGradientColors(item)}
+          colors={getGradientColors()}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[
             styles.assignmentCard,
-            isLate ? styles.lateCard : null,
-            isUrgent ? styles.urgentCard : null,
             { borderColor: theme.border }
-          ].filter(Boolean)}
+          ]}
         >
           <View style={styles.cardHeader}>
             <View style={styles.taskInfo}>
@@ -227,31 +272,15 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
               <Text style={[styles.groupName, { color: theme.textMuted }]}>{item.group?.name || 'Unknown Group'}</Text>
             </View>
             
+            {/* ✅ Status Badge - matches TaskDetailsScreen */}
             <LinearGradient
-              colors={getStatusBadgeColors(item)}
+              colors={[status.color + '20', status.color + '10']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.statusBadge, { borderColor: theme.border }]}
+              style={styles.statusBadge}
             >
-              <MaterialCommunityIcons 
-                name={
-                  isLate ? "timer-alert" :
-                  item.canSubmit ? "check-circle" : "clock-outline"
-                } 
-                size={14} 
-                color={
-                  isLate ? theme.primary :
-                  item.canSubmit ? theme.primary : theme.textMuted
-                } 
-              />
-              <Text style={[
-                styles.statusText,
-                isLate ? styles.lateText :
-                item.canSubmit ? styles.availableText : styles.waitingText,
-                { color: isLate ? theme.primary : item.canSubmit ? theme.primary : theme.textMuted }
-              ]}>
-                {isLate ? 'Late' : item.canSubmit ? 'Available' : 'Waiting'}
-              </Text>
+              <MaterialCommunityIcons name={status.icon as any} size={14} color={status.color} />
+              <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
             </LinearGradient>
           </View>
 
@@ -269,7 +298,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
               colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.pointsBadge, { borderColor: theme.border }]}
+              style={styles.pointsBadge}
             >
               <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
               <Text style={[styles.pointsText, { color: theme.primary }]}>
@@ -281,9 +310,9 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
             </LinearGradient>
           </View>
 
-          {item.timeLeft !== undefined && item.timeLeft > 0 && (
+          {item.timeLeft !== undefined && item.timeLeft > 0 && status.status === 'due_today' && (
             <LinearGradient
-              colors={getTimerGradientColors(isUrgent)}
+              colors={isUrgent ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={[styles.timerContainer, { borderColor: theme.border }]}
@@ -294,12 +323,12 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
                 color={isUrgent ? theme.error : theme.primary} 
               />
               <Text style={[styles.timerText, isUrgent && styles.urgentTimerText, { color: isUrgent ? theme.error : theme.primary }]}>
-                {formatTimeLeft(item.timeLeft)} {item.canSubmit ? 'left to submit' : 'until submission opens'}
+                {formatTimeLeft(item.timeLeft)} left
               </Text>
             </LinearGradient>
           )}
 
-          {item.reason && !item.canSubmit && (
+          {item.reason && !item.canSubmit && status.status !== 'expired' && status.status !== 'verified' && (
             <Text style={[styles.reasonText, { color: theme.textMuted }]}>{item.reason}</Text>
           )}
         </LinearGradient>
@@ -342,7 +371,6 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   );
 
   if (loading && !refreshing) {
-    console.log('⏳ [TodayAssignments] Showing loading indicator');
     return (
       <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.loadingContainer}>
@@ -354,7 +382,6 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   }
 
   if (authError) {
-    console.log('⚠️ [TodayAssignments] Showing auth error screen');
     return (
       <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         <View style={styles.errorContainer}>
@@ -378,8 +405,6 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
       </ScreenWrapper>
     );
   }
-
-  console.log(`🎨 [TodayAssignments] Rendering ${assignments.length} assignments`);
 
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
@@ -409,7 +434,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
               >
                 <MaterialCommunityIcons name="calendar-check" size={40} color={theme.primary} />
               </LinearGradient>
-              <Text style={[styles.emptyTitle, { color: theme.textMuted }]}>No assignments due today!</Text>
+              <Text style={[styles.emptyTitle, { color: theme.textMuted }]}>No active assignments due today!</Text>
               <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
                 You're all caught up for today
               </Text>
@@ -423,9 +448,7 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -446,21 +469,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 12,
-    marginTop: 2,
-    textAlign: 'center',
-  },
+  titleContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  subtitle: { fontSize: 12, marginTop: 2, textAlign: 'center' },
   refreshButton: {
     width: 36,
     height: 36,
@@ -472,50 +483,15 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorSubtext: {
-    fontSize: 14,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  retryButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  retryButtonGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  listContainer: {
-    padding: 16,
-    flexGrow: 1,
-  },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14 },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { fontSize: 18, fontWeight: '600', marginTop: 16, marginBottom: 8, textAlign: 'center' },
+  errorSubtext: { fontSize: 14, marginBottom: 24, textAlign: 'center' },
+  retryButton: { borderRadius: 8, overflow: 'hidden' },
+  retryButtonGradient: { paddingHorizontal: 24, paddingVertical: 12 },
+  retryButtonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  listContainer: { padding: 16, flexGrow: 1 },
   assignmentCard: {
     borderRadius: 12,
     padding: 16,
@@ -526,120 +502,24 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
   },
-  lateCard: {
-    borderWidth: 2,
-  },
-  urgentCard: {
-    borderWidth: 2,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  taskInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  taskTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  groupName: {
-    fontSize: 13,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-    borderWidth: 1,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  availableText: {},
-  waitingText: {},
-  lateText: {},
-  detailsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  timeSlot: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  timeSlotText: {
-    fontSize: 14,
-  },
-  pointsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-    borderWidth: 1,
-  },
-  pointsText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  penaltyText: {
-    fontSize: 11,
-    fontWeight: '400',
-  },
-  timerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 8,
-    gap: 6,
-    borderWidth: 1,
-  },
-  timerText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
+  taskInfo: { flex: 1, marginRight: 12 },
+  taskTitle: { fontSize: 16, fontWeight: '600', marginBottom: 4 },
+  groupName: { fontSize: 13 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
+  statusText: { fontSize: 12, fontWeight: '600' },
+  detailsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  timeSlot: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  timeSlotText: { fontSize: 14 },
+  pointsBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4, borderWidth: 1 },
+  pointsText: { fontSize: 13, fontWeight: '600' },
+  penaltyText: { fontSize: 11, fontWeight: '400' },
+  timerContainer: { flexDirection: 'row', alignItems: 'center', padding: 8, borderRadius: 8, gap: 6, borderWidth: 1 },
+  timerText: { fontSize: 13, fontWeight: '500' },
   urgentTimerText: {},
-  reasonText: {
-    fontSize: 13,
-    fontStyle: 'italic',
-    marginTop: 8,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-    paddingHorizontal: 32,
-  },
+  reasonText: { fontSize: 13, fontStyle: 'italic', marginTop: 8 },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
+  emptyIconContainer: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1 },
+  emptyTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
+  emptySubtext: { fontSize: 14, textAlign: 'center', lineHeight: 20, paddingHorizontal: 32 },
 });

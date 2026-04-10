@@ -1,4 +1,4 @@
-// src/components/SettingsModal.tsx - COMPLETE UPDATED VERSION
+// src/components/SettingsModal.tsx - COMPLETE FIXED VERSION
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
@@ -62,10 +62,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [recurringTasks, setRecurringTasks] = useState<any[]>([]);
   const [loggingOut, setLoggingOut] = useState(false);
   const [pendingVerificationsCount, setPendingVerificationsCount] = useState(0);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null); // ✅ MOVED HERE
   
   const { createSwapRequest, loading: swapLoading } = useSwapRequests();
 
   const isAdmin = userRole === 'ADMIN';
+
+  // ✅ MOVED HERE - Get current user ID
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const user = await TokenUtils.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+    };
+    getCurrentUser();
+  }, []);
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
@@ -77,7 +89,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return hasToken;
   }, []);
 
-  // Fetch pending verifications count for admin badge
   const fetchPendingVerificationsCount = useCallback(async () => {
     if (!isAdmin) return;
     
@@ -291,7 +302,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       }
       setLoadingMyTasks(false);
 
-      // Fetch pending verifications count for admin
       await fetchPendingVerificationsCount();
 
     } catch (error) {
@@ -425,7 +435,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     return [theme.bgSecondary, theme.bgTertiary];
   };
 
-  // ✅ UPDATED: Leaderboard item with navigation to MemberContributions
+  // ✅ FIXED: No hooks inside render function!
   const renderLeaderboardItem = (item: any, index: number) => {
     const isFirst = index === 0;
     const isSecond = index === 1;
@@ -438,14 +448,32 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         return;
       }
       
-      navigation.navigate('MemberContributions', { 
-        groupId, 
-        groupName, 
-        memberId,
-        userRole: userRole
-      });
-      onClose();
+      if (memberId === currentUserId) {
+        navigation.navigate('MemberContributions', { 
+          groupId, 
+          groupName, 
+          memberId,
+          userRole: userRole
+        });
+        onClose();
+      } else if (isAdmin) {
+        navigation.navigate('MemberContributions', { 
+          groupId, 
+          groupName, 
+          memberId,
+          userRole: 'ADMIN'
+        });
+        onClose();
+      } else {
+        Alert.alert(
+          'Access Denied',
+          'You can only view your own contributions. Admins can view all members.',
+          [{ text: 'OK' }]
+        );
+      }
     };
+
+    const isCurrentUser = item.userId === currentUserId;
 
     return (
       <TouchableOpacity
@@ -461,7 +489,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             styles.leaderboardItem,
             isFirst && styles.firstPlace,
             isSecond && styles.secondPlace,
-            isThird && styles.thirdPlace
+            isThird && styles.thirdPlace,
+            isCurrentUser && styles.currentUserItem
           ].filter(Boolean)}
         >
           <View style={styles.leaderboardRank}>
@@ -485,6 +514,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <View style={styles.userInfo}>
               <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
                 {item.fullName}
+                {isCurrentUser && <Text style={[styles.youBadge, { color: theme.primary }]}> (You)</Text>}
               </Text>
               <Text style={[styles.userStats, { color: theme.textMuted }]}>
                 {item.points} points
@@ -766,7 +796,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
                 </TouchableOpacity>
 
-                {/* ✅ Review Submissions with pending badge */}
                 <TouchableOpacity onPress={handleReviewSubmissions} style={[styles.menuItem, styles.reviewItem]}>
                   <View style={styles.menuItemLeft}>
                     <MaterialCommunityIcons name="clipboard-check" size={18} color={theme.error} />
@@ -1261,5 +1290,14 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  currentUserItem: {
+    borderWidth: 2,
+    borderColor: '#2b8a3e',
+    backgroundColor: '#ebfbee',
+  },
+  youBadge: {
+    fontSize: 12,
+    fontWeight: '500',
   },
 });

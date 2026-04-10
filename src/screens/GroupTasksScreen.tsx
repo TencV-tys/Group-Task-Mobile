@@ -63,7 +63,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
-  const [selectedTab, setSelectedTab] = useState<TabType>('all');
+  const [selectedTab, setSelectedTab] = useState<TabType>(isAdmin ? 'all' : 'my');
   const [tasks, setTasks] = useState<any[]>([]);
   const [myTasks, setMyTasks] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -253,15 +253,15 @@ const fetchPendingVerificationsCount = useCallback(async () => {
   }
 }, [groupId, isAdmin, checkToken]);
 
-  useEffect(() => {
-  if (route.params?.tab === 'my') {
+ useEffect(() => {
+  if (route.params?.tab === 'my' && !isAdmin) {
     console.log('📱 [GroupTasks] Setting tab to "my" from navigation params');
     setSelectedTab('my');
-  } else if (route.params?.tab === 'all') {
+  } else if (route.params?.tab === 'all' && isAdmin) {
     console.log('📱 [GroupTasks] Setting tab to "all" from navigation params');
     setSelectedTab('all');
   }
-}, [route.params?.tab]);
+}, [route.params?.tab, isAdmin]);
 
   const validateTaskTime = useCallback((task: any) => {
     const result = {
@@ -1343,43 +1343,42 @@ useEffect(() => {
     );
   };
 
-  // ===== BOTTOM TABS =====
-  const renderBottomTabs = () => {
-    return (
-      <LinearGradient
-        colors={[theme.card, theme.bgSecondary]}
-        style={[styles.bottomTab, { height: 70 + insets.bottom, paddingBottom: insets.bottom }]}
-      >
-        {isAdmin ? (
-          <>
-            <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="view-dashboard" size={24} color={theme.textMuted} />
-              <Text style={styles.tabText}>Dashboard</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('all')} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="format-list-bulleted" size={24} color={selectedTab === 'all' ? theme.primary : theme.textMuted} />
-              <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>All Tasks</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('all')} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="format-list-bulleted" size={24} color={selectedTab === 'all' ? theme.primary : theme.textMuted} />
-              <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>All Tasks</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('my')} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="clipboard-check" size={24} color={selectedTab === 'my' ? theme.primary : theme.textMuted} />
-              <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>My Tasks</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="view-dashboard" size={24} color={theme.textMuted} />
-              <Text style={styles.tabText}>Dashboard</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </LinearGradient>
-    );
-  };
+// ===== BOTTOM TABS - UPDATED =====
+const renderBottomTabs = () => {
+  return (
+    <LinearGradient
+      colors={[theme.card, theme.bgSecondary]}
+      style={[styles.bottomTab, { height: 70 + insets.bottom, paddingBottom: insets.bottom }]}
+    >
+      {isAdmin ? (
+        // ADMIN: Shows Dashboard + All Tasks
+        <>
+          <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="view-dashboard" size={24} color={selectedTab === 'all' ? theme.textMuted : theme.textMuted} />
+            <Text style={styles.tabText}>Dashboard</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('all')} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="format-list-bulleted" size={24} color={selectedTab === 'all' ? theme.primary : theme.textMuted} />
+            <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>All Tasks</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        // MEMBER: Shows Dashboard + My Tasks only (NO All Tasks)
+        <>
+          <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="view-dashboard" size={24} color={selectedTab === 'my' ? theme.textMuted : theme.textMuted} />
+            <Text style={styles.tabText}>Dashboard</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('my')} activeOpacity={0.7}>
+            <MaterialCommunityIcons name="clipboard-check" size={24} color={selectedTab === 'my' ? theme.primary : theme.textMuted} />
+            <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>My Tasks</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </LinearGradient>
+  );
+};
+
 
   // ===== LOADING STATES =====
   if (loadingUser) {

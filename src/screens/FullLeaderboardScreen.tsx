@@ -1,4 +1,4 @@
-// src/screens/FullLeaderboardScreen.tsx - COMPLETE UPDATED VERSION
+// src/screens/FullLeaderboardScreen.tsx - WITH ACCESS CONTROL FOR MEMBERS
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -21,12 +21,15 @@ import { useTheme } from '../context/ThemeContext';
 
 export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const { theme, isDark } = useTheme();
-  const { groupId, groupName } = route.params;
+  const { groupId, groupName, userRole } = route.params;
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [totalPoints, setTotalPoints] = useState(0);
   const [authError, setAuthError] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  const isAdmin = userRole === 'ADMIN';
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
@@ -36,6 +39,17 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     
     setAuthError(!hasToken);
     return hasToken;
+  }, []);
+
+  // Get current user ID
+  useEffect(() => {
+    const getCurrentUser = async () => {
+      const user = await TokenUtils.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+      }
+    };
+    getCurrentUser();
   }, []);
 
   useEffect(() => {
@@ -98,7 +112,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     loadLeaderboardData();
   };
 
-  // ✅ Handle leaderboard item press - navigate to MemberContributions
+  // ✅ Handle leaderboard item press - with access control
   const handleLeaderboardPress = (member: any) => {
     const memberId = member.userId;
     if (!memberId) {
@@ -106,12 +120,31 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
       return;
     }
     
-    navigation.navigate('MemberContributions', { 
-      groupId, 
-      groupName, 
-      memberId,
-      userRole: route.params?.userRole || 'MEMBER'
-    });
+    // ✅ Check if user is clicking on their own profile
+    if (memberId === currentUserId) {
+      // Navigate to own details
+      navigation.navigate('MemberContributions', { 
+        groupId, 
+        groupName, 
+        memberId,
+        userRole: userRole || 'MEMBER'
+      });
+    } else if (isAdmin) {
+      // Admin can view any member's details
+      navigation.navigate('MemberContributions', { 
+        groupId, 
+        groupName, 
+        memberId,
+        userRole: 'ADMIN'
+      });
+    } else {
+      // Member trying to view another member's details - show alert
+      Alert.alert(
+        'Access Denied',
+        'You can only view your own contributions. Admins can view all members.',
+        [{ text: 'OK' }]
+      );
+    }
   };
 
   const getRankIcon = (index: number) => {
@@ -137,6 +170,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const renderLeaderboardItem = ({ item, index }: { item: any; index: number }) => {
     const isTop3 = index < 3;
     const points = item.points || 0;
+    const isCurrentUser = item.userId === currentUserId;
     
     return (
       <TouchableOpacity
@@ -154,6 +188,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
             index === 0 && { borderColor: '#FFD700', borderWidth: 1.5 },
             index === 1 && { borderColor: '#C0C0C0', borderWidth: 1.5 },
             index === 2 && { borderColor: '#CD7F32', borderWidth: 1.5 },
+            isCurrentUser && styles.currentUserItem,
           ]}
         >
           <View style={styles.rankContainer}>
@@ -179,6 +214,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
             <View style={styles.userInfo}>
               <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
                 {item.fullName || 'Unknown'}
+                {isCurrentUser && <Text style={[styles.youBadge, { color: theme.primary }]}> (You)</Text>}
               </Text>
               <View style={styles.userStatsRow}>
                 <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
@@ -456,6 +492,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 3,
   },
+  youBadge: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   userStatsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -474,6 +514,11 @@ const styles = StyleSheet.create({
   },
   pointsLabel: {
     fontSize: 10,
+  },
+  currentUserItem: {
+    borderWidth: 2,
+    borderColor: '#2b8a3e',
+    backgroundColor: '#ebfbee',
   },
   emptyContainer: {
     alignItems: 'center',

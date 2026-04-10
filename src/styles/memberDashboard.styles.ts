@@ -12,7 +12,7 @@ export const makeMemberDashboardStyles = (theme: Theme) => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between', 
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: theme.card,
@@ -369,4 +369,47 @@ export const makeMemberDashboardStyles = (theme: Theme) => StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
   },
+progressCard: {
+  padding: 16,
+  borderRadius: 12,
+  marginBottom: 20,
+  borderWidth: 1,
+  borderColor: theme.border,
+  backgroundColor: theme.card,
+},
+progressHeader: {
+  flexDirection: 'row', 
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 8,
+},
+progressTitle: {
+  fontSize: 14,
+  fontWeight: '500',
+  color: theme.textSecondary,
+},
+progressPercentage: {
+  fontSize: 18,
+  fontWeight: '700',
+  color: theme.primary,
+},
+progressBarContainer: {
+  height: 8,
+  backgroundColor: theme.bgTertiary,
+  borderRadius: 4,
+  marginBottom: 8,
+  overflow: 'hidden',
+},
+progressBar: {
+  height: '100%',
+  borderRadius: 4,
+},
+progressStats: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+},
+progressStatsText: {
+  fontSize: 12,
+  color: theme.textMuted,
+},
 });

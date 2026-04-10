@@ -10,7 +10,7 @@ import { ThemeProvider } from './src/context/ThemeContext';
 
 const linking = {
   prefixes: [
-    'exp://192.168.1.29:8081',
+    'exp://192.168.1.18:8081',
     'exp://localhost:8081',
     'grouptask://',
     'https://grouptask.com',

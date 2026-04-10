@@ -398,7 +398,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         });
         
         if (tasksResult.success && isMounted.current) {
-          setMyTasks(tasksResult.tasks || []);
+          setMyTasks(tasksResult.tasks || []); 
           
           // Calculate due today tasks from myTasks
           const today = new Date();
@@ -757,6 +757,37 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             <Text style={[styles.pointsSubtext, { color: theme.textPlaceholder }]}>lifetime points</Text>
           </LinearGradient>
         </View>
+
+        {/* Progress Bar - Like Admin Dashboard */}
+<LinearGradient
+  colors={[theme.card, theme.bgSecondary]}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 1 }}
+  style={[styles.progressCard, { borderColor: theme.border }]}
+>
+  <View style={styles.progressHeader}>
+    <Text style={[styles.progressTitle, { color: theme.textSecondary }]}>Your Completion Rate</Text>
+    <Text style={[styles.progressPercentage, { color: theme.primary }]}>
+      {Math.round((points.total / (dashboardData?.stats?.totalPointsPossible || 1)) * 100)}%
+    </Text>
+  </View>
+  <View style={[styles.progressBarContainer, { backgroundColor: theme.bgTertiary }]}>
+    <View
+      style={[
+        styles.progressBar,
+        {
+          width: `${Math.min(100, Math.round((points.total / (dashboardData?.stats?.totalPointsPossible || 1)) * 100))}%`,
+          backgroundColor: theme.primary
+        }
+      ]}
+    />
+  </View>
+  <View style={styles.progressStats}>
+    <Text style={[styles.progressStatsText, { color: theme.textMuted }]}>
+      {points.total} of {dashboardData?.stats?.totalPointsPossible || 0} points earned
+    </Text>
+  </View>
+</LinearGradient>
 
         {/* Quick Stats - CLICKABLE */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Stats</Text>

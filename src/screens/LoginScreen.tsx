@@ -18,6 +18,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLoginForm } from '../authHook/useLoginForm';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { API_BASE_URL } from '../config/api';
 
 // ─── Color Palette ─────────────────────────────────────────────────────────────
 const COLORS = {
@@ -235,36 +236,55 @@ export default function LoginScreen({ navigation }: any) {
   const emailValid = touched.email && !emailError && !!formData.email;
   const passwordValid = touched.password && !passwordError && !!formData.password;
 
-  const handleLogin = async () => {
-    setTouched({ email: true, password: true });
+ // In LoginScreen.tsx - update the handleLogin function
 
-    const emailErr = validateEmail(formData.email);
-    const passErr = validatePassword(formData.password);
+const handleLogin = async () => {
+  setTouched({ email: true, password: true });
 
-    if (emailErr || passErr) {
-      setBanner({ message: emailErr || passErr, type: 'error' });
-      shake();
-      return;
-    }
+  const emailErr = validateEmail(formData.email);
+  const passErr = validatePassword(formData.password);
 
-    setBanner({ message: '', type: null });
-    Keyboard.dismiss();
-    const result = await handleSubmit();
+  if (emailErr || passErr) {
+    setBanner({ message: emailErr || passErr, type: 'error' });
+    shake();
+    return;
+  }
 
-    if (result?.success) {
-      setBanner({ message: 'Logged in successfully!', type: 'success' });
-      setTimeout(() => {
-        resetForm();
-        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-      }, 600);
+  setBanner({ message: '', type: null });
+  Keyboard.dismiss();
+  const result = await handleSubmit();
+
+  if (result?.success) {
+    setBanner({ message: 'Logged in successfully!', type: 'success' });
+    setTimeout(() => {
+      resetForm();
+      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+    }, 600);
+  } else {
+    // ✅ Handle field-specific errors
+    if (result?.field === 'email') {
+      setBanner({ 
+        message: 'Email not found. Please check your email or sign up.', 
+        type: 'error' 
+      });
+      // Highlight the email field with error styling
+      setTouched(prev => ({ ...prev, email: true }));
+    } else if (result?.field === 'password') {
+      setBanner({ 
+        message: 'Incorrect password. Please try again.', 
+        type: 'error' 
+      });
+      // Highlight the password field with error styling
+      setTouched(prev => ({ ...prev, password: true }));
     } else {
       setBanner({
         message: result?.message || 'Invalid email or password — please try again.',
         type: 'error',
       });
-      shake();
     }
-  };
+    shake();
+  }
+};
 
   return (
     <ScreenWrapper noTop={true} noBottom={true} backgroundColor={COLORS.white}>
@@ -352,9 +372,9 @@ export default function LoginScreen({ navigation }: any) {
 
               {/* Forgot */}
               <TouchableOpacity
-                onPress={() => Linking.openURL('http://192.168.1.29:5000/forgot-password')}
+                onPress={() => Linking.openURL(`${API_BASE_URL}/forgot-password`)}
                 disabled={loading}
-                style={styles.forgotContainer}
+                style={styles.forgotContainer} 
               >
                 <Text style={styles.forgotText}>Forgot password?</Text>
               </TouchableOpacity>
@@ -442,7 +462,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 10,
   },
-  logoContainer: {
+  logoContainer: { 
     width: 80,
     height: 80,
     borderRadius: 22,
@@ -451,7 +471,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.25)',
-  },
+  },  
   logoCheck: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.7)',

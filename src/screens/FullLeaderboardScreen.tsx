@@ -1,4 +1,5 @@
-// src/screens/FullLeaderboardScreen.tsx - UPDATED with getLeaderboard
+// src/screens/FullLeaderboardScreen.tsx - COMPLETE UPDATED VERSION
+
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -68,11 +69,10 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     }
 
     try {
-      // ✅ Use the new getLeaderboard method for all-time cumulative points
       const result = await GroupActivityService.getLeaderboard(groupId);
-      console.log('fullleaderboard:',result)
+      console.log('fullleaderboard:', result);
       if (result.success && result.data?.leaderboard) {
-        console.log('fullleaderboard:',result.data?.leaderboard)
+        console.log('fullleaderboard:', result.data?.leaderboard);
         setLeaderboard(result.data.leaderboard);
         setTotalPoints(result.data.totalPoints || 0);
       } else {
@@ -96,6 +96,22 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const handleRefresh = () => {
     setRefreshing(true);
     loadLeaderboardData();
+  };
+
+  // ✅ Handle leaderboard item press - navigate to MemberContributions
+  const handleLeaderboardPress = (member: any) => {
+    const memberId = member.userId;
+    if (!memberId) {
+      Alert.alert('Error', 'Cannot view member details - missing ID');
+      return;
+    }
+    
+    navigation.navigate('MemberContributions', { 
+      groupId, 
+      groupName, 
+      memberId,
+      userRole: route.params?.userRole || 'MEMBER'
+    });
   };
 
   const getRankIcon = (index: number) => {
@@ -123,57 +139,62 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     const points = item.points || 0;
     
     return (
-      <LinearGradient
-        colors={[theme.card, theme.bgSecondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[
-          styles.leaderboardItem,
-          { borderColor: theme.border },
-          isTop3 && styles.topRankItem,
-          index === 0 && { borderColor: '#FFD700', borderWidth: 1.5 },
-          index === 1 && { borderColor: '#C0C0C0', borderWidth: 1.5 },
-          index === 2 && { borderColor: '#CD7F32', borderWidth: 1.5 },
-        ]}
+      <TouchableOpacity
+        onPress={() => handleLeaderboardPress(item)}
+        activeOpacity={0.7}
       >
-        <View style={styles.rankContainer}>
-          {getRankIcon(index)}
-        </View>
+        <LinearGradient
+          colors={[theme.card, theme.bgSecondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.leaderboardItem,
+            { borderColor: theme.border },
+            isTop3 && styles.topRankItem,
+            index === 0 && { borderColor: '#FFD700', borderWidth: 1.5 },
+            index === 1 && { borderColor: '#C0C0C0', borderWidth: 1.5 },
+            index === 2 && { borderColor: '#CD7F32', borderWidth: 1.5 },
+          ]}
+        >
+          <View style={styles.rankContainer}>
+            {getRankIcon(index)}
+          </View>
 
-        <View style={styles.userContainer}>
-          <LinearGradient
-            colors={[theme.bgSecondary, theme.bgTertiary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.avatar, { borderColor: theme.border }]}
-          >
-            {item.avatarUrl ? (
-              <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
-            ) : (
-              <Text style={[styles.avatarText, { color: theme.textSecondary }]}>
-                {item.fullName?.charAt(0).toUpperCase() || '?'}
+          <View style={styles.userContainer}>
+            <LinearGradient
+              colors={[theme.bgSecondary, theme.bgTertiary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.avatar, { borderColor: theme.border }]}
+            >
+              {item.avatarUrl ? (
+                <Image source={{ uri: item.avatarUrl }} style={styles.avatarImage} />
+              ) : (
+                <Text style={[styles.avatarText, { color: theme.textSecondary }]}>
+                  {item.fullName?.charAt(0).toUpperCase() || '?'}
+                </Text>
+              )}
+            </LinearGradient>
+            
+            <View style={styles.userInfo}>
+              <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
+                {item.fullName || 'Unknown'}
               </Text>
-            )}
-          </LinearGradient>
-          
-          <View style={styles.userInfo}>
-            <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
-              {item.fullName || 'Unknown'}
-            </Text>
-            <View style={styles.userStatsRow}>
-              <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
-              <Text style={[styles.userStats, { color: theme.textMuted }]}>
-                Rank #{item.rank}
-              </Text>
+              <View style={styles.userStatsRow}>
+                <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                <Text style={[styles.userStats, { color: theme.textMuted }]}>
+                  Rank #{index + 1}
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <View style={styles.pointsContainer}>
-          <Text style={[styles.pointsValue, { color: theme.primary }]}>{points}</Text>
-          <Text style={[styles.pointsLabel, { color: theme.textMuted }]}>pts</Text>
-        </View>
-      </LinearGradient>
+          <View style={styles.pointsContainer}>
+            <Text style={[styles.pointsValue, { color: theme.primary }]}>{points}</Text>
+            <Text style={[styles.pointsLabel, { color: theme.textMuted }]}>pts</Text>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
     );
   };
 

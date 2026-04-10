@@ -1,4 +1,4 @@
-// src/components/SettingsModal.tsx - ADDED LOGOUT BUTTON
+// src/components/SettingsModal.tsx - COMPLETE UPDATED VERSION
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
@@ -16,10 +16,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { TaskService } from '../services/TaskService';
 import { GroupMembersService } from '../services/GroupMemberService';
 import { GroupActivityService } from '../services/GroupActivityService';
+import { AssignmentService } from '../services/AssignmentService';
 import { useSwapRequests } from '../SwapRequestHooks/useSwapRequests';
 import { TokenUtils } from '../utils/tokenUtils';
 import { useTheme } from '../context/ThemeContext';
-import { AuthService } from '../services/AuthService'; // ✅ Add this import
+import { AuthService } from '../services/AuthService';
 
 interface SettingsModalProps {
   visible: boolean;
@@ -59,7 +60,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [firstTaskDate, setFirstTaskDate] = useState<Date | null>(null);
   const [authError, setAuthError] = useState(false);
   const [recurringTasks, setRecurringTasks] = useState<any[]>([]);
-  const [loggingOut, setLoggingOut] = useState(false); // ✅ Add logout loading state
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [pendingVerificationsCount, setPendingVerificationsCount] = useState(0);
   
   const { createSwapRequest, loading: swapLoading } = useSwapRequests();
 
@@ -74,6 +76,28 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setAuthError(!hasToken);
     return hasToken;
   }, []);
+
+  // Fetch pending verifications count for admin badge
+  const fetchPendingVerificationsCount = useCallback(async () => {
+    if (!isAdmin) return;
+    
+    const hasToken = await checkToken();
+    if (!hasToken) return;
+    
+    try {
+      const result = await AssignmentService.getPendingVerifications(groupId, {
+        limit: 1,
+        offset: 0
+      });
+      
+      if (result.success && result.data) {
+        const count = result.data.total || 0;
+        setPendingVerificationsCount(count);
+      }
+    } catch (err) {
+      console.error('Error fetching pending count:', err);
+    }
+  }, [groupId, checkToken, isAdmin]);
 
   useEffect(() => {
     if (authError && visible) {
@@ -94,7 +118,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [authError, visible, navigation, onClose]);
 
-  // ✅ Add logout handler
   const handleLogout = useCallback(() => {
     Alert.alert(
       'Logout',
@@ -118,13 +141,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         onClose();
         navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
       } else {
-        // Even if logout fails, try to clear local state
         onClose();
         navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
       }
     } catch (error) {
       console.error('Logout error:', error);
-      // Still navigate to login on error
       onClose();
       navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     } finally {
@@ -132,32 +153,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, [navigation, onClose]);
 
-  // ===== FIXED: Get the earliest recurring task's creation date =====
   const getEarliestRecurringTaskDate = async (): Promise<Date | null> => {
     try {
-      // Fetch all tasks for the group
       const response = await TaskService.getGroupTasks(groupId);
       
       if (response.success && response.tasks) {
-        // Filter to only recurring tasks (not deleted)
         const recurringTasksList = response.tasks.filter((task: any) => task.isRecurring === true);
         setRecurringTasks(recurringTasksList);
         
         if (recurringTasksList.length === 0) {
-          console.log('📅 No recurring tasks found - week swap not available');
           return null;
         }
         
-        // Sort by creation date (oldest first)
         const sortedTasks = [...recurringTasksList].sort((a, b) => 
           new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
         
         const earliestTask = sortedTasks[0];
         const earliestDate = new Date(earliestTask.createdAt);
-        
-        console.log(`📅 Earliest recurring task: "${earliestTask.title}" created on ${earliestDate.toLocaleDateString()}`);
-        console.log(`   All recurring tasks count: ${recurringTasksList.length}`);
         
         return earliestDate;
       }
@@ -168,12 +181,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  // ===== FIXED: Check week swap availability based on earliest recurring task =====
   const checkWeekSwapAvailability = (firstTaskDate: Date) => {
     const now = new Date();
     const taskCreatedDate = new Date(firstTaskDate);
     
-    // Calculate hours since the FIRST recurring task was created
     const hoursSinceTaskCreated = (now.getTime() - taskCreatedDate.getTime()) / (1000 * 60 * 60);
     const isWithinFirst24Hours = hoursSinceTaskCreated >= 0 && hoursSinceTaskCreated <= 24;
     
@@ -200,95 +211,96 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-const loadGroupData = async () => {
-  if (!visible) return;
+  const loadGroupData = async () => {
+    if (!visible) return;
 
-  const hasToken = await checkToken();
-  if (!hasToken) {
-    Alert.alert(
-      'Authentication Error',
-      'Please log in again',
-      [{ text: 'OK', onPress: onClose }]
-    );
-    return;
-  }
-
-  try {
-    setLoadingStats(true);
-    
-    const statsResult = await TaskService.getTaskStatistics(groupId);
-    
-    const leaderboardResult = await GroupActivityService.getLeaderboard(groupId);
-    
-    let totalVerifiedPoints = 0;
-    if (leaderboardResult.success && leaderboardResult.data?.leaderboard) {
-      totalVerifiedPoints = leaderboardResult.data.leaderboard.reduce(
-        (sum: number, member: any) => sum + (member.points || 0), 0
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      Alert.alert(
+        'Authentication Error',
+        'Please log in again',
+        [{ text: 'OK', onPress: onClose }]
       );
-      const top5 = leaderboardResult.data.leaderboard.slice(0, 5);
-      setLeaderboard(top5);
-    }
-    
-    if (statsResult.success) {
-      const mergedStats = {
-        ...statsResult.statistics,
-        currentWeek: {
-          ...statsResult.statistics?.currentWeek,
-          earnedPoints: totalVerifiedPoints,
-          verifiedPoints: totalVerifiedPoints
-        }
-      };
-      setGroupStats(mergedStats);
+      return;
     }
 
-    const groupResult = await GroupMembersService.getGroupInfo(groupId);
-    if (groupResult.success) {
-      setRotationWeek(groupResult.group?.currentRotationWeek || 1);
-    }
-
-    const membersResult = await GroupMembersService.getGroupMembers(groupId);
-    if (membersResult.success) {
-      setMembers(membersResult.members || []);
-    }
-
-    const earliestTaskDate = await getEarliestRecurringTaskDate();
-    setFirstTaskDate(earliestTaskDate);
-    
-    if (earliestTaskDate) {
-      // ✅ Use UTC to avoid timezone shifting the date
-      const weekStart = new Date(earliestTaskDate);
-      weekStart.setUTCHours(0, 0, 0, 0);
+    try {
+      setLoadingStats(true);
       
-      const weekEnd = new Date(weekStart);
-      weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
-      weekEnd.setUTCHours(23, 59, 59, 999);
+      const statsResult = await TaskService.getTaskStatistics(groupId);
       
-      setWeekStartDate(weekStart);
-      setWeekEndDate(weekEnd);
+      const leaderboardResult = await GroupActivityService.getLeaderboard(groupId);
       
-      checkWeekSwapAvailability(earliestTaskDate);
-    } else {
-      setCanSwapWeek(false);
-      setWeekSwapReason('No recurring tasks found. Create a task first to enable week swaps.');
-      setWeekStartDate(null);
-      setWeekEndDate(null);
+      let totalVerifiedPoints = 0;
+      if (leaderboardResult.success && leaderboardResult.data?.leaderboard) {
+        totalVerifiedPoints = leaderboardResult.data.leaderboard.reduce(
+          (sum: number, member: any) => sum + (member.points || 0), 0
+        );
+        const top5 = leaderboardResult.data.leaderboard.slice(0, 5);
+        setLeaderboard(top5);
+      }
+      
+      if (statsResult.success) {
+        const mergedStats = {
+          ...statsResult.statistics,
+          currentWeek: {
+            ...statsResult.statistics?.currentWeek,
+            earnedPoints: totalVerifiedPoints,
+            verifiedPoints: totalVerifiedPoints
+          }
+        };
+        setGroupStats(mergedStats);
+      }
+
+      const groupResult = await GroupMembersService.getGroupInfo(groupId);
+      if (groupResult.success) {
+        setRotationWeek(groupResult.group?.currentRotationWeek || 1);
+      }
+
+      const membersResult = await GroupMembersService.getGroupMembers(groupId);
+      if (membersResult.success) {
+        setMembers(membersResult.members || []);
+      }
+
+      const earliestTaskDate = await getEarliestRecurringTaskDate();
+      setFirstTaskDate(earliestTaskDate);
+      
+      if (earliestTaskDate) {
+        const weekStart = new Date(earliestTaskDate);
+        weekStart.setUTCHours(0, 0, 0, 0);
+        
+        const weekEnd = new Date(weekStart);
+        weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+        weekEnd.setUTCHours(23, 59, 59, 999);
+        
+        setWeekStartDate(weekStart);
+        setWeekEndDate(weekEnd);
+        
+        checkWeekSwapAvailability(earliestTaskDate);
+      } else {
+        setCanSwapWeek(false);
+        setWeekSwapReason('No recurring tasks found. Create a task first to enable week swaps.');
+        setWeekStartDate(null);
+        setWeekEndDate(null);
+      }
+
+      setLoadingMyTasks(true);
+      const myTasksResult = await TaskService.getMyTasks(groupId);
+      if (myTasksResult.success && myTasksResult.tasks) {
+        setMyAssignments(myTasksResult.tasks);
+      }
+      setLoadingMyTasks(false);
+
+      // Fetch pending verifications count for admin
+      await fetchPendingVerificationsCount();
+
+    } catch (error) {
+      console.error('Error loading group data:', error);
+    } finally {
+      setLoadingStats(false);
+      setLoadingLeaderboard(false);
     }
-
-    setLoadingMyTasks(true);
-    const myTasksResult = await TaskService.getMyTasks(groupId);
-    if (myTasksResult.success && myTasksResult.tasks) {
-      setMyAssignments(myTasksResult.tasks);
-    }
-    setLoadingMyTasks(false);
-
-  } catch (error) {
-    console.error('Error loading group data:', error);
-  } finally {
-    setLoadingStats(false);
-    setLoadingLeaderboard(false);
-  }
-};
-
+  };
 
   useEffect(() => {
     if (visible) { 
@@ -413,82 +425,102 @@ const loadGroupData = async () => {
     return [theme.bgSecondary, theme.bgTertiary];
   };
 
-const renderLeaderboardItem = (item: any, index: number) => {
-  const isFirst = index === 0;
-  const isSecond = index === 1;
-  const isThird = index === 2;
+  // ✅ UPDATED: Leaderboard item with navigation to MemberContributions
+  const renderLeaderboardItem = (item: any, index: number) => {
+    const isFirst = index === 0;
+    const isSecond = index === 1;
+    const isThird = index === 2;
 
-  return (
-    <LinearGradient
-      key={item.userId}
-      colors={getLeaderboardGradientColors(index)}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[
-        styles.leaderboardItem,
-        isFirst && styles.firstPlace,
-        isSecond && styles.secondPlace,
-        isThird && styles.thirdPlace
-      ].filter(Boolean)}
-    >
-      <View style={styles.leaderboardRank}>
-        {isFirst ? (
-          <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
-        ) : isSecond ? (
-          <MaterialCommunityIcons name="trophy" size={18} color="#C0C0C0" />
-        ) : isThird ? (
-          <MaterialCommunityIcons name="trophy" size={16} color="#CD7F32" />
-        ) : (
-          <Text style={styles.rankNumber}>{index + 1}</Text>
-        )}
-      </View>
+    const handleLeaderboardPress = () => {
+      const memberId = item.userId;
+      if (!memberId) {
+        Alert.alert('Error', 'Cannot view member details - missing ID');
+        return;
+      }
       
-      <View style={styles.leaderboardUser}>
-        <View style={styles.userAvatar}>
-          <Text style={styles.userInitial}>
-            {item.fullName?.charAt(0) || '?'}
-          </Text>
-        </View>
-        <View style={styles.userInfo}>
-          <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
-            {item.fullName}
-          </Text>
-          <Text style={[styles.userStats, { color: theme.textMuted }]}>
-            {item.points} points
-          </Text>
-        </View>
-      </View>
-      
-      <LinearGradient
-        colors={[theme.primaryLight, theme.primaryLight]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.pointsBadge}
+      navigation.navigate('MemberContributions', { 
+        groupId, 
+        groupName, 
+        memberId,
+        userRole: userRole
+      });
+      onClose();
+    };
+
+    return (
+      <TouchableOpacity
+        key={item.userId}
+        onPress={handleLeaderboardPress}
+        activeOpacity={0.7}
       >
-        <Text style={[styles.pointsText, { color: theme.primary }]}>{item.points}</Text>
-      </LinearGradient>
-    </LinearGradient>
-  );
-};
-
+        <LinearGradient
+          colors={getLeaderboardGradientColors(index)}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.leaderboardItem,
+            isFirst && styles.firstPlace,
+            isSecond && styles.secondPlace,
+            isThird && styles.thirdPlace
+          ].filter(Boolean)}
+        >
+          <View style={styles.leaderboardRank}>
+            {isFirst ? (
+              <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
+            ) : isSecond ? (
+              <MaterialCommunityIcons name="trophy" size={18} color="#C0C0C0" />
+            ) : isThird ? (
+              <MaterialCommunityIcons name="trophy" size={16} color="#CD7F32" />
+            ) : (
+              <Text style={styles.rankNumber}>{index + 1}</Text>
+            )}
+          </View>
+          
+          <View style={styles.leaderboardUser}>
+            <View style={styles.userAvatar}>
+              <Text style={styles.userInitial}>
+                {item.fullName?.charAt(0) || '?'}
+              </Text>
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
+                {item.fullName}
+              </Text>
+              <Text style={[styles.userStats, { color: theme.textMuted }]}>
+                {item.points} points
+              </Text>
+            </View>
+          </View>
+          
+          <LinearGradient
+            colors={[theme.primaryLight, theme.primaryLight]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.pointsBadge}
+          >
+            <Text style={[styles.pointsText, { color: theme.primary }]}>{item.points}</Text>
+          </LinearGradient>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   const incompleteCount = myAssignments.filter((t: any) => 
     t.assignment && !t.assignment.completed
   ).length;
 
-const getHoursLeftText = () => {
-  if (!weekStartDate || !canSwapWeek) return '';
-  const now = new Date();
-  const weekStart = new Date(weekStartDate);
-  // ✅ Use UTC to avoid timezone shifting
-  weekStart.setUTCHours(0, 0, 0, 0);
-  const hoursSinceWeekStart = (now.getTime() - weekStart.getTime()) / (1000 * 60 * 60);
-  const hoursLeft = Math.max(0, 24 - hoursSinceWeekStart);
-  
-  if (hoursLeft <= 0) return '';
-  if (hoursLeft < 1) return `${Math.round(hoursLeft * 60)}m left`;
-  return `${Math.ceil(hoursLeft)}h left`;
-};
+  const getHoursLeftText = () => {
+    if (!weekStartDate || !canSwapWeek) return '';
+    const now = new Date();
+    const weekStart = new Date(weekStartDate);
+    weekStart.setUTCHours(0, 0, 0, 0);
+    const hoursSinceWeekStart = (now.getTime() - weekStart.getTime()) / (1000 * 60 * 60);
+    const hoursLeft = Math.max(0, 24 - hoursSinceWeekStart);
+    
+    if (hoursLeft <= 0) return '';
+    if (hoursLeft < 1) return `${Math.round(hoursLeft * 60)}m left`;
+    return `${Math.ceil(hoursLeft)}h left`;
+  };
 
   return (
     <Modal
@@ -734,6 +766,7 @@ const getHoursLeftText = () => {
                   <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
                 </TouchableOpacity>
 
+                {/* ✅ Review Submissions with pending badge */}
                 <TouchableOpacity onPress={handleReviewSubmissions} style={[styles.menuItem, styles.reviewItem]}>
                   <View style={styles.menuItemLeft}>
                     <MaterialCommunityIcons name="clipboard-check" size={18} color={theme.error} />
@@ -745,59 +778,61 @@ const getHoursLeftText = () => {
                     end={{ x: 1, y: 1 }}
                     style={styles.pendingBadge}
                   >
-                    <Text style={styles.pendingBadgeText}>Pending</Text>
+                    <Text style={styles.pendingBadgeText}>
+                      {pendingVerificationsCount > 0 ? pendingVerificationsCount : 'Pending'}
+                    </Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
             )}
-              {/* Statistics Section - Update the points stat */}
-<View style={styles.section}>
-  <View style={styles.sectionHeader}>
-    <LinearGradient
-      colors={[theme.bgSecondary, theme.bgTertiary]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.sectionIcon}
-    >
-      <MaterialCommunityIcons name="chart-bar" size={16} color={theme.primary} />
-    </LinearGradient>
-    <Text style={[styles.sectionTitle, { color: theme.text }]}>Stats</Text>
-  </View>
 
-  {loadingStats ? (
-    <ActivityIndicator size="small" color={theme.primary} style={styles.loader} />
-  ) : groupStats ? (
-    <View style={styles.statsGrid}>
-      <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
-        <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.totalTasks || 0}</Text>
-        <Text style={[styles.statLabel, { color: theme.textMuted }]}>Tasks</Text>
-      </View>
-      <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
-        <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.currentWeek?.totalAssignments || 0}</Text>
-        <Text style={[styles.statLabel, { color: theme.textMuted }]}>This Week</Text>
-      </View>
-      <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
-        <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.recurringTasks || 0}</Text>
-        <Text style={[styles.statLabel, { color: theme.textMuted }]}>Recurring</Text>
-      </View>
-      {/* ✅ UPDATE: Show VERIFIED points instead of completed points */}
-      <View style={[styles.statItem, styles.pointsStat, { backgroundColor: theme.primaryLight, borderColor: theme.primaryBorder }]}>
-        <Text style={[styles.statNumber, { color: theme.primary }]}>{groupStats.currentWeek?.earnedPoints || groupStats.currentWeek?.completedPoints || 0}</Text>
-        <Text style={[styles.statLabel, { color: theme.primary }]}>Verified Pts</Text>
-      </View>
-    </View>
-  ) : (
-    <Text style={[styles.noDataText, { color: theme.textPlaceholder }]}>No stats available</Text>
-  )}
+            {/* Statistics Section */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <LinearGradient
+                  colors={[theme.bgSecondary, theme.bgTertiary]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.sectionIcon}
+                >
+                  <MaterialCommunityIcons name="chart-bar" size={16} color={theme.primary} />
+                </LinearGradient>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Stats</Text>
+              </View>
 
-  <TouchableOpacity onPress={handleTaskStatistics} style={styles.menuItem}>
-    <View style={styles.menuItemLeft}>
-      <MaterialCommunityIcons name="chart-box" size={18} color={theme.primary} />
-      <Text style={[styles.menuItemText, { color: theme.text }]}>Detailed Statistics</Text>
-    </View>
-    <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
-  </TouchableOpacity>
-</View>
+              {loadingStats ? (
+                <ActivityIndicator size="small" color={theme.primary} style={styles.loader} />
+              ) : groupStats ? (
+                <View style={styles.statsGrid}>
+                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.totalTasks || 0}</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Tasks</Text>
+                  </View>
+                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.currentWeek?.totalAssignments || 0}</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>This Week</Text>
+                  </View>
+                  <View style={[styles.statItem, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                    <Text style={[styles.statNumber, { color: theme.text }]}>{groupStats.recurringTasks || 0}</Text>
+                    <Text style={[styles.statLabel, { color: theme.textMuted }]}>Recurring</Text>
+                  </View>
+                  <View style={[styles.statItem, styles.pointsStat, { backgroundColor: theme.primaryLight, borderColor: theme.primaryBorder }]}>
+                    <Text style={[styles.statNumber, { color: theme.primary }]}>{groupStats.currentWeek?.earnedPoints || groupStats.currentWeek?.completedPoints || 0}</Text>
+                    <Text style={[styles.statLabel, { color: theme.primary }]}>Verified Pts</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text style={[styles.noDataText, { color: theme.textPlaceholder }]}>No stats available</Text>
+              )}
+
+              <TouchableOpacity onPress={handleTaskStatistics} style={styles.menuItem}>
+                <View style={styles.menuItemLeft}>
+                  <MaterialCommunityIcons name="chart-box" size={18} color={theme.primary} />
+                  <Text style={[styles.menuItemText, { color: theme.text }]}>Detailed Statistics</Text>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
+              </TouchableOpacity>
+            </View>
 
             {/* Leaderboard */}
             <View style={styles.section}>
@@ -832,7 +867,7 @@ const getHoursLeftText = () => {
               </TouchableOpacity>
             </View>
 
-            {/* ✅ LOGOUT BUTTON - For ALL Users */}
+            {/* Logout Button - For ALL Users */}
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <LinearGradient
@@ -1210,7 +1245,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     fontStyle: 'italic',
   },
-  // ✅ New logout styles
   logoutMenuItem: {
     borderRadius: 12,
     overflow: 'hidden',

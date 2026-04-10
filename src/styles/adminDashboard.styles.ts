@@ -33,6 +33,11 @@ export const makeAdminDashboardStyles = (theme: Theme) => StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+progressArrow: {
+  position: 'absolute',
+  bottom: 16, 
+  right: 16,
+},
   refreshButton: {
     width: 36,
     height: 36,
@@ -225,10 +230,11 @@ export const makeAdminDashboardStyles = (theme: Theme) => StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  rotationTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
+rotationTitle: {
+  fontSize: 15,
+  fontWeight: '600',
+  color: theme.text,  
+},
   rotationMessage: {
     fontSize: 13,
     color: theme.textSecondary,
@@ -457,4 +463,5 @@ export const makeAdminDashboardStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
   },
+  
 });

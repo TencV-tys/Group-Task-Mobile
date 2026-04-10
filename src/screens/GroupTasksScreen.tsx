@@ -29,6 +29,7 @@ import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { TokenUtils } from '../utils/tokenUtils';
 import { useTheme } from '../context/ThemeContext';
 import { makeGroupTasksStyles } from '../styles/groupTasks.styles';
+import { AssignmentService } from '../services/AssignmentService';
 
 type TabType = 'all' | 'my';
 type UrgencyLevel = 'none' | 'urgent' | 'late' | 'warning' | 'expired' | 'completed';
@@ -76,6 +77,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [hasMixedCreationDays, setHasMixedCreationDays] = useState(false);
   const [tasksNeeded, setTasksNeeded] = useState(0);
   const [membersInRotation, setMembersInRotation] = useState<any[]>([]);
+  const [pendingVerificationsCount, setPendingVerificationsCount] = useState(0);
 
   // ===== CUSTOM HOOKS =====
   const { status: rotationStatus, checkStatus } = useRotationStatus(groupId);
@@ -194,6 +196,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return result;
   }, [selectedTab, myTasks, tasks]);
 
+  
+
   // ===== useCallback HOOKS =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
@@ -226,7 +230,28 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     if (nowTime > graceEnd) return 'expired';
     return 'none';
   }, []);
-
+// Add after fetchTasks function (around line 200-220)
+const fetchPendingVerificationsCount = useCallback(async () => {
+  if (!isAdmin) return;
+  
+  const hasToken = await checkToken();
+  if (!hasToken) return;
+  
+  try {
+    const result = await AssignmentService.getPendingVerifications(groupId, {
+      limit: 1,
+      offset: 0
+    });
+    
+    if (result.success && result.data) {
+      const count = result.data.total || 0;
+      setPendingVerificationsCount(count);
+      console.log(`📊 Pending verifications count: ${count}`);
+    }
+  } catch (err) {
+    console.error('Error fetching pending count:', err);
+  }
+}, [groupId, isAdmin, checkToken]);
 
   useEffect(() => {
   if (route.params?.tab === 'my') {
@@ -360,6 +385,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       null;
   }, []);
 
+  
   // ===== FETCH MEMBERS FUNCTION =====
   const fetchMembers = useCallback(async () => {
     const hasToken = await checkToken();
@@ -377,65 +403,79 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     }
   }, [groupId, checkToken]);
 
-  // ===== FETCH TASKS FUNCTION =====
-  const fetchTasks = useCallback(async (isRefreshing = false) => {
-    const hasToken = await checkToken();
-    if (!hasToken) {
-      setLoading(false);
+
+
+// Update your fetchTasks function - modify the finally block:
+const fetchTasks = useCallback(async (isRefreshing = false) => {
+  const hasToken = await checkToken();
+  if (!hasToken) {
+    setLoading(false);
+    if (isRefreshing) {
       setRefreshing(false);
-      return;
     }
+    return;
+  }
 
-    if (isRefreshing) setRefreshing(true);
-    else if (!initialLoadDone.current) setLoading(true);
-    setError(null);
+  if (isRefreshing) {
+    // Don't set refreshing here - it's already set by refreshTasks
+    // setRefreshing(true); ← REMOVE THIS LINE
+  } else if (!initialLoadDone.current) {
+    setLoading(true);
+  }
+  setError(null);
 
-    try {
-      const allTasksResult = await TaskService.getGroupTasks(groupId);
-      
-      if (allTasksResult.success && isMounted.current) {
-        const processedTasks = (allTasksResult.tasks || []).map((task: any) => {
-          const userAssignment = task.assignments?.find((a: any) => a.user?.id);
-          return {
-            ...task,
-            isAssignedToUser: !!userAssignment || !!task.userAssignment,
-            userAssignment: userAssignment || task.userAssignment,
-          };
-        });
-        setTasks(processedTasks);
-        analyzeTaskCreationDays(processedTasks);
-        initialLoadDone.current = true;
-      } else {
-        setError(allTasksResult.message || 'Failed to load tasks');
-      }
-      
-      const myTasksResult = await TaskService.getMyTasks(groupId);
-      
-      if (myTasksResult.success && myTasksResult.tasks && isMounted.current) {
-        const enhancedTasks = myTasksResult.tasks.map((task: any) => ({
+  try {
+    const allTasksResult = await TaskService.getGroupTasks(groupId);
+    
+    if (allTasksResult.success && isMounted.current) {
+      const processedTasks = (allTasksResult.tasks || []).map((task: any) => {
+        const userAssignment = task.assignments?.find((a: any) => a.user?.id);
+        return {
           ...task,
-          ...validateTaskTime(task),
-          urgencyLevel: getTaskUrgency(task)
-        }));
-        setMyTasks(enhancedTasks);
-        
-        const todayTasks = findTodayAssignments(enhancedTasks);
-        setTodayAssignments(todayTasks);
-        setShowTodaySection(todayTasks.length > 0);
-        setNextActiveTime(calculateNextActiveTime(todayTasks));
-      }
+          isAssignedToUser: !!userAssignment || !!task.userAssignment,
+          userAssignment: userAssignment || task.userAssignment,
+        };
+      });
+      setTasks(processedTasks);
+      analyzeTaskCreationDays(processedTasks);
+      initialLoadDone.current = true;
+    } else {
+      setError(allTasksResult.message || 'Failed to load tasks');
+    }
+    
+    const myTasksResult = await TaskService.getMyTasks(groupId);
+    
+    if (myTasksResult.success && myTasksResult.tasks && isMounted.current) {
+      const enhancedTasks = myTasksResult.tasks.map((task: any) => ({
+        ...task,
+        ...validateTaskTime(task),
+        urgencyLevel: getTaskUrgency(task)
+      }));
+      setMyTasks(enhancedTasks);
       
-    } catch (err: any) {
-      if (isMounted.current) setError(err.message || 'Network error');
-    } finally {
-      if (isMounted.current) {
-        setLoading(false);
+      const todayTasks = findTodayAssignments(enhancedTasks);
+      setTodayAssignments(todayTasks);
+      setShowTodaySection(todayTasks.length > 0);
+      setNextActiveTime(calculateNextActiveTime(todayTasks));
+    }
+    
+  } catch (err: any) {
+    if (isMounted.current) setError(err.message || 'Network error');
+  } finally {
+    if (isMounted.current) {
+      setLoading(false);
+      if (isRefreshing) {
         setRefreshing(false);
       }
     }
-  }, [groupId, checkToken, analyzeTaskCreationDays, validateTaskTime, getTaskUrgency, findTodayAssignments, calculateNextActiveTime]);
+  }
+}, [groupId, checkToken, analyzeTaskCreationDays, validateTaskTime, getTaskUrgency, findTodayAssignments, calculateNextActiveTime]);
 
-  const refreshTasks = useCallback(() => fetchTasks(true), [fetchTasks]);
+const refreshTasks = useCallback(() => {
+  console.log('🔄 Refreshing tasks...');
+  setRefreshing(true);
+  fetchTasks(true);
+}, [fetchTasks]);
 
   const handleViewTaskDetails = async (item: any) => {
     if (!await checkToken()) return;
@@ -462,6 +502,16 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       userRole 
     });
   };
+
+  // Add to the main useEffect that loads data (around where fetchTasks is called)
+useEffect(() => {
+  if (groupId && !loadingUser && !initialLoadDone.current) {
+    fetchTasks();
+    fetchMembers();
+    loadPendingForMe(groupId);
+    fetchPendingVerificationsCount(); // ✅ Add this line
+  }
+}, [groupId, loadingUser, fetchTasks, fetchMembers, loadPendingForMe, fetchPendingVerificationsCount]);
 
   // ===== useEffect HOOKS =====
   useEffect(() => {
@@ -1438,26 +1488,38 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       {!isAdmin && renderTodayFAB()}
 
       {isAdmin && selectedTab === 'all' && (
-        <View style={styles.floatingButtonsContainer}>
-          <TouchableOpacity onPress={() => navigation.navigate('PendingVerifications', { groupId, groupName, userRole })}>
-            <LinearGradient colors={[theme.error, theme.error]} style={[styles.floatingButton, styles.reviewButton]}>
-              <MaterialCommunityIcons name="clipboard-check" size={22} color="white" />
-            </LinearGradient>
-          </TouchableOpacity>
-          
-          <TouchableOpacity onPress={handleNavigateToAssignment}>
-            <LinearGradient colors={[theme.primary, theme.primaryDark]} style={[styles.floatingButton, styles.assignButton]}>
-              <MaterialCommunityIcons name="account-switch" size={22} color="white" />
-            </LinearGradient>
-          </TouchableOpacity>
-          
-          <TouchableOpacity onPress={handleCreateTask}>
-            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={[styles.floatingButton, styles.createButton]}>
-              <MaterialCommunityIcons name="plus" size={28} color={theme.textMuted} />
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      )}
+  <View style={styles.floatingButtonsContainer}>
+    {/* Pending Review Button with Badge */}
+    <TouchableOpacity 
+      onPress={() => navigation.navigate('PendingVerifications', { groupId, groupName, userRole })}
+    >
+      <LinearGradient colors={[theme.error, theme.error]} style={[styles.floatingButton, styles.reviewButton]}>
+        <MaterialCommunityIcons name="clipboard-check" size={22} color="white" />
+        {pendingVerificationsCount > 0 && (
+          <View style={styles.pendingBadge}>
+            <Text style={styles.pendingBadgeText}>
+              {pendingVerificationsCount > 99 ? '99+' : pendingVerificationsCount}
+            </Text>
+          </View>
+        )}
+      </LinearGradient>
+    </TouchableOpacity>
+    
+    {/* Assign Button */}
+    <TouchableOpacity onPress={handleNavigateToAssignment}>
+      <LinearGradient colors={[theme.primary, theme.primaryDark]} style={[styles.floatingButton, styles.assignButton]}>
+        <MaterialCommunityIcons name="account-switch" size={22} color="white" />
+      </LinearGradient>
+    </TouchableOpacity>
+    
+    {/* Create Task Button */}
+    <TouchableOpacity onPress={handleCreateTask}>
+      <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={[styles.floatingButton, styles.createButton]}>
+        <MaterialCommunityIcons name="plus" size={28} color={theme.textMuted} />
+      </LinearGradient>
+    </TouchableOpacity>
+  </View>
+)}
 
       {renderBottomTabs()}
 
@@ -1473,4 +1535,4 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       />
     </ScreenWrapper>
   );
-}
+} 

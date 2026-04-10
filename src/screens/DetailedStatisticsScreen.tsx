@@ -1,4 +1,4 @@
-// src/screens/DetailedStatisticsScreen.tsx - COMPLETE FIXED VERSION
+// src/screens/DetailedStatisticsScreen.tsx - WITH ADMIN BANNER
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
-  Alert
+  Alert 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -18,6 +18,7 @@ import { GroupActivityService } from '../services/GroupActivityService';
 import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext'; 
+import { AssignmentService } from '../services/AssignmentService';
 
 const { width } = Dimensions.get('window');
 
@@ -31,6 +32,9 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
   const [activityData, setActivityData] = useState<any>(null);
   const [leaderboardData, setLeaderboardData] = useState<any>(null);
   const [authError, setAuthError] = useState(false);
+  
+  const [memberDashboard, setMemberDashboard] = useState<any>(null);
+  const [myNeglectedTasks, setMyNeglectedTasks] = useState<any[]>([]);
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
@@ -75,23 +79,32 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     setAuthError(false);
     
     try {
-      // Fetch all data sources
-      const [taskStatsResult, activityResult, leaderboardResult] = await Promise.all([
-        TaskService.getTaskStatistics(groupId),
-        GroupActivityService.getGroupActivitySummary(groupId),
-        GroupActivityService.getLeaderboard(groupId)
-      ]);
+      const taskStatsResult = await TaskService.getTaskStatistics(groupId);
+      const leaderboardResult = await GroupActivityService.getLeaderboard(groupId);
       
-      console.log('Task Stats:', taskStatsResult);
-      console.log('Activity Data:', activityResult);
-      console.log('Leaderboard:', leaderboardResult);
+      if (isAdmin) {
+        const activityResult = await GroupActivityService.getGroupActivitySummary(groupId);
+        if (activityResult.success) {
+          setActivityData(activityResult.data);
+        }
+      } else {
+        const memberResult = await GroupActivityService.getMemberDashboard(groupId);
+        if (memberResult.success && memberResult.data) {
+          setMemberDashboard(memberResult.data);
+          
+          try {
+            const neglectedResult = await AssignmentService.getUserNeglectedTasks(groupId);
+            if (neglectedResult.success && neglectedResult.data?.tasks) {
+              setMyNeglectedTasks(neglectedResult.data.tasks);
+            }
+          } catch (err) {
+            console.log('Error loading neglected tasks:', err);
+          }
+        }
+      }
       
       if (taskStatsResult.success) {
         setStats(taskStatsResult.statistics);
-      }
-      
-      if (activityResult.success) {
-        setActivityData(activityResult.data);
       }
       
       if (leaderboardResult.success) {
@@ -122,28 +135,75 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     );
   }
 
-  // Get data from activityData (more accurate for current week)
-  const currentWeekActivity = activityData?.summary || {};
-  const assignments = currentWeekActivity.assignments || {};
-  const points = currentWeekActivity.points || {};
+  // Data extraction based on role
+  let totalMembers = 0;
+  let totalTasks = 0;
+  let membersInRotation = 0;
+  let verifiedCount = 0;
+  let neglectedCount = 0;
+  let pendingCount = 0;
+  let rejectedCount = 0;
+  let totalPointsPossible = 0;
+  let earnedPoints = 0;
+  let weeklyTotalAssignments = 0;
   
-  // Get all-time points from leaderboard
-  const allTimePoints = leaderboardData?.totalPoints || 0;
+  if (isAdmin && activityData) {
+    // ADMIN: Use activity data
+    const summary = activityData.summary || {};
+    totalMembers = summary.totalMembers || 0;
+    totalTasks = summary.totalTasks || 0;
+    membersInRotation = summary.membersInRotation || 0;
+    
+    const assignments = summary.assignments || {};
+    verifiedCount = assignments.verified || 0;
+    neglectedCount = assignments.neglected || 0;
+    pendingCount = assignments.pendingVerification || 0;
+    rejectedCount = assignments.rejected || 0;
+    
+    const points = summary.points || {};
+    totalPointsPossible = points.total || 0;
+    earnedPoints = points.earned || 0;
+    weeklyTotalAssignments = assignments.total || 0;
+  } else if (!isAdmin && memberDashboard) {
+    // MEMBER: Use member dashboard data
+    const groupInfo = memberDashboard.group || {};
+    const memberStats = memberDashboard.stats || {};
+    
+    totalMembers = groupInfo.memberCount || 0;
+    totalTasks = stats?.totalTasks || 0;
+    membersInRotation = stats?.membersInRotation || 0;
+    
+    // Member personal stats
+    const pendingTasks = memberStats.pendingTasks || 0;
+    const completedTasks = memberStats.completedTasks || 0;
+    const myNeglectedCount = memberStats.myNeglectedCount || 0;
+    
+    verifiedCount = completedTasks;
+    neglectedCount = myNeglectedCount;
+    pendingCount = pendingTasks;  // This is "Pending Tasks" for member
+    
+    totalPointsPossible = memberStats.totalAssignments || 0;
+    earnedPoints = memberStats.totalPoints || 0;
+    weeklyTotalAssignments = memberStats.totalAssignments || 0;
+  } else {
+    // Fallback
+    const currentWeek = stats?.currentWeek || {};
+    verifiedCount = currentWeek.verifiedAssignments || 0;
+    neglectedCount = currentWeek.neglectedAssignments || 0;
+    totalPointsPossible = currentWeek.totalPoints || 0;
+    earnedPoints = currentWeek.completedPoints || 0;
+    weeklyTotalAssignments = currentWeek.totalAssignments || 0;
+    totalMembers = stats?.totalMembers || 0;
+    totalTasks = stats?.totalTasks || 0;
+    membersInRotation = stats?.membersInRotation || 0;
+  }
   
-  // Calculate completion rate based on VERIFIED POINTS (matching AdminDashboard)
-  const totalPointsPossible = points.total || 0;
-  const earnedPoints = points.earned || 0;
   const completionRate = totalPointsPossible > 0 
     ? Math.round((earnedPoints / totalPointsPossible) * 100) 
     : 0;
   
-  // Get user stats from taskStats
+  const allTimePoints = leaderboardData?.totalPoints || 0;
   const userStats = stats?.userStats || {};
-  
-  // Get member count from activityData
-  const memberCount = activityData?.summary?.totalMembers || 0;
-  const totalTasks = activityData?.summary?.totalTasks || 0;
-  const membersInRotation = activityData?.summary?.membersInRotation || 0;
 
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
@@ -164,6 +224,21 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
       </View>
 
+      {/* ✅ ADMIN BANNER - Only visible to admin */}
+      {isAdmin && (
+        <LinearGradient
+          colors={[theme.primaryLight, theme.primaryLight]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.adminBanner, { borderColor: theme.primaryBorder }]}
+        >
+          <MaterialCommunityIcons name="shield-account" size={16} color={theme.primary} />
+          <Text style={[styles.adminBannerText, { color: theme.primary }]}>
+            Admin View - Full group statistics
+          </Text>
+        </LinearGradient>
+      )}
+
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         {/* Summary Cards */}
@@ -177,7 +252,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             <View style={[styles.iconContainer, { backgroundColor: '#EEF2FF' }]}>
               <MaterialCommunityIcons name="account-group" size={22} color="#4F46E5" />
             </View>
-            <Text style={[styles.summaryNumber, { color: theme.text }]}>{memberCount}</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{totalMembers}</Text>
             <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Members</Text>
           </LinearGradient>
 
@@ -203,8 +278,10 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             <View style={[styles.iconContainer, { backgroundColor: theme.primaryLight }]}>
               <MaterialCommunityIcons name="check-circle" size={22} color={theme.primary} />
             </View>
-            <Text style={[styles.summaryNumber, { color: theme.text }]}>{assignments.verified || 0}</Text>
-            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Verified</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{verifiedCount}</Text>
+            <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>
+              {isAdmin ? 'Verified' : 'Completed'}
+            </Text>
           </LinearGradient>
 
           <LinearGradient
@@ -216,12 +293,12 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             <View style={[styles.iconContainer, { backgroundColor: theme.errorBg }]}>
               <MaterialCommunityIcons name="alert-circle" size={22} color={theme.error} />
             </View>
-            <Text style={[styles.summaryNumber, { color: theme.text }]}>{assignments.neglected || 0}</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>{neglectedCount}</Text>
             <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>Neglected</Text>
           </LinearGradient>
         </View>
 
-        {/* Points Overview - Based on VERIFIED POINTS */}
+        {/* Points Overview */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Points Overview</Text>
           <LinearGradient
@@ -235,27 +312,36 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
               <Text style={[styles.pointsValue, { color: theme.text }]}>{totalPointsPossible}</Text>
             </View>
             <View style={styles.pointsRow}>
-              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Verified Points Earned:</Text>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>
+                {isAdmin ? 'Verified Points Earned:' : 'Your Points Earned:'}
+              </Text>
               <Text style={[styles.pointsValue, { color: theme.primary }]}>{earnedPoints}</Text>
             </View>
             <View style={styles.pointsRow}>
               <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>All-Time Verified Points:</Text>
               <Text style={[styles.pointsValue, { color: theme.primary }]}>{allTimePoints}</Text>
             </View>
+            
+            {/* Different label for Admin vs Member */}
             <View style={styles.pointsRow}>
-              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Pending Verification:</Text>
-              <Text style={[styles.pointsValue, { color: theme.primary }]}>
-                {assignments.pendingVerification || 0} tasks
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>
+                {isAdmin ? 'Pending Verification:' : 'Pending Tasks:'}
               </Text>
-            </View>
-            <View style={styles.pointsRow}>
-              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Rejected:</Text>
-              <Text style={[styles.pointsValue, { color: theme.error }]}>
-                {assignments.rejected || 0} tasks
+              <Text style={[styles.pointsValue, { color: theme.primary }]}>
+                {pendingCount} {isAdmin ? 'tasks' : 'tasks'}
               </Text>
             </View>
             
-            {/* Completion Rate Bar - Based on Verified Points */}
+            {rejectedCount > 0 && (
+              <View style={styles.pointsRow}>
+                <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Rejected:</Text>
+                <Text style={[styles.pointsValue, { color: theme.error }]}>
+                  {rejectedCount} tasks
+                </Text>
+              </View>
+            )}
+            
+            {/* Completion Rate Bar */}
             <View style={[styles.progressBar, { backgroundColor: theme.bgTertiary }]}>
               <LinearGradient
                 colors={[
@@ -268,14 +354,16 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
               />
             </View>
             <Text style={[styles.completionRate, { color: theme.textMuted }]}>
-              {completionRate}% Completion Rate ({earnedPoints}/{totalPointsPossible} points verified)
+              {completionRate}% Completion Rate ({earnedPoints}/{totalPointsPossible} points)
             </Text>
           </LinearGradient>
         </View>
 
         {/* Weekly Assignment Stats */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Weekly Assignment Status</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            {isAdmin ? 'Weekly Assignment Status' : 'Your Weekly Status'}
+          </Text>
           <LinearGradient
             colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
@@ -285,42 +373,50 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             <View style={styles.distributionRow}>
               <View style={styles.distributionLabel}>
                 <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Total Assignments</Text>
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>
+                  {isAdmin ? 'Total Assignments' : 'Your Assignments'}
+                </Text>
               </View>
-              <Text style={[styles.distributionNumber, { color: theme.text }]}>{assignments.total || 0}</Text>
+              <Text style={[styles.distributionNumber, { color: theme.text }]}>{weeklyTotalAssignments}</Text>
             </View>
             <View style={styles.distributionRow}>
               <View style={styles.distributionLabel}>
                 <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Verified</Text>
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>
+                  {isAdmin ? 'Verified' : 'Completed'}
+                </Text>
               </View>
-              <Text style={[styles.distributionNumber, { color: theme.primary }]}>{assignments.verified || 0}</Text>
+              <Text style={[styles.distributionNumber, { color: theme.primary }]}>{verifiedCount}</Text>
             </View>
             <View style={styles.distributionRow}>
               <View style={styles.distributionLabel}>
                 <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Pending Verification</Text>
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>
+                  {isAdmin ? 'Pending Verification' : 'Pending Tasks'}
+                </Text>
               </View>
-              <Text style={[styles.distributionNumber, { color: theme.primary }]}>{assignments.pendingVerification || 0}</Text>
+              <Text style={[styles.distributionNumber, { color: theme.primary }]}>{pendingCount}</Text>
             </View>
-            <View style={styles.distributionRow}>
-              <View style={styles.distributionLabel}>
-                <View style={[styles.dot, { backgroundColor: theme.error }]} />
-                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Rejected</Text>
+            {rejectedCount > 0 && (
+              <View style={styles.distributionRow}>
+                <View style={styles.distributionLabel}>
+                  <View style={[styles.dot, { backgroundColor: theme.error }]} />
+                  <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Rejected</Text>
+                </View>
+                <Text style={[styles.distributionNumber, { color: theme.error }]}>{rejectedCount}</Text>
               </View>
-              <Text style={[styles.distributionNumber, { color: theme.error }]}>{assignments.rejected || 0}</Text>
-            </View>
+            )}
             <View style={styles.distributionRow}>
               <View style={styles.distributionLabel}>
                 <View style={[styles.dot, { backgroundColor: theme.error }]} />
                 <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Neglected/Missed</Text>
               </View>
-              <Text style={[styles.distributionNumber, { color: theme.error }]}>{assignments.neglected || 0}</Text>
+              <Text style={[styles.distributionNumber, { color: theme.error }]}>{neglectedCount}</Text>
             </View>
           </LinearGradient>
         </View>
 
-        {/* Task Distribution */}
+        {/* Task Distribution - Shows for both */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.text }]}>Task Distribution</Text>
           <LinearGradient
@@ -360,7 +456,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
           </LinearGradient>
         </View>
 
-        {/* Your Performance - Members only */}
+        {/* Member's Performance - Only for members */}
         {!isAdmin && userStats && Object.keys(userStats).length > 0 && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Performance</Text>
@@ -395,11 +491,41 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
                 </View>
               )}
               <View style={styles.performanceRow}>
-                <Text style={[styles.performanceLabel, { color: theme.textSecondary }]}>Your Points (Verified):</Text>
+                <Text style={[styles.performanceLabel, { color: theme.textSecondary }]}>Your Points:</Text>
                 <Text style={[styles.performanceNumber, { color: theme.primary }]}>
                   {userStats.userPoints || 0}
                 </Text>
               </View>
+            </LinearGradient>
+          </View>
+        )}
+
+        {/* Show member's neglected tasks if any */}
+        {!isAdmin && myNeglectedTasks.length > 0 && (
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Missed Tasks</Text>
+            <LinearGradient
+              colors={[theme.card, theme.bgSecondary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.performanceCard, { borderColor: theme.errorBorder }]}
+            >
+              {myNeglectedTasks.slice(0, 5).map((task) => (
+                <View key={task.id} style={styles.neglectedRow}>
+                  <MaterialCommunityIcons name="alert-circle" size={16} color={theme.error} />
+                  <Text style={[styles.neglectedText, { color: theme.textSecondary }]} numberOfLines={1}>
+                    {task.taskTitle}
+                  </Text>
+                  <Text style={[styles.neglectedPoints, { color: theme.error }]}>
+                    -{task.pointsLost} pts
+                  </Text>
+                </View>
+              ))}
+              {myNeglectedTasks.length > 5 && (
+                <Text style={[styles.moreText, { color: theme.textMuted }]}>
+                  +{myNeglectedTasks.length - 5} more
+                </Text>
+              )}
             </LinearGradient>
           </View>
         )}
@@ -460,11 +586,30 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
   },
+  // ✅ Admin Banner Styles
+  adminBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+  },
+  adminBannerText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
   summaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
     marginBottom: 20,
+    marginTop: 8,
   },
   summaryCard: {
     flex: 1,
@@ -574,5 +719,27 @@ const styles = StyleSheet.create({
   performanceNumber: {
     fontSize: 15,
     fontWeight: '600',
+  },
+  neglectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+    gap: 8,
+  },
+  neglectedText: {
+    flex: 1,
+    fontSize: 13,
+  },
+  neglectedPoints: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  moreText: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 });

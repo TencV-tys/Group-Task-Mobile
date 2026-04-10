@@ -1,4 +1,4 @@
-// src/styles/completeAssignment.styles.ts - UPDATED with time slot selector styles
+// src/styles/completeAssignment.styles.ts - COMPLETE with all missing styles
 
 import { StyleSheet, Dimensions } from 'react-native';
 import { Theme } from '../context/ThemeContext';
@@ -198,6 +198,9 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
   timeSlotCardSelected: {
     borderWidth: 2,
   },
+  disabledCard: {
+    opacity: 0.6,
+  },
   radioButton: {
     width: 20,
     height: 20,
@@ -222,6 +225,30 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
     marginTop: 2,
   },
 
+  // ===== SUCCESS MESSAGE STYLES (NEW) =====
+  successMessageContainer: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  successMessage: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  successSubMessage: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  successFooter: {
+    textAlign: 'center',
+    marginTop: 12,
+    fontSize: 12,
+  },
+  
+  // ===== SUBMIT BUTTON SUCCESS STATE (NEW) =====
+  submitButtonSuccess: {
+    opacity: 0.9,
+  },
   
   section: {
     marginBottom: 24,
@@ -384,5 +411,4 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
     fontStyle: 'italic',
     color: theme.error,
   },
-
 });

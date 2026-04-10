@@ -98,6 +98,7 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
       } else {
         result = await AssignmentService.getUserNeglectedTasks({ groupId });
         if (result.success && isMounted.current) {
+          console.log('User Neglected data: ',result.data.tasks)
           setNeglectedTasks(result.data.tasks || []);
           const totalCount = result.data.summary?.total || result.data.total || 0;
           setStats({

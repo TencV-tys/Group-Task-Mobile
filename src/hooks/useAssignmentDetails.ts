@@ -211,24 +211,33 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
 const getStatusText = useCallback(() => {
   if (isTaskDeleted) return 'Task Deleted';
   
-  // ✅ PRIORITY 1: Check verified/rejected first (most important)
+  // ✅ PRIORITY 1: Check verified/rejected first
   if (assignment?.verified === true) return 'Verified';
   if (assignment?.verified === false) return 'Rejected';
   
   // ✅ PRIORITY 2: Check pending verification
   if (assignment?.completed === true && assignment?.verified === null) return 'Pending Verification';
   
-  // ✅ PRIORITY 3: Check expired/missed (only if not verified)
+  // ✅ PRIORITY 3: Check if due date has passed (different day)
+  const now = new Date();
+  const dueDate = new Date(assignment?.dueDate);
+  const dueDateUTC = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
+  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  
+  // If due date is from a previous day, it's expired
+  if (dueDateUTC < todayUTC && !assignment?.completed) return 'Expired';
+  
+  // ✅ PRIORITY 4: Check expired flag (for same-day cron updates)
   if (assignment?.expired === true) return 'Expired';
   
   const missedSlotIds = assignment?.missedTimeSlotIds || [];
   const currentTimeSlotId = assignment?.timeSlot?.id;
   if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'Missed';
   
-  // ✅ PRIORITY 4: Check completed but no verification status
+  // ✅ PRIORITY 5: Check completed
   if (assignment?.completed === true) return 'Completed';
   
-  return 'Not Completed';
+  return 'Not Started'; 
 }, [assignment, isTaskDeleted]);
 
 const getStatusColor = useCallback(() => {

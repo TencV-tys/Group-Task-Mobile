@@ -1,6 +1,6 @@
-// src/screens/CompleteAssignmentScreen.tsx - COMPLETE FIXED WITH AUTO-DETECTION
+// src/screens/CompleteAssignmentScreen.tsx - COMPLETE FIXED with auto-detection and submission disable
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -35,12 +35,15 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   const needsManualSelection = isMultiSlotTask && !assignmentTimeSlotId;
   
   const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(assignmentTimeSlotId || null);
+  const [hasSubmitted, setHasSubmitted] = useState(false); // ✅ Track if already submitted
+  const isMounted = useRef(true);
   
   console.log('🎯 [CompleteAssignmentScreen]', {
     assignmentTimeSlotId,
     isMultiSlotTask,
     needsManualSelection,
-    selectedTimeSlotId
+    selectedTimeSlotId,
+    hasSubmitted
   });
   
   const {
@@ -53,15 +56,31 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     timeStatus,
     isLate,
     authError,
+    lastSubmitSuccess, // ✅ Get success state from hook
     setNotes,
     setPhoto,
-    formatTime,  
+    formatTime,   
     getTimeStatusMessage,
     pickImage,
     takePhoto, 
     submitCompletion,
+    resetSubmitSuccess,
     clearAuthError
   } = useCompleteAssignment(assignmentId, taskTitle, dueDate, timeSlot, onCompleted);
+
+  // ✅ Monitor submission success from hook
+  useEffect(() => {
+    if (lastSubmitSuccess && isMounted.current) {
+      console.log('✅✅✅ Submission was successful! Disabling submit button.');
+      setHasSubmitted(true);
+      // Reset after a delay (optional)
+      setTimeout(() => {
+        if (isMounted.current) {
+          resetSubmitSuccess();
+        }
+      }, 1000);
+    }
+  }, [lastSubmitSuccess, resetSubmitSuccess]);
 
   useEffect(() => {
     if (authError) {
@@ -71,13 +90,51 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     }
   }, [authError, navigation, clearAuthError]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   const handleSubmit = async () => {
+    // ✅ Prevent multiple submissions after success
+    if (hasSubmitted) {
+      console.log('🚫 Assignment already submitted, ignoring duplicate submit');
+      Alert.alert('Already Submitted', 'This assignment has already been submitted successfully.');
+      return;
+    }
+    
+    if (submitting) {
+      console.log('⏳ Already submitting, please wait...');
+      return;
+    }
+    
     if (needsManualSelection && !selectedTimeSlotId) {
       Alert.alert('Select Time Slot', 'Please select which time slot you are completing');
       return;
     }
+    
     const finalTimeSlotId = assignmentTimeSlotId || selectedTimeSlotId;
-    await submitCompletion(finalTimeSlotId);
+    
+    console.log('📤 [Screen] Submitting with timeSlotId:', finalTimeSlotId);
+    
+    // Call submit and wait for result
+    const result = await submitCompletion(finalTimeSlotId);
+    
+    // ✅ If successful, disable the button immediately
+    if (result.success) {
+      console.log('✅ [Screen] Submit successful, disabling button');
+      setHasSubmitted(true);
+      
+      // Optional: Navigate back after a short delay
+      setTimeout(() => {
+        if (isMounted.current) {
+          // navigation.goBack(); // Uncomment if you want auto-navigation
+        }
+      }, 2000);
+    }
   };
 
   const renderTimeSlotSelector = () => {
@@ -95,13 +152,19 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
           const slotTime = `${slot.startTime} - ${slot.endTime}`;
           
           return (
-            <TouchableOpacity key={slot.id} onPress={() => setSelectedTimeSlotId(slot.id)} activeOpacity={0.7}>
+            <TouchableOpacity 
+              key={slot.id} 
+              onPress={() => !hasSubmitted && !submitting && setSelectedTimeSlotId(slot.id)} // ✅ Disable if submitted or submitting
+              activeOpacity={0.7}
+              disabled={hasSubmitted || submitting}
+            >
               <LinearGradient
                 colors={isSelected ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
                 style={[
                   styles.timeSlotCard,
                   isSelected && styles.timeSlotCardSelected,
-                  { borderColor: isSelected ? theme.primary : theme.border }
+                  { borderColor: isSelected ? theme.primary : theme.border },
+                  (hasSubmitted || submitting) && styles.disabledCard
                 ]}
               >
                 <View style={styles.radioButton}>
@@ -162,7 +225,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
           <Text style={[styles.timeInfoTitle, { color: timeStatusMsg.color }]}>{timeStatusMsg.title}</Text>
         </View>
         
-        {timeStatus === 'submission_open' && timeLeft !== null ? (
+        {timeStatus === 'submission_open' && timeLeft !== null && !hasSubmitted ? (
           <>
             <Text style={[styles.timerText, isCritical && styles.timeCriticalText, isWarning && styles.timeWarningText, { color: timeStatusMsg.color }]}>
               {formatTime(timeLeft)}
@@ -185,7 +248,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
               </View>
             )}
           </>
-        ) : timeStatus === 'waiting' && timeLeft !== null ? (
+        ) : timeStatus === 'waiting' && timeLeft !== null && !hasSubmitted ? (
           <>
             <Text style={[styles.timerText, { color: timeStatusMsg.color }]}>{formatTime(timeLeft)}</Text>
             <Text style={[styles.timeInstructions, { color: theme.textSecondary }]}>Submission opens at {openTimeString}</Text>
@@ -196,6 +259,12 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
               })()}
             </Text>
           </>
+        ) : hasSubmitted ? (
+          <View style={styles.successMessageContainer}>
+            <MaterialCommunityIcons name="check-circle" size={24} color="#2b8a3e" />
+            <Text style={[styles.successMessage, { color: '#2b8a3e' }]}>✓ Assignment Submitted Successfully!</Text>
+            <Text style={[styles.successSubMessage, { color: theme.textMuted }]}>Waiting for admin verification</Text>
+          </View>
         ) : (
           <Text style={[styles.timeMessage, { color: theme.textSecondary }]}>{timeStatusMsg.message}</Text>
         )}
@@ -219,19 +288,31 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         <View style={styles.photoPreviewContainer}>
           <Image source={{ uri: photo }} style={styles.photoPreview} resizeMode="cover" />
           <View style={styles.photoActions}>
-            <TouchableOpacity style={styles.photoActionButton} onPress={pickImage}>
+            <TouchableOpacity 
+              style={styles.photoActionButton} 
+              onPress={pickImage}
+              disabled={hasSubmitted || submitting}
+            >
               <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.photoActionGradient}>
                 <MaterialCommunityIcons name="image-edit" size={14} color={theme.textSecondary} />
                 <Text style={[styles.photoActionText, { color: theme.textSecondary }]}>Change</Text>
               </LinearGradient>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.photoActionButton} onPress={takePhoto}>
+            <TouchableOpacity 
+              style={styles.photoActionButton} 
+              onPress={takePhoto}
+              disabled={hasSubmitted || submitting}
+            >
               <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.photoActionGradient}>
                 <MaterialCommunityIcons name="camera" size={14} color={theme.textSecondary} />
                 <Text style={[styles.photoActionText, { color: theme.textSecondary }]}>Retake</Text>
               </LinearGradient>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.photoActionButton} onPress={() => setPhoto(null)}>
+            <TouchableOpacity 
+              style={styles.photoActionButton} 
+              onPress={() => !hasSubmitted && !submitting && setPhoto(null)}
+              disabled={hasSubmitted || submitting}
+            >
               <LinearGradient colors={[theme.errorBg, theme.errorBg]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.photoActionGradient, styles.removeGradient]}>
                 <MaterialCommunityIcons name="delete" size={14} color={theme.error} />
                 <Text style={[styles.photoActionText, styles.removeText, { color: theme.error }]}>Remove</Text>
@@ -241,13 +322,21 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         </View>
       ) : (
         <View style={styles.photoUploadOptions}>
-          <TouchableOpacity style={styles.photoOption} onPress={takePhoto}>
+          <TouchableOpacity 
+            style={styles.photoOption} 
+            onPress={takePhoto}
+            disabled={hasSubmitted || submitting}
+          >
             <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.photoOptionGradient}>
               <MaterialCommunityIcons name="camera" size={28} color={theme.primary} />
               <Text style={[styles.photoOptionText, { color: theme.primary }]}>Take Photo</Text>
             </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.photoOption} onPress={pickImage}>
+          <TouchableOpacity 
+            style={styles.photoOption} 
+            onPress={pickImage}
+            disabled={hasSubmitted || submitting}
+          >
             <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.photoOptionGradient}>
               <MaterialCommunityIcons name="image" size={28} color={theme.primary} />
               <Text style={[styles.photoOptionText, { color: theme.primary }]}>Choose from Gallery</Text>
@@ -276,6 +365,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
           maxLength={500}
           textAlignVertical="top"
           selectionColor={theme.primary}
+          editable={!hasSubmitted && !submitting}
         />
       </LinearGradient>
       
@@ -288,7 +378,11 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
 
   const renderHeader = () => (
     <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
+      <TouchableOpacity 
+        onPress={() => navigation.goBack()} 
+        style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
+        disabled={submitting}
+      >
         <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
       </TouchableOpacity>
       <View style={styles.titleContainer}>
@@ -298,7 +392,8 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
     </View>
   );
 
-  const isSubmitDisabled = !isSubmittable || submitting || (needsManualSelection && !selectedTimeSlotId);
+  // ✅ Updated submit disabled logic
+  const isSubmitDisabled = hasSubmitted || submitting || !isSubmittable || (needsManualSelection && !selectedTimeSlotId);
 
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
@@ -321,20 +416,45 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             {renderPhotoSection()}
             {renderNotesSection()}
 
-            <TouchableOpacity style={[styles.submitButton, isSubmitDisabled && styles.submitButtonDisabled, timeStatus === 'wrong_day' && styles.submitButtonWrongDay]} onPress={handleSubmit} disabled={isSubmitDisabled} activeOpacity={0.8}>
+            <TouchableOpacity 
+              style={[
+                styles.submitButton, 
+                isSubmitDisabled && styles.submitButtonDisabled, 
+                timeStatus === 'wrong_day' && styles.submitButtonWrongDay,
+                hasSubmitted && styles.submitButtonSuccess
+              ]} 
+              onPress={handleSubmit} 
+              disabled={isSubmitDisabled} 
+              activeOpacity={0.8}
+            >
               <LinearGradient
-                colors={isSubmitDisabled ? [theme.bgSecondary, theme.bgTertiary] : timeStatus === 'submission_open' && isLate ? [theme.primary, theme.primaryDark] : timeStatus === 'submission_open' ? [theme.primary, theme.primaryDark] : [theme.textMuted, theme.textMuted]}
+                colors={
+                  hasSubmitted ? ['#2b8a3e', '#2b8a3e'] :
+                  isSubmitDisabled ? [theme.bgSecondary, theme.bgTertiary] : 
+                  timeStatus === 'submission_open' && isLate ? [theme.primary, theme.primaryDark] : 
+                  timeStatus === 'submission_open' ? [theme.primary, theme.primaryDark] : 
+                  [theme.textMuted, theme.textMuted]
+                }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.submitButtonGradient}
               >
                 {submitting ? (
-                  <ActivityIndicator size="small" color={!isSubmitDisabled ? "#fff" : theme.textMuted} />
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : hasSubmitted ? (
+                  <View style={styles.submitButtonContent}>
+                    <MaterialCommunityIcons name="check-circle" size={20} color="#fff" />
+                    <Text style={[styles.submitButtonText, { color: "#fff" }]}>✓ Submitted Successfully!</Text>
+                  </View>
                 ) : (
                   <View style={styles.submitButtonContent}>
                     <MaterialCommunityIcons name={timeStatus === 'submission_open' ? (isLate ? "timer-alert" : "check-circle") : "clock"} size={20} color={!isSubmitDisabled ? "#fff" : theme.textMuted} />
                     <Text style={[styles.submitButtonText, !isSubmitDisabled && styles.submitButtonTextDisabled, { color: !isSubmitDisabled ? "#fff" : theme.textMuted }]}>
-                      {needsManualSelection && !selectedTimeSlotId ? 'Select Time Slot First' : timeStatus === 'submission_open' ? (isLate ? 'Submit Late (Points Reduced)' : 'Submit On-Time') : timeStatus === 'waiting' ? `Opens at ${timeSlot?.endTime}` : timeStatus === 'wrong_day' ? 'Wrong Day' : 'Submission Closed'}
+                      {needsManualSelection && !selectedTimeSlotId ? 'Select Time Slot First' : 
+                       hasSubmitted ? 'Already Submitted' :
+                       timeStatus === 'submission_open' ? (isLate ? 'Submit Late (Points Reduced)' : 'Submit On-Time') : 
+                       timeStatus === 'waiting' ? `Opens at ${timeSlot?.endTime}` : 
+                       timeStatus === 'wrong_day' ? 'Wrong Day' : 'Submission Closed'}
                     </Text>
                   </View>
                 )}
@@ -342,8 +462,9 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
             </TouchableOpacity>
             
             {timeStatus === 'wrong_day' && <Text style={[styles.disabledText, { color: theme.textMuted }]}>This assignment can only be submitted on the due date: {new Date(dueDate).toLocaleDateString()}</Text>}
-            {timeStatus === 'waiting' && timeLeft !== null && <Text style={[styles.waitingText, { color: theme.primary }]}>Submission opens at {timeSlot?.endTime} ({formatTime(timeLeft)} remaining)</Text>}
-            {timeStatus === 'expired' && <Text style={[styles.expiredMessage, { color: theme.error }]}>The 30-minute grace period has ended. Please contact an administrator.</Text>}
+            {timeStatus === 'waiting' && timeLeft !== null && !hasSubmitted && <Text style={[styles.waitingText, { color: theme.primary }]}>Submission opens at {timeSlot?.endTime} ({formatTime(timeLeft)} remaining)</Text>}
+            {timeStatus === 'expired' && !hasSubmitted && <Text style={[styles.expiredMessage, { color: theme.error }]}>The 30-minute grace period has ended. Please contact an administrator.</Text>}
+            {hasSubmitted && <Text style={[styles.successFooter, { color: theme.textMuted }]}>You can now close this screen. Your submission is pending admin approval.</Text>}
           </LinearGradient>
         </ScrollView>
       </KeyboardAvoidingView>

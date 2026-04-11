@@ -1,4 +1,5 @@
-// src/screens/AccountSettingsScreen.tsx - Dark Mode Added
+// src/screens/AccountSettingsScreen.tsx - SIMPLIFIED FIXED VERSION
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -8,8 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
-  KeyboardAvoidingView,
-  Platform
+  Platform,
+  Animated
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,6 +21,93 @@ import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { useTheme } from '../context/ThemeContext';
 import { makeAccountSettingsStyles } from '../styles/accountSettings.styles';
+
+// ─── Password Strength Indicator ────────────────────────────────────────────────
+type StrengthLevel = 'weak' | 'fair' | 'good' | 'strong';
+
+const getPasswordStrength = (password: string) => {
+  if (!password) return { level: 'weak' as StrengthLevel, score: 0, label: '', color: '#e9ecef', tip: '' };
+
+  let score = 0;
+  const tips: string[] = [];
+
+  if (password.length >= 6) score++; else tips.push('At least 6 chars');
+  if (password.length >= 10) score++; else tips.push('10+ chars helps');
+  if (/[A-Z]/.test(password)) score++; else tips.push('Add uppercase');
+  if (/[0-9]/.test(password)) score++; else tips.push('Add a number');
+  if (/[^A-Za-z0-9]/.test(password)) score++; else tips.push('Add !@#$...');
+
+  if (score <= 1) return { level: 'weak' as StrengthLevel, score: 1, label: 'Weak', color: '#fa5252', tip: tips[0] ?? '' };
+  if (score === 2) return { level: 'fair' as StrengthLevel, score: 2, label: 'Fair', color: '#fd7e14', tip: tips[0] ?? '' };
+  if (score === 3) return { level: 'good' as StrengthLevel, score: 3, label: 'Good', color: '#f59f00', tip: tips[0] ?? '' };
+  return { level: 'strong' as StrengthLevel, score: 4, label: 'Strong', color: '#2b8a3e', tip: '' };
+};
+
+const PasswordStrengthBar = ({ password, theme }: { password: string; theme: any }) => {
+  const strength = getPasswordStrength(password);
+  const widths = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
+
+  useEffect(() => {
+    widths.forEach((w, i) =>
+      Animated.timing(w, {
+        toValue: i < strength.score ? 1 : 0,
+        duration: 280,
+        delay: i * 50,
+        useNativeDriver: false,
+      }).start()
+    );
+  }, [password, strength.score]);
+
+  if (!password) return null;
+
+  return (
+    <View style={{ marginTop: 8 }}>
+      <View style={{ flexDirection: 'row', gap: 4, marginBottom: 5 }}>
+        {widths.map((anim, i) => (
+          <View key={i} style={{ flex: 1, height: 3, borderRadius: 2, backgroundColor: theme.bgTertiary, overflow: 'hidden' }}>
+            <Animated.View
+              style={{ height: '100%', borderRadius: 2, backgroundColor: strength.color, transform: [{ scaleX: anim }] }}
+            />
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={{ fontSize: 11, fontWeight: '700', color: strength.color }}>{strength.label}</Text>
+        {strength.tip ? <Text style={{ fontSize: 11, color: theme.textMuted }}>{strength.tip}</Text> : null}
+      </View>
+    </View>
+  );
+};
+
+// ─── Eye Icon ─────────────────────────────────────────────────────────────────
+const EyeIcon = ({ visible, color }: { visible: boolean; color: string }) => (
+  <View style={{ width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
+    {visible ? (
+      <View style={{ width: 18, height: 10, borderRadius: 9, borderWidth: 1.5, borderColor: color, justifyContent: 'center', alignItems: 'center' }}>
+        <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color }} />
+      </View>
+    ) : (
+      <View style={{ position: 'relative' }}>
+        <View style={{ width: 18, height: 10, borderRadius: 9, borderWidth: 1.5, borderColor: color, justifyContent: 'center', alignItems: 'center', opacity: 0.4 }}>
+          <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color, opacity: 0.4 }} />
+        </View>
+        <View style={{ position: 'absolute', width: 20, height: 1.5, backgroundColor: color, top: 4, left: -1, transform: [{ rotate: '-30deg' }] }} />
+      </View>
+    )}
+  </View>
+);
+
+// ─── Check Icon ────────────────────────────────────────────────────────────────
+const CheckIcon = ({ color }: { color: string }) => (
+  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: color, justifyContent: 'center', alignItems: 'center' }}>
+    <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700', lineHeight: 14 }}>✓</Text>
+  </View>
+);
 
 export default function AccountSettingsScreen({ navigation }: any) {
   const { theme, isDark } = useTheme();
@@ -39,10 +127,25 @@ export default function AccountSettingsScreen({ navigation }: any) {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
+  // Touched states for validation
+  const [touched, setTouched] = useState({
+    fullName: false,
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false
+  });
 
   const isMounted = useRef(true);
 
-  // ===== REAL-TIME NOTIFICATIONS =====
+  // Validation
+  const nameError = touched.fullName && !fullName.trim() ? 'Name cannot be empty' : '';
+  const nameValid = touched.fullName && !nameError && fullName.trim().length > 0;
+  
+  const currentPasswordError = touched.currentPassword && !currentPassword ? 'Current password is required' : '';
+  const newPasswordError = touched.newPassword && newPassword && newPassword.length < 6 ? 'Password must be at least 6 characters' : '';
+  const confirmPasswordError = touched.confirmPassword && confirmPassword && newPassword !== confirmPassword ? 'Passwords do not match' : '';
+
   useRealtimeNotifications({
     onNewNotification: (notification) => {
       if (notification.type === 'PROFILE_UPDATED') {
@@ -52,7 +155,6 @@ export default function AccountSettingsScreen({ navigation }: any) {
     showAlerts: true
   });
 
-  // ===== TOKEN CHECK USING TOKENUTILS =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -63,7 +165,6 @@ export default function AccountSettingsScreen({ navigation }: any) {
     return hasToken;
   }, []);
 
-  // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
       Alert.alert(
@@ -122,6 +223,8 @@ export default function AccountSettingsScreen({ navigation }: any) {
     const hasToken = await checkToken();
     if (!hasToken) return;
 
+    setTouched(prev => ({ ...prev, fullName: true }));
+
     if (!fullName.trim()) {
       Alert.alert('Error', 'Name cannot be empty');
       return;
@@ -134,6 +237,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
       if (result.success && isMounted.current) {
         Alert.alert('Success', 'Profile updated successfully');
         await loadUserData();
+        setTouched(prev => ({ ...prev, fullName: false }));
       } else if (isMounted.current) {
         Alert.alert('Error', result.message || 'Failed to update profile');
       }
@@ -151,6 +255,13 @@ export default function AccountSettingsScreen({ navigation }: any) {
   const handleChangePassword = async () => {
     const hasToken = await checkToken();
     if (!hasToken) return;
+
+    setTouched(prev => ({ 
+      ...prev, 
+      currentPassword: true, 
+      newPassword: true, 
+      confirmPassword: true 
+    }));
 
     if (!currentPassword) {
       Alert.alert('Error', 'Current password is required');
@@ -181,6 +292,12 @@ export default function AccountSettingsScreen({ navigation }: any) {
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
+        setTouched({
+          fullName: false,
+          currentPassword: false,
+          newPassword: false,
+          confirmPassword: false
+        });
       } else if (isMounted.current) {
         Alert.alert('Error', result.message || 'Failed to change password');
       }
@@ -200,34 +317,38 @@ export default function AccountSettingsScreen({ navigation }: any) {
     value, 
     onChangeText, 
     showPassword, 
-    toggleVisibility 
+    toggleVisibility,
+    hasError,
+    isValid,
+    onBlur
   }: any) => (
-    <LinearGradient
-      colors={[theme.bgSecondary, theme.bgTertiary]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.passwordContainer, { borderColor: theme.border }]}
-    >
+    <View style={[
+      styles.inputWrapper,
+      hasError && styles.inputError,
+      isValid && styles.inputValid,
+    ]}>
       <TextInput
-        style={[styles.passwordInput, { color: theme.text }]}
+        style={[styles.input, saving && styles.inputDisabled]}
         placeholder={placeholder}
         placeholderTextColor={theme.textPlaceholder}
         value={value}
         onChangeText={onChangeText}
+        onBlur={onBlur}
         secureTextEntry={!showPassword}
         editable={!saving}
         selectionColor={theme.primary}
+        blurOnSubmit={false}
       />
+      {isValid && !hasError && <CheckIcon color={theme.primary} />}
       <TouchableOpacity 
         style={styles.eyeButton}
         onPress={toggleVisibility}
         disabled={saving}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Text style={styles.eyeIcon}>
-          {showPassword ? '👁️' : '👁️‍🗨️'}
-        </Text>
+        <EyeIcon visible={showPassword} color={hasError ? theme.error : theme.textMuted} />
       </TouchableOpacity>
-    </LinearGradient>
+    </View>
   );
 
   if (loading) {
@@ -250,10 +371,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
+      <View style={{ flex: 1 }}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
@@ -266,6 +384,8 @@ export default function AccountSettingsScreen({ navigation }: any) {
         <ScrollView 
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          key={Platform.OS === 'android' ? 'android-scroll' : 'ios-scroll'}
         >
           {/* Profile Information */}
           <View style={styles.section}>
@@ -279,40 +399,41 @@ export default function AccountSettingsScreen({ navigation }: any) {
             >
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Full Name</Text>
-                <LinearGradient
-                  colors={[theme.bgSecondary, theme.bgTertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.inputGradient, { borderColor: theme.border }]}
-                >
+                <View style={[
+                  styles.inputWrapper,
+                  nameError ? styles.inputError : nameValid ? styles.inputValid : null
+                ]}>
                   <TextInput
-                    style={[styles.input, saving && styles.inputDisabled, { color: theme.text }]}
+                    style={[styles.input, saving && styles.inputDisabled]}
                     placeholder="Your full name"
                     placeholderTextColor={theme.textPlaceholder}
                     value={fullName}
-                    onChangeText={setFullName}
+                    onChangeText={(text) => {
+                      setFullName(text);
+                      setTouched(prev => ({ ...prev, fullName: true }));
+                    }}
                     editable={!saving}
                     selectionColor={theme.primary}
+                    blurOnSubmit={false}
                   />
-                </LinearGradient>
+                  {nameValid && <CheckIcon color={theme.primary} />}
+                </View>
+                {nameError ? (
+                  <Text style={[styles.errorText, { color: theme.error }]}>{nameError}</Text>
+                ) : null}
               </View>
 
               <View style={styles.inputGroup}>
                 <Text style={[styles.inputLabel, { color: theme.textMuted }]}>Email Address</Text>
-                <LinearGradient
-                  colors={[theme.bgSecondary, theme.bgTertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.inputGradient, { borderColor: theme.border }]}
-                >
+                <View style={[styles.inputWrapper, styles.disabledInputWrapper]}>
                   <TextInput
-                    style={[styles.input, styles.disabledInput, { color: theme.textMuted, backgroundColor: theme.bgSecondary }]}
+                    style={[styles.input, styles.disabledInput, { color: theme.textMuted }]}
                     placeholder="Email address"
                     placeholderTextColor={theme.textPlaceholder}
                     value={email}
                     editable={false}
                   />
-                </LinearGradient>
+                </View>
                 <Text style={[styles.hintText, { color: theme.textMuted }]}>Email cannot be changed</Text>
               </View>
 
@@ -355,10 +476,19 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 <PasswordInput
                   placeholder="Enter current password"
                   value={currentPassword}
-                  onChangeText={setCurrentPassword}
+                  onChangeText={(text: string) => {
+                    setCurrentPassword(text);
+                    setTouched(prev => ({ ...prev, currentPassword: true }));
+                  }}
+                  onBlur={() => setTouched(prev => ({ ...prev, currentPassword: true }))}
                   showPassword={showCurrentPassword}
                   toggleVisibility={() => setShowCurrentPassword(!showCurrentPassword)}
+                  hasError={!!currentPasswordError}
+                  isValid={!currentPasswordError && currentPassword.length > 0}
                 />
+                {currentPasswordError ? (
+                  <Text style={[styles.errorText, { color: theme.error }]}>{currentPasswordError}</Text>
+                ) : null}
               </View>
 
               <View style={styles.inputGroup}>
@@ -366,10 +496,20 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 <PasswordInput
                   placeholder="Enter new password (min. 6 characters)"
                   value={newPassword}
-                  onChangeText={setNewPassword}
+                  onChangeText={(text: string) => {
+                    setNewPassword(text);
+                    setTouched(prev => ({ ...prev, newPassword: true }));
+                  }}
+                  onBlur={() => setTouched(prev => ({ ...prev, newPassword: true }))}
                   showPassword={showNewPassword}
                   toggleVisibility={() => setShowNewPassword(!showNewPassword)}
+                  hasError={!!newPasswordError}
+                  isValid={!newPasswordError && newPassword.length >= 6}
                 />
+                {newPasswordError ? (
+                  <Text style={[styles.errorText, { color: theme.error }]}>{newPasswordError}</Text>
+                ) : null}
+                <PasswordStrengthBar password={newPassword} theme={theme} />
               </View>
 
               <View style={styles.inputGroup}>
@@ -377,10 +517,19 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 <PasswordInput
                   placeholder="Re-enter new password"
                   value={confirmPassword}
-                  onChangeText={setConfirmPassword}
+                  onChangeText={(text: string) => {
+                    setConfirmPassword(text);
+                    setTouched(prev => ({ ...prev, confirmPassword: true }));
+                  }}
+                  onBlur={() => setTouched(prev => ({ ...prev, confirmPassword: true }))}
                   showPassword={showConfirmPassword}
                   toggleVisibility={() => setShowConfirmPassword(!showConfirmPassword)}
+                  hasError={!!confirmPasswordError}
+                  isValid={!confirmPasswordError && confirmPassword.length > 0 && newPassword === confirmPassword}
                 />
+                {confirmPasswordError ? (
+                  <Text style={[styles.errorText, { color: theme.error }]}>{confirmPasswordError}</Text>
+                ) : null}
               </View>
 
               <TouchableOpacity
@@ -401,10 +550,9 @@ export default function AccountSettingsScreen({ navigation }: any) {
             </LinearGradient>
           </View>
 
-          {/* Add some bottom padding for better scrolling */}
-          <View style={{ height: 20 }} />
+          <View style={{ height: 40 }} />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
     </ScreenWrapper>
   );
-}
+} 

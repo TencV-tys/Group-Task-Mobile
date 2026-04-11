@@ -40,7 +40,7 @@ export const makeHomeStyles = (theme: Theme) => StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 8,
   },
   iconButton: {
     position: 'relative',
@@ -65,63 +65,37 @@ export const makeHomeStyles = (theme: Theme) => StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 80,
+    paddingTop: 8,
   },
-  statsGrid: {
+
+  // ── Overdue Banner ───────────────────────────────────────────────────────
+  overdueBanner: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 12,
-    marginBottom: 24,
-    marginTop: 16,
-  },
-  statCard: {
-    width: '30%',
-    backgroundColor: theme.card,
-    borderRadius: 16,
-    padding: 16,
-    margin: '1.5%',
-    shadowColor: theme.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    position: 'relative',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  statIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: theme.text,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: theme.textMuted,
-    textAlign: 'center',
-  },
-  overdueBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
+    gap: 10,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    marginTop: 8,
     backgroundColor: theme.errorBg,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: theme.errorBorder,
+    borderRadius: 12,
+    padding: 12,
   },
-  overdueBadgeText: {
-    fontSize: 9,
-    color: theme.error,
+  overdueBannerText: {
+    fontSize: 13,
     fontWeight: '600',
   },
+  overdueBannerSub: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+  overdueBannerLink: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // ── Sections ─────────────────────────────────────────────────────────────
   section: {
     paddingHorizontal: 16,
     marginBottom: 24,
@@ -133,7 +107,7 @@ export const makeHomeStyles = (theme: Theme) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
@@ -145,114 +119,159 @@ export const makeHomeStyles = (theme: Theme) => StyleSheet.create({
     color: theme.primary,
     fontWeight: '600',
   },
-  quickActionsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  quickActionCard: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  quickActionGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    gap: 6,
-  },
-  quickActionText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  overdueList: {
+
+  // ── Task Cards ────────────────────────────────────────────────────────────
+  tasksContainer: {
     gap: 8,
   },
-  overdueTaskItem: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  overdueTaskGradient: {
+  taskCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: theme.card,
+    borderRadius: 12,
     padding: 12,
     gap: 12,
     borderWidth: 1,
+    borderColor: theme.border,
+    shadowColor: theme.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  overdueTaskContent: {
+  // left accent dot on task card
+  taskDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    flexShrink: 0,
+  },
+  taskContent: {
     flex: 1,
+    minWidth: 0,
   },
-  overdueTaskTitle: {
-    fontSize: 15,
+  taskTitle: {
+    fontSize: 14,
     fontWeight: '600',
     color: theme.text,
-    marginBottom: 2,
+    marginBottom: 4,
   },
-  overdueTaskGroup: {
-    fontSize: 12,
+  taskMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  groupPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 99,
+  },
+  groupPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  taskMetaText: {
+    fontSize: 11,
     color: theme.textMuted,
+    textTransform: 'capitalize',
   },
-  overdueTaskDays: {
+  taskRight: {
+    alignItems: 'flex-end',
+    flexShrink: 0,
+  },
+  taskPoints: {
     fontSize: 12,
     fontWeight: '600',
-    color: theme.error,
+    color: theme.primary,
+    marginBottom: 2,
   },
-  moreOverdueText: {
-    textAlign: 'center',
-    fontSize: 13,
+  taskDueLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+
+  // ── Empty today state ────────────────────────────────────────────────────
+  emptyFocusCard: {
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+  emptyFocusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     color: theme.textMuted,
-    marginTop: 8,
-    fontStyle: 'italic',
+    marginTop: 12,
+    marginBottom: 4,
   },
+  emptyFocusSub: {
+    fontSize: 13,
+    color: theme.textPlaceholder,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  // ── Groups horizontal scroll ──────────────────────────────────────────────
   groupsScroll: {
     marginHorizontal: -16,
     paddingHorizontal: 16,
-    marginBottom: 0,
   },
   groupCard: {
     width: 120,
     backgroundColor: theme.card,
     borderRadius: 16,
-    padding: 16,
-    marginRight: 12,
-    marginBottom: 10,
+    padding: 14,
+    marginRight: 10,
+    marginBottom: 4,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
     shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 6,
     elevation: 2,
-    borderWidth: 1,
-    borderColor: theme.border,
   },
   groupAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    marginBottom: 12,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginBottom: 10,
   },
   groupAvatarPlaceholder: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   groupAvatarText: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
   },
   groupName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: theme.text,
     textAlign: 'center',
+    marginBottom: 6,
+  },
+  // new: task count badge on group card
+  groupTaskBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 99,
     marginBottom: 4,
+  },
+  groupTaskBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   groupRoleBadge: {
     paddingHorizontal: 8,
@@ -269,65 +288,32 @@ export const makeHomeStyles = (theme: Theme) => StyleSheet.create({
     color: theme.primary,
     fontWeight: '600',
   },
-  tasksContainer: {
-    gap: 8,
+
+  // ── Quick Actions ─────────────────────────────────────────────────────────
+  quickActionsGrid: {
+    flexDirection: 'row',
+    gap: 10,
   },
-  taskCard: {
+  quickActionCard: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  quickActionGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: theme.card,
-    borderRadius: 12,
-    padding: 12,
-    shadowColor: theme.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  taskIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 8,
+    gap: 6,
   },
-  taskContent: {
-    flex: 1,
-  },
-  taskTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.text,
-    marginBottom: 2,
-  },
-  taskGroup: {
-    fontSize: 12,
-    color: theme.textMuted,
-  },
-  taskRight: {
-    alignItems: 'flex-end',
-  },
-  taskPoints: {
+  quickActionText: {
+    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
-    color: theme.primary,
-    marginBottom: 2,
   },
-  taskDaysLeft: {
-    fontSize: 11,
-    color: theme.textMuted,
-  },
-  taskDueToday: {
-    color: theme.error,
-    fontWeight: '600',
-  },
-  taskDueTomorrow: {
-    color: '#e67700',
-    fontWeight: '500',
-  },
+
+  // ── Activity ──────────────────────────────────────────────────────────────
   activityContainer: {
     gap: 8,
   },
@@ -337,14 +323,14 @@ export const makeHomeStyles = (theme: Theme) => StyleSheet.create({
     backgroundColor: theme.card,
     borderRadius: 12,
     padding: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    position: 'relative',
     shadowColor: theme.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: theme.border,
   },
   activityIcon: {
     width: 40,
@@ -375,17 +361,14 @@ export const makeHomeStyles = (theme: Theme) => StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.primary,
   },
+
+  // ── Empty / Loading / Error ───────────────────────────────────────────────
   emptyState: {
     backgroundColor: theme.card,
     borderRadius: 16,
     padding: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: theme.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
     borderWidth: 1,
     borderColor: theme.border,
   },
@@ -437,6 +420,8 @@ export const makeHomeStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+
+  // ── Bottom Nav ────────────────────────────────────────────────────────────
   bottomNav: {
     position: 'absolute',
     bottom: 0,

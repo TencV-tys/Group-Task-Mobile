@@ -1636,7 +1636,7 @@ const getVerificationStatus = (assignment: any) => {
                   );
                 })}
               </View>
-              <Text style={styles.timeSlotNote}>ⓘ Submit within 30 minutes before/after time slot end</Text>
+              <Text style={styles.timeSlotNote}>ⓘ Submit within 30 minutes after time slot end</Text>
             </View>
           )}
 

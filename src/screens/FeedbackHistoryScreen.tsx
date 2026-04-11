@@ -1,11 +1,11 @@
-// src/screens/FeedbackHistoryScreen.tsx - Dark Mode Added
+// src/screens/FeedbackHistoryScreen.tsx - CLEAN WORKING VERSION
+
 import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
   Alert,
   ActivityIndicator,
@@ -25,7 +25,6 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
     loading,
     feedbackList,
     stats,
-    activeFilter,
     loadFeedback,
     loadStats,
     setFilter,
@@ -41,7 +40,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
         [{ text: 'OK', onPress: () => navigation.navigate('Login') }]
       );
     }
-  }, [authError]);
+  }, [authError, navigation]);
 
   useEffect(() => {
     loadStats();
@@ -55,42 +54,14 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
     loadFeedback(1, filter);
   }, [filter]);
 
-  const handleFilterPress = () => {
-    Alert.alert(
-      'Filter Feedback',
-      'Select filter option',
-      [
-        { 
-          text: 'All', 
-          onPress: () => {
-            setFilterState(null);
-            setFilter(null);
-          }
-        },
-        { 
-          text: 'Open', 
-          onPress: () => {
-            setFilterState('OPEN');
-            setFilter('OPEN');
-          }
-        },
-        { 
-          text: 'In Progress', 
-          onPress: () => {
-            setFilterState('IN_PROGRESS');
-            setFilter('IN_PROGRESS');
-          }
-        },
-        { 
-          text: 'Resolved', 
-          onPress: () => {
-            setFilterState('RESOLVED');
-            setFilter('RESOLVED');
-          }
-        },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
+  const handleStatPress = (newFilter: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | null) => {
+    if (filter === newFilter) {
+      setFilterState(null);
+      setFilter(null);
+    } else {
+      setFilterState(newFilter);
+      setFilter(newFilter);
+    }
   };
 
   const handleDelete = (feedbackId: string) => {
@@ -124,14 +95,9 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
     }
   };
 
-  const getStatCount = (status: string) => {
-    if (!stats) return 0;
-    
-    if (status === 'OPEN') return stats.open || 0;
-    if (status === 'IN_PROGRESS') return stats.inProgress || 0;
-    if (status === 'RESOLVED') return stats.resolved || 0;
-    if (status === 'TOTAL') return stats.total || 0;
-    return 0;
+  const isActiveFilter = (status: string | null) => {
+    if (status === null) return !filter;
+    return filter === status;
   };
 
   return (
@@ -151,75 +117,63 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
         </View>
         
         <View style={styles.headerRight}>
-          {/* Filter Button */}
-          <TouchableOpacity 
-            onPress={handleFilterPress}
-            style={[styles.iconButton, filter && styles.activeFilterButton, { borderColor: filter ? theme.primary : theme.border }]}
-          >
-            <LinearGradient
-              colors={filter ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.iconButtonGradient}
-            >
-              <MaterialCommunityIcons 
-                name="filter" 
-                size={18} 
-                color={filter ? theme.primary : theme.textSecondary} 
-              />
-            </LinearGradient>
-          </TouchableOpacity>
-
-          {/* Refresh Button */}
           <TouchableOpacity 
             onPress={() => loadFeedback(1, filter)}
             disabled={loading}
-            style={[styles.iconButton, { borderColor: theme.border }]}
+            style={[styles.refreshButton, { borderColor: theme.border, backgroundColor: theme.card }]}
           >
-            <LinearGradient
-              colors={[theme.bgSecondary, theme.bgTertiary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.iconButtonGradient}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color={theme.primary} />
-              ) : (
-                <MaterialCommunityIcons name="refresh" size={18} color={theme.primary} />
-              )}
-            </LinearGradient>
+            {loading ? (
+              <ActivityIndicator size="small" color={theme.primary} />
+            ) : (
+              <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
+            )}
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Stats Summary - Updated to show IN_PROGRESS */}
+      {/* Stats Summary - Tap to Filter */}
       {stats && (
-        <LinearGradient
-          colors={[theme.card, theme.bgSecondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.statsRow, { borderBottomColor: theme.border }]}
-        >
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.text }]}>{stats.total || 0}</Text>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Total</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.primary }]}>{stats.open || 0}</Text>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Open</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.primary }]}>{stats.inProgress || 0}</Text>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>In Progress</Text>
-          </View>
-          <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-          <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: theme.primary }]}>{stats.resolved || 0}</Text>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Resolved</Text>
-          </View>
-        </LinearGradient>
+        <View style={[styles.statsRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
+          {/* Total Card */}
+          <TouchableOpacity 
+            style={[styles.statCard, isActiveFilter(null) && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
+            onPress={() => handleStatPress(null)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.statValue, { color: isActiveFilter(null) ? theme.primary : theme.text }]}>{stats.total || 0}</Text>
+            <Text style={[styles.statLabel, { color: isActiveFilter(null) ? theme.primary : theme.textMuted }]}>Total</Text>
+          </TouchableOpacity>
+
+          {/* Open Card */}
+          <TouchableOpacity 
+            style={[styles.statCard, isActiveFilter('OPEN') && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
+            onPress={() => handleStatPress('OPEN')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.statValue, { color: isActiveFilter('OPEN') ? theme.primary : theme.text }]}>{stats.open || 0}</Text>
+            <Text style={[styles.statLabel, { color: isActiveFilter('OPEN') ? theme.primary : theme.textMuted }]}>Open</Text>
+          </TouchableOpacity>
+
+          {/* In Progress Card */}
+          <TouchableOpacity 
+            style={[styles.statCard, isActiveFilter('IN_PROGRESS') && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
+            onPress={() => handleStatPress('IN_PROGRESS')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.statValue, { color: isActiveFilter('IN_PROGRESS') ? theme.primary : theme.text }]}>{stats.inProgress || 0}</Text>
+            <Text style={[styles.statLabel, { color: isActiveFilter('IN_PROGRESS') ? theme.primary : theme.textMuted }]}>In Progress</Text>
+          </TouchableOpacity>
+
+          {/* Resolved Card */}
+          <TouchableOpacity 
+            style={[styles.statCard, isActiveFilter('RESOLVED') && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
+            onPress={() => handleStatPress('RESOLVED')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.statValue, { color: isActiveFilter('RESOLVED') ? theme.primary : theme.text }]}>{stats.resolved || 0}</Text>
+            <Text style={[styles.statLabel, { color: isActiveFilter('RESOLVED') ? theme.primary : theme.textMuted }]}>Resolved</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       <ScrollView
@@ -236,14 +190,9 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
       >
         {feedbackList.length === 0 ? (
           <View style={styles.emptyState}>
-            <LinearGradient
-              colors={[theme.bgSecondary, theme.bgTertiary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.emptyIconContainer, { borderColor: theme.border }]}
-            >
+            <View style={[styles.emptyIconContainer, { borderColor: theme.border, backgroundColor: theme.bgSecondary }]}>
               <MaterialCommunityIcons name="message-text-outline" size={48} color={theme.primary} />
-            </LinearGradient>
+            </View>
             <Text style={[styles.emptyStateText, { color: theme.textMuted }]}>No feedback yet</Text>
             <Text style={[styles.emptyStateSubtext, { color: theme.textPlaceholder }]}>
               {filter 
@@ -267,43 +216,30 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           </View>
         ) : (
           feedbackList.map((item) => (
-            <LinearGradient
+            <View
               key={item.id}
-              colors={[theme.card, theme.bgSecondary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.feedbackCard, { borderColor: theme.border }]}
+              style={[styles.feedbackCard, { backgroundColor: theme.card, borderColor: theme.border }]}
             >
               {/* Header */}
               <View style={styles.cardHeader}>
                 <View style={styles.typeContainer}>
-                  <LinearGradient
-                    colors={[theme.bgSecondary, theme.bgTertiary]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={[styles.typeIcon, { borderColor: theme.border }]}
-                  >
+                  <View style={[styles.typeIcon, { borderColor: theme.border, backgroundColor: theme.bgSecondary }]}>
                     <MaterialCommunityIcons 
                       name={getFeedbackIcon(item.type) as any} 
                       size={16} 
                       color={getFeedbackColor(item.type)} 
                     />
-                  </LinearGradient>
+                  </View>
                   <Text style={[styles.typeText, { color: theme.text }]}>{item.type.replace(/_/g, ' ')}</Text>
                 </View>
-                <LinearGradient
-                  colors={[getStatusColor(item.status), getStatusColor(item.status) + 'dd']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.statusBadge}
-                >
-                  <Text style={styles.statusText}>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+                  <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
                     {item.status === 'IN_PROGRESS' ? 'In Progress' : item.status}
                   </Text>
-                </LinearGradient>
+                </View>
               </View>
 
-              {/* Message - Clickable for details */}
+              {/* Message */}
               <TouchableOpacity 
                 onPress={() => navigation.navigate('FeedbackDetails', { feedbackId: item.id })}
                 activeOpacity={0.7}
@@ -313,18 +249,13 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                 </Text>
               </TouchableOpacity>
 
-              {/* Footer with actions */}
-              <View style={styles.cardFooter}>
+              {/* Footer */}
+              <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
                 <View style={styles.footerLeft}>
                   {item.category && (
-                    <LinearGradient
-                      colors={[theme.bgSecondary, theme.bgTertiary]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={[styles.categoryTag, { borderColor: theme.border }]}
-                    >
+                    <View style={[styles.categoryTag, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
                       <Text style={[styles.categoryText, { color: theme.textSecondary }]}>{item.category}</Text>
-                    </LinearGradient>
+                    </View>
                   )}
                   <Text style={[styles.date, { color: theme.textPlaceholder }]}>
                     {new Date(item.createdAt).toLocaleDateString()}
@@ -332,7 +263,6 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                 </View>
                 
                 <View style={styles.actions}>
-                  {/* Edit - Only if editable */}
                   {item.status !== 'RESOLVED' && item.status !== 'CLOSED' && (
                     <TouchableOpacity
                       onPress={() => navigation.navigate('FeedbackDetails', { 
@@ -341,34 +271,23 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                       })}
                       style={styles.actionButton}
                     >
-                      <LinearGradient
-                        colors={[theme.bgSecondary, theme.bgTertiary]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={[styles.actionButtonGradient, { borderColor: theme.border }]}
-                      >
+                      <View style={[styles.actionButtonInner, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
                         <MaterialCommunityIcons name="pencil" size={14} color={theme.primary} />
-                      </LinearGradient>
+                      </View>
                     </TouchableOpacity>
                   )}
                   
-                  {/* Delete */}
                   <TouchableOpacity
                     onPress={() => handleDelete(item.id)}
                     style={styles.actionButton}
                   >
-                    <LinearGradient
-                      colors={[theme.errorBg, theme.errorBg]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={[styles.actionButtonGradient, styles.deleteButtonGradient, { borderColor: theme.errorBorder }]}
-                    >
+                    <View style={[styles.actionButtonInner, { backgroundColor: theme.errorBg, borderColor: theme.errorBorder }]}>
                       <MaterialCommunityIcons name="delete" size={14} color={theme.error} />
-                    </LinearGradient>
+                    </View>
                   </TouchableOpacity>
                 </View>
               </View>
-            </LinearGradient>
+            </View>
           ))
         )}
       </ScrollView>
@@ -377,7 +296,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
 }
 
 // Helper functions
-const getFeedbackIcon = (type: string) => {
+const getFeedbackIcon = (type: string): string => {
   const icons: Record<string, string> = {
     'BUG': 'bug',
     'FEATURE_REQUEST': 'lightbulb',
@@ -390,7 +309,7 @@ const getFeedbackIcon = (type: string) => {
   return icons[type] || 'message';
 };
 
-const getFeedbackColor = (type: string) => {
+const getFeedbackColor = (type: string): string => {
   const colors: Record<string, string> = {
     'BUG': '#fa5252',
     'FEATURE_REQUEST': '#e67700',
@@ -403,7 +322,7 @@ const getFeedbackColor = (type: string) => {
   return colors[type] || '#2b8a3e';
 };
 
-const getStatusColor = (status: string) => {
+const getStatusColor = (status: string): string => {
   const colors: Record<string, string> = {
     'OPEN': '#e67700',
     'IN_PROGRESS': '#2b8a3e',
@@ -452,44 +371,44 @@ const styles = StyleSheet.create({
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
-  iconButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    borderWidth: 1,
-  },
-  iconButtonGradient: {
+  refreshButton: {
     width: 36,
     height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  activeFilterButton: {
-    borderWidth: 2,
+    borderWidth: 1,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
+    gap: 8,
   },
-  statItem: {
+  statCard: {
+    flex: 1,
     alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  activeStatCard: {
+    borderWidth: 1,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 10,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
+    fontSize: 11,
+    fontWeight: '500',
   },
   content: {
     padding: 16,
@@ -574,7 +493,6 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 10,
-    color: '#fff',
     fontWeight: '600',
   },
   message: {
@@ -586,6 +504,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 12,
+    marginTop: 4,
+    borderTopWidth: 1,
   },
   footerLeft: {
     flexDirection: 'row',
@@ -615,14 +536,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     overflow: 'hidden',
   },
-  actionButtonGradient: {
+  actionButtonInner: {
     width: 30,
     height: 30,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-  },
-  deleteButtonGradient: {
-    borderWidth: 1,
+    borderRadius: 6,
   },
 });

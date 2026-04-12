@@ -44,9 +44,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   
-  // State for my swap requests count (requests I created)
   const [mySwapRequestsCount, setMySwapRequestsCount] = useState(0);
-  // State for pending requests for me (requests I need to respond to)
   const [pendingForMeCount, setPendingForMeCount] = useState(0);
   const [loadingSwaps, setLoadingSwaps] = useState(false);
   
@@ -60,7 +58,6 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   console.log('🏠 [MemberDashboard] Current mySwapRequestsCount:', mySwapRequestsCount);
   console.log('🏠 [MemberDashboard] Current pendingForMeCount:', pendingForMeCount);
 
-  // ===== GET USER ID USING TOKENUTILS =====
   useEffect(() => {
     const getUserId = async () => {
       try {
@@ -68,8 +65,6 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         if (user) {
           setCurrentUserId(user.id);
           console.log('👤 [MemberDashboard] Current user ID set:', user.id);
-          
-          // Fetch swap counts immediately after userId is set
           await fetchMySwapRequestsCount();
           await fetchPendingForMeCount();
         } else {
@@ -86,41 +81,19 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     };
   }, []);
 
-  // ===== FETCH MY SWAP REQUESTS COUNT (requests I created) =====
   const fetchMySwapRequestsCount = useCallback(async () => {
-    console.log('🔍 [MemberDashboard] fetchMySwapRequestsCount called');
-    console.log('🔍 [MemberDashboard] currentUserId:', currentUserId);
-    
-    if (!currentUserId) {
-      console.log('⚠️ [MemberDashboard] No currentUserId, skipping fetch');
-      return;
-    }
+    if (!currentUserId) return;
     
     setLoadingSwaps(true);
     try {
-      console.log('📡 [MemberDashboard] Fetching my swap requests from:', `${API_BASE_URL}/api/swap-requests/my-requests?limit=100`);
-      
       const headers = await TokenUtils.getAuthHeaders(false);
-      const response = await fetch(`${API_BASE_URL}/api/swap-requests/my-requests?limit=100`, {
-        headers
-      });
-      
+      const response = await fetch(`${API_BASE_URL}/api/swap-requests/my-requests?limit=100`, { headers });
       const data = await response.json();
-      console.log('📊 [MemberDashboard] My swap requests API response:', JSON.stringify(data, null, 2));
       
       if (data.success && data.data?.requests) {
-        // Count pending swaps created by the user
-        const pendingCount = data.data.requests.filter(
-          (req: any) => req.status === 'PENDING'
-        ).length;
-        
-        console.log(`📊 [MemberDashboard] Total requests: ${data.data.requests.length}`);
-        console.log(`📊 [MemberDashboard] Pending requests (my swaps): ${pendingCount}`);
-        
+        const pendingCount = data.data.requests.filter((req: any) => req.status === 'PENDING').length;
         setMySwapRequestsCount(pendingCount);
-        console.log(`✅ [MemberDashboard] Set mySwapRequestsCount to: ${pendingCount}`);
       } else {
-        console.log('⚠️ [MemberDashboard] No swap requests found or API error');
         setMySwapRequestsCount(0);
       }
     } catch (error) {
@@ -132,28 +105,17 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   }, [currentUserId]);
 
   const fetchPendingForMeCount = useCallback(async () => {
-    console.log('🔍 [MemberDashboard] fetchPendingForMeCount called');
-    
-    if (!currentUserId) {
-      console.log('⚠️ No currentUserId');
-      return;
-    }
+    if (!currentUserId) return;
     
     try {
       const headers = await TokenUtils.getAuthHeaders(false);
-      const response = await fetch(`${API_BASE_URL}/api/swap-requests/pending-for-me?limit=100`, {
-        headers
-      });
-      
+      const response = await fetch(`${API_BASE_URL}/api/swap-requests/pending-for-me?limit=100`, { headers });
       const data = await response.json();
-      console.log('📊 Pending for me FULL response:', JSON.stringify(data, null, 2));
       
       if (data.success && data.data) {
         const pendingCount = data.data.total || data.data.requests?.length || 0;
-        console.log(`✅ Pending requests for me: ${pendingCount}`);
         setPendingForMeCount(pendingCount);
       } else {
-        console.log('⚠️ No pending requests or API error:', data.message);
         setPendingForMeCount(0);
       }
     } catch (error) {
@@ -162,7 +124,6 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     }
   }, [currentUserId]);
 
-  // ===== LOG STATE CHANGES =====
   useEffect(() => {
     console.log('🔄 [MemberDashboard] mySwapRequestsCount changed to:', mySwapRequestsCount);
   }, [mySwapRequestsCount]);
@@ -171,41 +132,28 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     console.log('🔄 [MemberDashboard] pendingForMeCount changed to:', pendingForMeCount);
   }, [pendingForMeCount]);
 
-  // ===== REAL-TIME EVENT LISTENERS =====
   const { events: taskEvents, clearRotationCompleted } = useRealtimeTasks(groupId);
   const { events: assignmentEvents } = useRealtimeAssignments(groupId, currentUserId || '');
   const { events: swapEvents } = useRealtimeSwapRequests(groupId, currentUserId || '');
 
-  // ===== ROTATION COMPLETED HANDLER =====
   useEffect(() => {
     if (taskEvents.rotationCompleted) {
-      console.log('🔄 [MemberDashboard] Rotation completed', taskEvents.rotationCompleted);
-      
       const myNewTasks = taskEvents.rotationCompleted.rotatedTasks?.filter(
         (task: any) => task.newAssignee === currentUserId
       ) || [];
       
       Alert.alert(
         '🔄 New Week Started!',
-        `Week ${taskEvents.rotationCompleted.newWeek} has begun in ${groupName}\n\n` +
-        `You have ${myNewTasks.length} new task(s) assigned.`,
+        `Week ${taskEvents.rotationCompleted.newWeek} has begun in ${groupName}\n\nYou have ${myNewTasks.length} new task(s) assigned.`,
         [
           { 
             text: 'View My Tasks', 
             onPress: () => {
-              navigation.navigate('GroupTasks', { 
-                groupId, 
-                groupName, 
-                userRole: 'MEMBER',
-                tab: 'my' 
-              });
+              navigation.navigate('GroupTasks', { groupId, groupName, userRole: 'MEMBER', tab: 'my' });
               clearRotationCompleted();
             }
           },
-          { 
-            text: 'OK',
-            onPress: () => clearRotationCompleted()
-          }
+          { text: 'OK', onPress: () => clearRotationCompleted() }
         ]
       );
       
@@ -213,66 +161,34 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     }
   }, [taskEvents.rotationCompleted]);
 
-  // Refresh when tasks change
   useEffect(() => {
-    if (taskEvents.taskCreated || 
-        taskEvents.taskUpdated || 
-        taskEvents.taskDeleted ||
-        taskEvents.taskAssigned) {
-      console.log('🔄 [MemberDashboard] Task event detected, refreshing...');
+    if (taskEvents.taskCreated || taskEvents.taskUpdated || taskEvents.taskDeleted || taskEvents.taskAssigned) {
       refreshDashboardData();
     }
-  }, [
-    taskEvents.taskCreated,
-    taskEvents.taskUpdated, 
-    taskEvents.taskDeleted,
-    taskEvents.taskAssigned
-  ]);
+  }, [taskEvents.taskCreated, taskEvents.taskUpdated, taskEvents.taskDeleted, taskEvents.taskAssigned]);
 
-  // Refresh when assignments change
   useEffect(() => {
-    if (assignmentEvents.assignmentCompleted ||
-        assignmentEvents.assignmentVerified ||
-        assignmentEvents.assignmentPendingVerification) {
-      console.log('✅ [MemberDashboard] Assignment event detected, refreshing...');
+    if (assignmentEvents.assignmentCompleted || assignmentEvents.assignmentVerified || assignmentEvents.assignmentPendingVerification) {
       refreshDashboardData();
     }
-  }, [
-    assignmentEvents.assignmentCompleted,
-    assignmentEvents.assignmentVerified,
-    assignmentEvents.assignmentPendingVerification
-  ]);
+  }, [assignmentEvents.assignmentCompleted, assignmentEvents.assignmentVerified, assignmentEvents.assignmentPendingVerification]);
 
-  // Refresh when swap requests change - update both counts
   useEffect(() => {
-    if (swapEvents.swapCreated ||
-        swapEvents.swapResponded) {
-      console.log('🔄 [MemberDashboard] Swap event detected, refreshing...');
+    if (swapEvents.swapCreated || swapEvents.swapResponded) {
       refreshDashboardData();
       fetchMySwapRequestsCount();
       fetchPendingForMeCount();
     }
-  }, [
-    swapEvents.swapCreated,
-    swapEvents.swapResponded
-  ]);
+  }, [swapEvents.swapCreated, swapEvents.swapResponded]);
 
-  // Listen for notifications
   useRealtimeNotifications({
     onNewNotification: (notification) => {
       if ([
-        'TASK_ASSIGNED',
-        'SUBMISSION_VERIFIED',
-        'SUBMISSION_REJECTED',
-        'POINTS_EARNED',
-        'SWAP_ACCEPTED',
-        'SWAP_RESPONDED',
-        'LATE_SUBMISSION',
-        'POINT_DEDUCTION'
+        'TASK_ASSIGNED', 'SUBMISSION_VERIFIED', 'SUBMISSION_REJECTED',
+        'POINTS_EARNED', 'SWAP_ACCEPTED', 'SWAP_RESPONDED',
+        'LATE_SUBMISSION', 'POINT_DEDUCTION'
       ].includes(notification.type)) {
-        console.log(`🔔 [MemberDashboard] Notification ${notification.type} received, refreshing...`);
         refreshDashboardData();
-        
         if (notification.type === 'SWAP_ACCEPTED' || notification.type === 'SWAP_RESPONDED') {
           fetchMySwapRequestsCount();
           fetchPendingForMeCount();
@@ -284,15 +200,9 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
   useFocusEffect(
     useCallback(() => {
-      console.log('🎯 [MemberDashboard] Screen focused');
-      console.log('🎯 [MemberDashboard] Current userId on focus:', currentUserId);
-      console.log('🎯 [MemberDashboard] Current swap counts on focus:', { mySwaps: mySwapRequestsCount, pendingForMe: pendingForMeCount });
-      
       if (!initialLoadDone.current) {
         loadDashboardData();
       }
-      
-      // Always refresh swap counts when screen is focused
       if (currentUserId) {
         fetchMySwapRequestsCount();
         fetchPendingForMeCount();
@@ -305,32 +215,19 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
-    
     setAuthError(!hasToken);
     return hasToken;
   }, []);
 
   useEffect(() => {
     if (authError) {
-      Alert.alert(
-        'Session Expired',
-        'Please log in again',
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              setAuthError(false);
-              navigation.navigate('Login');
-            }
-          }
-        ]
-      );
+      Alert.alert('Session Expired', 'Please log in again', [
+        { text: 'OK', onPress: () => { setAuthError(false); navigation.navigate('Login'); } }
+      ]);
     }
   }, [authError, navigation]);
 
   const loadDashboardData = async (isRefreshing = false) => {
-    console.log('📥 [MemberDashboard] loadDashboardData called', { isRefreshing });
-    
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -346,16 +243,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     setError(null);
 
     try {
-      console.log('📥 [MemberDashboard] Loading member dashboard data for group:', groupId);
-
       const dashboardResult = await GroupActivityService.getMemberDashboard(groupId);
-      
-      console.log('📊 [MemberDashboard] Dashboard result:', {
-        success: dashboardResult.success,
-        hasData: !!dashboardResult.data,
-        tasksDueToday: dashboardResult.data?.tasks?.dueToday?.length || 0,
-        upcomingTasks: dashboardResult.data?.tasks?.upcoming?.length || 0
-      });
       
       if (dashboardResult.success && isMounted.current) {
         setDashboardData(dashboardResult.data);
@@ -370,50 +258,11 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
           ...(dashboardResult.data.tasks?.upcoming || [])
         ];
         setMyTasks(allTasks);
-        
-        // Log due today tasks
-        const dueTodayTasks = dashboardResult.data.tasks?.dueToday || [];
-        console.log(`📅 [MemberDashboard] Due today tasks count: ${dueTodayTasks.length}`);
-        if (dueTodayTasks.length > 0) {
-          dueTodayTasks.forEach((task: any, index: number) => {
-            console.log(`   Task ${index + 1}:`, {
-              id: task.id,
-              title: task.title,
-              dueDate: task.dueDate,
-              isDueToday: task.isDueToday
-            });
-          });
-        } else {
-          console.log('📅 [MemberDashboard] No tasks due today from dashboard API');
-        }
-        
         initialLoadDone.current = true;
       } else {
-        console.log('⚠️ [MemberDashboard] Falling back to individual API calls...');
-        
         const tasksResult = await TaskService.getMyTasks(groupId);
-        console.log('📊 [MemberDashboard] getMyTasks result:', {
-          success: tasksResult.success,
-          tasksCount: tasksResult.tasks?.length || 0
-        });
-        
         if (tasksResult.success && isMounted.current) {
-          setMyTasks(tasksResult.tasks || []); 
-          
-          // Calculate due today tasks from myTasks
-          const today = new Date();
-          const startOfDay = new Date(today);
-          startOfDay.setHours(0, 0, 0, 0);
-          const endOfDay = new Date(today);
-          endOfDay.setHours(23, 59, 59, 999);
-          
-          const dueTodayFromTasks = tasksResult.tasks?.filter((t: any) => {
-            if (t.assignment?.completed) return false;
-            const dueDate = new Date(t.assignment?.dueDate);
-            return dueDate >= startOfDay && dueDate <= endOfDay;
-          }) || [];
-          
-          console.log(`📅 [MemberDashboard] Calculated due today from tasks: ${dueTodayFromTasks.length}`);
+          setMyTasks(tasksResult.tasks || []);
           
           const thisWeek = tasksResult.tasks
             ?.filter((t: any) => {
@@ -437,7 +286,6 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
       await loadPendingForMe(groupId);
       
-      // Fetch swap counts after dashboard loads
       if (currentUserId) {
         await fetchMySwapRequestsCount();
         await fetchPendingForMeCount();
@@ -452,13 +300,11 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
       if (isMounted.current) { 
         setLoading(false);
         setRefreshing(false);
-        console.log('🏁 [MemberDashboard] loadDashboardData completed');
       }
     }
   };
 
   const refreshDashboardData = useCallback(() => {
-    console.log('🔄 [MemberDashboard] refreshDashboardData called');
     loadDashboardData(true);
   }, []);
 
@@ -470,17 +316,14 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     setShowSettingsModal(true);
   };
 
-  // ===== FIXED: Calculate pending tasks = dueToday + upcoming =====
   const dueTodayTasks = dashboardData?.tasks?.dueToday || [];
   const upcomingTasks = dashboardData?.tasks?.upcoming || [];
   const allPendingTasks = [...dueTodayTasks, ...upcomingTasks];
   const completedTasks = dashboardData?.stats?.completedTasks || myTasks.filter(t => t.assignment?.completed).length;
   
-  // Calculate tasks due today
   let tasksDueToday: any[] = [];
   if (dashboardData?.tasks?.dueToday) {
     tasksDueToday = dashboardData.tasks.dueToday;
-    console.log(`📅 [MemberDashboard] Using dashboard due today: ${tasksDueToday.length}`);
   } else {
     const today = new Date();
     const startOfDay = new Date(today);
@@ -493,23 +336,10 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
       const dueDate = new Date(t.assignment?.dueDate);
       return dueDate >= startOfDay && dueDate <= endOfDay;
     });
-    console.log(`📅 [MemberDashboard] Calculated due today: ${tasksDueToday.length}`);
   }
-  
-  console.log(`📊 [MemberDashboard] Final Stats - Pending: ${allPendingTasks.length}, Completed: ${completedTasks}, Due Today: ${tasksDueToday.length}, My Swaps: ${mySwapRequestsCount}, Requests for Me: ${pendingForMeCount}`);
 
-  const StatCard = ({ 
-    title, 
-    value, 
-    icon, 
-    color = theme.primary, 
-    subtitle,
-    onPress,
-    navigateTo,
-    navigationParams
-  }: any) => {
+  const StatCard = ({ title, value, icon, color = theme.primary, subtitle, onPress, navigateTo, navigationParams }: any) => {
     const handlePress = () => {
-      console.log(`👆 [MemberDashboard] StatCard pressed: ${title}, value: ${value}`);
       if (onPress) {
         onPress();
       } else if (navigateTo) {
@@ -538,12 +368,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         <Text style={[styles.statTitle, { color: theme.textMuted }]}>{title}</Text>
         {subtitle && <Text style={[styles.statSubtitle, { color: theme.textPlaceholder }]}>{subtitle}</Text>}
         {(navigateTo || onPress) && (
-          <MaterialCommunityIcons 
-            name="chevron-right" 
-            size={16} 
-            color={theme.textMuted} 
-            style={{ position: 'absolute', bottom: 12, right: 12 }}
-          />
+          <MaterialCommunityIcons name="chevron-right" size={16} color={theme.textMuted} style={{ position: 'absolute', bottom: 12, right: 12 }} />
         )}
       </TouchableOpacity>
     );
@@ -558,13 +383,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
     return (
       <TouchableOpacity
-        onPress={() => {
-          console.log(`👆 [MemberDashboard] Task pressed: ${task.title || task.taskTitle}`);
-          navigation.navigate('AssignmentDetails', {
-            assignmentId: task.id || task.assignment?.id,
-            isAdmin: false
-          });
-        }}
+        onPress={() => navigation.navigate('AssignmentDetails', { assignmentId: task.id || task.assignment?.id, isAdmin: false })}
         activeOpacity={0.7}
       >
         <LinearGradient
@@ -580,47 +399,24 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
               end={{ x: 1, y: 1 }}
               style={styles.taskIcon}
             >
-              <MaterialCommunityIcons
-                name={isCompleted ? "check" : "format-list-checks"}
-                size={20}
-                color="#fff"
-              />
+              <MaterialCommunityIcons name={isCompleted ? "check" : "format-list-checks"} size={20} color="#fff" />
             </LinearGradient>
             <View style={styles.taskInfo}>
-              <Text style={[
-                styles.taskTitle,
-                isCompleted && styles.completedTaskTitle,
-                { color: isCompleted ? theme.textMuted : theme.text }
-              ]} numberOfLines={1}>
+              <Text style={[styles.taskTitle, isCompleted && styles.completedTaskTitle, { color: isCompleted ? theme.textMuted : theme.text }]} numberOfLines={1}>
                 {task.title || task.taskTitle}
               </Text>
               <View style={styles.taskMeta}>
-                <LinearGradient
-                  colors={[theme.primaryLight, theme.primaryLight]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.pointsBadge}
-                >
+                <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pointsBadge}>
                   <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
                   <Text style={[styles.pointsText, { color: theme.primary }]}>{task.points || task.assignment?.points || 0} pts</Text>
                 </LinearGradient>
                 {isDueToday && !isCompleted && (
-                  <LinearGradient
-                    colors={[theme.error, theme.error]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.dueBadge}
-                  >
+                  <LinearGradient colors={[theme.error, theme.error]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.dueBadge}>
                     <Text style={styles.dueBadgeText}>Due Today</Text>
                   </LinearGradient>
                 )}
                 {isOverdue && !isCompleted && (
-                  <LinearGradient
-                    colors={[theme.primary, theme.primaryDark]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.dueBadge}
-                  >
+                  <LinearGradient colors={[theme.primary, theme.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.dueBadge}>
                     <Text style={styles.dueBadgeText}>Overdue</Text>
                   </LinearGradient>
                 )}
@@ -672,12 +468,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
           <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
           <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={() => loadDashboardData()}>
-            <LinearGradient
-              colors={[theme.primary, theme.primaryDark]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.retryButtonGradient}
-            >
+            <LinearGradient colors={[theme.primary, theme.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.retryButtonGradient}>
               <Text style={styles.retryButtonText}>Retry</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -692,14 +483,11 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
         </TouchableOpacity>
-        
         <Text style={[styles.headerTitle, { color: theme.text }]}>{groupName}</Text>
-        
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={handleRefresh} style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
             <MaterialCommunityIcons name="refresh" size={22} color={theme.primary} />
           </TouchableOpacity>
-          
           <TouchableOpacity onPress={handleSettingsPress} style={[styles.settingsButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
             <MaterialCommunityIcons name="cog" size={22} color={theme.primary} />
           </TouchableOpacity>
@@ -708,14 +496,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            colors={[theme.primary]}
-            tintColor={theme.primary}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[theme.primary]} tintColor={theme.primary} />}
         contentContainerStyle={styles.scrollContent}
       >
         {/* Welcome Card */}
@@ -727,84 +508,66 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         >
           <View style={styles.welcomeContent}>
             <Text style={styles.welcomeTitle}>Your Dashboard</Text>
-            <Text style={styles.welcomeSubtitle}>
-              Track your progress and upcoming tasks
-            </Text>
+            <Text style={styles.welcomeSubtitle}>Track your progress and upcoming tasks</Text>
           </View>
           <MaterialCommunityIcons name="view-dashboard" size={48} color="rgba(255,255,255,0.2)" />
         </LinearGradient>
 
         {/* Points Overview */}
         <View style={styles.pointsContainer}>
-          <LinearGradient
-            colors={[theme.card, theme.bgSecondary]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.pointsCard, { borderColor: theme.border }]}
-          >
+          <LinearGradient colors={[theme.card, theme.bgSecondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.pointsCard, { borderColor: theme.border }]}>
             <Text style={[styles.pointsLabel, { color: theme.textMuted }]}>This Week</Text>
             <Text style={[styles.pointsValue, { color: theme.primary }]}>{points.thisWeek}</Text>
             <Text style={[styles.pointsSubtext, { color: theme.textPlaceholder }]}>points earned</Text>
           </LinearGradient>
-          <LinearGradient 
-            colors={[theme.card, theme.bgSecondary]}
-            start={{ x: 0, y: 0 }} 
-            end={{ x: 1, y: 1 }}
-            style={[styles.pointsCard, { borderColor: theme.border }]}
-          >
+          <LinearGradient colors={[theme.card, theme.bgSecondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.pointsCard, { borderColor: theme.border }]}>
             <Text style={[styles.pointsLabel, { color: theme.textMuted }]}>Total</Text>
             <Text style={[styles.pointsValue, { color: theme.primary }]}>{points.total}</Text>
             <Text style={[styles.pointsSubtext, { color: theme.textPlaceholder }]}>lifetime points</Text>
           </LinearGradient>
         </View>
 
-        {/* Progress Bar - Like Admin Dashboard */}
-<LinearGradient
-  colors={[theme.card, theme.bgSecondary]}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 1 }}
-  style={[styles.progressCard, { borderColor: theme.border }]}
->
-  <View style={styles.progressHeader}>
-    <Text style={[styles.progressTitle, { color: theme.textSecondary }]}>Your Completion Rate</Text>
-    <Text style={[styles.progressPercentage, { color: theme.primary }]}>
-      {Math.round((points.total / (dashboardData?.stats?.totalPointsPossible || 1)) * 100)}%
-    </Text>
-  </View>
-  <View style={[styles.progressBarContainer, { backgroundColor: theme.bgTertiary }]}>
-    <View
-      style={[
-        styles.progressBar,
-        {
-          width: `${Math.min(100, Math.round((points.total / (dashboardData?.stats?.totalPointsPossible || 1)) * 100))}%`,
-          backgroundColor: theme.primary
-        }
-      ]}
-    />
-  </View>
-  <View style={styles.progressStats}>
-    <Text style={[styles.progressStatsText, { color: theme.textMuted }]}>
-      {points.total} of {dashboardData?.stats?.totalPointsPossible || 0} points earned
-    </Text>
-  </View>
-</LinearGradient>
+        {/* Progress Bar */}
+        <LinearGradient
+          colors={[theme.card, theme.bgSecondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.progressCard, { borderColor: theme.border }]}
+        >
+          <View style={styles.progressHeader}>
+            <Text style={[styles.progressTitle, { color: theme.textSecondary }]}>Your Completion Rate</Text>
+            <Text style={[styles.progressPercentage, { color: theme.primary }]}>
+              {Math.round((points.total / (dashboardData?.stats?.totalPointsPossible || 1)) * 100)}%
+            </Text>
+          </View>
+          <View style={[styles.progressBarContainer, { backgroundColor: theme.bgTertiary }]}>
+            <View
+              style={[
+                styles.progressBar,
+                {
+                  width: `${Math.min(100, Math.round((points.total / (dashboardData?.stats?.totalPointsPossible || 1)) * 100))}%`,
+                  backgroundColor: theme.primary
+                }
+              ]}
+            />
+          </View>
+          <View style={styles.progressStats}>
+            <Text style={[styles.progressStatsText, { color: theme.textMuted }]}>
+              {points.total} of {dashboardData?.stats?.totalPointsPossible || 0} points earned
+            </Text>
+          </View>
+        </LinearGradient>
 
-        {/* Quick Stats - CLICKABLE */}
+        {/* Quick Stats */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Stats</Text>
         <View style={styles.statsGrid}>
-          {/* ✅ FIXED: Pending Tasks shows combined dueToday + upcoming */}
           <StatCard
             title="Pending Tasks" 
             value={allPendingTasks.length}
             icon="clock-outline"
             color={theme.primary}
             navigateTo="GroupTasks"
-            navigationParams={{ 
-              groupId, 
-              groupName, 
-              userRole: 'MEMBER', 
-              tab: 'my' 
-            }}
+            navigationParams={{ groupId, groupName, userRole: 'MEMBER', tab: 'my' }}
           />
           <StatCard 
             title="Completed"
@@ -865,7 +628,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
           </>
         )}
 
-        {/* Pending Tasks (Upcoming) */}
+        {/* Upcoming Tasks */}
         {upcomingTasks.length > 0 && (
           <>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Upcoming Tasks</Text>
@@ -882,12 +645,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             style={[styles.actionCard, { borderColor: theme.border }]}
             onPress={() => navigation.navigate('MySwapRequests')}
           >
-            <LinearGradient
-              colors={[theme.primary, theme.primaryDark]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.actionGradient}
-            >
+            <LinearGradient colors={[theme.primary, theme.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
               <MaterialCommunityIcons name="swap-horizontal" size={24} color="#fff" />
               <Text style={styles.actionText}>My Swaps</Text>
             </LinearGradient>
@@ -897,12 +655,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             style={[styles.actionCard, { borderColor: theme.border }]}
             onPress={() => navigation.navigate('PendingSwapRequests')}
           >
-            <LinearGradient
-              colors={[theme.error, theme.error]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.actionGradient}
-            >
+            <LinearGradient colors={[theme.error, theme.error]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
               <MaterialCommunityIcons name="bell-ring" size={24} color="#fff" />
               <Text style={styles.actionText}>Pending Requests</Text>
             </LinearGradient>
@@ -912,12 +665,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             style={[styles.actionCard, { borderColor: theme.border }]}
             onPress={() => navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole: 'MEMBER' })}
           >
-            <LinearGradient
-              colors={[theme.textSecondary, theme.textMuted]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.actionGradient}
-            >
+            <LinearGradient colors={[theme.textSecondary, theme.textMuted]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
               <MaterialCommunityIcons name="history" size={24} color="#fff" />
               <Text style={styles.actionText}>History</Text>
             </LinearGradient>
@@ -927,12 +675,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             style={[styles.actionCard, { borderColor: theme.border }]}
             onPress={() => navigation.navigate('RotationSchedule', { groupId, groupName, userRole: 'MEMBER' })}
           >
-            <LinearGradient
-              colors={[theme.textSecondary, theme.textMuted]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.actionGradient}
-            >
+            <LinearGradient colors={[theme.textSecondary, theme.textMuted]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
               <MaterialCommunityIcons name="calendar-sync" size={24} color="#fff" />
               <Text style={styles.actionText}>Schedule</Text>
             </LinearGradient>
@@ -942,14 +685,20 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             style={[styles.actionCard, { borderColor: theme.border }]}
             onPress={() => navigation.navigate('FullLeaderboard', { groupId, groupName })}
           >
-            <LinearGradient
-              colors={[theme.textSecondary, theme.textMuted]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.actionGradient}
-            >
+            <LinearGradient colors={[theme.textSecondary, theme.textMuted]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
               <MaterialCommunityIcons name="podium" size={24} color="#fff" />
               <Text style={styles.actionText}>Leaderboard</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* ✅ NEW: My Statistics quick action */}
+          <TouchableOpacity
+            style={[styles.actionCard, { borderColor: theme.border }]}
+            onPress={() => navigation.navigate('DetailedStatistics', { groupId, groupName, userRole: 'MEMBER' })}
+          >
+            <LinearGradient colors={[theme.primary, theme.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
+              <MaterialCommunityIcons name="chart-bar" size={24} color="#fff" />
+              <Text style={styles.actionText}>My Statistics</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>

@@ -1,6 +1,8 @@
 import Constants from 'expo-constants';
 
 // Simple function to get the right backend IP
+const PORT = process.env.EXPO_PUBLIC_BACKEND_PORT || 5000;
+
 export const getBackendIP = (): string => {
   // Get Expo's current IP
   const hostUri = Constants.expoConfig?.hostUri;
@@ -28,7 +30,7 @@ export const getBackendIP = (): string => {
 };
 
 // Export the full API URL
-export const API_BASE_URL = `http://${getBackendIP()}:5000`;
+export const API_BASE_URL = `http://${getBackendIP()}:${PORT}`;
 
 // Log it for debugging
 console.log('🌐 Backend URL:', API_BASE_URL); 

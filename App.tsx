@@ -96,7 +96,7 @@ async function registerForPushNotifications() {
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
-  }
+  }  
   
   if (finalStatus !== 'granted') {
     console.log('❌ Failed to get push token for push notification!');

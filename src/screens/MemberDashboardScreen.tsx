@@ -637,71 +637,81 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
             ))}
           </>
         )}
+       {/* Quick Actions */}
+<Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
+<View style={styles.actionsGrid}>
+  <TouchableOpacity
+    style={[styles.actionCard, { borderColor: theme.border }]}
+    onPress={() => navigation.navigate('MySwapRequests')}
+  >
+    <LinearGradient colors={[theme.primary, theme.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
+      <MaterialCommunityIcons name="swap-horizontal" size={24} color="#fff" />
+      <Text style={styles.actionText}>My Swaps</Text>
+    </LinearGradient>
+  </TouchableOpacity>
 
-        {/* Quick Actions */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Quick Actions</Text>
-        <View style={styles.actionsGrid}>
-          <TouchableOpacity
-            style={[styles.actionCard, { borderColor: theme.border }]}
-            onPress={() => navigation.navigate('MySwapRequests')}
-          >
-            <LinearGradient colors={[theme.primary, theme.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
-              <MaterialCommunityIcons name="swap-horizontal" size={24} color="#fff" />
-              <Text style={styles.actionText}>My Swaps</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.actionCard, { borderColor: theme.border }]}
+    onPress={() => navigation.navigate('PendingSwapRequests')}
+  >
+    <LinearGradient colors={[theme.error, theme.error]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
+      <MaterialCommunityIcons name="bell-ring" size={24} color="#fff" />
+      <Text style={styles.actionText}>Pending Requests</Text>
+    </LinearGradient>
+  </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionCard, { borderColor: theme.border }]}
-            onPress={() => navigation.navigate('PendingSwapRequests')}
-          >
-            <LinearGradient colors={[theme.error, theme.error]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
-              <MaterialCommunityIcons name="bell-ring" size={24} color="#fff" />
-              <Text style={styles.actionText}>Pending Requests</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+  {/* ✅ NEW: My Submissions Button */}
+  <TouchableOpacity
+    style={[styles.actionCard, { borderColor: theme.border }]}
+    onPress={() => navigation.navigate('MySubmissions', { groupId, groupName, userRole: 'MEMBER' })}
+  >
+    <LinearGradient colors={[theme.primary, theme.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
+      <MaterialCommunityIcons name="clipboard-list" size={24} color="#fff" />
+      <Text style={styles.actionText}>My Submissions</Text>
+    </LinearGradient>
+  </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionCard, { borderColor: theme.border }]}
-            onPress={() => navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole: 'MEMBER' })}
-          >
-            <LinearGradient colors={[theme.textSecondary, theme.textMuted]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
-              <MaterialCommunityIcons name="history" size={24} color="#fff" />
-              <Text style={styles.actionText}>History</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.actionCard, { borderColor: theme.border }]}
+    onPress={() => navigation.navigate('TaskCompletionHistory', { groupId, groupName, userRole: 'MEMBER' })}
+  >
+    <LinearGradient colors={[theme.textSecondary, theme.textMuted]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
+      <MaterialCommunityIcons name="history" size={24} color="#fff" />
+      <Text style={styles.actionText}>History</Text>
+    </LinearGradient>
+  </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionCard, { borderColor: theme.border }]}
-            onPress={() => navigation.navigate('RotationSchedule', { groupId, groupName, userRole: 'MEMBER' })}
-          >
-            <LinearGradient colors={[theme.textSecondary, theme.textMuted]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
-              <MaterialCommunityIcons name="calendar-sync" size={24} color="#fff" />
-              <Text style={styles.actionText}>Schedule</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.actionCard, { borderColor: theme.border }]}
+    onPress={() => navigation.navigate('RotationSchedule', { groupId, groupName, userRole: 'MEMBER' })}
+  >
+    <LinearGradient colors={[theme.textSecondary, theme.textMuted]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
+      <MaterialCommunityIcons name="calendar-sync" size={24} color="#fff" />
+      <Text style={styles.actionText}>Schedule</Text>
+    </LinearGradient>
+  </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionCard, { borderColor: theme.border }]}
-            onPress={() => navigation.navigate('FullLeaderboard', { groupId, groupName })}
-          >
-            <LinearGradient colors={[theme.textSecondary, theme.textMuted]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
-              <MaterialCommunityIcons name="podium" size={24} color="#fff" />
-              <Text style={styles.actionText}>Leaderboard</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+  <TouchableOpacity
+    style={[styles.actionCard, { borderColor: theme.border }]}
+    onPress={() => navigation.navigate('FullLeaderboard', { groupId, groupName })}
+  >
+    <LinearGradient colors={[theme.textSecondary, theme.textMuted]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
+      <MaterialCommunityIcons name="podium" size={24} color="#fff" />
+      <Text style={styles.actionText}>Leaderboard</Text>
+    </LinearGradient>
+  </TouchableOpacity>
 
-          {/* ✅ NEW: My Statistics quick action */}
-          <TouchableOpacity
-            style={[styles.actionCard, { borderColor: theme.border }]}
-            onPress={() => navigation.navigate('DetailedStatistics', { groupId, groupName, userRole: 'MEMBER' })}
-          >
-            <LinearGradient colors={[theme.primary, theme.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
-              <MaterialCommunityIcons name="chart-bar" size={24} color="#fff" />
-              <Text style={styles.actionText}>My Statistics</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
+  <TouchableOpacity
+    style={[styles.actionCard, { borderColor: theme.border }]}
+    onPress={() => navigation.navigate('DetailedStatistics', { groupId, groupName, userRole: 'MEMBER' })}
+  >
+    <LinearGradient colors={[theme.primary, theme.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.actionGradient}>
+      <MaterialCommunityIcons name="chart-bar" size={24} color="#fff" />
+      <Text style={styles.actionText}>My Statistics</Text>
+    </LinearGradient>
+  </TouchableOpacity>
+</View>
+      
       </ScrollView>
 
       <SettingsModal 

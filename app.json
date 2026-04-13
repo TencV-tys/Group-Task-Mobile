@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "GroupTaskMobile",
-    "slug": "GroupTaskMobile",
+    "slug": "grouptask",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,7 +19,10 @@
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["grouptask", "exp"]
+            "CFBundleURLSchemes": [
+              "grouptask",
+              "exp"
+            ]
           }
         ]
       }
@@ -41,7 +44,10 @@
               "scheme": "grouptask"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
@@ -53,8 +59,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "your-project-id-here"
+        "projectId": "cfac69aa-72f5-4ef5-a8ce-39e531e8897a"
       }
-    }
+    },
+    "owner": "sybeans"
   }
 }

@@ -9,7 +9,8 @@ import {
   Modal,
   ScrollView, 
   ActivityIndicator, 
-  Alert
+  Alert,
+  Image
 } from 'react-native'; 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -443,104 +444,126 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   };
 
   // ✅ FIXED: No hooks inside render function!
-  const renderLeaderboardItem = (item: any, index: number) => {
-    const isFirst = index === 0;
-    const isSecond = index === 1;
-    const isThird = index === 2;
+ 
 
-    const handleLeaderboardPress = () => {
-      const memberId = item.userId;
-      if (!memberId) {
-        Alert.alert('Error', 'Cannot view member details - missing ID');
-        return;
-      }
-      
-      if (memberId === currentUserId) {
-        navigation.navigate('MemberContributions', { 
-          groupId, 
-          groupName, 
-          memberId,
-          userRole: userRole
-        });
-        onClose();
-      } else if (isAdmin) {
-        navigation.navigate('MemberContributions', { 
-          groupId, 
-          groupName, 
-          memberId,
-          userRole: 'ADMIN'
-        });
-        onClose();
-      } else {
-        Alert.alert(
-          'Access Denied',
-          'You can only view your own contributions. Admins can view all members.',
-          [{ text: 'OK' }]
-        );
-      }
-    };
+const renderLeaderboardItem = (item: any, index: number) => {
+  const isFirst = index === 0;
+  const isSecond = index === 1;
+  const isThird = index === 2;
 
-    const isCurrentUser = item.userId === currentUserId;
+  const handleLeaderboardPress = () => {
+    const memberId = item.userId;
+    if (!memberId) {
+      Alert.alert('Error', 'Cannot view member details - missing ID');
+      return;
+    }
+    
+    if (memberId === currentUserId) {
+      navigation.navigate('MemberContributions', { 
+        groupId, 
+        groupName, 
+        memberId,
+        userRole: userRole
+      });
+      onClose();
+    } else if (isAdmin) {
+      navigation.navigate('MemberContributions', { 
+        groupId, 
+        groupName, 
+        memberId,
+        userRole: 'ADMIN'
+      });
+      onClose();
+    } else {
+      Alert.alert(
+        'Access Denied',
+        'You can only view your own contributions. Admins can view all members.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
 
-    return (
-      <TouchableOpacity
-        key={item.userId}
-        onPress={handleLeaderboardPress}
-        activeOpacity={0.7}
+  const isCurrentUser = item.userId === currentUserId;
+
+  // Optional: Add Cloudinary URL optimization
+  const getOptimizedAvatarUrl = (url: string) => {
+    if (!url) return null;
+    if (url.includes('cloudinary.com')) {
+      return url.replace('/upload/', '/upload/w_32,h_32,c_fill/');
+    }
+    return url;
+  };
+
+  return (
+    <TouchableOpacity
+      key={item.userId}
+      onPress={handleLeaderboardPress}
+      activeOpacity={0.7}
+    >
+      <LinearGradient
+        colors={getLeaderboardGradientColors(index)}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[
+          styles.leaderboardItem,
+          isFirst && styles.firstPlace,
+          isSecond && styles.secondPlace,
+          isThird && styles.thirdPlace,
+          isCurrentUser && styles.currentUserItem
+        ].filter(Boolean)}
       >
-        <LinearGradient
-          colors={getLeaderboardGradientColors(index)}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[
-            styles.leaderboardItem,
-            isFirst && styles.firstPlace,
-            isSecond && styles.secondPlace,
-            isThird && styles.thirdPlace,
-            isCurrentUser && styles.currentUserItem
-          ].filter(Boolean)}
-        >
-          <View style={styles.leaderboardRank}>
-            {isFirst ? (
-              <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
-            ) : isSecond ? (
-              <MaterialCommunityIcons name="trophy" size={18} color="#C0C0C0" />
-            ) : isThird ? (
-              <MaterialCommunityIcons name="trophy" size={16} color="#CD7F32" />
-            ) : (
-              <Text style={styles.rankNumber}>{index + 1}</Text>
-            )}
-          </View>
-          
-          <View style={styles.leaderboardUser}>
+        <View style={styles.leaderboardRank}>
+          {isFirst ? (
+            <MaterialCommunityIcons name="trophy" size={20} color="#FFD700" />
+          ) : isSecond ? (
+            <MaterialCommunityIcons name="trophy" size={18} color="#C0C0C0" />
+          ) : isThird ? (
+            <MaterialCommunityIcons name="trophy" size={16} color="#CD7F32" />
+          ) : (
+            <Text style={styles.rankNumber}>{index + 1}</Text>
+          )}
+        </View>
+        
+        <View style={styles.leaderboardUser}>
+          {/* ✅ UPDATED: Cloudinary avatar with fallback */}
+          {item.avatarUrl ? (
+            <Image 
+              source={{ uri: getOptimizedAvatarUrl(item.avatarUrl) } as any} 
+              style={styles.userAvatarImage}
+              onError={(e) => {
+                console.log('Failed to load avatar:', item.avatarUrl);
+              }}
+            />
+          ) : (
             <View style={styles.userAvatar}>
               <Text style={styles.userInitial}>
                 {item.fullName?.charAt(0) || '?'}
               </Text>
             </View>
-            <View style={styles.userInfo}>
-              <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
-                {item.fullName}
-                {isCurrentUser && <Text style={[styles.youBadge, { color: theme.primary }]}> (You)</Text>}
-              </Text>
-              <Text style={[styles.userStats, { color: theme.textMuted }]}>
-                {item.points} points
-              </Text>
-            </View>
+          )}
+          <View style={styles.userInfo}>
+            <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
+              {item.fullName}
+              {isCurrentUser && <Text style={[styles.youBadge, { color: theme.primary }]}> (You)</Text>}
+            </Text>
+            <Text style={[styles.userStats, { color: theme.textMuted }]}>
+              {item.points} points
+            </Text>
           </View>
-          
-          <LinearGradient
-            colors={[theme.primaryLight, theme.primaryLight]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.pointsBadge}
-          >
-            <Text style={[styles.pointsText, { color: theme.primary }]}>{item.points}</Text>
-          </LinearGradient>
+        </View>
+        
+        <LinearGradient
+          colors={[theme.primaryLight, theme.primaryLight]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.pointsBadge}
+        >
+          <Text style={[styles.pointsText, { color: theme.primary }]}>{item.points}</Text>
         </LinearGradient>
-      </TouchableOpacity>
-    );
-  };
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+};
 
   const incompleteCount = myAssignments.filter((t: any) => 
     t.assignment && !t.assignment.completed
@@ -1315,4 +1338,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+  userAvatarImage: {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+},
 });

@@ -270,7 +270,7 @@ static async completeAssignment(
       });
       
       // IMPORTANT: The field name must be 'photo' to match multer configuration
-      formData.append('photo', {
+      formData.append('file', {
         uri: uri,
         name: filename,
         type: mimeType,

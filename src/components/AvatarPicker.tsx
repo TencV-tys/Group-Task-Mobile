@@ -62,41 +62,42 @@ export const AvatarPicker: React.FC<AvatarPickerProps> = ({
     );
   };
 
-  const handleTakePhoto = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
+ // Change handleTakePhoto from base64 to file URI:
+const handleTakePhoto = async () => {
+  const hasPermission = await requestPermissions();
+  if (!hasPermission) return;
 
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-      base64: true,
-    });
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.7,
+    base64: false,  // ← CHANGE to false
+  });
 
-    if (!result.canceled && result.assets[0]?.base64) {
-      const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      onAvatarSelect(base64Image);
-    }
-  };
+  if (!result.canceled && result.assets[0]?.uri) {  // ← Use uri, not base64
+    onAvatarSelect(result.assets[0].uri);  // ← Send URI, not base64
+  }
+};
 
-  const handleChoosePhoto = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) return;
+// Same for handleChoosePhoto:
+const handleChoosePhoto = async () => {
+  const hasPermission = await requestPermissions();
+  if (!hasPermission) return;
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.7,
-      base64: true,
-    });
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [1, 1],
+    quality: 0.7,
+    base64: false,  // ← CHANGE to false
+  });
 
-    if (!result.canceled && result.assets[0]?.base64) {
-      const base64Image = `data:image/jpeg;base64,${result.assets[0].base64}`;
-      onAvatarSelect(base64Image);
-    }
-  };
+  if (!result.canceled && result.assets[0]?.uri) {  // ← Use uri
+    onAvatarSelect(result.assets[0].uri);  // ← Send URI
+  }
+};
+
 
   const handleRemovePhoto = () => {
     Alert.alert(

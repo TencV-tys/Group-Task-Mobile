@@ -301,37 +301,17 @@ export class UploadService {
     }
   }
 
-static async uploadAvatarCloudinary(fileUri: string): Promise<UploadResponse> {
+  static async uploadAvatarCloudinary(fileUri: string): Promise<UploadResponse> {
   try {
-    console.log('📤 Uploading avatar to Cloudinary from URI:', fileUri);
-    
     const token = await TokenUtils.getAccessToken();
     const formData = new FormData();
     
     const filename = fileUri.split('/').pop() || 'avatar.jpg';
     
-    const getMimeType = (uri: string): string => {
-      const extension = uri.split('.').pop()?.toLowerCase();
-      switch (extension) {
-        case 'jpg':
-        case 'jpeg':
-          return 'image/jpeg';
-        case 'png':
-          return 'image/png';
-        case 'gif':
-          return 'image/gif';
-        case 'webp':
-          return 'image/webp';
-        default:
-          return 'image/jpeg';
-      }
-    };
-
-    const mimeType = getMimeType(fileUri);
-    
-    formData.append('avatar', {
+    // ✅ CHANGE THIS:
+    formData.append('file', {  // ← 'file' not 'avatar'
       uri: fileUri,
-      type: mimeType,
+      type: 'image/jpeg',
       name: filename,
     } as any);
 
@@ -346,17 +326,9 @@ static async uploadAvatarCloudinary(fileUri: string): Promise<UploadResponse> {
       body: formData,
     });
 
-    const result = await response.json();
-    console.log('📥 Cloudinary upload response:', result);
-    
-    return result;
-
+    return await response.json();
   } catch (error: any) {
-    console.error('❌ Cloudinary avatar upload error:', error);
-    return {
-      success: false,
-      message: error.message || 'Failed to upload avatar to Cloudinary'
-    };
+    return { success: false, message: error.message };
   }
 }
 
@@ -377,7 +349,7 @@ static async uploadGroupAvatarCloudinary(groupId: string, fileUri: string): Prom
 
     const mimeType = getMimeType(fileUri);
     
-    formData.append('avatar', {
+    formData.append('file', {
       uri: fileUri,
       type: mimeType,
       name: filename,
@@ -423,7 +395,7 @@ static async uploadTaskPhotoCloudinary(fileUri: string): Promise<UploadResponse>
 
     const mimeType = getMimeType(fileUri);
     
-    formData.append('photo', {
+    formData.append('file', {
       uri: fileUri,
       type: mimeType,
       name: filename,
@@ -437,7 +409,7 @@ static async uploadTaskPhotoCloudinary(fileUri: string): Promise<UploadResponse>
     const response = await fetch(`${API_URL}/task-photo`, {
       method: 'POST',
       headers,
-      body: formData,
+      body: formData, 
     });
 
     const result = await response.json();

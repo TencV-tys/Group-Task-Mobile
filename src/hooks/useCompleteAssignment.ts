@@ -54,94 +54,71 @@ export const useCompleteAssignment = (
     }
   }, [timeSlot, dueDate]);
 
-  const startCountdownTimer = useCallback(() => {
-    const calculateTimeLeft = () => {
-      const now = new Date();
-      const due = new Date(dueDate);
-      
-      // Check if it's the due date
-      const isToday = now.toDateString() === due.toDateString();
-      
-      console.log('⏰ [useCompleteAssignment] Time check:', {
-        now: now.toLocaleString(),
-        dueDate: due.toLocaleString(),
-        isToday,
-        timeSlot: timeSlot ? `${timeSlot.startTime}-${timeSlot.endTime}` : 'none'
-      });
-      
-      if (!isToday) {
-        setTimeStatus('wrong_day');
-        setIsSubmittable(false);
-        setTimeLeft(null);
-        return;
-      }
-      
-      // Parse end time (this is when submission OPENS)
-      const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
-      
-      // ✅ Submission opens AT end time
-      const submissionOpenTime = new Date(now);
-      submissionOpenTime.setHours(endHour, endMinute, 0, 0);
-      
-      // ✅ On-time window: 0 to 25 minutes after end time
-      const onTimeEnd = new Date(submissionOpenTime.getTime() + 25 * 60000);
-      
-      // ✅ Late window: 25 to 30 minutes after end time
-      const lateWindowEnd = new Date(submissionOpenTime.getTime() + 30 * 60000);
-      
-      const currentTime = now.getTime();
-      const openTime = submissionOpenTime.getTime();
-      const onTimeEndMs = onTimeEnd.getTime();
-      const lateWindowEndMs = lateWindowEnd.getTime();
-      
-      console.log('⏰ [useCompleteAssignment] Time windows:', {
-        submissionOpen: submissionOpenTime.toLocaleTimeString(),
-        onTimeEnd: onTimeEnd.toLocaleTimeString(),
-        lateWindowEnd: lateWindowEnd.toLocaleTimeString(),
-        currentTime: now.toLocaleTimeString()
-      });
-      
-      if (currentTime < openTime) {
-        // BEFORE submission opens - WAITING
-        const timeUntilOpen = Math.floor((openTime - currentTime) / 1000);
-        setTimeStatus('waiting');
-        setIsSubmittable(false);
-        setIsLate(false);
-        setTimeLeft(timeUntilOpen);
-        console.log('⏰ [useCompleteAssignment] Status: waiting, opens in', timeUntilOpen, 'seconds');
-        
-      } else if (currentTime >= openTime && currentTime <= onTimeEndMs) {
-        // ✅ ON TIME: First 25 minutes after end time
-        const timeLeftMs = onTimeEndMs - currentTime;
-        setTimeStatus('submission_open');
-        setIsSubmittable(true);
-        setIsLate(false);
-        setTimeLeft(Math.floor(timeLeftMs / 1000));
-        console.log('✅ [useCompleteAssignment] Status: on-time, time left:', Math.floor(timeLeftMs / 1000), 'seconds');
-        
-      } else if (currentTime > onTimeEndMs && currentTime <= lateWindowEndMs) {
-        // ✅ LATE: Next 5 minutes (25-30 minutes after end time)
-        const timeLeftMs = lateWindowEndMs - currentTime;
-        setTimeStatus('submission_open');
-        setIsSubmittable(true);
-        setIsLate(true);
-        setTimeLeft(Math.floor(timeLeftMs / 1000));
-        console.log('⚠️ [useCompleteAssignment] Status: late, time left:', Math.floor(timeLeftMs / 1000), 'seconds');
-        
-      } else {
-        // After 30 minutes - EXPIRED
-        setTimeStatus('expired');
-        setIsSubmittable(false);
-        setIsLate(false);
-        setTimeLeft(0);
-        console.log('❌ [useCompleteAssignment] Status: expired');
-      }
-    };
+const startCountdownTimer = useCallback(() => {
+  const calculateTimeLeft = () => {
+    const now = new Date();
+    const assignmentDate = new Date(dueDate);
     
-    calculateTimeLeft();
-    const timer = setInterval(calculateTimeLeft, 1000);
-    return timer;
-  }, [dueDate, timeSlot]);
+    // ✅ Use UTC comparison (matching useAssignmentDetails)
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
+    
+    if (todayUTC !== assignmentUTC) {
+      setTimeStatus('wrong_day');
+      setIsSubmittable(false);
+      setTimeLeft(null);
+      return;
+    }
+    
+    if (!timeSlot) {
+      setTimeStatus('submission_open');
+      setIsSubmittable(true);
+      setIsLate(false);
+      setTimeLeft(null);
+      return;
+    }
+    
+    const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
+    
+    // ✅ Convert PHT to UTC (subtract 8 hours) - matching useAssignmentDetails
+    const endTime = new Date(Date.UTC(
+      assignmentDate.getUTCFullYear(),
+      assignmentDate.getUTCMonth(),
+      assignmentDate.getUTCDate(),
+      endHour - 8, endMinute, 0, 0
+    ));
+    
+    const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
+    const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
+    
+    const currentTime = now.getTime();
+    const endTimeMs = endTime.getTime();
+    const lateThresholdMs = lateThreshold.getTime();
+    const graceEndMs = gracePeriodEnd.getTime();
+    
+    if (currentTime < endTimeMs) {
+      setTimeStatus('waiting');
+      setIsSubmittable(false);
+      setIsLate(false);
+      setTimeLeft(Math.floor((endTimeMs - currentTime) / 1000));
+    } else if (currentTime >= endTimeMs && currentTime <= graceEndMs) {
+      const isLateSubmission = currentTime > lateThresholdMs;
+      setTimeStatus('submission_open');
+      setIsSubmittable(true);
+      setIsLate(isLateSubmission);
+      setTimeLeft(Math.floor((graceEndMs - currentTime) / 1000));
+    } else {
+      setTimeStatus('expired');
+      setIsSubmittable(false);
+      setIsLate(false);
+      setTimeLeft(0);
+    }
+  };
+  
+  calculateTimeLeft();
+  const timer = setInterval(calculateTimeLeft, 1000);
+  return timer;
+}, [dueDate, timeSlot]);
 
   // Get time status message
   const getTimeStatusMessage = useCallback(() => {

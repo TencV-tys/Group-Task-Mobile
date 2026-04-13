@@ -320,7 +320,7 @@ const isDueTodayUTC = (dueDate: string) => {
     }
   };
 
- const checkTimeValidity = (taskData: any) => {
+  const checkTimeValidity = (taskData: any) => {
   if (!taskData?.userAssignment || taskData.userAssignment.completed) {
     setIsSubmittable(false);
     setCurrentTimeSlot(null);
@@ -330,6 +330,8 @@ const isDueTodayUTC = (dueDate: string) => {
 
   const now = new Date();
   const assignmentDate = new Date(taskData.userAssignment.dueDate);
+  
+  // Compare UTC dates
   const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
   
@@ -340,63 +342,41 @@ const isDueTodayUTC = (dueDate: string) => {
     return;
   }
 
-  if (taskData.userAssignment.timeSlot || (taskData.timeSlots && taskData.timeSlots.length > 0)) {
-    // ✅ Convert UTC now to PHT (UTC+8) minutes for comparison against slot times
-    const phtHours = (now.getUTCHours() + 8) % 24;
-    const currentInMinutes = phtHours * 60 + now.getUTCMinutes();
+  if (taskData.userAssignment.timeSlot) {
+    const [endHour, endMinute] = taskData.userAssignment.timeSlot.endTime.split(':').map(Number);
     
-    let activeSlot = null;
-    let slotFound = false;
+    // Convert PHT to UTC (subtract 8 hours)
+    const endTime = new Date(Date.UTC(
+      assignmentDate.getUTCFullYear(),
+      assignmentDate.getUTCMonth(),
+      assignmentDate.getUTCDate(),
+      endHour - 8, endMinute, 0, 0
+    ));
     
-    const slotsToCheck = taskData.timeSlots || [taskData.userAssignment.timeSlot].filter(Boolean);
+    const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
+    const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
     
-    for (const slot of slotsToCheck) {
-      if (!slot) continue;
-      
-      const slotStart = convertTimeToMinutes(slot.startTime);
-      const slotEnd = convertTimeToMinutes(slot.endTime);
-      const graceEnd = slotEnd + 30;
-      
-      if (currentInMinutes >= slotStart && currentInMinutes <= graceEnd) {
-        activeSlot = slot;
-        slotFound = true;
-        
-        const canSubmitStart = slotEnd;  // ✅ opens AT end time (not 30 mins before)
-        const canSubmit = currentInMinutes >= canSubmitStart && currentInMinutes <= graceEnd;
-        
-        setIsSubmittable(canSubmit);
-        setSubmissionStatus(canSubmit ? 'available' : 'waiting');
-        
-        const timeLeftMs = (graceEnd - currentInMinutes) * 60000;
-        setTimeLeft(Math.max(0, Math.floor(timeLeftMs / 1000)));
-        break;
-      }
-    }
+    const currentTime = now.getTime();
     
-    setCurrentTimeSlot(activeSlot || taskData.userAssignment.timeSlot);
-    
-    if (!slotFound) {
+    if (currentTime < endTime.getTime()) {
+      setIsSubmittable(false);
+      setSubmissionStatus('waiting');
+      setTimeLeft(Math.floor((endTime.getTime() - currentTime) / 1000));
+    } else if (currentTime >= endTime.getTime() && currentTime <= gracePeriodEnd.getTime()) {
+      setIsSubmittable(true);
+      setSubmissionStatus('available');
+      setTimeLeft(Math.floor((gracePeriodEnd.getTime() - currentTime) / 1000));
+    } else {
       setIsSubmittable(false);
       setSubmissionStatus('expired');
       setTimeLeft(0);
-      
-      if (slotsToCheck.length > 0) {
-        const firstSlotStart = convertTimeToMinutes(slotsToCheck[0].startTime);
-        if (currentInMinutes < firstSlotStart) {
-          setSubmissionStatus('waiting');
-          const timeUntilFirstSlot = (firstSlotStart - currentInMinutes) * 60000;
-          setTimeLeft(Math.floor(timeUntilFirstSlot / 1000));
-        }
-      }
     }
   } else {
     setIsSubmittable(true);
     setSubmissionStatus('available');
-    setCurrentTimeSlot(null);
     setTimeLeft(null);
   }
 };
-
 
   // ===== FETCH TASK DETAILS =====
   const fetchTaskDetails = async () => {
@@ -823,7 +803,7 @@ const getVerificationStatus = (assignment: any) => {
             <Text style={styles.weekInfoValue}>
               {formatUTCDate(task.group.weekStart)} - {formatUTCDate(task.group.weekEnd)}
             </Text>
-          </View>
+          </View> 
         )}
       </LinearGradient>
     </View>

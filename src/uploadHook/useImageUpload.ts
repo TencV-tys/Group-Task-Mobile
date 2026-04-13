@@ -71,7 +71,7 @@ export const useImageUpload = ({ onSuccess, onError, onAuthError }: UseImageUplo
         return result.assets[0];
       }
 
-      return null;
+      return null; 
     } catch (error: any) {
       console.error('❌ Error picking image:', error);
       Alert.alert('Error', 'Failed to pick image from gallery');
@@ -386,6 +386,7 @@ const uploadTaskPhotoToCloudinary = async (imageUri: string) => {
     requestPermissions,
     uploadGroupAvatar,
     deleteGroupAvatar,
+    
      uploadAvatarToCloudinary,
   uploadGroupAvatarToCloudinary,
   uploadTaskPhotoToCloudinary,

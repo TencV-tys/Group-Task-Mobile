@@ -1,4 +1,5 @@
-// src/screens/ProfileScreen.tsx - Fixed Version
+// src/screens/ProfileScreen.tsx - UPDATED to use Cloudinary
+
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
@@ -65,20 +66,21 @@ export default function ProfileScreen({ navigation }: any) {
 
   const { unreadCount, loadUnreadCount } = useNotifications();
 
+  // ✅ UPDATED: Use Cloudinary upload method
   const {
     uploading,
     progress,
     pickImageFromGallery,
     takePhotoWithCamera,
-    uploadAvatarFromPicker,
+    uploadAvatarToCloudinary,  // ← Changed from uploadAvatarFromPicker
     deleteAvatar
   } = useImageUpload({
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       await loadUserData(true);
       Alert.alert('Success', 'Profile picture updated successfully!');
     },
-    onError: () => {
-      Alert.alert('Error', 'Failed to update profile picture');
+    onError: (error) => {
+      Alert.alert('Error', error?.message || 'Failed to update profile picture');
     }
   });
 
@@ -179,15 +181,16 @@ export default function ProfileScreen({ navigation }: any) {
     }
   }, [navigation]);
 
+  // ✅ UPDATED: Use Cloudinary upload method
   const handleAvatarPress = useCallback(() => {
     if (uploading) return;
     Alert.alert('Change Profile Picture', 'How would you like to update your profile picture?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Take Photo', onPress: () => takePhotoWithCamera().then(img => img && uploadAvatarFromPicker(img)) },
-      { text: 'Choose from Gallery', onPress: () => pickImageFromGallery().then(img => img && uploadAvatarFromPicker(img)) },
+      { text: 'Take Photo', onPress: () => takePhotoWithCamera().then(img => img && uploadAvatarToCloudinary(img)) },
+      { text: 'Choose from Gallery', onPress: () => pickImageFromGallery().then(img => img && uploadAvatarToCloudinary(img)) },
       user?.avatarUrl && { text: 'Remove Picture', style: 'destructive', onPress: handleRemoveAvatar }
     ].filter(Boolean));
-  }, [uploading, user?.avatarUrl]);
+  }, [uploading, user?.avatarUrl, takePhotoWithCamera, pickImageFromGallery, uploadAvatarToCloudinary]);
 
   const handleRemoveAvatar = useCallback(async () => {
     Alert.alert('Remove Profile Picture', 'Are you sure?', [
@@ -257,13 +260,13 @@ export default function ProfileScreen({ navigation }: any) {
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity onPress={() => navigateTo('Notifications')} style={styles.notificationButton}>
           <MaterialCommunityIcons name="bell-outline" size={22} color={theme.primary} />
-           {unreadCount > 0 && (
-  <Animated.View style={styles.notificationBadge}>
-    <Text style={styles.notificationBadgeText}>
-      {unreadCount > 9 ? '9+' : unreadCount}
-    </Text>
-  </Animated.View>
-)}
+          {unreadCount > 0 && (
+            <Animated.View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Text>
+            </Animated.View>
+          )}
         </TouchableOpacity>
       </Animated.View>
 

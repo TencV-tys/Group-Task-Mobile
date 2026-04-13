@@ -65,6 +65,10 @@ export const NotificationTypes = {
   MENTION: 'MENTION',
   REMINDER: 'REMINDER',
   DAILY_TASK_REMINDER: 'DAILY_TASK_REMINDER',
+
+  FEEDBACK_UPDATED: 'FEEDBACK_UPDATED',
+  FEEDBACK_DELETED: 'FEEDBACK_DELETED',
+  FEEDBACK_REPLY: 'FEEDBACK_REPLY',
 } as const;
 
 export type NotificationType = typeof NotificationTypes[keyof typeof NotificationTypes];

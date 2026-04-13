@@ -126,7 +126,7 @@ export default function NotificationsScreen({ navigation }: any) {
       if (data?.expired === true) {
         return { valid: false, message: 'This task has expired.', type: 'expired' };
       }
-    }
+    } 
     
     return { valid: true };
   };
@@ -152,196 +152,178 @@ export default function NotificationsScreen({ navigation }: any) {
     }
   };
 
-  const handleNavigation = (type: string, data: any) => {
-    console.log('Navigating with type:', type, 'data:', data);
-    
-    // ===== SWAP REQUEST NOTIFICATIONS =====
-    if (type === NotificationTypes.SWAP_ADMIN_NOTIFICATION ||
-        type === NotificationTypes.SWAP_REQUEST ||
-        type === NotificationTypes.SWAP_ACCEPTED ||
-        type === NotificationTypes.SWAP_REJECTED ||
-        type === NotificationTypes.SWAP_CANCELLED ||
-        type === NotificationTypes.SWAP_COMPLETED) {
-      
-      if (data?.swapRequestId) {
-        navigation.navigate('SwapRequestDetails', { 
-          requestId: data.swapRequestId,
-          mayBeDeleted: true
-        });
-      } else if (data?.assignmentId && !data?.taskDeleted) {
-        navigation.navigate('AssignmentDetails', { 
-          assignmentId: data.assignmentId,
-          isAdmin: type === NotificationTypes.SWAP_ADMIN_NOTIFICATION
-        });
-      } else if (data?.groupId) {
-        navigation.navigate('MySwapRequests', { 
-          groupId: data.groupId,
-          groupName: data.groupName
-        });
-      } else {
-        Alert.alert('Content Unavailable', 'This swap request is no longer available.');
-      }
-      return;
+const handleNavigation = (type: string, data: any) => {
+  console.log('Navigating with type:', type, 'data:', data);
+  
+  // ===== FEEDBACK NOTIFICATIONS =====
+  if (type === 'FEEDBACK_SUBMITTED' || 
+      type === 'FEEDBACK_STATUS_UPDATE' ||
+      type === 'FEEDBACK_UPDATED' ||
+      type === 'FEEDBACK_DELETED' ||
+      type === 'FEEDBACK_REPLY') {
+    if (data?.feedbackId) {
+      navigation.navigate('FeedbackDetails', { feedbackId: data.feedbackId });
+    } else {
+      navigation.navigate('FeedbackHistory');
     }
+    return;
+  }
+  
+  // ===== SWAP REQUEST NOTIFICATIONS =====
+  if (type === NotificationTypes.SWAP_ADMIN_NOTIFICATION ||
+      type === NotificationTypes.SWAP_REQUEST ||
+      type === NotificationTypes.SWAP_ACCEPTED ||
+      type === NotificationTypes.SWAP_REJECTED ||
+      type === NotificationTypes.SWAP_CANCELLED ||
+      type === NotificationTypes.SWAP_COMPLETED) {
     
-    // ===== SUBMISSION PENDING (Admin Review) =====
-    if (type === NotificationTypes.SUBMISSION_PENDING) {
-      if (data?.assignmentId && !data?.taskDeleted) {
-        navigation.navigate('AssignmentDetails', { 
-          assignmentId: data.assignmentId,
-          isAdmin: true 
-        });
-      } else if (data?.groupId) {
-        navigation.navigate('PendingVerifications', { 
-          groupId: data.groupId,
-          groupName: data.groupName,
-          userRole: 'ADMIN'
-        });
-      } else {
-        Alert.alert('Submission Unavailable', 'This submission is no longer available for review.');
-      }
-      return;
+    if (data?.swapRequestId) {
+      navigation.navigate('SwapRequestDetails', { 
+        requestId: data.swapRequestId,
+        mayBeDeleted: true
+      });
+    } else if (data?.assignmentId && !data?.taskDeleted) {
+      navigation.navigate('AssignmentDetails', { 
+        assignmentId: data.assignmentId,
+        isAdmin: type === NotificationTypes.SWAP_ADMIN_NOTIFICATION
+      });
+    } else if (data?.groupId) {
+      navigation.navigate('MySwapRequests', { 
+        groupId: data.groupId,
+        groupName: data.groupName
+      });
+    } else {
+      Alert.alert('Content Unavailable', 'This swap request is no longer available.');
     }
-    
-    // ===== SUBMISSION VERIFIED/REJECTED =====
-    if (type === NotificationTypes.SUBMISSION_VERIFIED || type === NotificationTypes.SUBMISSION_REJECTED) {
-      if (data?.assignmentId && !data?.taskDeleted) {
-        navigation.navigate('AssignmentDetails', { 
-          assignmentId: data.assignmentId,
-          isAdmin: false 
-        });
-      } else if (data?.taskId && !data?.taskDeleted) {
-        navigation.navigate('TaskDetails', { 
-          taskId: data.taskId,
-          groupId: data.groupId 
-        });
-      } else {
-        Alert.alert('Submission Unavailable', 'This submission details are no longer available.');
-      }
-      return;
+    return;
+  }
+  
+  // ===== SUBMISSION PENDING (Admin Review) =====
+  if (type === NotificationTypes.SUBMISSION_PENDING) {
+    if (data?.assignmentId && !data?.taskDeleted) {
+      navigation.navigate('AssignmentDetails', { 
+        assignmentId: data.assignmentId,
+        isAdmin: true 
+      });
+    } else if (data?.groupId) {
+      navigation.navigate('PendingVerifications', { 
+        groupId: data.groupId,
+        groupName: data.groupName,
+        userRole: 'ADMIN'
+      });
+    } else {
+      Alert.alert('Submission Unavailable', 'This submission is no longer available for review.');
     }
-    
-    // ===== TASK REMINDERS =====
-    if (type === NotificationTypes.TASK_REMINDER || type === NotificationTypes.TASK_ACTIVE) {
-      if (data?.assignmentId && !data?.taskDeleted) {
-        navigation.navigate('AssignmentDetails', { 
-          assignmentId: data.assignmentId,
-          isAdmin: false 
-        });
-      } else if (data?.taskId && !data?.taskDeleted) {
-        navigation.navigate('TaskDetails', { 
-          taskId: data.taskId,
-          groupId: data.groupId 
-        });
-      } else if (data?.groupId) {
-        navigation.navigate('TodayAssignments', { 
-          groupId: data.groupId,
-          groupName: data.groupName 
-        });
-      } else {
-        Alert.alert('Task Unavailable', 'This task reminder is no longer available.');
-      }
-      return;
+    return;
+  }
+  
+  // ===== SUBMISSION VERIFIED/REJECTED =====
+  if (type === NotificationTypes.SUBMISSION_VERIFIED || type === NotificationTypes.SUBMISSION_REJECTED) {
+    if (data?.assignmentId && !data?.taskDeleted) {
+      navigation.navigate('AssignmentDetails', { 
+        assignmentId: data.assignmentId,
+        isAdmin: false 
+      });
+    } else if (data?.taskId && !data?.taskDeleted) {
+      navigation.navigate('TaskDetails', { 
+        taskId: data.taskId,
+        groupId: data.groupId 
+      });
+    } else {
+      Alert.alert('Submission Unavailable', 'This submission details are no longer available.');
     }
-    
-    // ===== ROTATION NOTIFICATIONS =====
-    if (type === 'ROTATION_COMPLETED') {
-      if (data?.groupId) {
-        navigation.navigate('RotationSchedule', { 
-          groupId: data.groupId,
-          groupName: data.groupName || 'Group',
-          userRole: data.userRole || 'MEMBER'
-        });
-      } else {
-        navigation.navigate('MyGroups');
-      }
-      return;
+    return;
+  }
+  
+  // ===== TASK REMINDERS =====
+  if (type === NotificationTypes.TASK_REMINDER || type === NotificationTypes.TASK_ACTIVE) {
+    if (data?.assignmentId && !data?.taskDeleted) {
+      navigation.navigate('AssignmentDetails', { 
+        assignmentId: data.assignmentId,
+        isAdmin: false 
+      });
+    } else if (data?.taskId && !data?.taskDeleted) {
+      navigation.navigate('TaskDetails', { 
+        taskId: data.taskId,
+        groupId: data.groupId 
+      });
+    } else if (data?.groupId) {
+      navigation.navigate('TodayAssignments', { 
+        groupId: data.groupId,
+        groupName: data.groupName 
+      });
+    } else {
+      Alert.alert('Task Unavailable', 'This task reminder is no longer available.');
     }
-    
-    // ===== POINT DEDUCTION & NEGLECT =====
-    if (type === NotificationTypes.POINT_DEDUCTION || type === NotificationTypes.LATE_SUBMISSION) {
-      if (data?.assignmentId && !data?.taskDeleted) {
-        navigation.navigate('AssignmentDetails', { 
-          assignmentId: data.assignmentId,
-          isAdmin: false 
-        });
-      } else if (data?.taskId && !data?.taskDeleted) {
-        navigation.navigate('TaskDetails', { 
-          taskId: data.taskId,
-          groupId: data.groupId 
-        });
-      } else if (data?.groupId) {
-        navigation.navigate('NeglectedTasks', { 
-          groupId: data.groupId,
-          groupName: data.groupName,
-          userRole: 'MEMBER'
-        });
-      } else {
-        Alert.alert('Content Unavailable', 'This notification is no longer available.');
-      }
-      return;
+    return;
+  }
+  
+  // ===== ROTATION NOTIFICATIONS =====
+  if (type === 'ROTATION_COMPLETED') {
+    if (data?.groupId) {
+      navigation.navigate('RotationSchedule', { 
+        groupId: data.groupId,
+        groupName: data.groupName || 'Group',
+        userRole: data.userRole || 'MEMBER'
+      });
+    } else {
+      navigation.navigate('MyGroups');
     }
-    
-    if (type === NotificationTypes.NEGLECT_DETECTED) {
-      if (data?.assignmentId && !data?.taskDeleted) {
-        navigation.navigate('AssignmentDetails', { 
-          assignmentId: data.assignmentId,
-          isAdmin: true 
-        });
-      } else if (data?.taskId && !data?.taskDeleted) {
-        navigation.navigate('TaskDetails', { 
-          taskId: data.taskId,
-          groupId: data.groupId 
-        });
-      } else if (data?.groupId) {
-        navigation.navigate('NeglectedTasks', { 
-          groupId: data.groupId,
-          groupName: data.groupName,
-          userRole: 'ADMIN'
-        });
-      } else {
-        Alert.alert('Content Unavailable', 'This neglect notification is no longer available.');
-      }
-      return;
+    return;
+  }
+  
+  // ===== POINT DEDUCTION & NEGLECT =====
+  if (type === NotificationTypes.POINT_DEDUCTION || type === NotificationTypes.LATE_SUBMISSION) {
+    if (data?.assignmentId && !data?.taskDeleted) {
+      navigation.navigate('AssignmentDetails', { 
+        assignmentId: data.assignmentId,
+        isAdmin: false 
+      });
+    } else if (data?.taskId && !data?.taskDeleted) {
+      navigation.navigate('TaskDetails', { 
+        taskId: data.taskId,
+        groupId: data.groupId 
+      });
+    } else if (data?.groupId) {
+      navigation.navigate('NeglectedTasks', { 
+        groupId: data.groupId,
+        groupName: data.groupName,
+        userRole: 'MEMBER'
+      });
+    } else {
+      Alert.alert('Content Unavailable', 'This notification is no longer available.');
     }
-    
-    // ===== TASK NOTIFICATIONS =====
-    if (type === NotificationTypes.TASK_ASSIGNED ||
-        type === NotificationTypes.TASK_COMPLETED ||
-        type === NotificationTypes.TASK_OVERDUE ||
-        type === NotificationTypes.TASK_CREATED) {
-      if (data?.taskId && !data?.taskDeleted) {
-        navigation.navigate('TaskDetails', { 
-          taskId: data.taskId,
-          groupId: data.groupId 
-        });
-      } else if (data?.groupId) {
-        navigation.navigate('GroupTasks', { 
-          groupId: data.groupId,
-          groupName: data.groupName || 'Group',
-          userRole: data.userRole || 'MEMBER'
-        });
-      } else {
-        Alert.alert('Task Unavailable', 'This task notification is no longer available.');
-      }
-      return;
+    return;
+  }
+  
+  if (type === NotificationTypes.NEGLECT_DETECTED) {
+    if (data?.assignmentId && !data?.taskDeleted) {
+      navigation.navigate('AssignmentDetails', { 
+        assignmentId: data.assignmentId,
+        isAdmin: true 
+      });
+    } else if (data?.taskId && !data?.taskDeleted) {
+      navigation.navigate('TaskDetails', { 
+        taskId: data.taskId,
+        groupId: data.groupId 
+      });
+    } else if (data?.groupId) {
+      navigation.navigate('NeglectedTasks', { 
+        groupId: data.groupId,
+        groupName: data.groupName,
+        userRole: 'ADMIN'
+      });
+    } else {
+      Alert.alert('Content Unavailable', 'This neglect notification is no longer available.');
     }
-    
-    // ===== POINTS EARNED =====
-    if (type === NotificationTypes.POINTS_EARNED) {
-      if (data?.groupId) {
-        navigation.navigate('FullLeaderboard', { 
-          groupId: data.groupId,
-          groupName: data.groupName 
-        });
-      } else {
-        Alert.alert('Content Unavailable', 'Leaderboard data is not available.');
-      }
-      return;
-    }
-    
-    // ===== DEFAULT FALLBACK =====
-    console.log('Unhandled notification type:', type);
+    return;
+  }
+  
+  // ===== TASK NOTIFICATIONS =====
+  if (type === NotificationTypes.TASK_ASSIGNED ||
+      type === NotificationTypes.TASK_COMPLETED ||
+      type === NotificationTypes.TASK_OVERDUE ||
+      type === NotificationTypes.TASK_CREATED) {
     if (data?.taskId && !data?.taskDeleted) {
       navigation.navigate('TaskDetails', { 
         taskId: data.taskId,
@@ -354,9 +336,41 @@ export default function NotificationsScreen({ navigation }: any) {
         userRole: data.userRole || 'MEMBER'
       });
     } else {
-      Alert.alert('Content Unavailable', 'This notification content is no longer available.');
+      Alert.alert('Task Unavailable', 'This task notification is no longer available.');
     }
-  };
+    return;
+  }
+  
+  // ===== POINTS EARNED =====
+  if (type === NotificationTypes.POINTS_EARNED) {
+    if (data?.groupId) {
+      navigation.navigate('FullLeaderboard', { 
+        groupId: data.groupId,
+        groupName: data.groupName 
+      });
+    } else {
+      Alert.alert('Content Unavailable', 'Leaderboard data is not available.');
+    }
+    return;
+  }
+  
+  // ===== DEFAULT FALLBACK =====
+  console.log('Unhandled notification type:', type);
+  if (data?.taskId && !data?.taskDeleted) {
+    navigation.navigate('TaskDetails', { 
+      taskId: data.taskId,
+      groupId: data.groupId 
+    });
+  } else if (data?.groupId) {
+    navigation.navigate('GroupTasks', { 
+      groupId: data.groupId,
+      groupName: data.groupName || 'Group',
+      userRole: data.userRole || 'MEMBER'
+    });
+  } else {
+    Alert.alert('Content Unavailable', 'This notification content is no longer available.');
+  }
+};
 
   const handleMarkAllAsRead = () => {
     if (unreadCount === 0) {

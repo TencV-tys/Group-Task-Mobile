@@ -1,6 +1,6 @@
-// src/screens/FeedbackHistoryScreen.tsx - CLEAN WORKING VERSION
+// src/screens/FeedbackHistoryScreen.tsx - FULLY UPDATED with New Badge
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,13 +13,20 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useFeedback } from '../feedbackHook/useFeedback';
+import { useSocket } from '../context/SocketContext';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
 
 export default function FeedbackHistoryScreen({ navigation, route }: any) {
   const { theme, isDark } = useTheme();
+  const { socket, isConnected } = useSocket();
   const [filter, setFilterState] = useState<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | null>(route.params?.filter || null);
+  
+  // ✅ Track new feedback indicator
+  const [hasNewFeedback, setHasNewFeedback] = useState(false);
+  const [newFeedbackCount, setNewFeedbackCount] = useState(0);
   
   const {
     loading,
@@ -42,6 +49,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
     }
   }, [authError, navigation]);
 
+  // Initial load
   useEffect(() => {
     loadStats();
     if (filter) {
@@ -50,9 +58,75 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
     loadFeedback(1, filter);
   }, []);
 
+  // Refresh when filter changes
   useEffect(() => {
     loadFeedback(1, filter);
   }, [filter]);
+
+  // ✅ Reset new feedback badge when filter changes or screen is viewed
+  useFocusEffect(
+    useCallback(() => {
+      loadFeedback(1, filter);
+      loadStats();
+      // Reset new feedback indicator when viewing the screen
+      setHasNewFeedback(false);
+      setNewFeedbackCount(0);
+    }, [filter])
+  );
+
+  // ✅ Listen for real-time socket events with badge indicator
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleNewFeedback = (data: any) => {
+      console.log('📢 New feedback received:', data);
+      loadFeedback(1, filter);
+      loadStats();
+      
+      // ✅ Update badge indicator
+      setHasNewFeedback(true);
+      setNewFeedbackCount(prev => prev + 1);
+      
+      // Show alert for admin (optional - can be disabled)
+      if (filter === null || filter === 'OPEN') {
+        Alert.alert(
+          'New Feedback',
+          `${data.userName} submitted new ${data.type} feedback`,
+          [{ text: 'OK' }]
+        );
+      }
+    };
+
+    const handleStatusChanged = (data: any) => {
+      console.log('📢 Feedback status changed:', data);
+      loadFeedback(1, filter);
+      loadStats();
+    };
+
+    const handleFeedbackUpdated = (data: any) => {
+      console.log('📢 Feedback updated:', data);
+      loadFeedback(1, filter);
+      loadStats();
+    };
+
+    const handleFeedbackDeleted = (data: any) => {
+      console.log('📢 Feedback deleted:', data);
+      loadFeedback(1, filter);
+      loadStats();
+    };
+
+    socket.on('feedback:new', handleNewFeedback);
+    socket.on('feedback:status', handleStatusChanged);
+    socket.on('feedback:updated', handleFeedbackUpdated);
+    socket.on('feedback:deleted', handleFeedbackDeleted);
+
+    return () => {
+      socket.off('feedback:new', handleNewFeedback);
+      socket.off('feedback:status', handleStatusChanged);
+      socket.off('feedback:updated', handleFeedbackUpdated);
+      socket.off('feedback:deleted', handleFeedbackDeleted);
+    };
+  }, [socket, isConnected, filter]);
 
   const handleStatPress = (newFilter: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | null) => {
     if (filter === newFilter) {
@@ -62,6 +136,9 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
       setFilterState(newFilter);
       setFilter(newFilter);
     }
+    // ✅ Reset badge when changing filter
+    setHasNewFeedback(false);
+    setNewFeedbackCount(0);
   };
 
   const handleDelete = (feedbackId: string) => {
@@ -83,6 +160,14 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
         }
       ]
     );
+  };
+
+  const handleManualRefresh = () => {
+    loadFeedback(1, filter);
+    loadStats();
+    // ✅ Reset badge on manual refresh
+    setHasNewFeedback(false);
+    setNewFeedbackCount(0);
   };
 
   const getHeaderTitle = () => {
@@ -118,7 +203,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
         
         <View style={styles.headerRight}>
           <TouchableOpacity 
-            onPress={() => loadFeedback(1, filter)}
+            onPress={handleManualRefresh}
             disabled={loading}
             style={[styles.refreshButton, { borderColor: theme.border, backgroundColor: theme.card }]}
           >
@@ -134,17 +219,23 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
       {/* Stats Summary - Tap to Filter */}
       {stats && (
         <View style={[styles.statsRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-          {/* Total Card */}
+          {/* Total Card with New Badge */}
           <TouchableOpacity 
             style={[styles.statCard, isActiveFilter(null) && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
             onPress={() => handleStatPress(null)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.statValue, { color: isActiveFilter(null) ? theme.primary : theme.text }]}>{stats.total || 0}</Text>
+            <View style={styles.statContent}>
+              <Text style={[styles.statValue, { color: isActiveFilter(null) ? theme.primary : theme.text }]}>{stats.total || 0}</Text>
+              {hasNewFeedback && (
+                <View style={[styles.newBadge, { backgroundColor: theme.primary }]}>
+                  <Text style={styles.newBadgeText}>{newFeedbackCount > 9 ? '9+' : newFeedbackCount}</Text>
+                </View>
+              )}
+            </View>
             <Text style={[styles.statLabel, { color: isActiveFilter(null) ? theme.primary : theme.textMuted }]}>Total</Text>
           </TouchableOpacity>
 
-          {/* Open Card */}
           <TouchableOpacity 
             style={[styles.statCard, isActiveFilter('OPEN') && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
             onPress={() => handleStatPress('OPEN')}
@@ -154,7 +245,6 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
             <Text style={[styles.statLabel, { color: isActiveFilter('OPEN') ? theme.primary : theme.textMuted }]}>Open</Text>
           </TouchableOpacity>
 
-          {/* In Progress Card */}
           <TouchableOpacity 
             style={[styles.statCard, isActiveFilter('IN_PROGRESS') && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
             onPress={() => handleStatPress('IN_PROGRESS')}
@@ -164,7 +254,6 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
             <Text style={[styles.statLabel, { color: isActiveFilter('IN_PROGRESS') ? theme.primary : theme.textMuted }]}>In Progress</Text>
           </TouchableOpacity>
 
-          {/* Resolved Card */}
           <TouchableOpacity 
             style={[styles.statCard, isActiveFilter('RESOLVED') && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
             onPress={() => handleStatPress('RESOLVED')}
@@ -180,7 +269,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
         refreshControl={
           <RefreshControl 
             refreshing={loading} 
-            onRefresh={() => loadFeedback(1, filter)}
+            onRefresh={handleManualRefresh}
             colors={[theme.primary]}
             tintColor={theme.primary}
           />
@@ -215,12 +304,11 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
             </TouchableOpacity>
           </View>
         ) : (
-          feedbackList.map((item) => (
+          feedbackList.map((item, index) => (
             <View
               key={item.id}
               style={[styles.feedbackCard, { backgroundColor: theme.card, borderColor: theme.border }]}
             >
-              {/* Header */}
               <View style={styles.cardHeader}>
                 <View style={styles.typeContainer}>
                   <View style={[styles.typeIcon, { borderColor: theme.border, backgroundColor: theme.bgSecondary }]}>
@@ -239,7 +327,6 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                 </View>
               </View>
 
-              {/* Message */}
               <TouchableOpacity 
                 onPress={() => navigation.navigate('FeedbackDetails', { feedbackId: item.id })}
                 activeOpacity={0.7}
@@ -249,7 +336,6 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
                 </Text>
               </TouchableOpacity>
 
-              {/* Footer */}
               <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
                 <View style={styles.footerLeft}>
                   {item.category && (
@@ -333,215 +419,68 @@ const getStatusColor = (status: string): string => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    minHeight: 60,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, minHeight: 60,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center',
+    shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  subtitle: {
-    fontSize: 11,
-    marginTop: 2,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
+  titleContainer: { flex: 1, alignItems: 'center' },
+  title:    { fontSize: 16, fontWeight: '600' },
+  subtitle: { fontSize: 11, marginTop: 2 },
+  headerRight: { flexDirection: 'row', alignItems: 'center' },
+  refreshButton: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
   statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    gap: 8,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
+    paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, gap: 8,
   },
-  statCard: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  activeStatCard: {
-    borderWidth: 1,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  statLabel: {
-    fontSize: 11,
-    fontWeight: '500',
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+  statCard: { flex: 1, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: 'transparent', position: 'relative' },
+  activeStatCard: { borderWidth: 1 },
+  statContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  statValue: { fontSize: 20, fontWeight: 'bold', marginBottom: 2 },
+  statLabel: { fontSize: 11, fontWeight: '500' },
+  // ✅ New Badge Styles
+  newBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-    borderWidth: 1,
+    paddingHorizontal: 4,
   },
-  emptyStateText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  emptyStateSubtext: {
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 20,
-    paddingHorizontal: 32,
-    lineHeight: 18,
-  },
-  submitButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  submitButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    gap: 6,
-  },
-  submitButtonText: {
+  newBadgeText: {
     color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  feedbackCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  typeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  typeIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  typeText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  message: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    marginTop: 4,
-    borderTopWidth: 1,
-  },
-  footerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flex: 1,
-    flexWrap: 'wrap',
-  },
-  categoryTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  categoryText: {
-    fontSize: 10,
-  },
-  date: {
-    fontSize: 10,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  actionButton: {
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  actionButtonInner: {
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 6,
-  },
+  content: { padding: 16, paddingBottom: 32 },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  emptyIconContainer: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', marginBottom: 16, borderWidth: 1 },
+  emptyStateText: { fontSize: 16, fontWeight: '600', marginTop: 8 },
+  emptyStateSubtext: { fontSize: 13, textAlign: 'center', marginTop: 4, marginBottom: 20, paddingHorizontal: 32, lineHeight: 18 },
+  submitButton: { borderRadius: 8, overflow: 'hidden' },
+  submitButtonGradient: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10, gap: 6 },
+  submitButtonText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  feedbackCard: { borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  typeContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  typeIcon: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
+  typeText: { fontSize: 13, fontWeight: '600' },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  statusText: { fontSize: 10, fontWeight: '600' },
+  message: { fontSize: 14, lineHeight: 20, marginBottom: 12 },
+  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 12, marginTop: 4, borderTopWidth: 1 },
+  footerLeft: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, flexWrap: 'wrap' },
+  categoryTag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1 },
+  categoryText: { fontSize: 10 },
+  date: { fontSize: 10 },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionButton: { borderRadius: 6, overflow: 'hidden' },
+  actionButtonInner: { width: 30, height: 30, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderRadius: 6 },
 });

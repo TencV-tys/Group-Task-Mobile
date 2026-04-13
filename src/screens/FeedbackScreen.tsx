@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   dropdownOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13 },
   dropdownOptionText: { fontSize: 14 },
 
-  // message input - mirrors modalInput
+  // message input - mirrors modalInput  
   messageInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14, fontSize: 14, minHeight: 150, textAlignVertical: 'top', lineHeight: 20 },
 
   // tips

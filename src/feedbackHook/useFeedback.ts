@@ -1,8 +1,9 @@
-// src/hooks/useFeedback.ts - UPDATED with TokenUtils
+// src/hooks/useFeedback.ts - FULLY UPDATED with real-time support
+
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { FeedbackService, Feedback, FeedbackStats } from '../services/FeedbackService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 
 export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED') => {
   const [loading, setLoading] = useState(false);
@@ -21,7 +22,11 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
 
   const isMounted = useRef(true);
 
-  // ✅ UPDATED: Use TokenUtils.checkToken()
+  // ✅ Track current filter and page for refresh
+  const currentFilterRef = useRef<'OPEN' | 'IN_PROGRESS' | 'RESOLVED' | 'CLOSED' | null>(initialFilter || null);
+  const currentPageRef = useRef(1);
+
+  // Check token
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -31,8 +36,6 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
     setAuthError(!hasToken);
     return hasToken;
   }, []);
-
-  // REMOVED POLLING - No more automatic stats updates
 
   // Submit feedback
   const submitFeedback = useCallback(async (data: { type: string; message: string; category?: string }) => {
@@ -117,6 +120,8 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
       setLoading(true);
       
       const currentFilter = filter !== undefined ? filter : activeFilter;
+      currentFilterRef.current = currentFilter;
+      currentPageRef.current = page;
       
       let result;
       if (currentFilter) {
@@ -144,6 +149,17 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
       setLoading(false);
     }
   }, [pagination.limit, activeFilter, checkToken]);
+
+  // ✅ Refresh current view (for real-time updates)
+  const refreshCurrentView = useCallback(async () => {
+    console.log('🔄 Refreshing current feedback view...');
+    await loadFeedback(currentPageRef.current, currentFilterRef.current);
+  }, [loadFeedback]);
+
+  // ✅ Refresh stats only
+  const refreshStats = useCallback(async () => {
+    await loadStats();
+  }, []);
 
   // Load feedback details
   const loadFeedbackDetails = useCallback(async (feedbackId: string) => {
@@ -264,6 +280,14 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
     setSelectedFeedback(null);
   }, []);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
   return {
     // State
     loading,
@@ -284,6 +308,10 @@ export const useFeedback = (initialFilter?: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED' 
     deleteFeedback,
     confirmDelete,
     clearSelected,
-    setFilter
+    setFilter,
+    
+    // ✅ New functions for real-time updates
+    refreshCurrentView,
+    refreshStats,
   };
 };

@@ -1,5 +1,6 @@
-// src/screens/FeedbackDetailsScreen.tsx - Custom Dropdown (Dark Mode Fixed)
-import React, { useEffect, useState, useRef } from 'react';
+// src/screens/FeedbackDetailsScreen.tsx - FULLY UPDATED with real-time socket
+
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,7 +16,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useFeedback } from '../feedbackHook/useFeedback';
+import { useSocket } from '../context/SocketContext';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
 
@@ -39,10 +42,6 @@ const CATEGORIES = [
   { label: 'Other',         value: 'Other' },
 ];
 
-// ─── Custom Dropdown ──────────────────────────────────────────────────────────
-// Uses an inline View overlay instead of a nested Modal to avoid the Android
-// bug where a Modal-inside-a-Modal causes the back gesture to close the outer
-// modal (and navigate back to the Expo app) instead of the inner dropdown.
 interface DropdownOption { label: string; value: string; }
 
 interface CustomDropdownProps {
@@ -51,7 +50,7 @@ interface CustomDropdownProps {
   options: DropdownOption[];
   onChange: (val: string) => void;
   disabled?: boolean;
-  onOpenChange?: (open: boolean) => void; // lets parent know a dropdown is open
+  onOpenChange?: (open: boolean) => void;
 }
 
 function CustomDropdown({ label, value, options, onChange, disabled, onOpenChange }: CustomDropdownProps) {
@@ -78,8 +77,6 @@ function CustomDropdown({ label, value, options, onChange, disabled, onOpenChang
   return (
     <View style={{ marginBottom: 20, zIndex: open ? 999 : 1 }}>
       <Text style={[dd.label, { color: theme.textMuted }]}>{label}</Text>
-
-      {/* Trigger button */}
       <TouchableOpacity
         onPress={handleOpen}
         activeOpacity={0.7}
@@ -94,8 +91,6 @@ function CustomDropdown({ label, value, options, onChange, disabled, onOpenChang
           color={open ? theme.primary : theme.textMuted}
         />
       </TouchableOpacity>
-
-      {/* Inline dropdown list — no nested Modal */}
       {open && (
         <View style={[dd.sheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {options.map((item, index) => {
@@ -132,48 +127,17 @@ function CustomDropdown({ label, value, options, onChange, disabled, onOpenChang
 }
 
 const dd = StyleSheet.create({
-  label: {
-    fontSize: 13,
-    fontWeight: '500',
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  trigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    minHeight: 50,
-  },
-  triggerText: {
-    fontSize: 14,
-    flex: 1,
-  },
-  // inline dropdown list, renders directly below the trigger
-  sheet: {
-    borderWidth: 1,
-    borderRadius: 8,
-    marginTop: 4,
-    overflow: 'hidden',
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-  },
-  optionText: {
-    fontSize: 14,
-  },
+  label: { fontSize: 13, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
+  trigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 14, minHeight: 50 },
+  triggerText: { fontSize: 14, flex: 1 },
+  sheet: { borderWidth: 1, borderRadius: 8, marginTop: 4, overflow: 'hidden' },
+  option: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13 },
+  optionText: { fontSize: 14 },
 });
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function FeedbackDetailsScreen({ navigation, route }: any) {
   const { theme } = useTheme();
+  const { socket, isConnected } = useSocket();
   const { feedbackId } = route.params;
 
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -182,7 +146,6 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
   const [editMessage,  setEditMessage]  = useState('');
   const [updating,     setUpdating]     = useState(false);
   const [localLoading, setLocalLoading] = useState(false);
-  // prevents back gesture from closing edit modal while a dropdown is expanded
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const {
@@ -195,11 +158,13 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
     authError,
   } = useFeedback();
 
+  // Initial load
   useEffect(() => {
     loadFeedbackDetails(feedbackId);
     return () => { clearSelected(); };
   }, [feedbackId]);
 
+  // Auth error handling
   useEffect(() => {
     if (authError) {
       Alert.alert('Session Expired', 'Please log in again', [
@@ -207,6 +172,58 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
       ]);
     }
   }, [authError]);
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      loadFeedbackDetails(feedbackId);
+    }, [feedbackId])
+  );
+
+  // ✅ Listen for real-time socket events for this specific feedback
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleStatusChanged = (data: any) => {
+      if (data.feedbackId === feedbackId) {
+        console.log('📢 This feedback status changed:', data);
+        loadFeedbackDetails(feedbackId);
+        Alert.alert(
+          'Status Updated',
+          `Your feedback status has been changed to ${data.newStatus}`,
+          [{ text: 'OK' }]
+        );
+      }
+    };
+
+    const handleFeedbackUpdated = (data: any) => {
+      if (data.feedbackId === feedbackId) {
+        console.log('📢 This feedback was updated:', data);
+        loadFeedbackDetails(feedbackId);
+      }
+    };
+
+    const handleFeedbackDeleted = (data: any) => {
+      if (data.feedbackId === feedbackId) {
+        console.log('📢 This feedback was deleted:', data);
+        Alert.alert(
+          'Feedback Deleted',
+          'This feedback has been deleted by an administrator.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
+      }
+    };
+
+    socket.on('feedback:status', handleStatusChanged);
+    socket.on('feedback:updated', handleFeedbackUpdated);
+    socket.on('feedback:deleted', handleFeedbackDeleted);
+
+    return () => {
+      socket.off('feedback:status', handleStatusChanged);
+      socket.off('feedback:updated', handleFeedbackUpdated);
+      socket.off('feedback:deleted', handleFeedbackDeleted);
+    };
+  }, [socket, isConnected, feedbackId]);
 
   useEffect(() => {
     if (selectedFeedback) {
@@ -263,7 +280,6 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
     }
   };
 
-  // ── loading ────────────────────────────────────────────────────────────────
   if (loading || localLoading) {
     return (
       <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
@@ -302,7 +318,6 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
 
   const canEdit = selectedFeedback.status !== 'RESOLVED' && selectedFeedback.status !== 'CLOSED';
 
-  // ── main render ───────────────────────────────────────────────────────────
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
@@ -454,20 +469,17 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
         )}
       </ScrollView>
 
-      {/* ── Edit Modal ── */}
+      {/* Edit Modal */}
       <Modal
         visible={editModalVisible}
         animationType="slide"
         transparent={true}
         onRequestClose={() => {
-          // on Android, back button fires onRequestClose — only close the
-          // edit modal if no inline dropdown is currently expanded
           if (!dropdownOpen) setEditModalVisible(false);
         }}
       >
         <View style={[styles.modalOverlay, { backgroundColor: theme.overlay }]}>
           <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
-            {/* Modal header */}
             <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>Edit Feedback</Text>
               <TouchableOpacity
@@ -479,7 +491,6 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {/* ✅ Custom dropdowns — fully themed, inline, no nested Modal */}
               <CustomDropdown
                 label="Feedback Type *"
                 value={editType}
@@ -498,7 +509,6 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
                 onOpenChange={setDropdownOpen}
               />
 
-              {/* Message Input */}
               <View>
                 <Text style={[styles.modalLabel, { color: theme.textMuted }]}>Your Feedback *</Text>
                 <TextInput
@@ -560,7 +570,7 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
   );
 }
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// Helper functions
 const getFeedbackIcon = (type: string) => {
   const icons: Record<string, string> = {
     BUG: 'bug', FEATURE_REQUEST: 'lightbulb', GENERAL: 'message',
@@ -585,7 +595,6 @@ const getStatusColor = (status: string) => {
   return colors[status] || '#868e96';
 };
 
-// ─── styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
@@ -593,8 +602,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, minHeight: 60,
   },
   backButton: {
-    width: 36, height: 36, borderRadius: 18,
-    justifyContent: 'center', alignItems: 'center',
+    width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center',
     shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
   headerTitle: { fontSize: 16, fontWeight: '600' },

@@ -48,13 +48,18 @@ export const makeTaskDetailsStyles = (theme: Theme) => StyleSheet.create({
   },
   editButtonDisabled: {
     opacity: 0.5,
-  },
+  }, 
   deleteButtonDisabled: {
     opacity: 0.5,
   },
   deleteButtonTextDisabled: {
     color: theme.textPlaceholder,
   },
+  weekAssignmentAvatarImage: {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+},
   backButton: {
     width: 36,
     height: 36,

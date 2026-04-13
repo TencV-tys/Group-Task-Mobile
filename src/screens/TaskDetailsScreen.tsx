@@ -55,6 +55,15 @@ const formatUTCDate = (dateString: string) => {
   return `${monthNames[month]} ${day}, ${year}`;
 };
 
+const formatTimeTo12Hour = (time24: string) => {
+  if (!time24) return '';
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  const minutesStr = minutes?.toString().padStart(2, '0') || '00';
+  return `${hours12}:${minutesStr} ${period}`;
+};
+
 const formatUTCDateTime = (dateString: string) => {
   const date = new Date(dateString);
   const year = date.getUTCFullYear();
@@ -640,7 +649,7 @@ const getVerificationStatus = (assignment: any) => {
       status: 'verified', 
       color: theme.primary, 
       icon: 'check-circle',
-      text: 'Verified'
+      text: 'Verified'  // ✅ Short
     };
   }
   
@@ -650,21 +659,21 @@ const getVerificationStatus = (assignment: any) => {
       status: 'rejected', 
       color: theme.error, 
       icon: 'close-circle',
-      text: 'Rejected'
+      text: 'Rejected'  // ✅ Short
     };
   }
   
-  // ✅ 3. Check if EXPIRED (submission window closed, never submitted)
+  // ✅ 3. Check if EXPIRED
   if (assignment.expired === true) {
     return { 
       status: 'expired', 
       color: theme.error, 
       icon: 'timer-off',
-      text: 'Expired'
+      text: 'Expired'  // ✅ Short
     };
   }
   
-  // ✅ 4. Check if MISSED (specific time slot was missed)
+  // ✅ 4. Check if MISSED
   const missedSlotIds = assignment.missedTimeSlotIds || [];
   const currentTimeSlotId = assignment.timeSlot?.id;
   if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
@@ -672,31 +681,31 @@ const getVerificationStatus = (assignment: any) => {
       status: 'missed', 
       color: theme.error, 
       icon: 'close-circle',
-      text: 'Missed'
+      text: 'Missed'  // ✅ Short
     };
   }
   
-  // ✅ 5. Check if SUBMITTED but not yet verified (PENDING VERIFICATION)
+  // ✅ 5. Check if PENDING VERIFICATION (submitted but not verified)
   if (assignment.completed === true && assignment.verified === null) {
     return { 
       status: 'pending_verification', 
       color: theme.primary, 
       icon: 'clock-check',
-      text: 'Pending Verification'
+      text: 'Pending'  // ✅ Shortened from "Pending Verification"
     };
   }
   
-  // ✅ 6. Check if COMPLETED (fully done - for single slot tasks)
+  // ✅ 6. Check if COMPLETED
   if (assignment.completed === true) {
     return { 
       status: 'completed', 
       color: theme.primary, 
       icon: 'check-circle',
-      text: 'Completed'
+      text: 'Done'  // ✅ Short from "Completed"
     };
   }
   
-  // ✅ 7. Check if OVERDUE (due date passed but not completed)
+  // ✅ 7. Check if OVERDUE
   const dueDate = new Date(assignment.dueDate);
   const now = new Date();
   const isOverdue = dueDate < now;
@@ -706,7 +715,7 @@ const getVerificationStatus = (assignment: any) => {
       status: 'overdue', 
       color: theme.error, 
       icon: 'alert-circle',
-      text: 'Overdue'
+      text: 'Late'  // ✅ Short from "Overdue"
     };
   }
   
@@ -717,16 +726,16 @@ const getVerificationStatus = (assignment: any) => {
       status: 'due_today', 
       color: theme.primary, 
       icon: 'clock-alert',
-      text: 'Due Today'
+      text: 'Today'  // ✅ Short from "Due Today"
     };
   }
   
-  // ✅ 9. Default - PENDING (future assignment)
+  // ✅ 9. Default - PENDING
   return { 
     status: 'pending',  
     color: theme.textSecondary, 
     icon: 'clock-outline',
-    text: 'Pending'
+    text: 'Wait'  // ✅ Short from "Pending"
   };
 };
   
@@ -809,134 +818,135 @@ const getVerificationStatus = (assignment: any) => {
     </View>
   );
 
-  // ===== RENDER ALL ASSIGNMENTS FOR CURRENT WEEK - GROUPED BY DAY =====
-  const renderAllWeekAssignments = () => {
-    const currentWeek = task?.group?.currentRotationWeek || 1;
+ const renderAllWeekAssignments = () => {
+  const currentWeek = task?.group?.currentRotationWeek || 1;
+  
+  const allWeekAssignments = task?.assignments?.filter((a: any) => 
+    a.rotationWeek === currentWeek
+  ) || [];
+  
+  if (allWeekAssignments.length === 0) return null;
+  
+  const groupedByDay = new Map();
+  
+  allWeekAssignments.forEach((assignment: any) => {
+    const dueDate = new Date(assignment.dueDate);
+    const dayKey = formatUTCDate(assignment.dueDate);
+    const dayName = dueDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
     
-    const allWeekAssignments = task?.assignments?.filter((a: any) => 
-      a.rotationWeek === currentWeek
-    ) || [];
-    
-    if (allWeekAssignments.length === 0) return null;
-    
-    // Group assignments by day
-    const groupedByDay = new Map();
-    
-    allWeekAssignments.forEach((assignment: any) => {
-      const dueDate = new Date(assignment.dueDate);
-      const dayKey = formatUTCDate(assignment.dueDate);
-      const dayName = dueDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+    if (!groupedByDay.has(dayKey)) {
+      groupedByDay.set(dayKey, {
+        date: dayKey,
+        dayName: dayName,
+        assignments: []
+      });
+    }
+    groupedByDay.get(dayKey).assignments.push(assignment);
+  });
+  
+  const groupedDays = Array.from(groupedByDay.values()).sort((a, b) => {
+    return new Date(a.date).getTime() - new Date(b.date).getTime();
+  });
+  
+  return (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.sectionIcon}>
+          <MaterialCommunityIcons name="format-list-checks" size={16} color={theme.textSecondary} />
+        </LinearGradient>
+        <Text style={styles.sectionTitle}>All Assignments (Current Week)</Text>
+      </View>
       
-      if (!groupedByDay.has(dayKey)) {
-        groupedByDay.set(dayKey, {
-          date: dayKey,
-          dayName: dayName,
-          assignments: []
-        });
-      }
-      
-      groupedByDay.get(dayKey).assignments.push(assignment);
-    });
-    
-    // Convert to array and sort by date
-    const groupedDays = Array.from(groupedByDay.values()).sort((a, b) => {
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    });
-    
-    return (
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.sectionIcon}>
-            <MaterialCommunityIcons name="format-list-checks" size={16} color={theme.textSecondary} />
-          </LinearGradient>
-          <Text style={styles.sectionTitle}>All Assignments (Current Week)</Text>
-        </View>
+      {groupedDays.map((dayGroup: any, dayIndex: number) => {
+        const isToday = isDueTodayUTC(dayGroup.assignments[0].dueDate);
         
-        {groupedDays.map((dayGroup: any, dayIndex: number) => {
-          const isToday = isDueTodayUTC(dayGroup.assignments[0].dueDate);
-          
-          return (
-            <View key={dayIndex} style={styles.dayGroupContainer}>
-              <View style={styles.dayGroupHeader}>
-                <LinearGradient
-                  colors={isToday ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
-                  style={[styles.dayGroupBadge, isToday && styles.todayDayGroupBadge]}
-                >
-                  <Text style={[styles.dayGroupTitle, isToday && { color: theme.primary }]}>
-                    {dayGroup.dayName}
-                  </Text>
-                  <Text style={[styles.dayGroupDate, isToday && { color: theme.primary }]}>
-                    {dayGroup.date}
-                  </Text>
-                </LinearGradient>
-              </View>
+        return (
+          <View key={dayIndex} style={styles.dayGroupContainer}>
+            <View style={styles.dayGroupHeader}>
+              <LinearGradient
+                colors={isToday ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
+                style={[styles.dayGroupBadge, isToday && styles.todayDayGroupBadge]}
+              >
+                <Text style={[styles.dayGroupTitle, isToday && { color: theme.primary }]}>
+                  {dayGroup.dayName}
+                </Text>
+                <Text style={[styles.dayGroupDate, isToday && { color: theme.primary }]}>
+                  {dayGroup.date}
+                </Text>
+              </LinearGradient>
+            </View>
+            
+            {dayGroup.assignments.map((assignment: any, idx: number) => {
+              const isCurrentUser = assignment.userId === currentUserId;
+              const status = getVerificationStatus(assignment);
+              const userAvatarUrl = assignment.user?.avatarUrl;
+              const userName = assignment.user?.fullName || 'Unknown';
+              const userInitial = userName.charAt(0).toUpperCase();
               
-              {dayGroup.assignments.map((assignment: any, idx: number) => {
-                const isCurrentUser = assignment.userId === currentUserId;
-                const status = getVerificationStatus(assignment);
-                
-                return (
-                  <TouchableOpacity
-                    key={assignment.id || idx}
-                    style={[
-                      styles.weekAssignmentCard,
-                      isCurrentUser && styles.currentUserAssignmentCard
-                    ]}
-                    onPress={() => handleViewAssignmentDetails(assignment)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.weekAssignmentHeader}>
-                      <View style={styles.weekAssignmentUser}>
+              return (
+                <TouchableOpacity
+                  key={assignment.id || idx}
+                  style={[styles.weekAssignmentCard, isCurrentUser && styles.currentUserAssignmentCard]}
+                  onPress={() => handleViewAssignmentDetails(assignment)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.weekAssignmentHeader}>
+                    <View style={styles.weekAssignmentUser}>
+                      {userAvatarUrl ? (
+                        <Image 
+                          source={{ uri: userAvatarUrl }} 
+                          style={[styles.weekAssignmentAvatar, styles.weekAssignmentAvatarImage, isCurrentUser && styles.currentUserAvatar]}
+                        />
+                      ) : (
                         <LinearGradient
                           colors={[theme.bgSecondary, theme.bgTertiary]}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 1 }}
                           style={[styles.weekAssignmentAvatar, isCurrentUser && styles.currentUserAvatar]}
                         >
-                          <Text style={[styles.weekAssignmentAvatarText, { color: theme.textSecondary }]}>
-                            {assignment.user?.fullName?.charAt(0) || '?'}
-                          </Text>
+                          <Text style={styles.weekAssignmentAvatarText}>{userInitial}</Text>
                         </LinearGradient>
-                        <View>
-                          <Text style={[styles.weekAssignmentUserName, { color: theme.text }]}>
-                            {assignment.user?.fullName || 'Unknown'}
-                            {isCurrentUser && <Text style={[styles.currentUserLabel, { color: theme.primary }]}> (You)</Text>}
-                          </Text>
-                          <Text style={[styles.weekAssignmentTime, { color: theme.textMuted }]}>
-                            {assignment.timeSlot?.startTime} - {assignment.timeSlot?.endTime}
-                          </Text>
-                        </View>
-                      </View>
-                      <LinearGradient
-                        colors={[status.color + '20', status.color + '10']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.weekAssignmentStatus}
-                      >
-                        <MaterialCommunityIcons name={status.icon as any} size={12} color={status.color} />
-                        <Text style={[styles.weekAssignmentStatusText, { color: status.color }]}>{status.text}</Text>
-                      </LinearGradient>
-                    </View>
-                    <View style={styles.weekAssignmentFooter}>
-                      <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.weekAssignmentPoints}>
-                        <MaterialCommunityIcons name="star" size={10} color={theme.primary} />
-                        <Text style={[styles.weekAssignmentPointsText, { color: theme.primary }]}>{assignment.points} pts</Text>
-                      </LinearGradient>
-                      {assignment.completed && assignment.completedAt && (
-                        <Text style={[styles.weekAssignmentCompleted, { color: theme.textMuted }]}>
-                          Completed: {formatUTCDate(assignment.completedAt)}
-                        </Text>
                       )}
+                      <View>
+                        <Text style={[styles.weekAssignmentUserName, { color: theme.text }]}>
+                          {userName}
+                          {isCurrentUser && <Text style={[styles.currentUserLabel, { color: theme.primary }]}> (You)</Text>}
+                        </Text>
+                        <Text style={[styles.weekAssignmentTime, { color: theme.textMuted }]}>
+                          {formatTimeTo12Hour(assignment.timeSlot?.startTime)} - {formatTimeTo12Hour(assignment.timeSlot?.endTime)}
+                        </Text>
+                      </View>
                     </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          );
-        })}
-      </View>
-    );
-  };
+                    
+                    <LinearGradient
+                      colors={[status.color + '20', status.color + '10']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[styles.weekAssignmentStatus, { borderWidth: 1, borderColor: status.color + '40' }]}
+                    >
+                      <MaterialCommunityIcons name={status.icon as any} size={12} color={status.color} />
+                      <Text style={[styles.weekAssignmentStatusText, { color: status.color }]}>{status.text}</Text>
+                    </LinearGradient>
+                  </View>
+                  
+                  <View style={styles.weekAssignmentFooter}>
+                    <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.weekAssignmentPoints}>
+                      <MaterialCommunityIcons name="star" size={10} color={theme.primary} />
+                      <Text style={[styles.weekAssignmentPointsText, { color: theme.primary }]}>{assignment.points} pts</Text>
+                    </LinearGradient>
+                    {assignment.completed && assignment.completedAt && (
+                      <Text style={[styles.weekAssignmentCompleted, { color: theme.textMuted }]}>
+                        Completed: {formatUTCDate(assignment.completedAt)}
+                      </Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        );
+      })}
+    </View>
+  );
+};
 
   const renderMemberAssignmentSection = () => {
     const currentWeek = task?.group?.currentRotationWeek || 1;
@@ -1022,10 +1032,10 @@ const getVerificationStatus = (assignment: any) => {
               />
               <View style={styles.assignmentInfo}>
                 <Text style={styles.todayAssignmentTitle}>{task.title}</Text>
-                <Text style={styles.assignmentDate}>
-                  Due: {formatUTCDate(todayAssignment.dueDate)}
-                  {todayAssignment.timeSlot && ` • ${todayAssignment.timeSlot.startTime} - ${todayAssignment.timeSlot.endTime}`}
-                </Text>
+                   <Text style={styles.assignmentDate}>
+  Due: {formatUTCDate(todayAssignment.dueDate)}
+  {todayAssignment.timeSlot && ` • ${formatTimeTo12Hour(todayAssignment.timeSlot.startTime)} - ${formatTimeTo12Hour(todayAssignment.timeSlot.endTime)}`}
+</Text>
               </View>
             </View>
             
@@ -1158,11 +1168,11 @@ const getVerificationStatus = (assignment: any) => {
                     />
                   </LinearGradient>
                   <View style={styles.pendingInfo}>
-                    <Text style={styles.pendingTitle}>
-                      {assignment.timeSlot 
-                        ? `${assignment.timeSlot.startTime} - ${assignment.timeSlot.endTime}`
-                        : 'Time slot assignment'}
-                    </Text>
+                     <Text style={styles.pendingTitle}>
+  {assignment.timeSlot 
+    ? `${formatTimeTo12Hour(assignment.timeSlot.startTime)} - ${formatTimeTo12Hour(assignment.timeSlot.endTime)}`
+    : 'Time slot assignment'}
+</Text>
                     <Text style={[
                       styles.pendingDate,
                       isToday && styles.todayPendingText,
@@ -1280,11 +1290,11 @@ const getVerificationStatus = (assignment: any) => {
                 </LinearGradient>
                 <View style={styles.submissionHistoryInfo}>
                   <Text style={[styles.submissionHistoryStatus, { color: status.color }]}>{status.text}</Text>
-                  <Text style={styles.submissionHistoryDate}>
-                    {formatUTCDate(submission.dueDate)}
-                    {submission.timeSlot && ` • ${submission.timeSlot.startTime} - ${submission.timeSlot.endTime}`}
-                    {dueToday && <Text style={styles.todayText}> (Today)</Text>}
-                  </Text>
+                    <Text style={styles.submissionHistoryDate}>
+  {formatUTCDate(submission.dueDate)}
+  {submission.timeSlot && ` • ${formatTimeTo12Hour(submission.timeSlot.startTime)} - ${formatTimeTo12Hour(submission.timeSlot.endTime)}`}
+  {dueToday && <Text style={styles.todayText}> (Today)</Text>}
+</Text>
                 </View>
               </View>
 
@@ -1375,9 +1385,9 @@ const getVerificationStatus = (assignment: any) => {
                 <View style={styles.upcomingDetailRow}>
                   <MaterialCommunityIcons name="calendar" size={12} color={theme.textMuted} />
                   <Text style={styles.upcomingDetailText}>
-                    Due: {formatUTCDate(assignment.dueDate)}
-                    {assignment.timeSlot && ` at ${assignment.timeSlot.startTime}`}
-                  </Text>
+  Due: {formatUTCDate(assignment.dueDate)}
+  {assignment.timeSlot && ` at ${formatTimeTo12Hour(assignment.timeSlot.startTime)}`}
+</Text>
                 </View>
                 <View style={styles.upcomingDetailRow}>
                   <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
@@ -1448,10 +1458,11 @@ const getVerificationStatus = (assignment: any) => {
                       <View style={styles.userDetails}>
                         <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
                         <Text style={styles.assignmentDateSmall}>
-                          Due: {formatUTCDate(assignment.dueDate)}
-                          {assignment.rotationWeek && ` • Week ${assignment.rotationWeek}`}
-                          {dueToday && <Text style={styles.todaySmallText}> (Today)</Text>}
-                        </Text>
+  Due: {formatUTCDate(assignment.dueDate)}
+  {assignment.timeSlot && ` • ${formatTimeTo12Hour(assignment.timeSlot.startTime)}`}
+  {assignment.rotationWeek && ` • Week ${assignment.rotationWeek}`}
+  {dueToday && <Text style={styles.todaySmallText}> (Today)</Text>}
+</Text>
                       </View>
                     </View>
                     <LinearGradient colors={[status.color + '20', status.color + '10']} style={styles.statusBadge}>
@@ -1615,47 +1626,47 @@ const getVerificationStatus = (assignment: any) => {
             </View>
           )}
 
-          {task.timeSlots?.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Time Slots</Text>
-              <View style={styles.timeSlotsContainer}>
-                {task.timeSlots.map((slot: any, index: number) => {
-                  const isCurrent = currentTimeSlot && 
-                    slot.startTime === currentTimeSlot.startTime && 
-                    slot.endTime === currentTimeSlot.endTime;
-                  
-                  return (
-                    <LinearGradient
-                      key={index}
-                      colors={isCurrent ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
-                      style={[styles.timeSlotCard, isCurrent && styles.currentTimeSlotCard]}
-                    >
-                      <View style={styles.timeSlotHeader}>
-                        <MaterialCommunityIcons name={isCurrent ? "clock-check" : "clock"} size={18} 
-                          color={isCurrent ? theme.primary : theme.textSecondary} />
-                        <Text style={[styles.timeSlotTime, isCurrent && styles.currentTimeSlotTime]}>
-                          {slot.startTime} - {slot.endTime}
-                        </Text>
-                        {slot.points !== undefined && slot.points > 0 && (
-                          <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.slotPointsBadge}>
-                            <Text style={styles.slotPointsText}>{slot.points} pts</Text>
-                          </LinearGradient>
-                        )}
-                      </View>
-                      {slot.label && <Text style={styles.timeSlotLabel}>{slot.label}</Text>}
-                      {isCurrent && isSubmittable && (
-                        <View style={styles.activeSlotIndicator}>
-                          <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
-                          <Text style={styles.activeSlotText}>Active - Can Submit</Text>
-                        </View>
-                      )}
-                    </LinearGradient>
-                  );
-                })}
-              </View>
-              <Text style={styles.timeSlotNote}>ⓘ Submit within 30 minutes after time slot end</Text>
+        {task.timeSlots?.length > 0 && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Time Slots</Text>
+    <View style={styles.timeSlotsContainer}>
+      {task.timeSlots.map((slot: any, index: number) => {
+        const isCurrent = currentTimeSlot && 
+          slot.startTime === currentTimeSlot.startTime && 
+          slot.endTime === currentTimeSlot.endTime;
+        
+        return (
+          <LinearGradient
+            key={index}
+            colors={isCurrent ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
+            style={[styles.timeSlotCard, isCurrent && styles.currentTimeSlotCard]}
+          >
+            <View style={styles.timeSlotHeader}>
+              <MaterialCommunityIcons name={isCurrent ? "clock-check" : "clock"} size={18} 
+                color={isCurrent ? theme.primary : theme.textSecondary} />
+              <Text style={[styles.timeSlotTime, isCurrent && styles.currentTimeSlotTime]}>
+                {formatTimeTo12Hour(slot.startTime)} - {formatTimeTo12Hour(slot.endTime)}
+              </Text>
+              {slot.points !== undefined && slot.points > 0 && (
+                <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.slotPointsBadge}>
+                  <Text style={styles.slotPointsText}>{slot.points} pts</Text>
+                </LinearGradient>
+              )}
             </View>
-          )}
+            {slot.label && <Text style={styles.timeSlotLabel}>{slot.label}</Text>}
+            {isCurrent && isSubmittable && (
+              <View style={styles.activeSlotIndicator}>
+                <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
+                <Text style={styles.activeSlotText}>Active - Can Submit</Text>
+              </View>
+            )}
+          </LinearGradient>
+        );
+      })}
+    </View>
+    <Text style={styles.timeSlotNote}>ⓘ Submit within 30 minutes after time slot end</Text>
+  </View>
+)}
 
 
          

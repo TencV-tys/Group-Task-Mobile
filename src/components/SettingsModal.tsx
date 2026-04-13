@@ -144,6 +144,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     );
   }, []);
 
+  const handleMySubmissions = async () => {
+  const hasToken = await checkToken();
+  if (!hasToken) return;
+  navigation.navigate('MySubmissions', { groupId, groupName, userRole });
+  onClose();
+};
+
   const performLogout = useCallback(async () => {
     setLoggingOut(true);
     try {
@@ -739,6 +746,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 </LinearGradient>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
               </View>
+
+              <TouchableOpacity onPress={handleMySubmissions} style={styles.menuItem}>
+    <View style={styles.menuItemLeft}>
+      <MaterialCommunityIcons name="clipboard-list" size={18} color={theme.primary} />
+      <Text style={[styles.menuItemText, { color: theme.text }]}>My Submissions</Text>
+    </View>
+    <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
+  </TouchableOpacity>
 
               <TouchableOpacity onPress={handleTaskCompletionHistory} style={styles.menuItem}>
                 <View style={styles.menuItemLeft}>

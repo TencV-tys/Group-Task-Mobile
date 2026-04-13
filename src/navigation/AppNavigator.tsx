@@ -33,6 +33,7 @@ import AccountSettingsScreen from '../screens/AccountSettingsScreen';
 import { NeglectedTasksScreen } from '../screens/NeglectedTasksScreen'; 
 import { TeamOverviewScreen } from '../screens/TeamOverviewScreen';  
 import TaskDraftsScreen from '../screens/TaskDraftsScreen';
+import MySubmissionsScreen from '../screens/MySubmissionsScreen';
 
 // Import Swap Request Screens
 import { PendingSwapRequestsScreen } from '../screens/PendingSwapRequestsScreen';
@@ -338,6 +339,12 @@ export default function AppNavigator() {
         component={NeglectedTasksScreen}
         options={{ headerShown: false }}
       />
+      <Stack.Screen 
+  name="MySubmissions" 
+  component={MySubmissionsScreen}
+  options={{ headerShown: false }}
+/>
     </Stack.Navigator> 
-  );
+    
+  ); 
 }

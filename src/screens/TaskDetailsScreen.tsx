@@ -468,34 +468,71 @@ const isDueTodayUTC = (dueDate: string) => {
   };
 
   const handleDelete = async () => {
-    if (!task) return;
+  if (!task) return;
 
-    Alert.alert(
-      'Delete Task',
-      `Are you sure you want to delete "${task.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const result = await TaskService.deleteTask(task.id);
-              if (result.success) {
-                Alert.alert('Success', 'Task deleted successfully');
-                navigation.goBack();
-              } else {
-                Alert.alert('Error', result.message || 'Failed to delete task');
-              }
-            } catch (err: any) {
-              console.error('Error deleting task:', err);
-              Alert.alert('Error', err.message || 'Failed to delete task');
+  // Check if there are assignments for this task
+  const hasAssignments = task.assignments && task.assignments.length > 0;
+  const currentWeekAssignments = task.assignments?.filter(
+    (a: any) => a.rotationWeek === (task.group?.currentRotationWeek || 1)
+  ) || [];
+  
+  let warningMessage = '';
+  
+  if (hasAssignments) {
+    warningMessage = 
+      `⚠️ TASK HAS ${task.assignments.length} ASSIGNMENT(S)!\n\n` +
+      `What will happen:\n` +
+      `✅ Assignment records will be PRESERVED in the database\n` +
+      `✅ All submission data (photos, notes, completion status) will be kept\n` +
+      `✅ Points earned by members will NOT be lost\n` +
+      `✅ Verification statuses will remain intact\n\n` +
+      `❌ The task will be soft-deleted (marked as deleted)\n` +
+      `❌ Assignments will no longer be linked to this task (taskId set to NULL)\n` +
+      `❌ Members will see this task as "Task Deleted" in their history\n` +
+      `❌ New assignments cannot be created for this task\n\n` +
+      `Current week assignments: ${currentWeekAssignments.length}\n` +
+      `Total assignments: ${task.assignments.length}\n\n` +
+      `Are you sure you want to delete "${task.title}"?`;
+  } else {
+    warningMessage = 
+      `Are you sure you want to delete "${task.title}"?\n\n` +
+      `This task has no assignments yet, so deletion is safe.\n\n` +
+      `This action cannot be undone.`;
+  }
+
+  Alert.alert(
+    'Delete Task',
+    warningMessage,
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Delete', 
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const result = await TaskService.deleteTask(task.id);
+            if (result.success) {
+              Alert.alert(
+                'Success', 
+                hasAssignments 
+                  ? `Task "${task.title}" has been deleted.\n\nAssignment history has been preserved for records.`
+                  : 'Task deleted successfully'
+              );
+              // Refresh previous screen if needed
+              if (onRefresh) onRefresh();
+              navigation.goBack();
+            } else {
+              Alert.alert('Error', result.message || 'Failed to delete task');
             }
+          } catch (err: any) {
+            console.error('Error deleting task:', err);
+            Alert.alert('Error', err.message || 'Failed to delete task');
           }
         }
-      ]
-    );
-  };
+      }
+    ]
+  );
+};
 
   const handleCompleteAssignment = () => {
     if (!task?.userAssignment || !isSubmittable) {
@@ -1640,21 +1677,22 @@ const getVerificationStatus = (assignment: any) => {
             </View>
           )}
 
-          {isAdmin && (
-            <TouchableOpacity 
-              style={[styles.deleteButton, isTaskAssigned() && styles.deleteButtonDisabled]} 
-              onPress={handleDelete}
-              disabled={isTaskAssigned()}
-            >
-              <LinearGradient colors={isTaskAssigned() ? [theme.bgSecondary, theme.bgTertiary] : [theme.errorBg, theme.errorBg]} style={styles.deleteButtonGradient}>
-                <MaterialCommunityIcons name="delete" size={18} color={isTaskAssigned() ? theme.textPlaceholder : theme.error} />
-                <Text style={[styles.deleteButtonText, isTaskAssigned() && styles.deleteButtonTextDisabled]}>
-                  Delete Task
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
 
+         
+{isAdmin && (
+  <TouchableOpacity 
+    style={styles.deleteButton} 
+    onPress={handleDelete}
+  >
+    <LinearGradient colors={[theme.errorBg, theme.errorBg]} style={styles.deleteButtonGradient}>
+      <MaterialCommunityIcons name="delete" size={18} color={theme.error} />
+      <Text style={styles.deleteButtonText}>
+        Delete Task
+      </Text>
+    </LinearGradient>
+  </TouchableOpacity>
+)}
+       
           {!isAdmin && (
             <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.memberInfoBox}>
               <MaterialCommunityIcons name="information" size={18} color={theme.textMuted} />

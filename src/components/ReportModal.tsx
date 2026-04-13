@@ -1,4 +1,5 @@
-// src/components/ReportModal.tsx - Dark Mode Added
+// src/components/ReportModal.tsx - UPDATED with better error handling
+
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
@@ -17,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TokenUtils } from '../utils/tokenUtils';
 import { useTheme } from '../context/ThemeContext';
+import { useSocket } from '../context/SocketContext'; // ✅ Add socket if needed for real-time
 
 const REPORT_REASONS = [
   { value: 'INAPPROPRIATE_CONTENT', label: 'Inappropriate Content', icon: 'alert-octagon' },
@@ -46,6 +48,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   navigation
 }) => {
   const { theme, isDark } = useTheme();
+  const { isConnected } = useSocket(); // ✅ Get socket connection status
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -104,20 +107,30 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
     setSubmitting(true);
     try {
-      await onSubmit({ type: selectedReason, description });
+      await onSubmit({ type: selectedReason, description: description.trim() });
+      
+      // ✅ Show success with real-time info
       Alert.alert(
         'Report Submitted',
-        'Thank you for helping keep our community safe. We will review your report.',
+        `Thank you for helping keep our community safe.\n\nYour report has been submitted and will be reviewed by our team.${
+          isConnected ? ' You will receive updates in real-time.' : ' You will be notified when a decision is made.'
+        }`,
         [{ text: 'OK', onPress: handleClose }]
       );
-    } catch (error) {
-      if (error instanceof Error && 
-          (error.message.toLowerCase().includes('token') || 
-           error.message.toLowerCase().includes('auth') ||
-           error.message.toLowerCase().includes('unauthorized'))) {
+    } catch (error: any) {
+      console.error('❌ Report submission error:', error);
+      
+      // ✅ Better error handling
+      if (error?.message?.toLowerCase().includes('token') || 
+          error?.message?.toLowerCase().includes('auth') ||
+          error?.message?.toLowerCase().includes('unauthorized')) {
         setAuthError(true);
+      } else if (error?.message?.includes('already reported')) {
+        Alert.alert('Already Reported', 'You have already reported this group. Duplicate reports are not allowed.');
+      } else if (error?.message?.includes('rate limit')) {
+        Alert.alert('Too Many Requests', 'Please wait a moment before submitting another report.');
       } else {
-        Alert.alert('Error', 'Failed to submit report. Please try again.');
+        Alert.alert('Error', error?.message || 'Failed to submit report. Please check your connection and try again.');
       }
     } finally {
       setSubmitting(false);
@@ -135,6 +148,15 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   const handleBack = () => {
     setStep('reason');
   };
+
+  // Clear form when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setSelectedReason('');
+      setDescription('');
+      setStep('reason');
+    }
+  }, [visible]);
 
   if (authError) {
     return null;

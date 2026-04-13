@@ -300,4 +300,156 @@ export class UploadService {
       };
     }
   }
+
+static async uploadAvatarCloudinary(fileUri: string): Promise<UploadResponse> {
+  try {
+    console.log('📤 Uploading avatar to Cloudinary from URI:', fileUri);
+    
+    const token = await TokenUtils.getAccessToken();
+    const formData = new FormData();
+    
+    const filename = fileUri.split('/').pop() || 'avatar.jpg';
+    
+    const getMimeType = (uri: string): string => {
+      const extension = uri.split('.').pop()?.toLowerCase();
+      switch (extension) {
+        case 'jpg':
+        case 'jpeg':
+          return 'image/jpeg';
+        case 'png':
+          return 'image/png';
+        case 'gif':
+          return 'image/gif';
+        case 'webp':
+          return 'image/webp';
+        default:
+          return 'image/jpeg';
+      }
+    };
+
+    const mimeType = getMimeType(fileUri);
+    
+    formData.append('avatar', {
+      uri: fileUri,
+      type: mimeType,
+      name: filename,
+    } as any);
+
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}/avatar`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const result = await response.json();
+    console.log('📥 Cloudinary upload response:', result);
+    
+    return result;
+
+  } catch (error: any) {
+    console.error('❌ Cloudinary avatar upload error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to upload avatar to Cloudinary'
+    };
+  }
+}
+
+// ========== CLOUDINARY GROUP AVATAR UPLOAD ==========
+static async uploadGroupAvatarCloudinary(groupId: string, fileUri: string): Promise<UploadResponse> {
+  try {
+    console.log('📤 Uploading group avatar to Cloudinary for group:', groupId);
+    
+    const token = await TokenUtils.getAccessToken();
+    const formData = new FormData();
+    
+    const filename = fileUri.split('/').pop() || 'group-avatar.jpg';
+    
+    const getMimeType = (uri: string): string => {
+      const extension = uri.split('.').pop()?.toLowerCase();
+      return extension === 'png' ? 'image/png' : 'image/jpeg';
+    };
+
+    const mimeType = getMimeType(fileUri);
+    
+    formData.append('avatar', {
+      uri: fileUri,
+      type: mimeType,
+      name: filename,
+    } as any);
+
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}/group/${groupId}/avatar`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('❌ Cloudinary group avatar upload error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to upload group avatar to Cloudinary'
+    };
+  }
+}
+
+// ========== CLOUDINARY TASK PHOTO UPLOAD ==========
+static async uploadTaskPhotoCloudinary(fileUri: string): Promise<UploadResponse> {
+  try {
+    console.log('📤 Uploading task photo to Cloudinary');
+    
+    const token = await TokenUtils.getAccessToken();
+    const formData = new FormData();
+    
+    const filename = fileUri.split('/').pop() || 'task-photo.jpg';
+    
+    const getMimeType = (uri: string): string => {
+      const extension = uri.split('.').pop()?.toLowerCase();
+      return extension === 'png' ? 'image/png' : 'image/jpeg';
+    };
+
+    const mimeType = getMimeType(fileUri);
+    
+    formData.append('photo', {
+      uri: fileUri,
+      type: mimeType,
+      name: filename,
+    } as any);
+
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_URL}/task-photo`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    const result = await response.json();
+    return result;
+
+  } catch (error: any) {
+    console.error('❌ Cloudinary task photo upload error:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to upload task photo to Cloudinary'
+    };
+  }
+}
+
 }

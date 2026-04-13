@@ -278,6 +278,102 @@ export const useImageUpload = ({ onSuccess, onError, onAuthError }: UseImageUplo
     }
   };
 
+
+  const uploadAvatarToCloudinary = async (image: ImagePicker.ImagePickerAsset) => {
+  try {
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return { success: false, message: 'Authentication required' };
+    }
+
+    setUploading(true);
+    setProgress(0);
+    setAuthError(false);
+
+    const result = await UploadService.uploadAvatarCloudinary(image.uri);
+
+    setProgress(100);
+
+    if (result.success) {
+      onSuccess?.(result);
+      return result;
+    } else {
+      throw new Error(result.message);
+    }
+  } catch (error: any) {
+    console.error('❌ Cloudinary upload error:', error);
+    onError?.(error);
+    Alert.alert('Upload Failed', error.message || 'Failed to upload image to Cloudinary');
+    return { success: false, message: error.message };
+  } finally {
+    setUploading(false);
+  }
+};
+
+// Upload group avatar to Cloudinary
+const uploadGroupAvatarToCloudinary = async (groupId: string, image: ImagePicker.ImagePickerAsset) => {
+  try {
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return { success: false, message: 'Authentication required' };
+    }
+
+    setUploading(true);
+    setProgress(0);
+    setAuthError(false);
+
+    const result = await UploadService.uploadGroupAvatarCloudinary(groupId, image.uri);
+
+    setProgress(100);
+
+    if (result.success) {
+      onSuccess?.(result);
+      return result;
+    } else {
+      throw new Error(result.message);
+    }
+  } catch (error: any) {
+    console.error('❌ Cloudinary group avatar upload error:', error);
+    onError?.(error);
+    Alert.alert('Upload Failed', error.message || 'Failed to upload group avatar to Cloudinary');
+    return { success: false, message: error.message };
+  } finally {
+    setUploading(false);
+  }
+};
+
+// Upload task photo to Cloudinary
+const uploadTaskPhotoToCloudinary = async (imageUri: string) => {
+  try {
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return { success: false, message: 'Authentication required' };
+    }
+
+    setUploading(true);
+    setProgress(0);
+    setAuthError(false);
+
+    const result = await UploadService.uploadTaskPhotoCloudinary(imageUri);
+
+    setProgress(100);
+
+    if (result.success) {
+      onSuccess?.(result);
+      return result;
+    } else {
+      throw new Error(result.message);
+    }
+  } catch (error: any) {
+    console.error('❌ Cloudinary task photo upload error:', error);
+    onError?.(error);
+    Alert.alert('Upload Failed', error.message || 'Failed to upload task photo to Cloudinary');
+    return { success: false, message: error.message };
+  } finally {
+    setUploading(false);
+  }
+};
+
   return {
     uploading,
     progress,
@@ -289,6 +385,9 @@ export const useImageUpload = ({ onSuccess, onError, onAuthError }: UseImageUplo
     deleteAvatar,
     requestPermissions,
     uploadGroupAvatar,
-    deleteGroupAvatar
+    deleteGroupAvatar,
+     uploadAvatarToCloudinary,
+  uploadGroupAvatarToCloudinary,
+  uploadTaskPhotoToCloudinary,
   };
 };

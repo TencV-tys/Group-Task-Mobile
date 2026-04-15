@@ -1,4 +1,4 @@
-// src/screens/AccountSettingsScreen.tsx - FIXED KEYBOARD COVERING INPUTS
+// src/screens/AccountSettingsScreen.tsx - UPDATED with correct password validation
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -23,7 +23,7 @@ import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { useTheme } from '../context/ThemeContext';
 import { makeAccountSettingsStyles } from '../styles/accountSettings.styles';
 
-// ─── Password Strength Indicator ────────────────────────────────────────────────
+// ─── Password Strength Indicator (UPDATED for 8 chars minimum) ─────────────────
 type StrengthLevel = 'weak' | 'fair' | 'good' | 'strong';
 
 const getPasswordStrength = (password: string) => {
@@ -32,21 +32,25 @@ const getPasswordStrength = (password: string) => {
   let score = 0;
   const tips: string[] = [];
 
-  if (password.length >= 6) score++; else tips.push('At least 6 chars');
-  if (password.length >= 10) score++; else tips.push('10+ chars helps');
+  // Updated thresholds for 8 character minimum
+  if (password.length >= 8) score++; else tips.push('At least 8 chars');
+  if (password.length >= 12) score++; else tips.push('12+ chars stronger');
   if (/[A-Z]/.test(password)) score++; else tips.push('Add uppercase');
+  if (/[a-z]/.test(password)) score++; else tips.push('Add lowercase');
   if (/[0-9]/.test(password)) score++; else tips.push('Add a number');
-  if (/[^A-Za-z0-9]/.test(password)) score++; else tips.push('Add !@#$...');
+  if (/[^A-Za-z0-9]/.test(password)) score++; else tips.push('Add special char (!@#$)');
 
-  if (score <= 1) return { level: 'weak' as StrengthLevel, score: 1, label: 'Weak', color: '#fa5252', tip: tips[0] ?? '' };
-  if (score === 2) return { level: 'fair' as StrengthLevel, score: 2, label: 'Fair', color: '#fd7e14', tip: tips[0] ?? '' };
-  if (score === 3) return { level: 'good' as StrengthLevel, score: 3, label: 'Good', color: '#f59f00', tip: tips[0] ?? '' };
+  if (score <= 2) return { level: 'weak' as StrengthLevel, score: 1, label: 'Weak', color: '#fa5252', tip: tips[0] ?? '' };
+  if (score <= 3) return { level: 'fair' as StrengthLevel, score: 2, label: 'Fair', color: '#fd7e14', tip: tips[0] ?? '' };
+  if (score <= 4) return { level: 'good' as StrengthLevel, score: 3, label: 'Good', color: '#f59f00', tip: tips[0] ?? '' };
   return { level: 'strong' as StrengthLevel, score: 4, label: 'Strong', color: '#2b8a3e', tip: '' };
 };
 
 const PasswordStrengthBar = ({ password, theme }: { password: string; theme: any }) => {
   const strength = getPasswordStrength(password);
   const widths = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
@@ -111,7 +115,6 @@ const CheckIcon = ({ color }: { color: string }) => (
 );
 
 // ─── Password Input ────────────────────────────────────────────────────────────
-// Defined OUTSIDE AccountSettingsScreen to prevent remounting on every keystroke.
 interface PasswordInputProps {
   placeholder: string;
   value: string;
@@ -168,11 +171,40 @@ const PasswordInput = ({
   </View>
 );
 
+// ─── Requirements List Component ──────────────────────────────────────────────
+const PasswordRequirements = ({ password, theme }: { password: string; theme: any }) => {
+  const requirements = [
+    { label: 'At least 8 characters', check: password.length >= 8 },
+    { label: 'At least 1 uppercase letter (A-Z)', check: /[A-Z]/.test(password) },
+    { label: 'At least 1 lowercase letter (a-z)', check: /[a-z]/.test(password) },
+    { label: 'At least 1 number (0-9)', check: /[0-9]/.test(password) },
+    { label: 'At least 1 special character (!@#$%^&*)', check: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password) },
+  ];
+
+  const allMet = requirements.every(r => r.check);
+
+  if (!password || allMet) return null;
+
+  return (
+    <View style={{ marginTop: 8, padding: 8, backgroundColor: theme.bgSecondary, borderRadius: 8 }}>
+      <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textMuted, marginBottom: 4 }}>Requirements:</Text>
+      {requirements.map((req, index) => (
+        <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginVertical: 2 }}>
+          <Text style={{ fontSize: 10, color: req.check ? '#2b8a3e' : theme.error }}>
+            {req.check ? '✓' : '○'}
+          </Text>
+          <Text style={{ fontSize: 10, color: req.check ? theme.textSecondary : theme.error, flex: 1 }}>
+            {req.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function AccountSettingsScreen({ navigation }: any) {
   const { theme, isDark } = useTheme();
-
-  // Memoize styles so they don't recreate on every render
   const styles = useMemo(() => makeAccountSettingsStyles(theme), [theme]);
 
   const [user, setUser] = useState<any>(null);
@@ -200,13 +232,28 @@ export default function AccountSettingsScreen({ navigation }: any) {
 
   const isMounted = useRef(true);
 
-  // Validation
+  // ✅ UPDATED Validation (matching backend: 8 chars, uppercase, lowercase, number, special)
   const nameError = touched.fullName && !fullName.trim() ? 'Name cannot be empty' : '';
   const nameValid = touched.fullName && !nameError && fullName.trim().length > 0;
 
   const currentPasswordError = touched.currentPassword && !currentPassword ? 'Current password is required' : '';
-  const newPasswordError = touched.newPassword && newPassword && newPassword.length < 6 ? 'Password must be at least 6 characters' : '';
+  
+  const validateNewPassword = (password: string): string => {
+    if (!password) return '';
+    if (password.length < 8) return 'Password must be at least 8 characters';
+    if (password.length > 128) return 'Password is too long (max 128 characters)';
+    if (!/[A-Z]/.test(password)) return 'Password must contain at least one uppercase letter';
+    if (!/[a-z]/.test(password)) return 'Password must contain at least one lowercase letter';
+    if (!/[0-9]/.test(password)) return 'Password must contain at least one number';
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) return 'Password must contain at least one special character';
+    return '';
+  };
+
+  const newPasswordError = touched.newPassword ? validateNewPassword(newPassword) : '';
   const confirmPasswordError = touched.confirmPassword && confirmPassword && newPassword !== confirmPassword ? 'Passwords do not match' : '';
+  
+  const isNewPasswordValid = !!newPassword && newPasswordError === '';
+const isConfirmValid = !!confirmPassword && confirmPasswordError === '' && newPassword === confirmPassword;
 
   useRealtimeNotifications({
     onNewNotification: (notification) => {
@@ -324,14 +371,19 @@ export default function AccountSettingsScreen({ navigation }: any) {
       Alert.alert('Error', 'Current password is required');
       return;
     }
+    
+    // ✅ Updated validation
     if (!newPassword) {
       Alert.alert('Error', 'New password is required');
       return;
     }
-    if (newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    
+    const passwordError = validateNewPassword(newPassword);
+    if (passwordError) {
+      Alert.alert('Error', passwordError);
       return;
     }
+    
     if (newPassword !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
@@ -402,7 +454,6 @@ export default function AccountSettingsScreen({ navigation }: any) {
           <View style={{ width: 36 }} />
         </View>
 
-        {/* KeyboardAvoidingView pushes content up when keyboard appears */}
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -524,7 +575,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                 <View style={styles.inputGroup}>
                   <Text style={[styles.inputLabel, { color: theme.textMuted }]}>New Password</Text>
                   <PasswordInput
-                    placeholder="Enter new password (min. 6 characters)"
+                    placeholder="Enter new password" 
                     value={newPassword}
                     onChangeText={(text: string) => {
                       setNewPassword(text);
@@ -534,7 +585,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                     showPassword={showNewPassword}
                     toggleVisibility={() => setShowNewPassword(p => !p)}
                     hasError={!!newPasswordError}
-                    isValid={!newPasswordError && newPassword.length >= 6}
+                    isValid={isNewPasswordValid}
                     saving={saving}
                     theme={theme}
                     styles={styles}
@@ -543,6 +594,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                     <Text style={[styles.errorText, { color: theme.error }]}>{newPasswordError}</Text>
                   ) : null}
                   <PasswordStrengthBar password={newPassword} theme={theme} />
+                  <PasswordRequirements password={newPassword} theme={theme} />
                 </View>
 
                 <View style={styles.inputGroup}>
@@ -558,7 +610,7 @@ export default function AccountSettingsScreen({ navigation }: any) {
                     showPassword={showConfirmPassword}
                     toggleVisibility={() => setShowConfirmPassword(p => !p)}
                     hasError={!!confirmPasswordError}
-                    isValid={!confirmPasswordError && confirmPassword.length > 0 && newPassword === confirmPassword}
+                    isValid={isConfirmValid}
                     saving={saving}
                     theme={theme}
                     styles={styles}

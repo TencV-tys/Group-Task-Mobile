@@ -422,7 +422,7 @@ export default function LoginScreen({ navigation }: any) {
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Password</Text>
                 <PasswordInput
-                  placeholder="At least 8 chars, 1 uppercase, 1 number, 1 special"
+                  placeholder="Enter Password"
                   value={formData.password}
                   onChangeText={(t: string) => { handleChange('password', t); setTouched(p => ({ ...p, password: true })); }}
                   editable={!loading}
@@ -635,4 +635,4 @@ const styles = StyleSheet.create({
   signupRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10 },
   linkText: { color: COLORS.gray, fontSize: 14 },
   linkBold: { color: COLORS.primary, fontSize: 14, fontWeight: '700' },
-});
+}); 

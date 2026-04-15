@@ -195,11 +195,13 @@ export const makeGroupTasksStyles = (theme: Theme) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    alignSelf: 'flex-start',
   },
   taskPoints: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
     color: theme.primary,
+    
   },
   taskFooter: {
     flexDirection: 'row',
@@ -617,6 +619,7 @@ export const makeGroupTasksStyles = (theme: Theme) => StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
     paddingHorizontal: 4,
+
   },
   progressBar: {
     height: 6,

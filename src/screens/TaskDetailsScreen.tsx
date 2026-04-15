@@ -821,9 +821,16 @@ const getVerificationStatus = (assignment: any) => {
  const renderAllWeekAssignments = () => {
   const currentWeek = task?.group?.currentRotationWeek || 1;
   
-  const allWeekAssignments = task?.assignments?.filter((a: any) => 
+  let allWeekAssignments = task?.assignments?.filter((a: any) => 
     a.rotationWeek === currentWeek
   ) || [];
+  
+  // ✅ FOR MEMBERS: Only show their own assignments
+  if (!isAdmin && currentUserId) {
+    allWeekAssignments = allWeekAssignments.filter((a: any) => 
+      a.userId === currentUserId
+    );
+  }
   
   if (allWeekAssignments.length === 0) return null;
   
@@ -854,7 +861,9 @@ const getVerificationStatus = (assignment: any) => {
         <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.sectionIcon}>
           <MaterialCommunityIcons name="format-list-checks" size={16} color={theme.textSecondary} />
         </LinearGradient>
-        <Text style={styles.sectionTitle}>All Assignments (Current Week)</Text>
+        <Text style={styles.sectionTitle}>
+          {isAdmin ? 'All Assignments (Current Week)' : 'My Assignments (Current Week)'}
+        </Text>
       </View>
       
       {groupedDays.map((dayGroup: any, dayIndex: number) => {
@@ -947,6 +956,7 @@ const getVerificationStatus = (assignment: any) => {
     </View>
   );
 };
+
 
   const renderMemberAssignmentSection = () => {
     const currentWeek = task?.group?.currentRotationWeek || 1;
@@ -1597,7 +1607,7 @@ const getVerificationStatus = (assignment: any) => {
           
           {!isAdmin && renderMySubmissionsSection()}
           {!isAdmin && renderUpcomingAssignments()}
-          {!isAdmin && renderAllWeekAssignments()}
+          { renderAllWeekAssignments()}
           
           {isAdmin && renderAdminView()}
 
@@ -1680,7 +1690,7 @@ const getVerificationStatus = (assignment: any) => {
       <Text style={styles.deleteButtonText}>
         Delete Task
       </Text>
-    </LinearGradient>
+    </LinearGradient> 
   </TouchableOpacity>
 )}
        

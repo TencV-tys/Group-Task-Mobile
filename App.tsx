@@ -1,4 +1,4 @@
-// App.tsx - FIXED cleanup (no removeNotificationSubscription)
+// App.tsx - CLEAN VERSION (No Network Banner)
 
 import React, { useEffect, useRef } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -83,13 +83,11 @@ const linking = {
 
 // Register for push notifications
 async function registerForPushNotifications() {
-  // Check if it's a physical device (push notifications don't work on simulators)
   if (!Device.isDevice) {
     console.log('📱 Must use physical device for Push Notifications');
     return;
   }
 
-  // Request permissions
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
   
@@ -104,13 +102,11 @@ async function registerForPushNotifications() {
   }
   
   try {
-    // Get Expo push token
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
     const token = await Notifications.getExpoPushTokenAsync({ projectId });
     
     console.log('📱 Expo Push Token:', token.data);
     
-    // Send token to backend
     const user = await TokenUtils.getUser();
     if (user) {
       const headers = await TokenUtils.getAuthHeaders();
@@ -140,14 +136,12 @@ async function handleNotificationResponse(response: Notifications.NotificationRe
   const { data } = response.notification.request.content;
   console.log('🔘 Notification tapped:', data);
   
-  // Wait for navigation to be ready
   if (!navigationRef.current) {
     console.log('⏳ Navigation not ready, waiting...');
     setTimeout(() => handleNotificationResponse(response), 500);
     return;
   }
   
-  // Navigate based on notification type
   switch (data.type) {
     case 'SUBMISSION_VERIFIED':
     case 'SUBMISSION_REJECTED':
@@ -248,20 +242,16 @@ export default function App() {
   const responseListener = useRef<any>(null);
 
   useEffect(() => {
-    // Register for push notifications when app starts
     registerForPushNotifications();
     
-    // This listener is fired whenever a notification is received while the app is foregrounded
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       console.log('📨 Notification received in foreground:', notification);
     });
 
-    // This listener is fired whenever a user taps on or interacts with a notification
     responseListener.current = Notifications.addNotificationResponseReceivedListener(
       handleNotificationResponse
     );
     
-    // Cleanup function - just set refs to null, no removeNotificationSubscription needed
     return () => {
       notificationListener.current = null;
       responseListener.current = null;

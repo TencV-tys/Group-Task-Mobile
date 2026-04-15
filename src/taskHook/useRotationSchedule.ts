@@ -1,7 +1,8 @@
-// hooks/useRotationSchedule.ts - UPDATED with TokenUtils
+// hooks/useRotationSchedule.ts - UPDATED with TokenUtils and Verified Count by Day
+
 import { useState, useEffect, useCallback } from 'react';
 import { TaskService } from '../services/TaskService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
 import { Alert } from 'react-native';
 
 interface ScheduleItem {
@@ -26,13 +27,15 @@ interface WeekSchedule {
   assignedTasksCount: number;
   startDate?: string;
   endDate?: string;
+  verifiedByDay?: { [key: string]: number };
+  totalVerified?: number;
 }
 
 interface UseRotationScheduleProps {
   groupId: string;
-  initialWeeks?: number; // Number of past weeks to show (including current)
+  initialWeeks?: number;
 }
- 
+
 export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationScheduleProps) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -42,7 +45,6 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
 
-  // ✅ Check token before operations
   const checkAuth = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -56,7 +58,6 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     return hasToken;
   }, []);
 
-  // Generate week labels
   const generateWeekLabel = useCallback((weekNum: number, currentWeekNum: number): string => {
     const today = new Date();
     const weekDiff = weekNum - currentWeekNum;
@@ -87,7 +88,6 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
       scheduleData.forEach((weekData: any) => {
         const weekNum = weekData.week || 1;
         
-        // Include only current and past weeks (weekNum <= currentWeekNum)
         if (weekNum > currentWeekNum) return;
         
         weeksMap[weekNum] = {
@@ -97,12 +97,25 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
           totalPoints: 0,
           assignedTasksCount: 0,
           startDate: weekData.weekStart,
-          endDate: weekData.weekEnd
+          endDate: weekData.weekEnd,
+          verifiedByDay: weekData.verifiedByDay || {
+            Monday: 0, Tuesday: 0, Wednesday: 0,
+            Thursday: 0, Friday: 0, Saturday: 0, Sunday: 0
+          },
+          totalVerified: weekData.totalVerified || 0
         };
         
         if (Array.isArray(weekData.tasks)) {
           weekData.tasks.forEach((task: any) => {
-            // Extract assignee name properly
+            console.log('🔍 Raw task data from API:', {
+              taskId: task.taskId,
+              taskTitle: task.taskTitle,
+              selectedDays: task.selectedDays,
+              dayOfWeek: task.dayOfWeek,
+              dueDate: task.dueDate,
+              assignee: task.assignee
+            });
+            
             let assigneeName = 'Unassigned';
             let assigneeId = '';
             
@@ -111,15 +124,19 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
               assigneeId = task.assignee.id || '';
             }
             
-            // Get day of week properly
+            // Get day of week properly - WITH dueDate fallback
             let dayOfWeek = '';
             if (task.selectedDays && task.selectedDays.length > 0) {
               dayOfWeek = task.selectedDays[0];
             } else if (task.dayOfWeek) {
               dayOfWeek = task.dayOfWeek;
+            } else if (task.dueDate) {
+              const dueDate = new Date(task.dueDate);
+              const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+              dayOfWeek = days[dueDate.getUTCDay()];
+              console.log(`📅 Calculated day from dueDate for "${task.taskTitle}": ${dayOfWeek} (dueDate: ${task.dueDate})`);
             }
             
-            // Get scheduled time
             let scheduledTime = '';
             if (task.timeSlots && task.timeSlots.length > 0) {
               scheduledTime = task.timeSlots[0].startTime;
@@ -151,15 +168,15 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
       });
     }
     
-    // Sort weeks in descending order (newest first - current week at top)
     return Object.values(weeksMap)
       .sort((a, b) => b.weekNumber - a.weekNumber);
   }, [generateWeekLabel]);
 
+  // ✅ NEW: Get verified distribution by day
+  
   // Load rotation schedule
   const loadRotationSchedule = useCallback(async () => {
     try {
-      // ✅ Check authentication first
       const isAuthenticated = await checkAuth();
       if (!isAuthenticated) {
         setLoading(false);
@@ -173,14 +190,13 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
       const result = await TaskService.getRotationSchedule(groupId, initialWeeks);
       console.log('Rotation schedule result:', result);
       
-      if (result.success) {
+      if (result.success) { 
         const currentWeekNum = result.currentWeek || 1;
         let transformedWeeks: WeekSchedule[] = [];
         
         if (result.schedule && Array.isArray(result.schedule)) {
           transformedWeeks = transformScheduleData(result.schedule, currentWeekNum);
         } else {
-          // Create empty weeks for current and past weeks only
           const startWeek = Math.max(1, currentWeekNum - initialWeeks + 1);
           
           for (let weekNum = startWeek; weekNum <= currentWeekNum; weekNum++) {
@@ -189,10 +205,14 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
               weekLabel: generateWeekLabel(weekNum, currentWeekNum),
               tasks: [],
               totalPoints: 0,
-              assignedTasksCount: 0
+              assignedTasksCount: 0,
+              verifiedByDay: {
+                Monday: 0, Tuesday: 0, Wednesday: 0,
+                Thursday: 0, Friday: 0, Saturday: 0, Sunday: 0
+              },
+              totalVerified: 0
             });
           }
-          // Sort descending (newest first)
           transformedWeeks.sort((a, b) => b.weekNumber - a.weekNumber);
         }
         
@@ -200,13 +220,11 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
         setWeeks(transformedWeeks);
         setCurrentWeek(currentWeekNum);
         
-        // Set selected week to current week
         if (transformedWeeks.length > 0) {
           setSelectedWeek(currentWeekNum);
         }
         
       } else {
-        // Check if error is auth-related
         if (result.message?.toLowerCase().includes('token') || 
             result.message?.toLowerCase().includes('auth') ||
             result.message?.toLowerCase().includes('unauthorized')) {
@@ -225,7 +243,6 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
 
   const rotateTasks = useCallback(async () => {
     try {
-      // ✅ Check authentication first
       const isAuthenticated = await checkAuth();
       if (!isAuthenticated) {
         Alert.alert('Authentication Error', 'Please log in again');
@@ -238,7 +255,6 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
         await loadRotationSchedule();
         return true;
       } else {
-        // Check if error is auth-related
         if (result.message?.toLowerCase().includes('token') || 
             result.message?.toLowerCase().includes('auth') ||
             result.message?.toLowerCase().includes('unauthorized')) {
@@ -253,7 +269,6 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     }
   }, [groupId, loadRotationSchedule, checkAuth]);
 
-  // Initialize
   useEffect(() => {
     loadRotationSchedule();
   }, [loadRotationSchedule]);
@@ -263,7 +278,6 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     loadRotationSchedule();
   }, [loadRotationSchedule]);
 
-  // Calculate statistics for selected week
   const selectedWeekData = weeks.find(w => w.weekNumber === selectedWeek) || null;
   
   const getSelectedWeekTasks = useCallback(() => {
@@ -280,7 +294,6 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     
     tasks.forEach(task => {
       if (task.dayOfWeek) {
-        // Capitalize first letter and ensure proper format
         const day = task.dayOfWeek.charAt(0).toUpperCase() + task.dayOfWeek.slice(1).toLowerCase();
         if (distribution[day] !== undefined) {
           distribution[day]++;
@@ -290,6 +303,17 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     
     return distribution;
   }, [selectedWeekData]);
+
+  const getVerifiedDistributionByDay = useCallback(() => {
+    if (!selectedWeekData?.verifiedByDay) {
+      return {
+        Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0,
+        Friday: 0, Saturday: 0, Sunday: 0
+      };
+    }
+    return selectedWeekData.verifiedByDay;
+  }, [selectedWeekData]);
+
 
   const calculateFairnessScore = useCallback(() => {
     const tasks = selectedWeekData?.tasks || [];
@@ -302,7 +326,7 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     });
     
     const values = Object.values(pointsByAssignee);
-    if (values.length === 0) return 100; // All tasks unassigned = perfect fairness
+    if (values.length === 0) return 100;
     
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
     if (mean === 0) return 100;
@@ -319,7 +343,7 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     selectedWeek,
     currentWeek,
     error,
-    authError, // 👈 Added authError to return
+    authError,
     selectedWeekData,
     setSelectedWeek,
     loadRotationSchedule,
@@ -327,6 +351,7 @@ export const useRotationSchedule = ({ groupId, initialWeeks = 4 }: UseRotationSc
     refresh,
     getSelectedWeekTasks,
     getTaskDistributionByDay,
+    getVerifiedDistributionByDay,  // ✅ NEW: Export this
     calculateFairnessScore,
     isEmpty: weeks.length === 0,
     hasSchedule: weeks.some(week => week.tasks.length > 0),

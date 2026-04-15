@@ -8,7 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  Alert
+  Alert 
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -24,7 +24,7 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
   
   const { groupId, groupName, userRole } = route.params;
   const [authError, setAuthError] = useState(false);
-  
+   
   const {
     loading, 
     refreshing,
@@ -188,6 +188,15 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     if (rank <= Math.ceil(total / 3)) return 'trending-up';
     return 'swap-horizontal';
   };
+
+  // Get verified distribution by day from selectedWeekData
+const getVerifiedDistributionByDay = () => {
+  const verifiedData = selectedWeekData?.verifiedByDay || {
+    Monday: 0, Tuesday: 0, Wednesday: 0, Thursday: 0,
+    Friday: 0, Saturday: 0, Sunday: 0
+  };
+  return verifiedData;
+};
 
   const renderPredictionWeek = (prediction: any, index: number) => {
     if (!prediction) return null;
@@ -773,35 +782,41 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
             )}
 
             {/* Day Distribution */}
-            {selectedWeekData && selectedWeekData.tasks.length > 0 && (
-              <LinearGradient
-                colors={[theme.card, theme.bgSecondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.distributionCard, { borderColor: theme.border }]}
-              >
-                <Text style={[styles.distributionTitle, { color: theme.text }]}>Tasks by Day</Text>
-                <View style={styles.distributionGrid}>
-                  {Object.entries(getTaskDistributionByDay()).map(([day, count]: [string, any]) => (
-                    <View key={day} style={styles.dayColumn}>
-                      <Text style={[styles.dayLabel, { color: theme.textMuted }]}>{day.substring(0, 3)}</Text>
-                      <View style={styles.dayBarContainer}>
-                        <View 
-                          style={[
-                            styles.dayBar,
-                            { 
-                              height: (count / Math.max(...Object.values(getTaskDistributionByDay()), 1)) * 40,
-                              backgroundColor: count > 0 ? theme.primary : theme.bgTertiary
-                            }
-                          ]} 
-                        />
-                      </View>
-                      <Text style={[styles.dayCount, { color: theme.textSecondary }]}>{count}</Text>
-                    </View>
-                  ))}
-                </View>
-              </LinearGradient>
-            )}
+           {/* Day Distribution - Verified Tasks by Day */}
+{selectedWeekData && selectedWeekData.tasks.length > 0 && (
+  <LinearGradient
+    colors={[theme.card, theme.bgSecondary]}
+    start={{ x: 0, y: 0 }}
+    end={{ x: 1, y: 1 }}
+    style={[styles.distributionCard, { borderColor: theme.border }]}
+  >
+    <Text style={[styles.distributionTitle, { color: theme.text }]}>
+      ✅ Verified Tasks by Day ({selectedWeekData?.totalVerified || 0} total)
+    </Text>
+    <View style={styles.distributionGrid}>
+      {Object.entries(getVerifiedDistributionByDay()).map(([day, count]: [string, any]) => {
+        const maxCount = Math.max(...Object.values(getVerifiedDistributionByDay()), 1);
+        return (
+          <View key={day} style={styles.dayColumn}>
+            <Text style={[styles.dayLabel, { color: theme.textMuted }]}>{day.substring(0, 3)}</Text>
+            <View style={styles.dayBarContainer}>
+              <View 
+                style={[
+                  styles.dayBar,
+                  { 
+                    height: (count / maxCount) * 40,
+                    backgroundColor: count > 0 ? theme.primary : theme.bgTertiary
+                  }
+                ]} 
+              />
+            </View>
+            <Text style={[styles.dayCount, { color: theme.textSecondary }]}>{count}</Text>
+          </View>
+        );
+      })}
+    </View>
+  </LinearGradient>
+)}
 
             {/* Tasks List */}
             <View style={styles.tasksSection}>

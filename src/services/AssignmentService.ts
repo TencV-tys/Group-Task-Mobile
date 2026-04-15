@@ -916,7 +916,8 @@ static async getTodayAssignments(groupId?: string) {
   }
 
  
-// services/AssignmentService.ts - FIXED validateLocalSubmissionTime
+// services/AssignmentService.ts - Keep as is (working version)
+
 static validateLocalSubmissionTime(
   dueDate: string,
   timeSlot?: { startTime: string; endTime: string },
@@ -925,7 +926,7 @@ static validateLocalSubmissionTime(
   const due = new Date(dueDate);
   const current = currentTime;
   
-  // ✅ Use UTC date comparison
+  // UTC date comparison
   const isDueToday =
     due.getUTCFullYear() === current.getUTCFullYear() &&
     due.getUTCMonth() === current.getUTCMonth() &&
@@ -941,24 +942,20 @@ static validateLocalSubmissionTime(
   
   const [endHour, endMinute] = timeSlot.endTime.split(':').map(Number);
   
-  // ✅ Convert PHT (UTC+8) to UTC
+  // Convert PHT (UTC+8) to UTC
+  let utcHour = endHour - 8;
+  if (utcHour < 0) utcHour += 24;
+  
   const endTime = new Date(Date.UTC(
     due.getUTCFullYear(),
     due.getUTCMonth(),
     due.getUTCDate(),
-    endHour - 8, endMinute, 0, 0
+    utcHour, endMinute, 0, 0
   ));
   
   const submissionStart = endTime;
   const onTimeEnd = new Date(endTime.getTime() + 25 * 60000);
   const lateWindowEnd = new Date(endTime.getTime() + 30 * 60000);
-  
-  console.log(`⏰ [validateLocalSubmissionTime]`, {
-    current: current.toISOString(),
-    submissionStart: submissionStart.toISOString(),
-    onTimeEnd: onTimeEnd.toISOString(),
-    lateWindowEnd: lateWindowEnd.toISOString()
-  });
   
   if (current < submissionStart) {
     const timeUntilStart = submissionStart.getTime() - current.getTime();
@@ -1003,19 +1000,17 @@ static validateLocalSubmissionTime(
   };
 }
 
-
-  // ========== FORMAT TIME LEFT ==========
-  private static formatTimeLeft(seconds: number): string {
-    if (seconds <= 0) return 'Expired';
-    
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    if (minutes > 0) return `${minutes}m ${secs}s`;
-    return `${secs}s`;
-  }
+private static formatTimeLeft(seconds: number): string {
+  if (seconds <= 0) return 'Expired';
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${secs}s`;
+  return `${secs}s`;
+}
 
 
   // ========== GET NOTIFICATION BADGE COUNT ==========

@@ -1,4 +1,5 @@
-// src/components/TimeSlotModal.tsx - Dark Mode Added
+// src/components/TimeSlotModal.tsx - FULLY UPDATED WITH ALERTS
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -10,6 +11,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -90,7 +92,6 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     
     hour += 1;
     
-    // Handle 12-hour rollover
     if (hour === 12) {
       return {
         hour: '12',
@@ -116,6 +117,26 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
         period: period
       };
     }
+  };
+
+  // ✅ Check if time slot is in the past for today
+  const isTimeSlotInPast = (startHour12: string, startMinute: string, startPeriod: string): boolean => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    // Convert 12-hour format to 24-hour for comparison
+    const convertTo24 = (hour: string, minute: string, period: string): number => {
+      let h = parseInt(hour, 10);
+      if (period === 'PM' && h !== 12) h += 12;
+      if (period === 'AM' && h === 12) h = 0;
+      return h * 60 + parseInt(minute, 10);
+    };
+    
+    const startTotalMinutes = convertTo24(startHour12, startMinute, startPeriod);
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
+    
+    return startTotalMinutes < currentTotalMinutes;
   };
 
   useEffect(() => {
@@ -173,18 +194,36 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     setCurrentStep('time');
   }, [editingSlot, initialTime, visible]);
 
-  const handleTimeNext = () => {
-    const start24 = convertTo24Hour(startTime.hour, startTime.minute, startTime.period);
-    const end24 = convertTo24Hour(endTime.hour, endTime.minute, endTime.period);
-    
-    if (!validateTimeSlot(start24, end24)) {
-      setError('End time must be after start time');
-      return;
-    }
-    
-    setCurrentStep('details');
-    setError('');
-  };
+  // In handleTimeNext function - REMOVE "Add Anyway" option
+
+const handleTimeNext = () => {
+  const start24 = convertTo24Hour(startTime.hour, startTime.minute, startTime.period);
+  const end24 = convertTo24Hour(endTime.hour, endTime.minute, endTime.period);
+  
+  if (!validateTimeSlot(start24, end24)) {
+    Alert.alert(
+      '⏰ Invalid Time Range',
+      'End time must be after start time.\n\nPlease adjust your time selection.',
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  // ✅ Check if time slot is in the past for today - PREVENT completely
+  if (!editingSlot && isTimeSlotInPast(startTime.hour, startTime.minute, startTime.period)) {
+    Alert.alert(
+      '❌ Cannot Add Past Time Slot',
+      `You cannot add a time slot that has already passed for today (${startTime.hour}:${startTime.minute} ${startTime.period}).\n\n` +
+      `This time slot would be automatically marked as MISSED and points would be deducted.\n\n` +
+      `Please select a future time slot.`,
+      [{ text: 'OK' }]
+    );
+    return;
+  }
+  
+  setCurrentStep('details');
+  setError('');
+};
 
   const handleSave = () => {
     const start24 = convertTo24Hour(startTime.hour, startTime.minute, startTime.period);
@@ -193,12 +232,12 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     const pointsNum = points ? parseInt(points, 10) : 0;
     
     if (points && (isNaN(pointsNum) || pointsNum < 0)) {
-      setError('Points must be a valid number');
+      Alert.alert('Invalid Points', 'Points must be a valid number');
       return;
     }
     
     if (pointsNum > maxPointsPerSlot) {
-      setError(`Maximum ${maxPointsPerSlot} points per time slot`);
+      Alert.alert('Points Limit Exceeded', `Maximum ${maxPointsPerSlot} points per time slot`);
       return;
     }
     
@@ -211,7 +250,10 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
     }
     
     if (newTotalPoints > totalTaskPoints) {
-      setError(`Total points would exceed task limit of ${totalTaskPoints}`);
+      Alert.alert(
+        'Points Limit Exceeded', 
+        `Total points (${newTotalPoints}) would exceed task limit of ${totalTaskPoints}`
+      );
       return;
     }
 
@@ -706,7 +748,7 @@ export const TimeSlotModal: React.FC<TimeSlotModalProps> = ({
             >
               {currentStep === 'time' ? renderTimeStep() : renderDetailsStep()}
               
-              {error ? (
+              {error && currentStep !== 'time' ? (
                 <View style={[styles.errorBox, { backgroundColor: theme.errorBg, borderColor: theme.errorBorder }]}>
                   <MaterialCommunityIcons name="alert-circle" size={20} color={theme.error} />
                   <Text style={[styles.errorText, { color: theme.error }]}>{error}</Text>

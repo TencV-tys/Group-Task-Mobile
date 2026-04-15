@@ -1,4 +1,5 @@
-// src/styles/createTask.styles.ts - COMPLETE UPDATED VERSION
+// src/styles/createTask.styles.ts - Complete with customCategoryInput
+
 import { StyleSheet } from 'react-native';
 import { Theme } from '../context/ThemeContext';
 
@@ -196,6 +197,14 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
   },
+  
+  // ✅ CUSTOM CATEGORY INPUT (add this)
+  customCategoryInput: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 10,
+  },
 
   // ─── Points Suggestion Banner ─────────────────────────────────────────────
   suggestionBanner: {
@@ -335,7 +344,7 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
     gap: 6,
   },
   categoryChipText: {
-    fontSize: 13,
+    fontSize: 10,
     fontWeight: '500',
     color: theme.textSecondary,
   },

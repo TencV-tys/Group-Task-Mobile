@@ -1559,151 +1559,160 @@ const getVerificationStatus = (assignment: any) => {
   }
 
   // ===== MAIN RENDER =====
-  return (
-    <ScreenWrapper style={styles.container}>
-      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.card} />
-      {renderHeader()}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderAssignedWarning()}
-        
-        <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.card}>
-          <View style={styles.taskHeader}>
-            <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.taskIcon}>
-              <MaterialCommunityIcons name="format-list-checks" size={24} color={theme.primary} />
-            </LinearGradient>
-            <View style={styles.taskTitleContainer}>
-              <Text style={styles.taskTitle}>{task.title}</Text>
-              <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pointsBadge}>
-                <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
-                <Text style={styles.pointsText}>{task.points} points</Text>
-              </LinearGradient>
-            </View>
-          </View>
-
-          {task.description && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Description</Text>
-              <Text style={styles.description}>{task.description}</Text>
-            </View>
-          )}
-
-          <View style={styles.detailsGrid}>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Frequency</Text>
-              <Text style={styles.detailValue}>{task.executionFrequency}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Category</Text>
-              <Text style={styles.detailValue}>{task.category || 'None'}</Text>
-            </View>
-            <View style={styles.detailItem}>
-              <Text style={styles.detailLabel}>Recurring</Text>
-              <Text style={styles.detailValue}>{task.isRecurring ? 'Yes' : 'No'}</Text>
-            </View>
-          </View>
-
-          {renderWeekInfo()}
-          {renderMemberAssignmentSection()}
-          
-          {!isAdmin && renderMySubmissionsSection()}
-          {!isAdmin && renderUpcomingAssignments()}
-          { renderAllWeekAssignments()}
-          
-          {isAdmin && renderAdminView()}
-
-          {task.executionFrequency === 'WEEKLY' && task.selectedDays?.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Scheduled Days</Text>
-              <View style={styles.daysContainer}>
-                {task.selectedDays.map((day: string, index: number) => {
-                  const today = new Date();
-                  const todayDay = today.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-                  const isToday = day === todayDay;
-                  return (
-                    <LinearGradient
-                      key={index}
-                      colors={isToday ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight]}
-                      style={[styles.dayChip, isToday && styles.todayDayChip]}
-                    >
-                      <MaterialCommunityIcons name={isToday ? "clock-alert" : "calendar"} size={12} 
-                        color={isToday ? theme.primary : theme.textSecondary} />
-                      <Text style={[styles.dayText, isToday && styles.todayDayText]}>{day}</Text>
-                      {isToday && <Text style={styles.todayDayLabel}>Today</Text>}
-                    </LinearGradient>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
-        {task.timeSlots?.length > 0 && (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>Time Slots</Text>
-    <View style={styles.timeSlotsContainer}>
-      {task.timeSlots.map((slot: any, index: number) => {
-        const isCurrent = currentTimeSlot && 
-          slot.startTime === currentTimeSlot.startTime && 
-          slot.endTime === currentTimeSlot.endTime;
-        
-        return (
-          <LinearGradient
-            key={index}
-            colors={isCurrent ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
-            style={[styles.timeSlotCard, isCurrent && styles.currentTimeSlotCard]}
-          >
-            <View style={styles.timeSlotHeader}>
-              <MaterialCommunityIcons name={isCurrent ? "clock-check" : "clock"} size={18} 
-                color={isCurrent ? theme.primary : theme.textSecondary} />
-              <Text style={[styles.timeSlotTime, isCurrent && styles.currentTimeSlotTime]}>
-                {formatTimeTo12Hour(slot.startTime)} - {formatTimeTo12Hour(slot.endTime)}
-              </Text>
-              {slot.points !== undefined && slot.points > 0 && (
-                <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.slotPointsBadge}>
-                  <Text style={styles.slotPointsText}>{slot.points} pts</Text>
-                </LinearGradient>
-              )}
-            </View>
-            {slot.label && <Text style={styles.timeSlotLabel}>{slot.label}</Text>}
-            {isCurrent && isSubmittable && (
-              <View style={styles.activeSlotIndicator}>
-                <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
-                <Text style={styles.activeSlotText}>Active - Can Submit</Text>
-              </View>
-            )}
+return (
+  <ScreenWrapper style={styles.container}>
+    <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={theme.card} />
+    {renderHeader()}
+    <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      {renderAssignedWarning()}
+      
+      <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.card}>
+        {/* Task Header */}
+        <View style={styles.taskHeader}>
+          <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.taskIcon}>
+            <MaterialCommunityIcons name="format-list-checks" size={24} color={theme.primary} />
           </LinearGradient>
-        );
-      })}
-    </View>
-    <Text style={styles.timeSlotNote}>ⓘ Submit within 30 minutes after time slot end</Text>
-  </View>
-)}
-
-
-         
-{isAdmin && (
-  <TouchableOpacity 
-    style={styles.deleteButton} 
-    onPress={handleDelete}
-  >
-    <LinearGradient colors={[theme.errorBg, theme.errorBg]} style={styles.deleteButtonGradient}>
-      <MaterialCommunityIcons name="delete" size={18} color={theme.error} />
-      <Text style={styles.deleteButtonText}>
-        Delete Task
-      </Text>
-    </LinearGradient> 
-  </TouchableOpacity>
-)}
-       
-          {!isAdmin && (
-            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.memberInfoBox}>
-              <MaterialCommunityIcons name="information" size={18} color={theme.textMuted} />
-              <Text style={styles.memberInfoText}>
-                Only group administrators can edit or delete tasks.
-              </Text>
+          <View style={styles.taskTitleContainer}>
+            <Text style={styles.taskTitle}>{task.title}</Text>
+            <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pointsBadge}>
+              <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+              <Text style={styles.pointsText}>{task.points} points</Text>
             </LinearGradient>
-          )}
-        </LinearGradient>
-      </ScrollView>
-    </ScreenWrapper>
-  );
+          </View>
+        </View>
+
+        {/* Description */}
+        {task.description && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.description}>{task.description}</Text>
+          </View>
+        )}
+
+        {/* Details Grid */}
+        <View style={styles.detailsGrid}>
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Frequency</Text>
+            <Text style={styles.detailValue}>{task.executionFrequency}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Category</Text>
+            <Text style={styles.detailValue}>{task.category || 'None'}</Text>
+          </View>
+          <View style={styles.detailItem}>
+            <Text style={styles.detailLabel}>Recurring</Text>
+            <Text style={styles.detailValue}>{task.isRecurring ? 'Yes' : 'No'}</Text>
+          </View>
+        </View>
+
+        {/* Week Info */}
+        {renderWeekInfo()}
+        
+        {/* Member Assignment Section (for members) */}
+        {!isAdmin && renderMemberAssignmentSection()}
+        
+        {/* My Submissions (for members) */}
+        {!isAdmin && renderMySubmissionsSection()}
+        
+        {/* Upcoming Assignments (for members) */}
+        {!isAdmin && renderUpcomingAssignments()}
+        
+        {/* ✅ ADMIN VIEW - Comprehensive with verification actions */}
+        {isAdmin && renderAdminView()}
+        
+        {/* ✅ MEMBER VIEW - All assignments grouped by day (read-only) */}
+        {!isAdmin && renderAllWeekAssignments()}
+
+        {/* Weekly Days */}
+        {task.executionFrequency === 'WEEKLY' && task.selectedDays?.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Scheduled Days</Text>
+            <View style={styles.daysContainer}>
+              {task.selectedDays.map((day: string, index: number) => {
+                const today = new Date();
+                const todayDay = today.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+                const isToday = day === todayDay;
+                return (
+                  <LinearGradient
+                    key={index}
+                    colors={isToday ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight]}
+                    style={[styles.dayChip, isToday && styles.todayDayChip]}
+                  >
+                    <MaterialCommunityIcons name={isToday ? "clock-alert" : "calendar"} size={12} 
+                      color={isToday ? theme.primary : theme.textSecondary} />
+                    <Text style={[styles.dayText, isToday && styles.todayDayText]}>{day}</Text>
+                    {isToday && <Text style={styles.todayDayLabel}>Today</Text>}
+                  </LinearGradient>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
+        {/* Time Slots */}
+        {task.timeSlots?.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Time Slots</Text>
+            <View style={styles.timeSlotsContainer}>
+              {task.timeSlots.map((slot: any, index: number) => {
+                const isCurrent = currentTimeSlot && 
+                  slot.startTime === currentTimeSlot.startTime && 
+                  slot.endTime === currentTimeSlot.endTime;
+                
+                return (
+                  <LinearGradient
+                    key={index}
+                    colors={isCurrent ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
+                    style={[styles.timeSlotCard, isCurrent && styles.currentTimeSlotCard]}
+                  >
+                    <View style={styles.timeSlotHeader}>
+                      <MaterialCommunityIcons name={isCurrent ? "clock-check" : "clock"} size={18} 
+                        color={isCurrent ? theme.primary : theme.textSecondary} />
+                      <Text style={[styles.timeSlotTime, isCurrent && styles.currentTimeSlotTime]}>
+                        {formatTimeTo12Hour(slot.startTime)} - {formatTimeTo12Hour(slot.endTime)}
+                      </Text>
+                      {slot.points !== undefined && slot.points > 0 && (
+                        <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.slotPointsBadge}>
+                          <Text style={styles.slotPointsText}>{slot.points} pts</Text>
+                        </LinearGradient>
+                      )}
+                    </View>
+                    {slot.label && <Text style={styles.timeSlotLabel}>{slot.label}</Text>}
+                    {isCurrent && isSubmittable && (
+                      <View style={styles.activeSlotIndicator}>
+                        <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
+                        <Text style={styles.activeSlotText}>Active - Can Submit</Text>
+                      </View>
+                    )}
+                  </LinearGradient>
+                );
+              })}
+            </View>
+            <Text style={styles.timeSlotNote}>ⓘ Submit within 30 minutes after time slot end</Text>
+          </View>
+        )}
+
+        {/* Delete Button (Admin only) */}
+        {isAdmin && (
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+            <LinearGradient colors={[theme.errorBg, theme.errorBg]} style={styles.deleteButtonGradient}>
+              <MaterialCommunityIcons name="delete" size={18} color={theme.error} />
+              <Text style={styles.deleteButtonText}>Delete Task</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+       
+        {/* Member Info Box */}
+        {!isAdmin && (
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.memberInfoBox}>
+            <MaterialCommunityIcons name="information" size={18} color={theme.textMuted} />
+            <Text style={styles.memberInfoText}>
+              Only group administrators can edit or delete tasks.
+            </Text>
+          </LinearGradient>
+        )}
+      </LinearGradient>
+    </ScrollView>
+  </ScreenWrapper>
+);
 }

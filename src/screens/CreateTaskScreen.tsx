@@ -1,4 +1,5 @@
-// src/screens/CreateTaskScreen.tsx - FIXED Point Suggestion Logic
+// src/screens/CreateTaskScreen.tsx - ADDED "Other" category
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
@@ -25,12 +26,14 @@ import { DAY_OF_WEEK_OPTIONS } from '../utils/timeUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { TaskDraftService } from '../services/TaskDraftService';
 
-type Category = 'Work' | 'Study' | 'Chores' | '';
+type Category = 'Work' | 'Study' | 'Chores' | 'Other' | '';
 
+// ✅ ADDED "Other" category
 const CATEGORIES: { value: Category; icon: string }[] = [
   { value: 'Work',   icon: 'briefcase-outline' },
   { value: 'Study',  icon: 'book-open-outline' },
   { value: 'Chores', icon: 'broom' },
+  { value: 'Other',  icon: 'dots-horizontal' },  // ✅ NEW
 ];
 
 const convertTimeToMinutes = (time: string): number => {
@@ -97,6 +100,9 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   } | null>(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  
+  // ✅ State for custom category input when "Other" is selected
+  const [customCategory, setCustomCategory] = useState('');
 
   const totalPoints = parseInt(form.points, 10) || 0;
   const usedPoints = form.timeSlots.reduce(
@@ -106,46 +112,52 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   const remainingPoints = totalPoints - usedPoints;
   const canAddMoreSlots = remainingPoints > 0 && form.timeSlots.length < 10;
 
- // ─── FIXED: Points Suggestion Logic ──────────────────────────────────────
-// Points decrease by exactly 1 for each task in order
-// Task 1 = 10 pts, Task 2 = 9 pts, Task 3 = 8 pts, etc.
-const getSuggestedPoints = useCallback(() => {
-  if (!status) return null;
+  // Points Suggestion Logic
+  const getSuggestedPoints = useCallback(() => {
+    if (!status) return null;
 
-  const membersInRotation = status.membersInRotation || 0;
-  const currentTaskCount = status.totalTasks || 0;
-  const tasksNeeded = Math.max(0, membersInRotation - currentTaskCount);
+    const membersInRotation = status.membersInRotation || 0;
+    const currentTaskCount = status.totalTasks || 0;
+    const tasksNeeded = Math.max(0, membersInRotation - currentTaskCount);
 
-  if (membersInRotation === 0) return null;
-  if (currentTaskCount >= membersInRotation) return null;
+    if (membersInRotation === 0) return null;
+    if (currentTaskCount >= membersInRotation) return null;
 
-  const nextPosition = currentTaskCount + 1;
-  
-  // Simple formula: points = 11 - position (capped between 1 and 10)
-  // Position 1 → 10 pts, Position 2 → 9 pts, Position 3 → 8 pts, etc.
-  let suggested = 11 - nextPosition;
-  
-  // Ensure it stays within 1-10 range
-  suggested = Math.min(10, Math.max(1, suggested));
+    const nextPosition = currentTaskCount + 1;
+    
+    let suggested = 11 - nextPosition;
+    suggested = Math.min(10, Math.max(1, suggested));
 
-  console.log('📊 Point Suggestion Debug:', {
-    membersInRotation,
-    currentTaskCount,
-    tasksNeeded,
-    nextPosition,
-    suggested,
-    expected: `${11 - nextPosition} pts`
-  });  
+    console.log('📊 Point Suggestion Debug:', {
+      membersInRotation,
+      currentTaskCount,
+      tasksNeeded,
+      nextPosition,
+      suggested,
+      expected: `${11 - nextPosition} pts`
+    });  
 
-  return {
-    suggested,
-    position: nextPosition,
-    total: membersInRotation,
-  };
-}, [status]);
+    return {
+      suggested,
+      position: nextPosition,
+      total: membersInRotation,
+    };
+  }, [status]);
 
   useEffect(() => {
     if (draftData && (isEditingDraft || createFromDraft)) {
+      // Handle category - if it's not one of the predefined, treat as "Other" with custom value
+      const predefinedCategories = ['Work', 'Study', 'Chores'];
+      let categoryValue: Category = '';
+      let customCat = '';
+      
+      if (draftData.category && predefinedCategories.includes(draftData.category)) {
+        categoryValue = draftData.category as Category;
+      } else if (draftData.category) {
+        categoryValue = 'Other';
+        customCat = draftData.category;
+      }
+      
       setForm({
         title: draftData.title,
         description: draftData.description || '',
@@ -154,12 +166,13 @@ const getSuggestedPoints = useCallback(() => {
         selectedDays: draftData.selectedDays || [],
         dayOfWeek: '',
         isRecurring: draftData.isRecurring,
-        category: (draftData.category as Category) || '',
+        category: categoryValue,
         timeSlots: draftData.timeSlots.map((s: any) => ({
           ...s,
           points: s.points?.toString() || '',
         })),
       });
+      setCustomCategory(customCat);
       setCurrentDraftId(draftData.id);
 
       if (createFromDraft) {
@@ -241,8 +254,20 @@ const getSuggestedPoints = useCallback(() => {
         : [...form.selectedDays, day],
     });
 
-  const toggleCategory = (cat: Category) =>
-    updateForm({ category: form.category === cat ? '' : cat });
+  // ✅ Updated toggleCategory to handle "Other" properly
+  const toggleCategory = (cat: Category) => {
+    if (form.category === cat) {
+      // Deselect
+      updateForm({ category: '' });
+      setCustomCategory('');
+    } else {
+      // Select new category
+      updateForm({ category: cat });
+      if (cat !== 'Other') {
+        setCustomCategory('');
+      }
+    }
+  };
 
   const handleAddTimeSlot = () => {
     if (!canAddMoreSlots) {
@@ -329,6 +354,15 @@ const getSuggestedPoints = useCallback(() => {
 
   const buildTaskPayload = () => {
     const points = parseInt(form.points, 10);
+    
+    // ✅ Handle category - if "Other" is selected, use customCategory value
+    let finalCategory = form.category;
+    if (form.category === 'Other' && customCategory.trim()) {
+      finalCategory = customCategory.trim() as Category;
+    } else if (form.category === 'Other' && !customCategory.trim()) {
+      finalCategory = '';
+    }
+    
     const payload: any = {
       title: form.title,
       description: form.description || undefined,
@@ -336,7 +370,7 @@ const getSuggestedPoints = useCallback(() => {
       executionFrequency: form.executionFrequency,
       timeFormat: '12h',
       isRecurring: form.isRecurring,
-      category: form.category || undefined,
+      category: finalCategory || undefined,
       timeSlots: form.timeSlots.length
         ? form.timeSlots.map(s => ({
             startTime: s.startTime,
@@ -389,42 +423,49 @@ const getSuggestedPoints = useCallback(() => {
     }
   };
 
+  const handleSubmit = async () => {
+    Keyboard.dismiss();
+    if (!groupId) return Alert.alert('Error', 'Group ID is missing');
+    if (!form.title.trim()) return Alert.alert('Error', 'Please enter a task title');
 
-const handleSubmit = async () => {
-  Keyboard.dismiss();
-  if (!groupId) return Alert.alert('Error', 'Group ID is missing');
-  if (!form.title.trim()) return Alert.alert('Error', 'Please enter a task title');
-
-  const result = await createTask(groupId, buildTaskPayload());
-  
-  if (result.success) {
-    if (createFromDraft && currentDraftId) {
-      await TaskDraftService.deleteDraft(currentDraftId);
+    const result = await createTask(groupId, buildTaskPayload());
+    
+    if (result.success) {
+      if (createFromDraft && currentDraftId) {
+        await TaskDraftService.deleteDraft(currentDraftId);
+      }
+      
+      reset();
+      setForm(DEFAULT_FORM);
+      setCurrentDraftId(null);
+      setCustomCategory('');
+      
+      if (route.params?.onTaskCreated) route.params.onTaskCreated(result.task);
+      
+      navigation.replace('GroupTasks', {
+        groupId,
+        groupName,
+        userRole: 'ADMIN',
+        switchToAllTasks: true,
+        refreshTasks: true,
+        justCreatedTaskId: result.task?.id,
+        justCreatedTaskTitle: form.title,
+      });
+    } else {
+      Alert.alert('Error', result.message || error || 'Failed to create task');
     }
-    
-    reset();
-    setForm(DEFAULT_FORM);
-    setCurrentDraftId(null);
-    
-    if (route.params?.onTaskCreated) route.params.onTaskCreated(result.task);
-    
-    // ✅ Pass the task ID to suppress the real-time Alert
-    navigation.replace('GroupTasks', {
-      groupId,
-      groupName,
-      userRole: 'ADMIN',
-      switchToAllTasks: true,
-      refreshTasks: true,
-      justCreatedTaskId: result.task?.id,  // ✅ Pass the ID
-      justCreatedTaskTitle: form.title,
-    });
-  } else {
-    Alert.alert('Error', result.message || error || 'Failed to create task');
-  }
-};
+  };
 
   const recommendation = getTaskRecommendation();
   const pointsSuggestion = getSuggestedPoints();
+
+  // ✅ Get the display category value
+  const getDisplayCategory = () => {
+    if (form.category === 'Other' && customCategory) {
+      return customCategory;
+    }
+    return form.category || 'None';
+  };
 
   return (
     <ScreenWrapper style={styles.container}>
@@ -581,7 +622,7 @@ const handleSubmit = async () => {
                   </LinearGradient>
                 </View>
 
-                {/* ─── Points Suggestion Banner ─── */}
+                {/* Points Suggestion Banner */}
                 {pointsSuggestion && (
                   <LinearGradient
                     colors={[theme.primaryLight, theme.primaryLight]}
@@ -665,7 +706,7 @@ const handleSubmit = async () => {
                 </View>
               </View>
 
-              {/* Category */}
+              {/* Category - WITH "Other" option and custom input */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Category</Text>
                 <View style={styles.categoryChipsContainer}>
@@ -697,7 +738,33 @@ const handleSubmit = async () => {
                     );
                   })}
                 </View>
-                <Text style={styles.helperText}>Optional — tap to select, tap again to deselect</Text>
+                
+                {/* ✅ Custom category input when "Other" is selected */}
+                {form.category === 'Other' && (
+                  <LinearGradient
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.inputGradient, styles.customCategoryInput, { marginTop: 12 }]}
+                  >
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Enter custom category name..."
+                      placeholderTextColor={theme.textPlaceholder}
+                      value={customCategory}
+                      onChangeText={setCustomCategory}
+                      maxLength={30}
+                      editable={!loading}
+                      selectionColor={theme.primary}
+                    />
+                  </LinearGradient>
+                )}
+                
+                <Text style={styles.helperText}>
+                  {form.category === 'Other' 
+                    ? 'Enter a custom category name above' 
+                    : 'Optional — tap to select, tap again to deselect'}
+                </Text>
               </View>
 
               {/* Frequency */}
@@ -869,19 +936,19 @@ const handleSubmit = async () => {
               )}
 
               {/* Recurring Toggle */}
-              <View style={styles.inputGroup}>
+                <View style={styles.inputGroup}>
                 <View style={styles.toggleContainer}>
                   <Text style={styles.label}>Recurring Task</Text>
                   <TouchableOpacity
-                    style={[styles.toggleSwitch, form.isRecurring && styles.toggleSwitchActive]}
-                    onPress={() => updateForm({ isRecurring: !form.isRecurring })}
-                    disabled={loading}
+                    style={[styles.toggleSwitch, styles.toggleSwitchActive]}
+                    disabled={true}
+                    activeOpacity={1}
                   >
-                    <View style={[styles.toggleCircle, form.isRecurring && styles.toggleCircleActive]} />
+                    <View style={[styles.toggleCircle, styles.toggleCircleActive]} />
                   </TouchableOpacity>
                 </View>
-                <Text style={styles.helperText}>
-                  Recurring tasks rotate among group members weekly
+                <Text style={[styles.helperText, { color: theme.primary }]}>
+                  ✓ All tasks are recurring and rotate among group members weekly
                 </Text>
               </View>
             </LinearGradient>

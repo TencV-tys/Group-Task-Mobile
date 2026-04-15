@@ -1,4 +1,4 @@
-// src/screens/CreateTaskScreen.tsx - ADDED "Other" category
+// src/screens/CreateTaskScreen.tsx - WITH UNIQUE POINTS WARNING
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
@@ -25,15 +25,15 @@ import { TimeSlotModal } from '../components/TimeSlotModal';
 import { DAY_OF_WEEK_OPTIONS } from '../utils/timeUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { TaskDraftService } from '../services/TaskDraftService';
+import { TaskService } from '../services/TaskService'; // ✅ ADD THIS IMPORT
 
 type Category = 'Work' | 'Study' | 'Chores' | 'Other' | '';
 
-// ✅ ADDED "Other" category
 const CATEGORIES: { value: Category; icon: string }[] = [
   { value: 'Work',   icon: 'briefcase-outline' },
   { value: 'Study',  icon: 'book-open-outline' },
   { value: 'Chores', icon: 'broom' },
-  { value: 'Other',  icon: 'dots-horizontal' },  // ✅ NEW
+  { value: 'Other',  icon: 'dots-horizontal' },
 ];
 
 const convertTimeToMinutes = (time: string): number => {
@@ -100,9 +100,10 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   } | null>(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
-  
-  // ✅ State for custom category input when "Other" is selected
   const [customCategory, setCustomCategory] = useState('');
+  
+  // ✅ ADD THIS: State for existing points in the group
+  const [existingPoints, setExistingPoints] = useState<number[]>([]);
 
   const totalPoints = parseInt(form.points, 10) || 0;
   const usedPoints = form.timeSlots.reduce(
@@ -112,7 +113,26 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   const remainingPoints = totalPoints - usedPoints;
   const canAddMoreSlots = remainingPoints > 0 && form.timeSlots.length < 10;
 
-  // Points Suggestion Logic
+  // ✅ ADD THIS: Fetch existing task points when component mounts
+  useEffect(() => {
+    const fetchExistingPoints = async () => {
+      if (!groupId) return;
+      try {
+        const result = await TaskService.getGroupTasks(groupId);
+        if (result.success && result.tasks) {
+          const points = result.tasks
+            .filter((t: any) => t.isRecurring)
+            .map((t: any) => t.points);
+          setExistingPoints(points);
+          console.log('📊 Existing task points in group:', points);
+        }
+      } catch (err) {
+        console.error('Error fetching existing points:', err);
+      }
+    };
+    fetchExistingPoints();
+  }, [groupId]);
+
   const getSuggestedPoints = useCallback(() => {
     if (!status) return null;
 
@@ -134,7 +154,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
       tasksNeeded,
       nextPosition,
       suggested,
-      expected: `${11 - nextPosition} pts`
     });  
 
     return {
@@ -146,7 +165,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
   useEffect(() => {
     if (draftData && (isEditingDraft || createFromDraft)) {
-      // Handle category - if it's not one of the predefined, treat as "Other" with custom value
       const predefinedCategories = ['Work', 'Study', 'Chores'];
       let categoryValue: Category = '';
       let customCat = '';
@@ -254,14 +272,11 @@ export default function CreateTaskScreen({ navigation, route }: any) {
         : [...form.selectedDays, day],
     });
 
-  // ✅ Updated toggleCategory to handle "Other" properly
   const toggleCategory = (cat: Category) => {
     if (form.category === cat) {
-      // Deselect
       updateForm({ category: '' });
       setCustomCategory('');
     } else {
-      // Select new category
       updateForm({ category: cat });
       if (cat !== 'Other') {
         setCustomCategory('');
@@ -342,7 +357,8 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     hasSlotExceedingLimit() ||
     (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
     !weeklyDaysOk ||
-    loading;
+    loading ||
+    existingPoints.includes(totalPoints); // ✅ DISABLE if points already taken
 
   const isDraftDisabled = () =>
     !form.title.trim() ||
@@ -355,7 +371,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   const buildTaskPayload = () => {
     const points = parseInt(form.points, 10);
     
-    // ✅ Handle category - if "Other" is selected, use customCategory value
     let finalCategory = form.category;
     if (form.category === 'Other' && customCategory.trim()) {
       finalCategory = customCategory.trim() as Category;
@@ -428,6 +443,16 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     if (!groupId) return Alert.alert('Error', 'Group ID is missing');
     if (!form.title.trim()) return Alert.alert('Error', 'Please enter a task title');
 
+    // ✅ Check if points are unique before submitting
+    if (existingPoints.includes(totalPoints)) {
+      Alert.alert(
+        '❌ Points Already Used',
+        `Task with ${totalPoints} points already exists in this group.\n\nEach task must have UNIQUE points for fair rotation.\n\nPlease choose a different point value (1-10) that hasn't been used yet.`,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     const result = await createTask(groupId, buildTaskPayload());
     
     if (result.success) {
@@ -458,14 +483,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
 
   const recommendation = getTaskRecommendation();
   const pointsSuggestion = getSuggestedPoints();
-
-  // ✅ Get the display category value
-  const getDisplayCategory = () => {
-    if (form.category === 'Other' && customCategory) {
-      return customCategory;
-    }
-    return form.category || 'None';
-  };
+  const isPointAlreadyUsed = existingPoints.includes(totalPoints) && totalPoints > 0;
 
   return (
     <ScreenWrapper style={styles.container}>
@@ -675,7 +693,22 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 {!isPointsWithinLimit() && (
                   <Text style={styles.errorText}>Points must be between 1 and 10</Text>
                 )}
-              </View>
+
+                {/* ✅ UNIQUE POINTS WARNING */}
+                {isPointAlreadyUsed && (
+                  <LinearGradient
+                    colors={[theme.errorBg, theme.errorBg]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.warningContainer, { marginTop: 8, padding: 12, borderRadius: 8 }]}
+                  >
+                    <MaterialCommunityIcons name="alert" size={16} color={theme.error} />
+                    <Text style={[styles.warningText, { color: theme.error, flex: 1, fontSize: 12, lineHeight: 16 }]}>
+                      {totalPoints} points is already used by another task. Each task must have UNIQUE points (1-10) for fair rotation!
+                    </Text>
+                  </LinearGradient>
+                )}
+              </View> 
 
               {/* Points Usage Bar */}
               <View style={styles.pointsUsageContainer}>
@@ -706,7 +739,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 </View>
               </View>
 
-              {/* Category - WITH "Other" option and custom input */}
+              {/* Category */}
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Category</Text>
                 <View style={styles.categoryChipsContainer}>
@@ -739,7 +772,6 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   })}
                 </View>
                 
-                {/* ✅ Custom category input when "Other" is selected */}
                 {form.category === 'Other' && (
                   <LinearGradient
                     colors={[theme.bgSecondary, theme.bgTertiary]}
@@ -936,7 +968,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               )}
 
               {/* Recurring Toggle */}
-                <View style={styles.inputGroup}>
+              <View style={styles.inputGroup}>
                 <View style={styles.toggleContainer}>
                   <Text style={styles.label}>Recurring Task</Text>
                   <TouchableOpacity

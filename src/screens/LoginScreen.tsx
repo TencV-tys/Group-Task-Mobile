@@ -1,4 +1,5 @@
-// src/screens/LoginScreen.tsx
+// src/screens/LoginScreen.tsx - FULLY UPDATED with remaining attempts counter
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -14,8 +15,10 @@ import {
   Keyboard,
   Animated,
   Pressable,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLoginForm } from '../authHook/useLoginForm';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { API_BASE_URL } from '../config/api';
@@ -38,16 +41,29 @@ const COLORS = {
   black: '#1a1a2e',
 };
 
-// ─── Validation ─────────────────────────────────────────────────────────────────
+// ─── Validation - MATCHING BACKEND ─────────────────────────────────────────────
 const validateEmail = (email: string): string => {
   if (!email) return 'Email is required';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid email address';
+  if (email.length > 254) return 'Email is too long';
   return '';
 };
 
 const validatePassword = (password: string): string => {
   if (!password) return 'Password is required';
-  if (password.length < 6) return 'Password must be at least 6 characters';
+  if (password.length < 8) return `Password must be at least 8 characters (need ${8 - password.length} more)`;
+  if (password.length > 128) return 'Password is too long (max 128 characters)';
+  
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
+  
+  if (!hasUpperCase) return 'Password must contain at least one uppercase letter (A-Z)';
+  if (!hasLowerCase) return 'Password must contain at least one lowercase letter (a-z)';
+  if (!hasNumber) return 'Password must contain at least one number (0-9)';
+  if (!hasSpecial) return 'Password must contain at least one special character (!@#$%^&* etc.)';
+  
   return '';
 };
 
@@ -55,14 +71,12 @@ const validatePassword = (password: string): string => {
 const EyeIcon = ({ visible, color }: { visible: boolean; color: string }) => (
   <View style={{ width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}>
     {visible ? (
-      // Eye open
       <View>
         <View style={{ width: 18, height: 10, borderRadius: 9, borderWidth: 1.5, borderColor: color, justifyContent: 'center', alignItems: 'center' }}>
           <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color }} />
         </View>
       </View>
     ) : (
-      // Eye closed (slash line)
       <View style={{ position: 'relative' }}>
         <View style={{ width: 18, height: 10, borderRadius: 9, borderWidth: 1.5, borderColor: color, justifyContent: 'center', alignItems: 'center', opacity: 0.4 }}>
           <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: color, opacity: 0.4 }} />
@@ -189,23 +203,43 @@ const PasswordInput = ({
 
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 export default function LoginScreen({ navigation }: any) {
-  const { formData, loading, handleChange, handleSubmit, resetForm } = useLoginForm();
+  const { 
+    formData, 
+    loading, 
+    handleChange, 
+    handleSubmit, 
+    resetForm,
+    remainingAttempts,  // ✅ ADD THIS
+    isLocked            // ✅ ADD THIS
+  } = useLoginForm();
 
   const [showPassword, setShowPassword] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false });
   const [banner, setBanner] = useState<{ message: string; type: 'error' | 'success' | null }>({ message: '', type: null });
-   const { notifyLogin } = useSocket();
+  const { notifyLogin } = useSocket();
+  
   // ── Animations
   const logoAnim = useRef(new Animated.Value(0)).current;
   const formAnim = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.85)).current;
   const formSlide = useRef(new Animated.Value(28)).current;
-  // Shake
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
+  // ✅ Get remaining attempts message
+  const getRemainingAttemptsMessage = () => {
+    if (isLocked) {
+      return { message: '⚠️ Account temporarily locked due to too many failed attempts', type: 'error' };
+    }
+    if (remainingAttempts !== null && remainingAttempts > 0) {
+      return { message: `⚠️ ${remainingAttempts} attempt(s) remaining before account lockout`, type: 'warning' };
+    }
+    return null;
+  };
+
+  const attemptsInfo = getRemainingAttemptsMessage();
+
   useEffect(() => {
-    // Faster parallel entrance — no stagger needed
     Animated.parallel([
       Animated.timing(logoAnim, { toValue: 1, duration: 350, useNativeDriver: true }),
       Animated.spring(logoScale, { toValue: 1, friction: 9, tension: 50, useNativeDriver: true }),
@@ -237,61 +271,77 @@ export default function LoginScreen({ navigation }: any) {
   const emailValid = touched.email && !emailError && !!formData.email;
   const passwordValid = touched.password && !passwordError && !!formData.password;
 
- // In LoginScreen.tsx - update the handleLogin function
+  const handleLogin = async () => {
+    setTouched({ email: true, password: true });
 
-const handleLogin = async () => {
-  setTouched({ email: true, password: true });
+    const emailErr = validateEmail(formData.email);
+    const passErr = validatePassword(formData.password);
 
-  const emailErr = validateEmail(formData.email);
-  const passErr = validatePassword(formData.password);
-
-  if (emailErr || passErr) {
-    setBanner({ message: emailErr || passErr, type: 'error' });
-    shake();
-    return;
-  }
-
-  setBanner({ message: '', type: null });
-  Keyboard.dismiss();
-  const result = await handleSubmit();
-
-  if (result?.success) {
-    setBanner({ message: 'Logged in successfully!', type: 'success' });
-       await notifyLogin();
-         console.log('🔐 Socket notified of login');
-    setTimeout(() => {
-      resetForm();
-      navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
-    }, 600);
-  } else {
-    // ✅ Handle field-specific errors
-    if (result?.field === 'email') {
-      setBanner({ 
-        message: 'Email not found. Please check your email or sign up.', 
-        type: 'error' 
-      });
-      // Highlight the email field with error styling
-      setTouched(prev => ({ ...prev, email: true }));
-    } else if (result?.field === 'password') {
-      setBanner({ 
-        message: 'Incorrect password. Please try again.', 
-        type: 'error' 
-      });
-      // Highlight the password field with error styling
-      setTouched(prev => ({ ...prev, password: true }));
-    } else {
-      setBanner({
-        message: result?.message || 'Invalid email or password — please try again.',
-        type: 'error',
-      });
+    if (emailErr) {
+      Alert.alert('Invalid Email', emailErr);
+      shake();
+      return;
     }
-    shake();
-  }
-};
+    if (passErr) {
+      Alert.alert('Invalid Password', passErr);
+      shake();
+      return;
+    }
+
+    setBanner({ message: '', type: null });
+    Keyboard.dismiss();
+    const result = await handleSubmit();
+
+    if (result?.success) { 
+      setBanner({ message: 'Logged in successfully!', type: 'success' });
+      await notifyLogin();
+      console.log('🔐 Socket notified of login');
+      setTimeout(() => {
+        resetForm();
+        navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
+      }, 600);
+    } else {
+      if (result?.field === 'email') {
+        Alert.alert(
+          'Email Not Found',
+          'No account found with this email address.\n\nPlease check your email or sign up for a new account.',
+          [
+            { text: 'Try Again', style: 'cancel' },
+            { text: 'Sign Up', onPress: () => navigation.navigate('Signup') }
+          ]
+        );
+        setTouched(prev => ({ ...prev, email: true }));
+      } else if (result?.field === 'password') {
+        Alert.alert(
+          'Incorrect Password',
+          'The password you entered is incorrect.\n\nPlease try again.',
+          [{ text: 'OK' }]
+        );
+        setTouched(prev => ({ ...prev, password: true }));
+      } else if (result?.isLocked) {
+        Alert.alert(
+          'Account Temporarily Locked',
+          `Too many failed login attempts. Please try again in ${result.lockoutMinutes} minutes.`,
+          [{ text: 'OK' }]
+        );
+      } else if (result?.remainingAttempts !== undefined && result.remainingAttempts > 0) {
+        Alert.alert(
+          'Login Failed',
+          `${result.message || 'Invalid email or password'}\n\n${result.remainingAttempts} attempt(s) remaining before account lockout.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Login Failed',
+          result?.message || 'Invalid email or password. Please try again.'
+        );
+      }
+      shake();
+    }
+  };
 
   return (
     <ScreenWrapper noTop={true} noBottom={true} backgroundColor={COLORS.white}>
-      {/* Top progress bar */}
       <ProgressBar loading={loading} />
 
       <KeyboardAvoidingView
@@ -299,7 +349,6 @@ const handleLogin = async () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        {/* Tap outside to dismiss keyboard */}
         <Pressable style={{ flex: 1 }} onPress={Keyboard.dismiss}>
           <ScrollView
             contentContainerStyle={[styles.content, keyboardVisible && styles.contentWithKeyboard]}
@@ -332,8 +381,20 @@ const handleLogin = async () => {
                 },
               ]}
             >
-              {/* Inline banner */}
               <InlineBanner message={banner.message} type={banner.type} />
+
+              {/* ✅ REMAINING ATTEMPTS BANNER */}
+              {attemptsInfo && (
+                <LinearGradient
+                  colors={[COLORS.errorBg, COLORS.errorBg]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.warningBanner}
+                >
+                  <MaterialCommunityIcons name="alert-circle" size={18} color={COLORS.error} />
+                  <Text style={[styles.warningBannerText, { color: COLORS.error }]}>{attemptsInfo.message}</Text>
+                </LinearGradient>
+              )}
 
               {/* Email */}
               <View style={styles.inputGroup}>
@@ -361,7 +422,7 @@ const handleLogin = async () => {
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Password</Text>
                 <PasswordInput
-                  placeholder="Enter your password"
+                  placeholder="At least 8 chars, 1 uppercase, 1 number, 1 special"
                   value={formData.password}
                   onChangeText={(t: string) => { handleChange('password', t); setTouched(p => ({ ...p, password: true })); }}
                   editable={!loading}
@@ -373,7 +434,7 @@ const handleLogin = async () => {
                 <FieldError message={passwordError} />
               </View>
 
-              {/* Forgot */}
+              {/* Forgot Password */}
               <TouchableOpacity
                 onPress={() => Linking.openURL(`${API_BASE_URL}/forgot-password`)}
                 disabled={loading}
@@ -430,7 +491,6 @@ const handleLogin = async () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
 
-  // Progress bar
   progressTrack: {
     height: 3,
     backgroundColor: COLORS.tertiary,
@@ -454,11 +514,9 @@ const styles = StyleSheet.create({
   },
   contentWithKeyboard: { justifyContent: 'flex-start', paddingTop: 40 },
 
-  // Header / Logo
   headerContainer: { alignItems: 'center', marginBottom: 32 },
   logoWrapper: {
     marginBottom: 20,
-    // Layered ring glow effect
     shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.25,
@@ -486,7 +544,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: COLORS.black, marginBottom: 6, letterSpacing: -0.5 },
   subtitle: { fontSize: 14, color: COLORS.gray, textAlign: 'center' },
 
-  // Banner
   banner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -502,7 +559,24 @@ const styles = StyleSheet.create({
   bannerDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
   bannerText: { fontSize: 13, fontWeight: '500', flex: 1 },
 
-  // Form
+  // ✅ New warning banner style
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    borderColor: COLORS.errorBorder,
+    marginBottom: 16,
+  },
+  warningBannerText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
   formContainer: { width: '100%' },
   inputGroup: { marginBottom: 16 },
   inputLabel: {
@@ -531,19 +605,15 @@ const styles = StyleSheet.create({
   inputActive: { opacity: 1 },
   inputDisabled: { opacity: 0.55 },
 
-  // Eye button
   eyeButton: { padding: 4 },
 
-  // Field error
   fieldErrorRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5, marginLeft: 2 },
   fieldErrorDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: COLORS.error, flexShrink: 0 },
   fieldError: { fontSize: 12, color: COLORS.error, fontWeight: '500' },
 
-  // Forgot
   forgotContainer: { alignItems: 'flex-end', marginBottom: 20, marginTop: -4 },
   forgotText: { color: COLORS.primary, fontSize: 13, fontWeight: '600' },
 
-  // Button
   button: {
     borderRadius: 12,
     marginBottom: 22,
@@ -558,12 +628,10 @@ const styles = StyleSheet.create({
   buttonGradient: { height: 52, justifyContent: 'center', alignItems: 'center' },
   buttonText: { color: COLORS.white, fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
 
-  // Divider
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
   divider: { flex: 1, height: 0.5, backgroundColor: COLORS.tertiary },
   dividerText: { marginHorizontal: 14, color: COLORS.lightGray, fontSize: 12, fontWeight: '600' },
 
-  // Signup row
   signupRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10 },
   linkText: { color: COLORS.gray, fontSize: 14 },
   linkBold: { color: COLORS.primary, fontSize: 14, fontWeight: '700' },

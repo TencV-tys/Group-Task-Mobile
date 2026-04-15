@@ -1,4 +1,5 @@
-// src/screens/SignupScreen.tsx
+// src/screens/SignupScreen.tsx - FULLY UPDATED with backend matching validation
+
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -13,6 +14,7 @@ import {
   Keyboard,
   Animated,
   Pressable,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSignupForm } from '../authHook/useSignupForm';
@@ -44,10 +46,11 @@ const GENDER_OPTIONS = [
   { value: 'PREFER_NOT_TO_SAY', label: 'N/A' },
 ];
 
-// ─── Validation ─────────────────────────────────────────────────────────────────
+// ─── Validation - MATCHING BACKEND ─────────────────────────────────────────────
 const validateFullName = (name: string): string => {
   if (!name) return 'Full name is required';
   if (name.trim().length < 2) return 'Name must be at least 2 characters';
+  if (name.trim().length > 50) return 'Name cannot exceed 50 characters';
   if (!/^[a-zA-Z\s'-]+$/.test(name)) return 'Name can only contain letters, spaces, hyphens, or apostrophes';
   return '';
 };
@@ -55,12 +58,26 @@ const validateFullName = (name: string): string => {
 const validateEmail = (email: string): string => {
   if (!email) return 'Email is required';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Please enter a valid email (e.g. john@example.com)';
+  if (email.length > 254) return 'Email is too long';
   return '';
 };
 
+// ✅ UPDATED: Match backend requirements (8 chars, uppercase, lowercase, number, special)
 const validatePassword = (password: string): string => {
   if (!password) return 'Password is required';
-  if (password.length < 6) return `Too short — need ${6 - password.length} more character${6 - password.length !== 1 ? 's' : ''}`;
+  if (password.length < 8) return `Password must be at least 8 characters (need ${8 - password.length} more)`;
+  if (password.length > 128) return 'Password is too long (max 128 characters)';
+  
+  const hasUpperCase = /[A-Z]/.test(password);
+  const hasLowerCase = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
+  
+  if (!hasUpperCase) return 'Password must contain at least one uppercase letter (A-Z)';
+  if (!hasLowerCase) return 'Password must contain at least one lowercase letter (a-z)';
+  if (!hasNumber) return 'Password must contain at least one number (0-9)';
+  if (!hasSpecial) return 'Password must contain at least one special character (!@#$%^&* etc.)';
+  
   return '';
 };
 
@@ -70,7 +87,7 @@ const validateConfirmPassword = (password: string, confirm: string): string => {
   return '';
 };
 
-// ─── Password Strength ─────────────────────────────────────────────────────────
+// ─── Password Strength (updated for 8 char minimum) ────────────────────────────
 type StrengthLevel = 'weak' | 'fair' | 'good' | 'strong';
 
 const getPasswordStrength = (password: string) => {
@@ -79,22 +96,26 @@ const getPasswordStrength = (password: string) => {
   let score = 0;
   const tips: string[] = [];
 
-  if (password.length >= 6) score++; else tips.push('At least 6 chars');
-  if (password.length >= 10) score++; else tips.push('10+ chars helps');
+  if (password.length >= 8) score++; else tips.push('At least 8 chars');
+  if (password.length >= 12) score++; else tips.push('12+ chars stronger');
   if (/[A-Z]/.test(password)) score++; else tips.push('Add uppercase');
+  if (/[a-z]/.test(password)) score++; else tips.push('Add lowercase');
   if (/[0-9]/.test(password)) score++; else tips.push('Add a number');
-  if (/[^A-Za-z0-9]/.test(password)) score++; else tips.push('Add !@#$...');
+  if (/[^A-Za-z0-9]/.test(password)) score++; else tips.push('Add special char (!@#$)');
 
-  if (score <= 1) return { level: 'weak' as StrengthLevel, score: 1, label: 'Weak', color: COLORS.error, tip: tips[0] ?? '' };
-  if (score === 2) return { level: 'fair' as StrengthLevel, score: 2, label: 'Fair', color: '#fd7e14', tip: tips[0] ?? '' };
-  if (score === 3) return { level: 'good' as StrengthLevel, score: 3, label: 'Good', color: '#f59f00', tip: tips[0] ?? '' };
-  return { level: 'strong' as StrengthLevel, score: 4, label: 'Strong', color: COLORS.primary, tip: '' };
+  if (score <= 2) return { level: 'weak' as StrengthLevel, score, label: 'Weak', color: COLORS.error, tip: tips[0] ?? '' };
+  if (score <= 3) return { level: 'fair' as StrengthLevel, score, label: 'Fair', color: '#fd7e14', tip: tips[0] ?? '' };
+  if (score <= 4) return { level: 'good' as StrengthLevel, score, label: 'Good', color: '#f59f00', tip: tips[0] ?? '' };
+  return { level: 'strong' as StrengthLevel, score, label: 'Strong', color: COLORS.primary, tip: '' };
 };
 
 // ─── Password Strength Bar ─────────────────────────────────────────────────────
 const PasswordStrengthBar = ({ password }: { password: string }) => {
   const strength = getPasswordStrength(password);
+  const maxScore = 6;
   const widths = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0),
@@ -325,7 +346,7 @@ export default function SignupScreen({ navigation }: any) {
   const [banner, setBanner] = useState<{ message: string; type: 'error' | 'success' | null }>({ message: '', type: null });
   const { notifyLogin } = useSocket();
 
-  // ── Animations — run in parallel, faster
+  // ── Animations
   const logoAnim = useRef(new Animated.Value(0)).current;
   const formAnim = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.85)).current;
@@ -380,9 +401,24 @@ export default function SignupScreen({ navigation }: any) {
     const passErr = validatePassword(formData.password);
     const confirmErr = validateConfirmPassword(formData.password, formData.confirmPassword);
 
-    const firstErr = nameErr || emailErr || passErr || confirmErr;
-    if (firstErr) {
-      setBanner({ message: firstErr, type: 'error' });
+    // Show specific validation errors with Alert for better UX
+    if (nameErr) {
+      Alert.alert('Invalid Name', nameErr);
+      shake();
+      return;
+    }
+    if (emailErr) {
+      Alert.alert('Invalid Email', emailErr);
+      shake();
+      return;
+    }
+    if (passErr) {
+      Alert.alert('Invalid Password', passErr);
+      shake();
+      return;
+    }
+    if (confirmErr) {
+      Alert.alert('Password Mismatch', confirmErr);
       shake();
       return;
     }
@@ -393,16 +429,14 @@ export default function SignupScreen({ navigation }: any) {
 
     if (result.success) {
       setBanner({ message: 'Account created! Welcome to GroupTask 🎉', type: 'success' });
-        await notifyLogin();
+      await notifyLogin();
       setTimeout(() => {
         resetForm();
         navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
       }, 800);
     } else {
-      setBanner({
-        message: result.message || 'Something went wrong. Please try again.',
-        type: 'error',
-      });
+      // Show server error in Alert
+      Alert.alert('Signup Failed', result.message || 'Something went wrong. Please try again.');
       shake();
     }
   };
@@ -505,7 +539,7 @@ export default function SignupScreen({ navigation }: any) {
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Password *</Text>
                 <PasswordInput
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 chars, 1 uppercase, 1 number, 1 special"
                   value={formData.password}
                   onChangeText={(t: string) => { handleChange('password', t); touch('password'); }}
                   editable={!loading}

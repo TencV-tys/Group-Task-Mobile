@@ -1,4 +1,4 @@
-// src/authServices/AuthService.ts - COMPLETE SECURE VERSION
+// src/authServices/AuthService.ts - COMPLETE FIXED VERSION
 
 import { API_BASE_URL } from '../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,8 +33,15 @@ const validateEmail = (email: string): boolean => {
     return emailRegex.test(email);
 };
 
+// ✅ UPDATED: Match backend password requirements (8 chars, uppercase, lowercase, number, special)
 const validatePassword = (password: string): boolean => {
-    return password.length >= 6 && /[A-Za-z]/.test(password) && /[0-9]/.test(password);
+    if (password.length < 8) return false;
+    if (password.length > 128) return false;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    const hasSpecial = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
+    return hasUpperCase && hasLowerCase && hasNumber && hasSpecial;
 };
 
 // Store user data with tokens
@@ -110,10 +117,21 @@ export class AuthService {
                 );
                 console.log('🔐 Login successful, tokens stored');
                 
-                // ✅ Notify socket using callback
                 if (socketLoginCallback) {
                     await socketLoginCallback();
                 }
+            }
+
+            // ✅ FIXED: Return error details properly
+            if (!result.success) {
+                return {
+                    success: false,
+                    message: result.message,
+                    field: result.field,
+                    isLocked: result.isLocked,
+                    remainingAttempts: result.remainingAttempts,
+                    lockoutMinutes: result.lockoutMinutes
+                };
             }
 
             return result;
@@ -160,10 +178,11 @@ export class AuthService {
                 };
             }
             
+            // ✅ UPDATED: Use the new validatePassword with 8 char requirement
             if (!validatePassword(sanitizedPassword)) {
                 return {
                     success: false,
-                    message: "Password must be at least 6 characters with at least one letter and one number"
+                    message: "Password must be at least 8 characters with at least one uppercase letter, one lowercase letter, one number, and one special character"
                 };
             }
             
@@ -192,7 +211,6 @@ export class AuthService {
                 );
                 console.log('🔐 Signup successful, tokens stored');
                 
-                // ✅ Notify socket using callback
                 if (socketLoginCallback) {
                     await socketLoginCallback();
                 }
@@ -217,7 +235,6 @@ export class AuthService {
             await SecureStore.deleteItemAsync('userAccessToken');
             await SecureStore.deleteItemAsync('userRefreshToken');
             
-            // ✅ Notify socket using callback
             if (socketLogoutCallback) {
                 socketLogoutCallback();
             }
@@ -445,10 +462,11 @@ export class AuthService {
         try {
             console.log('🔍 Attempting to change password...');
             
+            // ✅ UPDATED: Use new password validation
             if (!validatePassword(data.newPassword)) {
                 return {
                     success: false,
-                    message: "New password must be at least 6 characters with at least one letter and one number"
+                    message: "New password must be at least 8 characters with at least one uppercase letter, one lowercase letter, one number, and one special character"
                 };
             }
             

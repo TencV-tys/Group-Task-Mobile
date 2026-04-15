@@ -732,4 +732,10 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
   confirmModalConfirmButtonText: {
     color: '#fff',
   },
+    warningText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 16,
+  },
 });

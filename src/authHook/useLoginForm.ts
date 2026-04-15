@@ -1,4 +1,5 @@
-// src/authHook/useLoginForm.ts
+// src/authHook/useLoginForm.ts - UPDATED with remainingAttempts
+
 import { useState } from 'react';
 import { AuthService } from '../services/AuthService';
 
@@ -11,7 +12,10 @@ interface LoginResult {
   success: boolean;
   message?: string;
   user?: any;
-  field?: 'email' | 'password';  // ← ADD THIS
+  field?: 'email' | 'password';
+  isLocked?: boolean;
+  remainingAttempts?: number;
+  lockoutMinutes?: number;
 }
 
 export function useLoginForm() {
@@ -23,16 +27,22 @@ export function useLoginForm() {
   const [loading, setLoading] = useState<boolean>(false);
   const [message, setMessage] = useState<string>('');
   const [success, setSuccess] = useState<boolean>(false);
-  const [errorField, setErrorField] = useState<'email' | 'password' | null>(null);  // ← ADD THIS
+  const [errorField, setErrorField] = useState<'email' | 'password' | null>(null);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);  // ✅ ADD THIS
+  const [isLocked, setIsLocked] = useState<boolean>(false);  // ✅ ADD THIS
 
   const handleChange = (name: keyof LoginData, value: string) => {
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
-    // Clear field-specific error when user types
     if (errorField === name) {
       setErrorField(null);
+    }
+    // ✅ Clear remaining attempts when user starts typing
+    if (remainingAttempts !== null) {
+      setRemainingAttempts(null);
+      setIsLocked(false);
     }
   }
 
@@ -47,6 +57,8 @@ export function useLoginForm() {
       if (result.success) {
         setSuccess(true);
         setMessage(`✅ ${result.message || 'Login successful!'}`);
+        setRemainingAttempts(null);
+        setIsLocked(false);
         return {
           success: true,
           message: result.message,
@@ -56,17 +68,31 @@ export function useLoginForm() {
         setSuccess(false);
         setMessage(`❌ ${result.message || 'Login failed'}`);
         
-        // ✅ Capture which field caused the error
+        // ✅ Capture field-specific error
         if ((result as any).field === 'email') {
           setErrorField('email');
         } else if ((result as any).field === 'password') {
           setErrorField('password');
         }
         
+        // ✅ Capture remaining attempts
+        if ((result as any).remainingAttempts !== undefined) {
+          setRemainingAttempts((result as any).remainingAttempts);
+        }
+        
+        // ✅ Capture lockout
+        if ((result as any).isLocked) {
+          setIsLocked(true);
+          setRemainingAttempts(0);
+        }
+        
         return {
           success: false,
           message: result.message,
-          field: (result as any).field  // ← ADD THIS
+          field: (result as any).field,
+          remainingAttempts: (result as any).remainingAttempts,
+          isLocked: (result as any).isLocked,
+          lockoutMinutes: (result as any).lockoutMinutes
         };
       }
 
@@ -87,6 +113,8 @@ export function useLoginForm() {
     setMessage('');
     setSuccess(false);
     setErrorField(null);
+    setRemainingAttempts(null);
+    setIsLocked(false);
   };
 
   return {
@@ -94,7 +122,9 @@ export function useLoginForm() {
     loading,
     message,
     success,
-    errorField,  // ← ADD THIS
+    errorField,
+    remainingAttempts,  // ✅ ADD THIS
+    isLocked,           // ✅ ADD THIS
     handleChange,
     handleSubmit,
     resetForm

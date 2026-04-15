@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSignupForm } from '../authHook/useSignupForm';
 import { AvatarPicker } from '../components/AvatarPicker';
 import { ScreenWrapper } from '../components/ScreenWrapper';
+import { useSocket } from '../context/SocketContext';
 
 // ─── Color Palette ─────────────────────────────────────────────────────────────
 const COLORS = {
@@ -322,6 +323,7 @@ export default function SignupScreen({ navigation }: any) {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [touched, setTouched] = useState({ fullName: false, email: false, password: false, confirmPassword: false });
   const [banner, setBanner] = useState<{ message: string; type: 'error' | 'success' | null }>({ message: '', type: null });
+  const { notifyLogin } = useSocket();
 
   // ── Animations — run in parallel, faster
   const logoAnim = useRef(new Animated.Value(0)).current;
@@ -391,6 +393,7 @@ export default function SignupScreen({ navigation }: any) {
 
     if (result.success) {
       setBanner({ message: 'Account created! Welcome to GroupTask 🎉', type: 'success' });
+        await notifyLogin();
       setTimeout(() => {
         resetForm();
         navigation.reset({ index: 0, routes: [{ name: 'Home' }] });

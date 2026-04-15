@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLoginForm } from '../authHook/useLoginForm';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { API_BASE_URL } from '../config/api';
+import { useSocket } from '../context/SocketContext';
 
 // ─── Color Palette ─────────────────────────────────────────────────────────────
 const COLORS = {
@@ -194,7 +195,7 @@ export default function LoginScreen({ navigation }: any) {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [touched, setTouched] = useState({ email: false, password: false });
   const [banner, setBanner] = useState<{ message: string; type: 'error' | 'success' | null }>({ message: '', type: null });
-
+   const { notifyLogin } = useSocket();
   // ── Animations
   const logoAnim = useRef(new Animated.Value(0)).current;
   const formAnim = useRef(new Animated.Value(0)).current;
@@ -256,6 +257,8 @@ const handleLogin = async () => {
 
   if (result?.success) {
     setBanner({ message: 'Logged in successfully!', type: 'success' });
+       await notifyLogin();
+         console.log('🔐 Socket notified of login');
     setTimeout(() => {
       resetForm();
       navigation.reset({ index: 0, routes: [{ name: 'Home' }] });

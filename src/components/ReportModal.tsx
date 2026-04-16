@@ -1,4 +1,4 @@
-// src/components/ReportModal.tsx - UPDATED with better error handling
+// src/components/ReportModal.tsx - COMPLETE WITH FRONTEND RATE LIMITING
 
 import React, { useState, useCallback, useEffect } from 'react';
 import {
@@ -14,11 +14,12 @@ import {
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { TokenUtils } from '../utils/tokenUtils';
 import { useTheme } from '../context/ThemeContext';
-import { useSocket } from '../context/SocketContext'; // ✅ Add socket if needed for real-time
+import { useSocket } from '../context/SocketContext';
 
 const REPORT_REASONS = [
   { value: 'INAPPROPRIATE_CONTENT', label: 'Inappropriate Content', icon: 'alert-octagon' },
@@ -48,14 +49,18 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   navigation
 }) => {
   const { theme, isDark } = useTheme();
-  const { isConnected } = useSocket(); // ✅ Get socket connection status
+  const { isConnected } = useSocket();
   const [selectedReason, setSelectedReason] = useState<string>('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState<'reason' | 'description'>('reason');
   const [authError, setAuthError] = useState(false);
+  
+  // ✅ Rate limit states
+  const [canReport, setCanReport] = useState(true);
+  const [timeRemaining, setTimeRemaining] = useState(0);
+  const [lastReportTime, setLastReportTime] = useState<number | null>(null);
 
-  // ===== Use TokenUtils.checkToken() =====
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -66,7 +71,81 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     return hasToken;
   }, []);
 
-  // ===== AUTH ERROR HANDLER =====
+  // ✅ Check if user can report based on stored time
+  const checkLastReportTime = useCallback(async () => {
+    try {
+      const storageKey = `last_report_${groupId}`;
+      const lastTime = await AsyncStorage.getItem(storageKey);
+      
+      if (lastTime) {
+        const lastTimeNum = parseInt(lastTime);
+        const now = Date.now();
+        const hoursPassed = (now - lastTimeNum) / (1000 * 60 * 60);
+        
+        if (hoursPassed < 24) {
+          const remainingHours = Math.ceil(24 - hoursPassed);
+          setTimeRemaining(remainingHours);
+          setCanReport(false);
+          setLastReportTime(lastTimeNum);
+          return false;
+        } else {
+          // Clear expired storage
+          await AsyncStorage.removeItem(storageKey);
+          setCanReport(true);
+          setTimeRemaining(0);
+          setLastReportTime(null);
+          return true;
+        }
+      } else {
+        setCanReport(true);
+        setTimeRemaining(0);
+        setLastReportTime(null);
+        return true;
+      }
+    } catch (error) {
+      console.error('Error checking last report time:', error);
+      return true; // Allow on error
+    }
+  }, [groupId]);
+
+  // ✅ Store report time after successful submission
+  const storeReportTime = useCallback(async () => {
+    try {
+      const storageKey = `last_report_${groupId}`;
+      await AsyncStorage.setItem(storageKey, Date.now().toString());
+      setCanReport(false);
+      setTimeRemaining(24);
+      setLastReportTime(Date.now());
+    } catch (error) {
+      console.error('Error storing report time:', error);
+    }
+  }, [groupId]);
+
+  // ✅ Check rate limit when modal opens
+  useEffect(() => {
+    if (visible) {
+      checkLastReportTime();
+    }
+  }, [visible, checkLastReportTime]);
+
+  // ✅ Show warning if cannot report and modal is open
+  useEffect(() => {
+    if (visible && !canReport && !submitting) {
+      Alert.alert(
+        '⚠️ Cannot Submit Report',
+        `You have already reported this group.\n\nPlease wait ${timeRemaining} hour${timeRemaining !== 1 ? 's' : ''} before submitting another report.`,
+        [
+          { 
+            text: 'OK', 
+            onPress: () => {
+              handleClose();
+            }
+          }
+        ]
+      );
+    }
+  }, [visible, canReport, timeRemaining]);
+
   useEffect(() => {
     if (authError && visible) {
       Alert.alert(
@@ -92,6 +171,16 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     const hasToken = await checkToken();
     if (!hasToken) return;
 
+    // ✅ Check rate limit BEFORE sending request
+    if (!canReport) {
+      Alert.alert(
+        'Rate Limit Exceeded',
+        `You have already reported this group. Please wait ${timeRemaining} hour${timeRemaining !== 1 ? 's' : ''} before submitting another report.`,
+        [{ text: 'OK', onPress: () => handleClose() }]
+      );
+      return;
+    }
+
     if (!selectedReason) {
       Alert.alert('Error', 'Please select a reason');
       return;
@@ -109,7 +198,9 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     try {
       await onSubmit({ type: selectedReason, description: description.trim() });
       
-      // ✅ Show success with real-time info
+      // ✅ Store the report time on successful submission
+      await storeReportTime();
+      
       Alert.alert(
         'Report Submitted',
         `Thank you for helping keep our community safe.\n\nYour report has been submitted and will be reviewed by our team.${
@@ -120,17 +211,46 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     } catch (error: any) {
       console.error('❌ Report submission error:', error);
       
-      // ✅ Better error handling
-      if (error?.message?.toLowerCase().includes('token') || 
-          error?.message?.toLowerCase().includes('auth') ||
-          error?.message?.toLowerCase().includes('unauthorized')) {
+      const errorMessage = error?.message || error?.toString() || 'Unknown error';
+      const errorLower = errorMessage.toLowerCase();
+      
+      // ✅ Handle backend rate limit error (just in case)
+      if (errorMessage.includes('429') || errorLower.includes('rate limit') || errorLower.includes('wait 24 hours')) {
+        // Store the time even if backend rejected? No, only store on success
+        Alert.alert(
+          '⚠️ Rate Limit Exceeded',
+          'You have already reported this group recently.\n\nPlease wait 24 hours before submitting another report.',
+          [{ text: 'OK', onPress: () => {
+            // Refresh the rate limit check
+            checkLastReportTime();
+            handleClose();
+          }}]
+        );
+      } 
+      else if (errorLower.includes('already reported')) {
+        await storeReportTime(); // Store time since backend says already reported
+        Alert.alert(
+          'Already Reported',
+          'You have already reported this group. Our team is reviewing your previous report.',
+          [{ text: 'OK', onPress: handleClose }]
+        );
+      }
+      else if (errorLower.includes('token') || errorLower.includes('auth') || errorLower.includes('unauthorized')) {
         setAuthError(true);
-      } else if (error?.message?.includes('already reported')) {
-        Alert.alert('Already Reported', 'You have already reported this group. Duplicate reports are not allowed.');
-      } else if (error?.message?.includes('rate limit')) {
-        Alert.alert('Too Many Requests', 'Please wait a moment before submitting another report.');
-      } else {
-        Alert.alert('Error', error?.message || 'Failed to submit report. Please check your connection and try again.');
+      }
+      else if (errorLower.includes('network') || errorLower.includes('connection')) {
+        Alert.alert(
+          'Network Error',
+          'Unable to submit report. Please check your internet connection and try again.',
+          [{ text: 'OK' }]
+        );
+      }
+      else {
+        Alert.alert(
+          'Submission Failed',
+          errorMessage || 'Failed to submit report. Please try again later.',
+          [{ text: 'OK' }]
+        );
       }
     } finally {
       setSubmitting(false);
@@ -149,7 +269,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     setStep('reason');
   };
 
-  // Clear form when modal closes
+  // Reset form when modal closes
   useEffect(() => {
     if (!visible) {
       setSelectedReason('');
@@ -161,6 +281,13 @@ export const ReportModal: React.FC<ReportModalProps> = ({
   if (authError) {
     return null;
   }
+
+  // Format time remaining for display
+  const getTimeRemainingText = () => {
+    if (timeRemaining >= 24) return 'Tomorrow';
+    if (timeRemaining >= 1) return `${timeRemaining}h`;
+    return `${Math.ceil(timeRemaining * 60)}min`;
+  };
 
   return (
     <Modal
@@ -174,7 +301,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <View style={[styles.modalContent, { backgroundColor: theme.card }]}>
-          {/* Header - Fixed at top */}
+          {/* Header */}
           <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
             <View style={styles.headerLeft}>
               {step === 'description' && (
@@ -197,7 +324,7 @@ export const ReportModal: React.FC<ReportModalProps> = ({
             </TouchableOpacity>
           </View>
 
-          {/* Scrollable Content - Takes remaining space */}
+          {/* Body */}
           <ScrollView 
             style={[styles.body, { backgroundColor: theme.card }]} 
             contentContainerStyle={styles.bodyContent}
@@ -316,15 +443,14 @@ export const ReportModal: React.FC<ReportModalProps> = ({
               </>
             )}
             
-            {/* Add extra padding at bottom to ensure content doesn't get hidden behind footer */}
             <View style={{ height: 20 }} />
           </ScrollView>
 
-          {/* Footer - Fixed at bottom */}
+          {/* Footer */}
           <View style={[styles.footer, { borderTopColor: theme.border, backgroundColor: theme.card }]}>
             {step === 'reason' ? (
               <TouchableOpacity
-                style={[styles.nextButton, !selectedReason && styles.nextButtonDisabled]}
+                style={[styles.nextButton, (!selectedReason || submitting) && styles.nextButtonDisabled]}
                 onPress={handleSubmit}
                 disabled={!selectedReason || submitting}
               >
@@ -362,17 +488,24 @@ export const ReportModal: React.FC<ReportModalProps> = ({
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
+                  style={[styles.submitButton, (!canReport || submitting) && styles.submitButtonDisabled]}
                   onPress={handleSubmit}
-                  disabled={submitting}
+                  disabled={!canReport || submitting}
                 >
                   <LinearGradient
-                    colors={submitting ? [theme.bgSecondary, theme.bgTertiary] : [theme.error, theme.error]}
+                    colors={(!canReport || submitting) ? [theme.bgSecondary, theme.bgTertiary] : [theme.error, theme.error]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.submitButtonGradient}
                   >
-                    {submitting ? (
+                    {!canReport ? (
+                      <>
+                        <MaterialCommunityIcons name="clock-outline" size={18} color={theme.textMuted} />
+                        <Text style={[styles.submitButtonText, { color: theme.textMuted }]}>
+                          Try again in {getTimeRemainingText()}
+                        </Text>
+                      </>
+                    ) : submitting ? (
                       <ActivityIndicator size="small" color={theme.textMuted} />
                     ) : (
                       <>

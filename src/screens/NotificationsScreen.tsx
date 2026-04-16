@@ -6,8 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
-  RefreshControl,
+  ActivityIndicator, 
+  RefreshControl, 
   Alert
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -613,7 +613,10 @@ const handleNavigation = (type: string, data: any) => {
 
         <TouchableOpacity
           style={styles.deleteButton}
-          onPress={() => handleDelete(item.id)}
+          onPress={(e) =>{
+               e.stopPropagation(); 
+               deleteNotification(item.id);
+          }}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <MaterialCommunityIcons name="close" size={14} color={theme.textMuted} />

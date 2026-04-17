@@ -270,4 +270,27 @@ export class NotificationService {
       return false;
     }
   }
+
+  static async deleteAllNotifications(): Promise<{ success: boolean; message?: string }> {
+  try {
+    // ✅ Use TokenUtils.getAuthHeaders()
+    const headers = await TokenUtils.getAuthHeaders();
+    
+    const response = await fetch(`${API_URL}/delete-all`, {
+      method: "DELETE",
+      headers,
+    });
+
+    const result = await response.json(); 
+    return result;
+
+  } catch (error: any) {
+    console.error("Error deleting all notifications:", error);
+    return {
+      success: false,
+      message: "Cannot connect to the server"
+    };
+  }
+}
+
 }

@@ -1,4 +1,4 @@
-// notificationHook/useNotifications.ts - UPDATED with TokenUtils
+// notificationHook/useNotifications.ts - FULLY UPDATED with deleteAllNotifications
 import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { NotificationService, Notification, NotificationTypes } from '../services/NotificationService';
@@ -8,7 +8,7 @@ import { useSocket } from '../context/SocketContext';
 interface PaginationInfo {
   page: number;
   limit: number;
-  total: number;
+  total: number; 
   pages: number;
 }
 
@@ -47,6 +47,7 @@ export const useNotifications = () => {
 
       if (result.success) {
         const notificationsData = result.notifications || result.data?.notifications || [];
+        console.log('notification: ',notificationsData)
         const unread = result.unreadCount || result.data?.unreadCount || 0;
         
         setNotifications(notificationsData as Notification[]);
@@ -161,7 +162,33 @@ export const useNotifications = () => {
     }
   }, [notifications, checkToken]);
 
-  // Confirm delete
+  // ✅ DELETE ALL NOTIFICATIONS - NEW METHOD
+  const deleteAllNotifications = useCallback(async (): Promise<boolean> => {
+    try {
+      const hasToken = await checkToken();
+      if (!hasToken) return false;
+
+      const result = await NotificationService.deleteAllNotifications();
+      
+      if (result.success) {
+        console.log('delete allnotification structure: ',result)
+        setNotifications([]);
+        setUnreadCount(0);
+        Alert.alert('Success', result.message || 'All notifications deleted successfully');
+        return true;
+      } else {
+        console.log('delete allnotification structure: ',result)
+        Alert.alert('Error', result.message || 'Failed to delete notifications');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Delete all notifications error:', error);
+      Alert.alert('Error', 'Failed to delete notifications');
+      return false;
+    }
+  }, [checkToken]);
+
+  // Confirm delete single notification
   const confirmDelete = useCallback((notificationId: string) => {
     Alert.alert(
       'Delete Notification',
@@ -176,6 +203,27 @@ export const useNotifications = () => {
       ]
     );
   }, [deleteNotification]);
+
+  // ✅ CONFIRM DELETE ALL NOTIFICATIONS - NEW METHOD
+  const confirmDeleteAll = useCallback(() => {
+    if (notifications.length === 0) {
+      Alert.alert('Info', 'No notifications to delete');
+      return;
+    }
+
+    Alert.alert(
+      'Delete All Notifications',
+      `Are you sure you want to delete all ${notifications.length} notifications? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete All',
+          style: 'destructive',
+          onPress: deleteAllNotifications
+        }
+      ]
+    );
+  }, [notifications.length, deleteAllNotifications]);
 
   // Refresh data
   const refreshNotifications = useCallback(async () => {
@@ -238,6 +286,7 @@ export const useNotifications = () => {
     markAsRead,
     markAllAsRead,
     deleteNotification: confirmDelete,
+    deleteAllNotifications: confirmDeleteAll, // ✅ EXPORT THE NEW METHOD
     refreshNotifications
   };
 };

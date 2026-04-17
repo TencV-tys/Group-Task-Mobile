@@ -1,6 +1,6 @@
-// src/screens/FeedbackHistoryScreen.tsx - FULLY UPDATED with New Badge
+// src/screens/FeedbackHistoryScreen.tsx - FIXED for double updates
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,6 +27,13 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
   // ✅ Track new feedback indicator
   const [hasNewFeedback, setHasNewFeedback] = useState(false);
   const [newFeedbackCount, setNewFeedbackCount] = useState(0);
+  
+  // ✅ Debounce ref for rate limiting
+  const lastAlertTimeRef = useRef(0);
+  
+  // ✅ Track if an action is in progress to prevent double refreshes
+  const actionInProgressRef = useRef(false);
+  const lastActionTimeRef = useRef(0);
   
   const {
     loading,
@@ -68,48 +75,73 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
     useCallback(() => {
       loadFeedback(1, filter);
       loadStats();
-      // Reset new feedback indicator when viewing the screen
       setHasNewFeedback(false);
       setNewFeedbackCount(0);
     }, [filter])
   );
 
-  // ✅ Listen for real-time socket events with badge indicator
+  // ✅ Listen for real-time socket events with deduplication
   useEffect(() => {
     if (!socket || !isConnected) return;
 
     const handleNewFeedback = (data: any) => {
+      // ✅ Skip if action just happened (within 1 second)
+      const now = Date.now();
+      if (now - lastActionTimeRef.current < 1000) {
+        console.log('📢 Skipping duplicate socket event (too soon)');
+        return;
+      }
+      
       console.log('📢 New feedback received:', data);
       loadFeedback(1, filter);
       loadStats();
       
-      // ✅ Update badge indicator
       setHasNewFeedback(true);
       setNewFeedbackCount(prev => prev + 1);
       
-      // Show alert for admin (optional - can be disabled)
-      if (filter === null || filter === 'OPEN') {
-        Alert.alert(
-          'New Feedback',
-          `${data.userName} submitted new ${data.type} feedback`,
-          [{ text: 'OK' }]
-        );
+      if (now - lastAlertTimeRef.current > 3000) {
+        lastAlertTimeRef.current = now;
+        if (filter === null || filter === 'OPEN') {
+          Alert.alert(
+            'New Feedback',
+            `${data.userName} submitted new ${data.type} feedback`,
+            [{ text: 'OK' }]
+          );
+        }
       }
     };
 
     const handleStatusChanged = (data: any) => {
+      const now = Date.now();
+      if (now - lastActionTimeRef.current < 1000) {
+        console.log('📢 Skipping duplicate status event (too soon)');
+        return;
+      }
+      
       console.log('📢 Feedback status changed:', data);
       loadFeedback(1, filter);
       loadStats();
     };
 
     const handleFeedbackUpdated = (data: any) => {
+      const now = Date.now();
+      if (now - lastActionTimeRef.current < 1000) {
+        console.log('📢 Skipping duplicate update event (too soon)');
+        return;
+      }
+      
       console.log('📢 Feedback updated:', data);
       loadFeedback(1, filter);
       loadStats();
     };
 
     const handleFeedbackDeleted = (data: any) => {
+      const now = Date.now();
+      if (now - lastActionTimeRef.current < 1000) {
+        console.log('📢 Skipping duplicate delete event (too soon)');
+        return;
+      }
+      
       console.log('📢 Feedback deleted:', data);
       loadFeedback(1, filter);
       loadStats();
@@ -136,12 +168,11 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
       setFilterState(newFilter);
       setFilter(newFilter);
     }
-    // ✅ Reset badge when changing filter
     setHasNewFeedback(false);
     setNewFeedbackCount(0);
   };
 
-  const handleDelete = (feedbackId: string) => {
+  const handleDelete = async (feedbackId: string) => {
     Alert.alert(
       'Delete Feedback',
       'Are you sure you want to delete this feedback?',
@@ -151,11 +182,19 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            // ✅ Set action timestamp to prevent duplicate socket handling
+            lastActionTimeRef.current = Date.now();
+            actionInProgressRef.current = true;
+            
             const deleted = await deleteFeedback(feedbackId);
+            
             if (deleted) {
-              loadFeedback(1, filter);
-              loadStats();
+              // ✅ Manually refresh (socket will also try, but our debounce will skip it)
+              await loadFeedback(1, filter);
+              await loadStats();
             }
+            
+            actionInProgressRef.current = false;
           }
         }
       ]
@@ -163,11 +202,15 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
   };
 
   const handleManualRefresh = () => {
+    lastActionTimeRef.current = Date.now();
     loadFeedback(1, filter);
     loadStats();
-    // ✅ Reset badge on manual refresh
     setHasNewFeedback(false);
     setNewFeedbackCount(0);
+  };
+
+  const handleCardPress = (feedbackId: string) => {
+    navigation.navigate('FeedbackDetails', { feedbackId });
   };
 
   const getHeaderTitle = () => {
@@ -216,12 +259,11 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
         </View>
       </View>
 
-      {/* Stats Summary - Tap to Filter */}
+      {/* Stats Summary */}
       {stats && (
         <View style={[styles.statsRow, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
-          {/* Total Card with New Badge */}
           <TouchableOpacity 
-            style={[styles.statCard, isActiveFilter(null) && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
+            style={[styles.statCard, isActiveFilter(null) && styles.activeStatCard, { backgroundColor: theme.bgSecondary, borderColor: isActiveFilter(null) ? theme.primary : 'transparent' }]}
             onPress={() => handleStatPress(null)}
             activeOpacity={0.7}
           >
@@ -237,7 +279,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.statCard, isActiveFilter('OPEN') && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
+            style={[styles.statCard, isActiveFilter('OPEN') && styles.activeStatCard, { backgroundColor: theme.bgSecondary, borderColor: isActiveFilter('OPEN') ? theme.primary : 'transparent' }]}
             onPress={() => handleStatPress('OPEN')}
             activeOpacity={0.7}
           >
@@ -246,7 +288,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.statCard, isActiveFilter('IN_PROGRESS') && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
+            style={[styles.statCard, isActiveFilter('IN_PROGRESS') && styles.activeStatCard, { backgroundColor: theme.bgSecondary, borderColor: isActiveFilter('IN_PROGRESS') ? theme.primary : 'transparent' }]}
             onPress={() => handleStatPress('IN_PROGRESS')}
             activeOpacity={0.7}
           >
@@ -255,7 +297,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.statCard, isActiveFilter('RESOLVED') && styles.activeStatCard, { backgroundColor: theme.bgSecondary }]}
+            style={[styles.statCard, isActiveFilter('RESOLVED') && styles.activeStatCard, { backgroundColor: theme.bgSecondary, borderColor: isActiveFilter('RESOLVED') ? theme.primary : 'transparent' }]}
             onPress={() => handleStatPress('RESOLVED')}
             activeOpacity={0.7}
           >
@@ -304,76 +346,89 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
             </TouchableOpacity>
           </View>
         ) : (
-          feedbackList.map((item, index) => (
-            <View
+          feedbackList.map((item) => (
+            <TouchableOpacity
               key={item.id}
-              style={[styles.feedbackCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+              activeOpacity={0.7}
+              onPress={() => handleCardPress(item.id)}
             >
-              <View style={styles.cardHeader}>
-                <View style={styles.typeContainer}>
-                  <View style={[styles.typeIcon, { borderColor: theme.border, backgroundColor: theme.bgSecondary }]}>
-                    <MaterialCommunityIcons 
-                      name={getFeedbackIcon(item.type) as any} 
-                      size={16} 
-                      color={getFeedbackColor(item.type)} 
-                    />
-                  </View>
-                  <Text style={[styles.typeText, { color: theme.text }]}>{item.type.replace(/_/g, ' ')}</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-                  <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-                    {item.status === 'IN_PROGRESS' ? 'In Progress' : item.status}
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity 
-                onPress={() => navigation.navigate('FeedbackDetails', { feedbackId: item.id })}
-                activeOpacity={0.7}
+              <LinearGradient
+                colors={[theme.card, theme.bgSecondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.feedbackCard, { borderColor: theme.border }]}
               >
+                <View style={styles.cardHeader}>
+                  <View style={styles.typeContainer}>
+                    <View style={[styles.typeIcon, { borderColor: theme.border, backgroundColor: theme.bgSecondary }]}>
+                      <MaterialCommunityIcons 
+                        name={getFeedbackIcon(item.type) as any} 
+                        size={16} 
+                        color={getFeedbackColor(item.type)} 
+                      />
+                    </View>
+                    <Text style={[styles.typeText, { color: theme.text }]}>{item.type.replace(/_/g, ' ')}</Text>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
+                    <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
+                      {item.status === 'IN_PROGRESS' ? 'In Progress' : item.status}
+                    </Text>
+                  </View>
+                </View>
+
                 <Text style={[styles.message, { color: theme.textSecondary }]} numberOfLines={2}>
                   {item.message}
                 </Text>
-              </TouchableOpacity>
 
-              <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
-                <View style={styles.footerLeft}>
-                  {item.category && (
-                    <View style={[styles.categoryTag, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
-                      <Text style={[styles.categoryText, { color: theme.textSecondary }]}>{item.category}</Text>
-                    </View>
-                  )}
-                  <Text style={[styles.date, { color: theme.textPlaceholder }]}>
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </Text>
-                </View>
-                
-                <View style={styles.actions}>
-                  {item.status !== 'RESOLVED' && item.status !== 'CLOSED' && (
+                <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
+                  <View style={styles.footerLeft}>
+                    {item.category && (
+                      <View style={[styles.categoryTag, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                        <Text style={[styles.categoryText, { color: theme.textSecondary }]}>{item.category}</Text>
+                      </View>
+                    )}
+                    <Text style={[styles.date, { color: theme.textPlaceholder }]}>
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </Text>
+                  </View>
+                  
+                  <View style={styles.actions}>
+                    {item.status !== 'RESOLVED' && item.status !== 'CLOSED' && (
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          navigation.navigate('FeedbackDetails', { 
+                            feedbackId: item.id,
+                            editMode: true 
+                          });
+                        }}
+                        style={styles.actionButton}
+                      >
+                        <View style={[styles.actionButtonInner, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                          <MaterialCommunityIcons name="pencil" size={14} color={theme.primary} />
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                    
                     <TouchableOpacity
-                      onPress={() => navigation.navigate('FeedbackDetails', { 
-                        feedbackId: item.id,
-                        editMode: true 
-                      })}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleDelete(item.id);
+                      }}
                       style={styles.actionButton}
                     >
-                      <View style={[styles.actionButtonInner, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
-                        <MaterialCommunityIcons name="pencil" size={14} color={theme.primary} />
+                      <View style={[styles.actionButtonInner, { backgroundColor: theme.errorBg, borderColor: theme.errorBorder }]}>
+                        <MaterialCommunityIcons name="delete" size={14} color={theme.error} />
                       </View>
                     </TouchableOpacity>
-                  )}
-                  
-                  <TouchableOpacity
-                    onPress={() => handleDelete(item.id)}
-                    style={styles.actionButton}
-                  >
-                    <View style={[styles.actionButtonInner, { backgroundColor: theme.errorBg, borderColor: theme.errorBorder }]}>
-                      <MaterialCommunityIcons name="delete" size={14} color={theme.error} />
+                    
+                    <View style={[styles.chevronButton, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
+                      <MaterialCommunityIcons name="chevron-right" size={16} color={theme.textMuted} />
                     </View>
-                  </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            </View>
+              </LinearGradient>
+            </TouchableOpacity>
           ))
         )}
       </ScrollView>
@@ -381,7 +436,7 @@ export default function FeedbackHistoryScreen({ navigation, route }: any) {
   );
 }
 
-// Helper functions
+// Helper functions (keep as is)
 const getFeedbackIcon = (type: string): string => {
   const icons: Record<string, string> = {
     'BUG': 'bug',
@@ -418,6 +473,7 @@ const getStatusColor = (status: string): string => {
   return colors[status] || '#868e96';
 };
 
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
@@ -430,19 +486,18 @@ const styles = StyleSheet.create({
   },
   titleContainer: { flex: 1, alignItems: 'center' },
   title:    { fontSize: 16, fontWeight: '600' },
-  subtitle: { fontSize: 11, marginTop: 2 },
+  subtitle: { fontSize: 11, marginTop: 2 }, 
   headerRight: { flexDirection: 'row', alignItems: 'center' },
   refreshButton: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
   statsRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around',
     paddingVertical: 12, paddingHorizontal: 16, borderBottomWidth: 1, gap: 8,
   },
-  statCard: { flex: 1, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, borderColor: 'transparent', position: 'relative' },
-  activeStatCard: { borderWidth: 1 },
+  statCard: { flex: 1, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 12, borderWidth: 1, position: 'relative' },
+  activeStatCard: { borderWidth: 2 },
   statContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  statValue: { fontSize: 20, fontWeight: 'bold', marginBottom: 2 },
+  statValue: { fontSize: 13, fontWeight: 'bold', marginBottom: 2 },
   statLabel: { fontSize: 11, fontWeight: '500' },
-  // ✅ New Badge Styles
   newBadge: {
     position: 'absolute',
     top: -8,
@@ -483,4 +538,5 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   actionButton: { borderRadius: 6, overflow: 'hidden' },
   actionButtonInner: { width: 30, height: 30, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderRadius: 6 },
+  chevronButton: { width: 28, height: 28, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderRadius: 6 },
 });

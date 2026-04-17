@@ -327,7 +327,7 @@ export default function HomeScreen({ navigation }: any) {
       <ScreenWrapper style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={styles.loadingText}>Loading your dashboard...</Text>
+          <Text style={styles.loadingText}>Loading your Home...</Text>
         </View>
       </ScreenWrapper>
     );

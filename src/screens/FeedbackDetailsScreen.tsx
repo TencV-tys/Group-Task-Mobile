@@ -1,4 +1,4 @@
-// src/screens/FeedbackDetailsScreen.tsx - FULLY UPDATED with real-time socket
+// src/screens/FeedbackDetailsScreen.tsx - FULLY UPDATED with deduplication
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
@@ -147,6 +147,9 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
   const [updating,     setUpdating]     = useState(false);
   const [localLoading, setLocalLoading] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const lastAlertTimeRef = useRef(0);
+  // ✅ Add action timestamp to prevent duplicate socket handling
+  const lastActionTimeRef = useRef(0);
 
   const {
     loading,
@@ -162,7 +165,7 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
   useEffect(() => {
     loadFeedbackDetails(feedbackId);
     return () => { clearSelected(); };
-  }, [feedbackId]);
+  }, [feedbackId, loadFeedbackDetails, clearSelected]);
 
   // Auth error handling
   useEffect(() => {
@@ -171,33 +174,50 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
         { text: 'OK', onPress: () => navigation.navigate('Login') },
       ]);
     }
-  }, [authError]);
+  }, [authError, navigation]);
 
   // Refresh when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       loadFeedbackDetails(feedbackId);
-    }, [feedbackId])
+    }, [feedbackId, loadFeedbackDetails])
   );
 
-  // ✅ Listen for real-time socket events for this specific feedback
+  // ✅ Socket listeners with deduplication
   useEffect(() => {
     if (!socket || !isConnected) return;
 
     const handleStatusChanged = (data: any) => {
       if (data.feedbackId === feedbackId) {
+        // ✅ Skip if action just happened (within 1 second)
+        const now = Date.now();
+        if (now - lastActionTimeRef.current < 1000) {
+          console.log('📢 Skipping duplicate status event (too soon)');
+          return;
+        }
+        
         console.log('📢 This feedback status changed:', data);
         loadFeedbackDetails(feedbackId);
-        Alert.alert(
-          'Status Updated',
-          `Your feedback status has been changed to ${data.newStatus}`,
-          [{ text: 'OK' }]
-        );
+        
+        if (now - lastAlertTimeRef.current > 3000) {
+          lastAlertTimeRef.current = now;
+          Alert.alert(
+            'Status Updated',
+            `Your feedback status has been changed to ${data.newStatus}`,
+            [{ text: 'OK' }]
+          );
+        }
       }
     };
 
     const handleFeedbackUpdated = (data: any) => {
       if (data.feedbackId === feedbackId) {
+        const now = Date.now();
+        if (now - lastActionTimeRef.current < 1000) {
+          console.log('📢 Skipping duplicate update event (too soon)');
+          return;
+        }
+        
         console.log('📢 This feedback was updated:', data);
         loadFeedbackDetails(feedbackId);
       }
@@ -205,12 +225,24 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
 
     const handleFeedbackDeleted = (data: any) => {
       if (data.feedbackId === feedbackId) {
+        const now = Date.now();
+        if (now - lastActionTimeRef.current < 1000) {
+          console.log('📢 Skipping duplicate delete event (too soon)');
+          return;
+        }
+        
         console.log('📢 This feedback was deleted:', data);
-        Alert.alert(
-          'Feedback Deleted',
-          'This feedback has been deleted by an administrator.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
+        
+        if (now - lastAlertTimeRef.current > 3000) {
+          lastAlertTimeRef.current = now;
+          Alert.alert(
+            'Feedback Deleted',
+            'This feedback has been deleted by an administrator.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+        } else {
+          navigation.goBack();
+        }
       }
     };
 
@@ -223,8 +255,9 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
       socket.off('feedback:updated', handleFeedbackUpdated);
       socket.off('feedback:deleted', handleFeedbackDeleted);
     };
-  }, [socket, isConnected, feedbackId]);
+  }, [socket, isConnected, feedbackId, loadFeedbackDetails, navigation]);
 
+  // Update edit form when selectedFeedback changes
   useEffect(() => {
     if (selectedFeedback) {
       setEditType(selectedFeedback.type);
@@ -242,10 +275,13 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () => {
-            deleteFeedback(feedbackId).then((deleted: boolean) => {
-              if (deleted) navigation.goBack();
-            });
+          onPress: async () => {
+            // ✅ Set action timestamp to prevent duplicate socket handling
+            lastActionTimeRef.current = Date.now();
+            const deleted = await deleteFeedback(feedbackId);
+            if (deleted) {
+              navigation.goBack();
+            }
           },
         },
       ]
@@ -265,6 +301,10 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
       Alert.alert('Error', 'Feedback message cannot be empty');
       return;
     }
+    
+    // ✅ Set action timestamp to prevent duplicate socket handling
+    lastActionTimeRef.current = Date.now();
+    
     setUpdating(true);
     const result = await updateFeedback(feedbackId, {
       type: editType,
@@ -272,6 +312,7 @@ export default function FeedbackDetailsScreen({ navigation, route }: any) {
       category: editCategory || null,
     });
     setUpdating(false);
+    
     if (result.success) {
       setEditModalVisible(false);
       setLocalLoading(true);

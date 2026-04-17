@@ -1,4 +1,5 @@
-// src/screens/FeedbackScreen.tsx - UI matched to FeedbackDetailsScreen edit style
+// src/screens/FeedbackScreen.tsx - FULLY UPDATED with real-time
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,12 +8,12 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  Alert,
+  Alert, 
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFeedback } from '../feedbackHook/useFeedback';
+import { useFeedback } from '../feedbackHook/useFeedback'; // ✅ Fixed import path
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
 
@@ -36,7 +37,7 @@ const CATEGORIES = [
   { label: 'Other',          value: 'Other' },
 ];
 
-// Custom Dropdown - identical to FeedbackDetailsScreen
+// Custom Dropdown
 interface DropdownOption { label: string; value: string; }
 interface CustomDropdownProps {
   label: string;
@@ -109,16 +110,26 @@ export default function FeedbackScreen({ navigation }: any) {
       ]);
     }
   }, [authError]);
-
+ 
   const handleSubmit = async () => {
     if (!message.trim()) {
       Alert.alert('Error', 'Please enter your feedback message');
       return;
     }
-    const result = await submitFeedback({ type, message: message.trim(), category: category || undefined });
+    
+    // ✅ Submit feedback - success alert will come from socket
+    const result = await submitFeedback({ 
+      type, 
+      message: message.trim(), 
+      category: category || undefined 
+    });
+    
     if (result.success) {
-      setMessage(''); setCategory(''); setType('GENERAL');
-      Alert.alert('Thank You!', 'Your feedback has been submitted successfully.', [{ text: 'OK' }]);
+      // ✅ Clear form immediately
+      setMessage('');
+      setCategory('');
+      setType('GENERAL');
+    
     }
   };
 
@@ -143,9 +154,8 @@ export default function FeedbackScreen({ navigation }: any) {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-        {/* Form Card - mirrors detailCard structure from FeedbackDetailsScreen */}
+        {/* Form Card */}
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          {/* card header - mirrors detailHeader */}
           <View style={[styles.cardHeader, { borderBottomColor: theme.border }]}>
             <View style={[styles.cardIconWrap, { backgroundColor: theme.bgTertiary }]}>
               <MaterialCommunityIcons name="message-plus-outline" size={20} color={theme.primary} />
@@ -157,7 +167,6 @@ export default function FeedbackScreen({ navigation }: any) {
             <CustomDropdown label="Feedback Type *" value={type} options={FEEDBACK_TYPES} onChange={setType} disabled={submitting} />
             <CustomDropdown label="Category (Optional)" value={category} options={CATEGORIES} onChange={setCategory} disabled={submitting} />
 
-            {/* message - mirrors modalInput */}
             <View>
               <Text style={[styles.fieldLabel, { color: theme.textMuted }]}>Your Feedback *</Text>
               <TextInput
@@ -175,7 +184,6 @@ export default function FeedbackScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* footer - mirrors modalFooter two-button row */}
           <View style={[styles.cardFooter, { borderTopColor: theme.border }]}>
             <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()} disabled={submitting}>
               <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.cancelGradient}>
@@ -193,7 +201,7 @@ export default function FeedbackScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* Tips Card - same card structure */}
+        {/* Tips Card */}
         <View style={[styles.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={[styles.cardHeader, { borderBottomColor: theme.border }]}>
             <View style={[styles.cardIconWrap, { backgroundColor: theme.bgTertiary }]}>
@@ -238,14 +246,12 @@ const styles = StyleSheet.create({
   historyButton: { width: 36, height: 36, borderRadius: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
   content: { padding: 16, paddingBottom: 40 },
 
-  // card - mirrors detailCard
   card: { borderRadius: 12, borderWidth: 1, marginBottom: 16, overflow: 'hidden' },
   cardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1 },
   cardIconWrap: { width: 32, height: 32, borderRadius: 8, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
   cardTitle: { fontSize: 15, fontWeight: '600' },
   cardBody:  { padding: 16 },
 
-  // footer - mirrors modalFooter
   cardFooter: { flexDirection: 'row', gap: 12, padding: 16, borderTopWidth: 1 },
   cancelButton:   { flex: 1, borderRadius: 8, overflow: 'hidden' },
   cancelGradient: { paddingVertical: 14, alignItems: 'center' },
@@ -255,20 +261,16 @@ const styles = StyleSheet.create({
   submitText:     { fontSize: 14, fontWeight: '600', color: '#fff' },
   buttonDisabled: { opacity: 0.6 },
 
-  // field label - mirrors modalLabel
   fieldLabel: { fontSize: 13, fontWeight: '500', marginBottom: 8, marginLeft: 4 },
 
-  // dropdown
   dropdownTrigger: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 14, minHeight: 50 },
   dropdownTriggerText: { fontSize: 14, flex: 1 },
   dropdownSheet: { borderWidth: 1, borderRadius: 8, marginTop: 4, overflow: 'hidden' },
   dropdownOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13 },
   dropdownOptionText: { fontSize: 14 },
 
-  // message input - mirrors modalInput  
   messageInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 14, fontSize: 14, minHeight: 150, textAlignVertical: 'top', lineHeight: 20 },
 
-  // tips
   tipRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
   tipIcon: { width: 28, height: 28, borderRadius: 8, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
   tipText: { flex: 1, fontSize: 13, lineHeight: 18 },

@@ -1,4 +1,4 @@
-// src/authHook/useSignupForm.ts - UPDATED for Cloudinary
+// src/authHook/useSignupForm.ts - FULLY UPDATED
 
 import { useState } from "react";
 import { Alert } from "react-native";
@@ -13,7 +13,7 @@ interface SignupData {
     gender: string;
     password: string;
     confirmPassword: string;
-    avatarUrl?: string; // ✅ Change to avatarUrl
+    avatarUrl?: string;
 }
 
 interface SignupResult {
@@ -21,6 +21,32 @@ interface SignupResult {
   message?: string;
   user?: any;
 }
+
+// ✅ Password strength validation (matching backend requirements)
+const validatePasswordStrength = (password: string): { isValid: boolean; message?: string } => {
+  if (!password) {
+    return { isValid: false, message: "Password is required" };
+  }
+  if (password.length < 8) {
+    return { isValid: false, message: "Password must be at least 8 characters" };
+  }
+  if (password.length > 128) {
+    return { isValid: false, message: "Password is too long (max 128 characters)" };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { isValid: false, message: "Password must contain at least one uppercase letter (A-Z)" };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { isValid: false, message: "Password must contain at least one lowercase letter (a-z)" };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { isValid: false, message: "Password must contain at least one number (0-9)" };
+  }
+  if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
+    return { isValid: false, message: "Password must contain at least one special character (!@#$%^&* etc.)" };
+  }
+  return { isValid: true };
+};
 
 export function useSignupForm() {
     const [formData, setFormData] = useState<SignupData>({
@@ -35,7 +61,7 @@ export function useSignupForm() {
     const [message, setMessage] = useState<string>('');
     const [success, setSuccess] = useState<boolean>(false);
     const [avatarImage, setAvatarImage] = useState<string | null>(null);
-    const [avatarCloudinaryUrl, setAvatarCloudinaryUrl] = useState<string | null>(null); // ✅ Store Cloudinary URL
+    const [avatarCloudinaryUrl, setAvatarCloudinaryUrl] = useState<string | null>(null);
     const [uploadingAvatar, setUploadingAvatar] = useState<boolean>(false);
 
     const handleChange = (field: keyof SignupData, value: string) => {
@@ -45,7 +71,7 @@ export function useSignupForm() {
         }));
     }
 
-    // ✅ UPDATED: Upload to Cloudinary immediately when user selects image
+    // ✅ Upload to Cloudinary immediately when user selects image
     const handleAvatarSelect = async (imageUri: string) => {
         setAvatarImage(imageUri);
         setUploadingAvatar(true);
@@ -82,34 +108,45 @@ export function useSignupForm() {
     };
 
     const handleSubmit = async (): Promise<SignupResult> => {
-        console.log("Signup attempt with data:", formData);
+        console.log("Signup attempt with data:", { ...formData, password: '***', confirmPassword: '***' });
         
-        // Validation
+        // ===== VALIDATION =====
+        
+        // Check required fields
         if (!formData.fullName.trim() || !formData.email.trim() || 
             !formData.gender.trim() || !formData.password || !formData.confirmPassword) {
-            setMessage('❌ All fields are required');
-            return { success: false, message: 'All fields are required' };
+            const msg = 'All fields are required';
+            setMessage(`❌ ${msg}`);
+            return { success: false, message: msg };
         }
 
+        // Email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(formData.email)) {
-            setMessage('❌ Please enter a valid email address');
-            return { success: false, message: 'Please enter a valid email address' };
+            const msg = 'Please enter a valid email address';
+            setMessage(`❌ ${msg}`);
+            return { success: false, message: msg };
         }
 
+        // Password match validation
         if (formData.password !== formData.confirmPassword) {
-            setMessage('❌ Passwords do not match');
-            return { success: false, message: 'Passwords do not match' };
+            const msg = 'Passwords do not match';
+            setMessage(`❌ ${msg}`);
+            return { success: false, message: msg };
         }
 
-        if (formData.password.length < 6) {
-            setMessage('❌ Password must be at least 6 characters');
-            return { success: false, message: 'Password must be at least 6 characters' };
+        // ✅ Password strength validation (8 chars, uppercase, lowercase, number, special)
+        const passwordValidation = validatePasswordStrength(formData.password);
+        if (!passwordValidation.isValid) {
+            setMessage(`❌ ${passwordValidation.message}`);
+            return { success: false, message: passwordValidation.message };
         }
 
+        // Gender validation
         if (!VALID_GENDERS.includes(formData.gender.toUpperCase())) {
-            setMessage(`❌ Gender must be one of: ${VALID_GENDERS.join(', ')}`);
-            return { success: false, message: `Gender must be one of: ${VALID_GENDERS.join(', ')}` };
+            const msg = `Gender must be one of: ${VALID_GENDERS.join(', ')}`;
+            setMessage(`❌ ${msg}`);
+            return { success: false, message: msg };
         }
 
         setLoading(true);
@@ -120,13 +157,19 @@ export function useSignupForm() {
             
             // ✅ Prepare data with Cloudinary URL if available
             const signupData = {
-                fullName: formData.fullName,
-                email: formData.email,
-                gender: formData.gender,
+                fullName: formData.fullName.trim(),
+                email: formData.email.trim().toLowerCase(),
+                gender: formData.gender.toUpperCase(),
                 password: formData.password,
                 confirmPassword: formData.confirmPassword,
-                avatarUrl: avatarCloudinaryUrl || undefined, // ✅ Send Cloudinary URL
+                avatarUrl: avatarCloudinaryUrl || undefined,
             };
+
+            console.log("📤 Sending signup data:", { 
+                ...signupData, 
+                password: '***', 
+                confirmPassword: '***' 
+            });
 
             const result = await AuthService.signup(signupData);
             console.log("AuthService result:", result);
@@ -141,20 +184,22 @@ export function useSignupForm() {
                 };
             } else {
                 setSuccess(false);
-                setMessage(`❌ ${result.message || 'Signup failed'}`);
+                const errorMsg = result.message || 'Signup failed';
+                setMessage(`❌ ${errorMsg}`);
                 return {
                     success: false,
-                    message: result.message
+                    message: errorMsg
                 };
             }
 
         } catch (e: any) {
             console.error("Signup error:", e);
+            const errorMsg = e.message || 'Network error';
             setSuccess(false);
-            setMessage(`❌ ${e.message || 'Network error'}`);
+            setMessage(`❌ ${errorMsg}`);
             return {
                 success: false,
-                message: e.message
+                message: errorMsg
             };
         } finally {
             setLoading(false);
@@ -181,7 +226,7 @@ export function useSignupForm() {
         message,
         success,
         avatarImage,
-        avatarCloudinaryUrl, // ✅ Add this
+        avatarCloudinaryUrl,
         uploadingAvatar,
         handleChange,
         handleAvatarSelect,

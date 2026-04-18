@@ -3,13 +3,14 @@ import { useState, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { UploadService } from '../uploadService/UploadService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 IMPORT TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
+import { API_BASE_URL } from '../config/api'; // 👈 IMPORT TokenUtils
 
 interface UseImageUploadProps {
   onSuccess?: (result: any) => void;
   onError?: (error: any) => void;
   onAuthError?: () => void; // Add this for navigation
-}
+} 
 
 export const useImageUpload = ({ onSuccess, onError, onAuthError }: UseImageUploadProps = {}) => {
   const [uploading, setUploading] = useState(false);
@@ -373,7 +374,68 @@ const uploadTaskPhotoToCloudinary = async (imageUri: string) => {
     setUploading(false);
   }
 };
+// In useImageUpload.ts - Fix the URL
 
+const uploadAvatarToCloudinaryWithAuth = async (image: ImagePicker.ImagePickerAsset) => {
+  try {
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      return { success: false, message: 'Authentication required' };
+    }
+
+    setUploading(true);
+    setProgress(0);
+    setAuthError(false);
+
+    // ✅ Use the correct API URL
+    const token = await TokenUtils.getAccessToken();
+    const formData = new FormData();
+    
+    const filename = image.uri.split('/').pop() || 'avatar.jpg';
+    
+    const getMimeType = (uri: string): string => {
+      const extension = uri.split('.').pop()?.toLowerCase();
+      return extension === 'png' ? 'image/png' : 'image/jpeg';
+    };
+
+    const mimeType = getMimeType(image.uri);
+    
+    formData.append('file', {
+      uri: image.uri, 
+      type: mimeType,
+      name: filename,
+    } as any);
+
+
+    const response = await fetch(`${API_BASE_URL}/api/uploads/avatar`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        // Don't set Content-Type - let fetch set it with boundary for FormData
+      },
+      body: formData,
+    });
+
+    const result = await response.json();
+    console.log('📥 Auth upload response:', result);
+    
+    setProgress(100);
+
+    if (result.success) {
+      onSuccess?.(result);
+      return result;
+    } else {
+      throw new Error(result.message);
+    }
+  } catch (error: any) {
+    console.error('❌ Cloudinary auth upload error:', error);
+    onError?.(error);
+    Alert.alert('Upload Failed', error.message || 'Failed to upload image');
+    return { success: false, message: error.message };
+  } finally {
+    setUploading(false);
+  }
+};
   return {
     uploading,
     progress,
@@ -386,9 +448,9 @@ const uploadTaskPhotoToCloudinary = async (imageUri: string) => {
     requestPermissions,
     uploadGroupAvatar,
     deleteGroupAvatar,
-    
+  uploadAvatarToCloudinaryWithAuth, 
   uploadAvatarToCloudinary,
   uploadGroupAvatarToCloudinary,
   uploadTaskPhotoToCloudinary,
   };
-};
+}; 

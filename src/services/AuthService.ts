@@ -145,87 +145,103 @@ export class AuthService {
         }
     }
 
-    static async signup(data: { 
-        email: string; 
-        password: string; 
-        fullName: string;
-        gender?: string;
-    }) {
-        try {
-            const sanitizedEmail = sanitizeEmail(data.email);
-            const sanitizedFullName = sanitizeString(data.fullName);
-            const sanitizedPassword = data.password.trim();
-            const sanitizedGender = data.gender ? sanitizeString(data.gender) : undefined;
-            
-            if (!validateEmail(sanitizedEmail)) {
-                return {
-                    success: false,
-                    message: "Please enter a valid email address"
-                };
-            }
-            
-            if (!sanitizedFullName || sanitizedFullName.length < 2) {
-                return {
-                    success: false,
-                    message: "Please enter your full name (at least 2 characters)"
-                };
-            }
-            
-            if (sanitizedFullName.length > 100) {
-                return {
-                    success: false,
-                    message: "Full name cannot exceed 100 characters"
-                };
-            }
-            
-            // ✅ UPDATED: Use the new validatePassword with 8 char requirement
-            if (!validatePassword(sanitizedPassword)) {
-                return {
-                    success: false,
-                    message: "Password must be at least 8 characters with at least one uppercase letter, one lowercase letter, one number, and one special character"
-                };
-            }
-            
-            console.log("🔍 Attempting signup for:", sanitizedEmail);
-            
-            const response = await fetch(`${API_URL}/signup`, {
-                method: "POST",
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    email: sanitizedEmail,
-                    password: sanitizedPassword,
-                    fullName: sanitizedFullName,
-                    gender: sanitizedGender
-                }),
-                credentials: 'include'
-            });
+    // src/services/AuthService.ts - FIXED signup method
 
-            const result = await response.json();
-            console.log("🔍 Signup response:", result);
-            
-            if (result.success && result.user) {
-                await storeUserData(
-                    result.user,
-                    result.accessToken,
-                    result.refreshToken
-                );
-                console.log('🔐 Signup successful, tokens stored');
-                
-                if (socketLoginCallback) {
-                    await socketLoginCallback();
-                }
-            }
-
-            return result;
-
-        } catch (e: any) {
-            console.error("Signup error:", e);
-            return {
-                success: false,
-                message: "Cannot connect to the server"
-            };
-        }
+static async signup(data: { 
+  email: string; 
+  password: string; 
+  fullName: string;
+  gender?: string;
+  confirmPassword?: string;  // ✅ ADD THIS
+  avatarUrl?: string;         // ✅ ADD THIS
+}) {
+  try {
+    const sanitizedEmail = sanitizeEmail(data.email);
+    const sanitizedFullName = sanitizeString(data.fullName);
+    const sanitizedPassword = data.password.trim();
+    const sanitizedGender = data.gender ? sanitizeString(data.gender) : undefined;
+    const sanitizedConfirmPassword = data.confirmPassword?.trim(); // ✅ ADD THIS
+    
+    if (!validateEmail(sanitizedEmail)) {
+      return {
+        success: false,
+        message: "Please enter a valid email address"
+      };
     }
+    
+    if (!sanitizedFullName || sanitizedFullName.length < 2) {
+      return {
+        success: false,
+        message: "Please enter your full name (at least 2 characters)"
+      };
+    }
+    
+    if (sanitizedFullName.length > 100) {
+      return {
+        success: false,
+        message: "Full name cannot exceed 100 characters"
+      };
+    }
+    
+    // ✅ UPDATED: Use the new validatePassword with 8 char requirement
+    if (!validatePassword(sanitizedPassword)) {
+      return {
+        success: false,
+        message: "Password must be at least 8 characters with at least one uppercase letter, one lowercase letter, one number, and one special character"
+      };
+    }
+    
+    // ✅ ADD confirmPassword validation
+    if (sanitizedPassword !== sanitizedConfirmPassword) {
+      return {
+        success: false,
+        message: "Passwords do not match"
+      };
+    }
+    
+    console.log("🔍 Attempting signup for:", sanitizedEmail);
+    
+    // ✅ INCLUDE confirmPassword in the request body
+    const response = await fetch(`${API_URL}/signup`, {
+      method: "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: sanitizedEmail,
+        password: sanitizedPassword,
+        fullName: sanitizedFullName,
+        gender: sanitizedGender,
+        confirmPassword: sanitizedConfirmPassword,  // ✅ ADD THIS
+        avatarUrl: data.avatarUrl                    // ✅ ADD THIS
+      }),
+      credentials: 'include'
+    });
+
+    const result = await response.json();
+    console.log("🔍 Signup response:", result);
+    
+    if (result.success && result.user) {
+      await storeUserData(
+        result.user,
+        result.accessToken,
+        result.refreshToken
+      );
+      console.log('🔐 Signup successful, tokens stored');
+      
+      if (socketLoginCallback) {
+        await socketLoginCallback();
+      }
+    }
+
+    return result;
+
+  } catch (e: any) {
+    console.error("Signup error:", e);
+    return {
+      success: false,
+      message: "Cannot connect to the server"
+    };
+  }
+}
 
     static async logout() {
         try {

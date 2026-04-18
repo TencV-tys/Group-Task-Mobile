@@ -72,6 +72,7 @@ export default function ProfileScreen({ navigation }: any) {
     progress,
     pickImageFromGallery,
     takePhotoWithCamera,
+    uploadAvatarToCloudinaryWithAuth,
     uploadAvatarToCloudinary,  // ← Changed from uploadAvatarFromPicker
     deleteAvatar
   } = useImageUpload({
@@ -181,22 +182,21 @@ export default function ProfileScreen({ navigation }: any) {
     }
   }, [navigation]);
 
-  // ✅ UPDATED: Use Cloudinary upload method
   const handleAvatarPress = useCallback(() => {
-    if (uploading) return;
-    Alert.alert('Change Profile Picture', 'How would you like to update your profile picture?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Take Photo', onPress: () => takePhotoWithCamera().then(img => img && uploadAvatarToCloudinary(img)) },
-      { text: 'Choose from Gallery', onPress: () => pickImageFromGallery().then(img => img && uploadAvatarToCloudinary(img)) },
-      user?.avatarUrl && { text: 'Remove Picture', style: 'destructive', onPress: handleRemoveAvatar }
-    ].filter(Boolean));
-  }, [uploading, user?.avatarUrl, takePhotoWithCamera, pickImageFromGallery, uploadAvatarToCloudinary]);
-
+  if (uploading) return;
+  Alert.alert('Change Profile Picture', 'How would you like to update your profile picture?', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Take Photo', onPress: () => takePhotoWithCamera().then(img => img && uploadAvatarToCloudinaryWithAuth(img)) },
+    { text: 'Choose from Gallery', onPress: () => pickImageFromGallery().then(img => img && uploadAvatarToCloudinaryWithAuth(img)) },
+    user?.avatarUrl && { text: 'Remove Picture', style: 'destructive', onPress: handleRemoveAvatar }
+  ].filter(Boolean));
+}, [uploading, user?.avatarUrl, takePhotoWithCamera, pickImageFromGallery, uploadAvatarToCloudinaryWithAuth]);
+  
   const handleRemoveAvatar = useCallback(async () => {
     Alert.alert('Remove Profile Picture', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Remove',
+        text: 'Remove', 
         style: 'destructive',
         onPress: async () => {
           const result = await deleteAvatar();

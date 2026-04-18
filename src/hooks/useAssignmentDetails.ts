@@ -180,7 +180,7 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
             : 'Not due today',
           buttonText: 'Not Due',
           canSubmit: false
-        };
+        }; 
       case 'completed':
         return {
           label: '✓ COMPLETED',
@@ -207,9 +207,34 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
   }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft, isTaskDeleted, isAdmin, isOwner]);
 
   // In useAssignmentDetails.ts - REPLACE these three functions
+// In useAssignmentDetails.ts - REPLACE getStatusText with this:
+
 const getStatusText = useCallback(() => {
   if (isTaskDeleted) return 'Task Deleted';
-  
+    // ✅ For Admin View (admin but not owner)
+  if (isAdmin && !isOwner) {
+    // Show the actual status from the assignment
+    if (assignment?.verified === true) return 'Verified';
+    if (assignment?.verified === false) return 'Rejected';
+    if (assignment?.completed === true && assignment?.verified === null) return 'Pending Verification';
+    if (assignment?.completed === true) return 'Completed';
+    
+    // Show when the user can submit
+    const now = new Date();
+    const dueDate = new Date(assignment?.dueDate);
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const dueUTC = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
+    
+    if (todayUTC === dueUTC) {
+      return 'Available for User';  // User can submit today
+    } else if (dueUTC < todayUTC && !assignment?.completed) {
+      return 'Expired';
+    } else if (dueUTC > todayUTC) {
+      return 'Upcoming';
+    }
+    
+    return 'Not Started (Admin)';
+  }
   // ✅ PRIORITY 1: Check verified/rejected first
   if (assignment?.verified === true) return 'Verified';
   if (assignment?.verified === false) return 'Rejected';
@@ -234,16 +259,23 @@ const getStatusText = useCallback(() => {
   
   // ✅ PRIORITY 5: Check submission status (THIS IS THE KEY!)
   if (submissionStatus === 'available') {
-    return isLate ? 'Late' : 'Started';  // ✅ Shows "Started" during time slot
+    return isLate ? 'Late' : 'Started';  // ✅ "Started" during time slot
   }
   
-  if (submissionStatus === 'waiting') return 'Not Started';
+  if (submissionStatus === 'waiting') {
+    // ✅ Check if it's the right day but before time slot
+    const isRightDay = dueDateUTC === todayUTC;
+    if (isRightDay) {
+      return 'Not Started';  // ✅ Shows "Not Started" before time slot opens
+    }
+    return 'Not Started';
+  }
   
   // ✅ PRIORITY 6: Check completed
   if (assignment?.completed === true) return 'Completed';
   
   return 'Not Started';
-}, [assignment, isTaskDeleted, submissionStatus, isLate]); // ✅ Added submissionStatus and isLate
+}, [assignment, isTaskDeleted, submissionStatus, isLate, isAdmin, isOwner]);
 
 const getStatusColor = useCallback(() => {
   if (isTaskDeleted) return '#868e96';
@@ -282,7 +314,7 @@ const getStatusIcon = useCallback(() => {
   const missedSlotIds = assignment?.missedTimeSlotIds || [];
   const currentTimeSlotId = assignment?.timeSlot?.id;
   if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'timer-off';
-  
+   
   // ✅ Add submissionStatus check
   if (submissionStatus === 'available') {
     return isLate ? 'timer-alert' : 'check-circle';
@@ -290,7 +322,7 @@ const getStatusIcon = useCallback(() => {
   
   if (submissionStatus === 'waiting') return 'clock-outline';
   
-  if (assignment?.completed === true) return 'check-circle';
+  if (assignment?.completed === true) return 'check-circle'; 
   
   return 'clock-outline';
 }, [assignment, isTaskDeleted, submissionStatus, isLate]); // ✅ Added dependencies
@@ -311,7 +343,11 @@ const getStatusIcon = useCallback(() => {
   }, []);
 
 
-  const checkTimeValidity = useCallback((assignmentData: any) => {
+// In useAssignmentDetails.ts - Ensure checkTimeValidity runs when needed
+
+// Replace your checkTimeValidity function with this:
+
+const checkTimeValidity = useCallback((assignmentData: any) => {
   if (isAdmin && !isOwner) {
     setIsSubmittable(false);
     setSubmissionStatus('waiting');
@@ -333,44 +369,92 @@ const getStatusIcon = useCallback(() => {
   const now = new Date();
   const assignmentDate = new Date(assignmentData.dueDate);
   
+  // Compare UTC dates (just the date part)
   const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
+  
+  console.log('🔍 [checkTimeValidity] Debug:', {
+    nowUTC: now.toISOString(),
+    assignmentDateUTC: assignmentDate.toISOString(),
+    todayUTC: new Date(todayUTC).toISOString(),
+    assignmentUTC: new Date(assignmentUTC).toISOString(),
+    isSameDay: todayUTC === assignmentUTC
+  });
   
   if (todayUTC !== assignmentUTC) {
     setIsSubmittable(false);
     setSubmissionStatus('wrong_day');
+    console.log('📅 Not due today, setting status to wrong_day');
     return;
   }
 
   if (assignmentData.timeSlot) {
+    // Get the time slot times (already in PHT)
+    const [startHour, startMinute] = assignmentData.timeSlot.startTime.split(':').map(Number);
     const [endHour, endMinute] = assignmentData.timeSlot.endTime.split(':').map(Number);
     
-    // ✅ Convert PHT to UTC by subtracting 8 hours
-    const endTime = new Date(Date.UTC(
+    // Convert PHT to UTC (subtract 8 hours)
+    // Start time in UTC
+    const startTimeUTC = new Date(Date.UTC(
+      assignmentDate.getUTCFullYear(),
+      assignmentDate.getUTCMonth(),
+      assignmentDate.getUTCDate(),
+      startHour - 8, startMinute, 0, 0
+    ));
+    
+    // End time in UTC
+    const endTimeUTC = new Date(Date.UTC(
       assignmentDate.getUTCFullYear(),
       assignmentDate.getUTCMonth(),
       assignmentDate.getUTCDate(),
       endHour - 8, endMinute, 0, 0
     ));
     
-    const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
-    const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
+    // Grace period ends 30 minutes after end time
+    const gracePeriodEndUTC = new Date(endTimeUTC.getTime() + 30 * 60000);
+    // Late threshold (25 minutes after end time)
+    const lateThresholdUTC = new Date(endTimeUTC.getTime() + 25 * 60000);
     
-    const currentTime = now.getTime();
-    const endTimeMs = endTime.getTime();
-    const lateThresholdMs = lateThreshold.getTime();
-    const graceEndMs = gracePeriodEnd.getTime();
+    const currentTimeMs = now.getTime();
+    const startTimeMs = startTimeUTC.getTime();
+    const endTimeMs = endTimeUTC.getTime();
+    const graceEndMs = gracePeriodEndUTC.getTime();
+    const lateThresholdMs = lateThresholdUTC.getTime();
     
-    if (currentTime < endTimeMs) {
+    console.log('⏰ [checkTimeValidity] Time slot check:', {
+      startTime: startTimeUTC.toISOString(),
+      endTime: endTimeUTC.toISOString(),
+      graceEnd: gracePeriodEndUTC.toISOString(),
+      currentTime: now.toISOString(),
+      isBeforeStart: currentTimeMs < startTimeMs,
+      isDuringSlot: currentTimeMs >= startTimeMs && currentTimeMs < endTimeMs,
+      isDuringGrace: currentTimeMs >= endTimeMs && currentTimeMs <= graceEndMs,
+      isAfterGrace: currentTimeMs > graceEndMs
+    });
+    
+    // Check if before time slot starts
+    if (currentTimeMs < startTimeMs) {
       setIsSubmittable(false);
       setSubmissionStatus('waiting');
       setIsLate(false);
       setPenaltyInfo(null);
-      const timeUntilEnd = Math.floor((endTimeMs - currentTime) / 1000);
-      setTimeLeft(timeUntilEnd);
+      const timeUntilStart = Math.floor((startTimeMs - currentTimeMs) / 1000);
+      setTimeLeft(timeUntilStart);
+      console.log('⏳ Before time slot starts, waiting for:', timeUntilStart, 'seconds');
     }
-    else if (currentTime >= endTimeMs && currentTime <= graceEndMs) {
-      const isLateSubmission = currentTime > lateThresholdMs;
+    // Check if during time slot
+    else if (currentTimeMs >= startTimeMs && currentTimeMs < endTimeMs) {
+      setIsSubmittable(true);
+      setSubmissionStatus('available');
+      setIsLate(false);
+      setPenaltyInfo(null);
+      const timeUntilEnd = Math.floor((endTimeMs - currentTimeMs) / 1000);
+      setTimeLeft(timeUntilEnd);
+      console.log('✅ During time slot, available for:', timeUntilEnd, 'seconds');
+    }
+    // Check if during grace period (after time slot)
+    else if (currentTimeMs >= endTimeMs && currentTimeMs <= graceEndMs) {
+      const isLateSubmission = currentTimeMs > lateThresholdMs;
       setIsSubmittable(true);
       setSubmissionStatus('available');
       setIsLate(isLateSubmission);
@@ -386,25 +470,44 @@ const getStatusIcon = useCallback(() => {
         setPenaltyInfo(null);
       }
       
-      const timeLeftMs = graceEndMs - currentTime;
+      const timeLeftMs = graceEndMs - currentTimeMs;
       setTimeLeft(Math.floor(timeLeftMs / 1000));
+      console.log('⚠️ During grace period, late:', isLateSubmission, 'timeLeft:', timeLeftMs / 1000, 'seconds');
     }
+    // After grace period - expired
     else {
       setIsSubmittable(false);
       setSubmissionStatus('expired');
       setIsLate(false);
       setPenaltyInfo(null);
       setTimeLeft(0);
+      console.log('❌ After grace period, expired');
     }
   } else {
+    // No time slot - always submittable
     setIsSubmittable(true);
     setSubmissionStatus('available');
     setTimeLeft(null);
     setIsLate(false);
     setPenaltyInfo(null);
+    console.log('✅ No time slot, always available');
   }
-}, [isTaskDeleted, isAdmin, isOwner]);
+}, [isAdmin, isOwner, isTaskDeleted]);
 
+
+// In useAssignmentDetails.ts - Add this useEffect to debug
+
+useEffect(() => {
+  console.log('📊 [Status Debug]', {
+    submissionStatus,
+    isSubmittable,
+    isLate,
+    timeLeft,
+    assignmentDay: assignment?.assignmentDay,
+    dueDate: assignment?.dueDate,
+    taskTitle: assignment?.task?.title
+  });
+}, [submissionStatus, isSubmittable, isLate, timeLeft, assignment]);
 
 const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
   if (isAdmin && !isOwner) {

@@ -40,7 +40,7 @@ export class UploadService {
           case 'gif':
             return 'image/gif';
           case 'webp':
-            return 'image/webp';
+            return 'image/webp'; 
           default:
             return 'image/jpeg';
         }
@@ -332,6 +332,8 @@ export class UploadService {
   }
 }
 
+// In UploadService.ts - Update the Cloudinary group avatar endpoint
+
 // ========== CLOUDINARY GROUP AVATAR UPLOAD ==========
 static async uploadGroupAvatarCloudinary(groupId: string, fileUri: string): Promise<UploadResponse> {
   try {
@@ -360,6 +362,7 @@ static async uploadGroupAvatarCloudinary(groupId: string, fileUri: string): Prom
       headers['Authorization'] = `Bearer ${token}`;
     }
 
+    // ✅ REMOVE '/cloudinary' from the endpoint - use the correct route
     const response = await fetch(`${API_URL}/group/${groupId}/avatar`, {
       method: 'POST',
       headers,
@@ -367,6 +370,8 @@ static async uploadGroupAvatarCloudinary(groupId: string, fileUri: string): Prom
     });
 
     const result = await response.json();
+    console.log('📥 Cloudinary group avatar upload result:', result);
+    
     return result;
 
   } catch (error: any) {

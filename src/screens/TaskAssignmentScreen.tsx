@@ -1,4 +1,4 @@
-// src/screens/TaskAssignmentScreen.tsx - FULLY UPDATED with Swap Support
+// src/screens/TaskAssignmentScreen.tsx - FULLY UPDATED with Avatar Images
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -11,7 +11,8 @@ import {
   Alert,
   Modal,
   ScrollView,
-  RefreshControl
+  RefreshControl,
+  Image
 } from 'react-native'; 
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -167,208 +168,207 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
               setIsReassigning(false);
             }
           }
-        } 
+        }
       ]
     );
   }, [selectedTask, reassignTask, loadData]);
 
-  // In renderTask function - Show swap indicator for BOTH parties in week swap
+  const renderTask = useCallback(({ item }: any) => {
+    const currentAssignee = membersInRotation.find(m => m.userId === item.currentAssignee);
+    const isRecurring = item.isRecurring;
+    const hasTimeSlots = item.timeSlots && item.timeSlots.length > 0;
+    const taskAssigned = isTaskAssigned(item);
+    
+    const isAcquiredViaWeekSwap = 
+      (item.acquiredViaSwap === true && item.swapScope === 'week') ||
+      (item.assignment?.acquiredViaSwap === true && item.assignment?.swapScope === 'week') ||
+      (item.userAssignment?.acquiredViaSwap === true && item.userAssignment?.swapScope === 'week');
+    
+    const swappedFromName = 
+      item.swappedFromName ||
+      item.assignment?.swappedFromName ||
+      item.userAssignment?.swappedFromName ||
+      null;
 
-const renderTask = useCallback(({ item }: any) => {
-  const currentAssignee = membersInRotation.find(m => m.userId === item.currentAssignee);
-  const isRecurring = item.isRecurring;
-  const hasTimeSlots = item.timeSlots && item.timeSlots.length > 0;
-  const taskAssigned = isTaskAssigned(item);
-  
-  // ✅ Check if this task was acquired via WEEK SWAP
-  // This applies to BOTH the requester AND the acceptor
-  // Because they EXCHANGED tasks (not one-way transfer)
-  const isAcquiredViaWeekSwap = 
-    (item.acquiredViaSwap === true && item.swapScope === 'week') ||
-    (item.assignment?.acquiredViaSwap === true && item.assignment?.swapScope === 'week') ||
-    (item.userAssignment?.acquiredViaSwap === true && item.userAssignment?.swapScope === 'week');
-  
-  // Get the name of who this task came from (the other person in the swap)
-  // For BOTH parties, this shows the other person's name
-  const swappedFromName = 
-    item.swappedFromName ||
-    item.assignment?.swappedFromName ||
-    item.userAssignment?.swappedFromName ||
-    null;
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={() => {
-        console.log('👆 Navigating to TaskDetails:', item.id);
-        navigation.navigate('TaskDetails', {
-          taskId: item.id,
-          groupId: groupId,
-          userRole: userRole
-        });
-      }}
-    >
-      <LinearGradient
-        colors={[theme.card, theme.bgSecondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[
-          styles.taskCard, 
-          { borderColor: theme.border, shadowColor: theme.shadow },
-          isAcquiredViaWeekSwap && styles.swappedTaskCard
-        ]}
+    return (
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={() => {
+          console.log('👆 Navigating to TaskDetails:', item.id);
+          navigation.navigate('TaskDetails', {
+            taskId: item.id,
+            groupId: groupId,
+            userRole: userRole
+          });
+        }}
       >
-        <View style={styles.taskHeader}>
-          <View style={styles.taskTitleContainer}>
-            <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
-              {item.title}
-            </Text>
-            {isRecurring && (
-              <LinearGradient
-                colors={[theme.primaryLight, theme.primaryLight]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.recurringBadge}
-              >
-                <MaterialCommunityIcons name="repeat" size={12} color={theme.primary} />
-                <Text style={[styles.recurringText, { color: theme.primary }]}>Recurring</Text>
-              </LinearGradient>
-            )}
+        <LinearGradient
+          colors={[theme.card, theme.bgSecondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.taskCard, 
+            { borderColor: theme.border, shadowColor: theme.shadow },
+            isAcquiredViaWeekSwap && styles.swappedTaskCard
+          ]}
+        >
+          <View style={styles.taskHeader}>
+            <View style={styles.taskTitleContainer}>
+              <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
+                {item.title}
+              </Text>
+              {isRecurring && (
+                <LinearGradient
+                  colors={[theme.primaryLight, theme.primaryLight]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.recurringBadge}
+                >
+                  <MaterialCommunityIcons name="repeat" size={12} color={theme.primary} />
+                  <Text style={[styles.recurringText, { color: theme.primary }]}>Recurring</Text>
+                </LinearGradient>
+              )}
+            </View>
+            <LinearGradient
+              colors={[theme.primaryLight, theme.primaryLight]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.pointsBadge}
+            >
+              <Text style={[styles.pointsText, { color: theme.primary }]}>{item.points} pts</Text>
+            </LinearGradient>
           </View>
-          <LinearGradient
-            colors={[theme.primaryLight, theme.primaryLight]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.pointsBadge}
-          >
-            <Text style={[styles.pointsText, { color: theme.primary }]}>{item.points} pts</Text>
-          </LinearGradient>
-        </View>
 
-        {/* ✅ WEEK SWAP BADGE - Shows for BOTH parties because they EXCHANGED tasks */}
-        {isAcquiredViaWeekSwap && (
-          <LinearGradient
-            colors={['#8B5CF6', '#7C3AED']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.swapBadge}
-          >
-            <MaterialCommunityIcons name="swap-vertical" size={12} color="#fff" />
-            <Text style={styles.swapBadgeText}>
-              Week Swap {swappedFromName ? `from ${swappedFromName}` : '(Exchanged)'}
+          {isAcquiredViaWeekSwap && (
+            <LinearGradient
+              colors={['#8B5CF6', '#7C3AED']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.swapBadge}
+            >
+              <MaterialCommunityIcons name="swap-vertical" size={12} color="#fff" />
+              <Text style={styles.swapBadgeText}>
+                Week Swap {swappedFromName ? `from ${swappedFromName}` : '(Exchanged)'}
+              </Text>
+            </LinearGradient>
+          )}
+
+          {item.description && (
+            <Text style={[styles.taskDescription, { color: theme.textMuted }]} numberOfLines={2}>
+              {item.description}
             </Text>
-          </LinearGradient>
-        )}
+          )}
 
-        {item.description && (
-          <Text style={[styles.taskDescription, { color: theme.textMuted }]} numberOfLines={2}>
-            {item.description}
-          </Text>
-        )}
-
-        <View style={styles.taskDetails}>
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="calendar-clock" size={14} color={theme.textMuted} />
-            <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-              {item.executionFrequency === 'DAILY' ? 'Daily' : 'Weekly'}
-              {item.selectedDays?.length > 0 && ` (${item.selectedDays.join(', ')})`}
-            </Text>
-          </View>
-          
-          {hasTimeSlots && (
+          <View style={styles.taskDetails}>
             <View style={styles.detailRow}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+              <MaterialCommunityIcons name="calendar-clock" size={14} color={theme.textMuted} />
               <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-                {item.timeSlots.length} time slot{item.timeSlots.length > 1 ? 's' : ''}
+                {item.executionFrequency === 'DAILY' ? 'Daily' : 'Weekly'}
+                {item.selectedDays?.length > 0 && ` (${item.selectedDays.join(', ')})`}
               </Text>
             </View>
-          )}
-        </View>
-
-        <View style={[styles.assignmentSection, { borderTopColor: theme.border }]}>
-          <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>Assigned to:</Text>
-          <View style={styles.assigneeRow}>
-            {currentAssignee ? (
-              <View style={styles.currentAssignee}>
-                <LinearGradient
-                  colors={[theme.bgSecondary, theme.bgTertiary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.assigneeAvatar, { borderColor: theme.border }]}
-                >
-                  <Text style={[styles.assigneeInitial, { color: theme.textSecondary }]}>
-                    {currentAssignee.fullName?.charAt(0) || '?'}
-                  </Text>
-                </LinearGradient>
-                <View style={styles.assigneeInfo}>
-                  <Text style={[styles.assigneeName, { color: theme.text }]}>
-                    {currentAssignee.fullName}
-                  </Text>
-                  {isAcquiredViaWeekSwap && swappedFromName && (
-                    <Text style={[styles.swapNote, { color: '#8B5CF6' }]}>
-                      (Received via week swap from {swappedFromName})
-                    </Text>
-                  )}
-                  <View style={styles.assigneeMeta}>
-                    {currentAssignee.rotationOrder && (
-                      <LinearGradient
-                        colors={[theme.bgSecondary, theme.bgTertiary]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.rotationBadge}
-                      >
-                        <Text style={[styles.rotationOrder, { color: theme.textSecondary }]}>
-                          #{currentAssignee.rotationOrder}
-                        </Text>
-                      </LinearGradient>
-                    )}
-                  </View>
-                </View>
-              </View>
-            ) : (
-              <View style={styles.unassignedContainer}>
-                <MaterialCommunityIcons name="account-question" size={20} color={theme.textPlaceholder} />
-                <Text style={[styles.unassignedText, { color: theme.textPlaceholder }]}>Not assigned</Text>
-              </View>
-            )}
             
-            {userRole === 'ADMIN' && (
-              <TouchableOpacity
-                style={[
-                  styles.changeButton,
-                  taskAssigned && styles.changeButtonDisabled
-                ]}
-                onPress={() => !taskAssigned && handleOpenAssigneeModal(item)}
-                activeOpacity={taskAssigned ? 0.5 : 0.8}
-                disabled={taskAssigned}
-              >
-                <LinearGradient
-                  colors={taskAssigned ? [theme.bgTertiary, theme.bgTertiary] : [theme.primary, theme.primaryDark]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.changeButtonGradient}
-                >
-                  <MaterialCommunityIcons 
-                    name={taskAssigned ? "check" : "account-switch"} 
-                    size={14} 
-                    color={taskAssigned ? theme.textMuted : "#fff"} 
-                  />
-                  <Text style={[
-                    styles.changeButtonText,
-                    taskAssigned && styles.changeButtonTextDisabled,
-                    { color: taskAssigned ? theme.textMuted : "#fff" }
-                  ]}>
-                    {taskAssigned ? "Assigned" : "Change"}
-                  </Text>
-                </LinearGradient>
-              </TouchableOpacity>
+            {hasTimeSlots && (
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+                <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+                  {item.timeSlots.length} time slot{item.timeSlots.length > 1 ? 's' : ''}
+                </Text>
+              </View>
             )}
           </View>
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-}, [membersInRotation, theme, navigation, groupId, userRole, isTaskAssigned, handleOpenAssigneeModal]);
+
+          <View style={[styles.assignmentSection, { borderTopColor: theme.border }]}>
+            <Text style={[styles.sectionLabel, { color: theme.textMuted }]}>Assigned to:</Text>
+            <View style={styles.assigneeRow}>
+              {currentAssignee ? (
+                <View style={styles.currentAssignee}>
+                  <LinearGradient
+                    colors={[theme.bgSecondary, theme.bgTertiary]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.assigneeAvatar, { borderColor: theme.border }]}
+                  >
+                    {currentAssignee.avatarUrl ? (
+                      <Image 
+                        source={{ uri: currentAssignee.avatarUrl }} 
+                        style={styles.assigneeAvatarImage} 
+                      />
+                    ) : (
+                      <Text style={[styles.assigneeInitial, { color: theme.textSecondary }]}>
+                        {currentAssignee.fullName?.charAt(0) || '?'}
+                      </Text>
+                    )}
+                  </LinearGradient>
+                  <View style={styles.assigneeInfo}>
+                    <Text style={[styles.assigneeName, { color: theme.text }]}>
+                      {currentAssignee.fullName}
+                    </Text>
+                    {isAcquiredViaWeekSwap && swappedFromName && (
+                      <Text style={[styles.swapNote, { color: '#8B5CF6' }]}>
+                        (Received via week swap from {swappedFromName})
+                      </Text>
+                    )}
+                    <View style={styles.assigneeMeta}>
+                      {currentAssignee.rotationOrder && (
+                        <LinearGradient
+                          colors={[theme.bgSecondary, theme.bgTertiary]}
+                          start={{ x: 0, y: 0 }}
+                          end={{ x: 1, y: 1 }}
+                          style={styles.rotationBadge}
+                        >
+                          <Text style={[styles.rotationOrder, { color: theme.textSecondary }]}>
+                            #{currentAssignee.rotationOrder}
+                          </Text>
+                        </LinearGradient>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.unassignedContainer}>
+                  <MaterialCommunityIcons name="account-question" size={20} color={theme.textPlaceholder} />
+                  <Text style={[styles.unassignedText, { color: theme.textPlaceholder }]}>Not assigned</Text>
+                </View>
+              )}
+              
+              {userRole === 'ADMIN' && (
+                <TouchableOpacity
+                  style={[
+                    styles.changeButton,
+                    taskAssigned && styles.changeButtonDisabled
+                  ]}
+                  onPress={() => !taskAssigned && handleOpenAssigneeModal(item)}
+                  activeOpacity={taskAssigned ? 0.5 : 0.8}
+                  disabled={taskAssigned}
+                >
+                  <LinearGradient
+                    colors={taskAssigned ? [theme.bgTertiary, theme.bgTertiary] : [theme.primary, theme.primaryDark]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.changeButtonGradient}
+                  >
+                    <MaterialCommunityIcons 
+                      name={taskAssigned ? "check" : "account-switch"} 
+                      size={14} 
+                      color={taskAssigned ? theme.textMuted : "#fff"} 
+                    />
+                    <Text style={[
+                      styles.changeButtonText,
+                      taskAssigned && styles.changeButtonTextDisabled,
+                      { color: taskAssigned ? theme.textMuted : "#fff" }
+                    ]}>
+                      {taskAssigned ? "Assigned" : "Change"}
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  }, [membersInRotation, theme, navigation, groupId, userRole, isTaskAssigned, handleOpenAssigneeModal]);
 
   if (loading && !refreshing) {
     return (
@@ -583,9 +583,16 @@ const renderTask = useCallback(({ item }: any) => {
                             { borderColor: theme.border }
                           ]}
                         >
-                          <Text style={[styles.memberInitial, { color: theme.textSecondary }]}>
-                            {member.fullName?.charAt(0) || '?'}
-                          </Text>
+                          {member.avatarUrl ? (
+                            <Image 
+                              source={{ uri: member.avatarUrl }} 
+                              style={styles.memberAvatarImage} 
+                            />
+                          ) : (
+                            <Text style={[styles.memberInitial, { color: theme.textSecondary }]}>
+                              {member.fullName?.charAt(0) || '?'}
+                            </Text>
+                          )}
                         </LinearGradient>
                         <View style={styles.memberDetails}>
                           <Text style={[
@@ -665,9 +672,16 @@ const renderTask = useCallback(({ item }: any) => {
                               end={{ x: 1, y: 1 }}
                               style={[styles.memberAvatar, styles.disabledAvatar, { borderColor: theme.border }]}
                             >
-                              <Text style={[styles.memberInitial, styles.disabledInitial, { color: theme.textPlaceholder }]}>
-                                {member.fullName?.charAt(0) || '?'}
-                              </Text>
+                              {member.avatarUrl ? (
+                                <Image 
+                                  source={{ uri: member.avatarUrl }} 
+                                  style={[styles.memberAvatarImage, styles.disabledAvatarImage]} 
+                                />
+                              ) : (
+                                <Text style={[styles.memberInitial, styles.disabledInitial, { color: theme.textPlaceholder }]}>
+                                  {member.fullName?.charAt(0) || '?'}
+                                </Text>
+                              )}
                             </LinearGradient>
                             <View style={styles.memberDetails}>
                               <Text style={[styles.memberName, styles.disabledText, { color: theme.textPlaceholder }]}>
@@ -934,6 +948,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  assigneeAvatarImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   assigneeInitial: {
     fontWeight: 'bold',
@@ -1119,6 +1139,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  memberAvatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  disabledAvatarImage: {
+    opacity: 0.5,
   },
   currentAssigneeAvatar: { 
     borderWidth: 2,
@@ -1196,5 +1225,5 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-  } 
+  }
 });

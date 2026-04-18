@@ -7,11 +7,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
+  Alert, 
   Share,
   ScrollView,
   Modal,
-  TextInput,
+  TextInput, 
   Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -28,6 +28,7 @@ import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
 import { makeGroupMembersStyles } from '../styles/groupMembers.styles';
+import { UploadResponse } from '../uploadService/UploadService';
 
 export default function GroupMembersScreen({ navigation, route }: any) {
   const { theme, isDark } = useTheme();
@@ -90,6 +91,7 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     pickImageFromGallery,
     takePhotoWithCamera,
     uploadGroupAvatar,
+    uploadGroupAvatarToCloudinary,  
     deleteGroupAvatar: deleteGroupAvatarHook
   } = useImageUpload({
     onSuccess: (result) => {
@@ -389,27 +391,44 @@ export default function GroupMembersScreen({ navigation, route }: any) {
     );
   };
 
-  const handleTakeGroupPhoto = async () => {
-    try {
-      const photo = await takePhotoWithCamera();
-      if (photo) {
-        await uploadGroupAvatar(groupId, photo);
-      }
-    } catch (err: any) {
-      Alert.alert('Error', 'Failed to take photo: ' + err.message);
-    }
-  };
 
-  const handleChooseGroupPhoto = async () => {
-    try {
-      const photo = await pickImageFromGallery();
-      if (photo) {
-        await uploadGroupAvatar(groupId, photo);
+const handleTakeGroupPhoto = async () => {
+  try {
+    const photo = await takePhotoWithCamera();
+    if (photo) {
+      const result = await uploadGroupAvatarToCloudinary(groupId, photo);
+      // ✅ Type assertion - tell TypeScript this is UploadResponse
+      const uploadResult = result as UploadResponse;
+      if (uploadResult.success && uploadResult.data?.avatarUrl) {
+        updateGroupAvatar(uploadResult.data.avatarUrl);
+        Alert.alert('Success', 'Group avatar updated successfully');
+      } else {
+        Alert.alert('Error', uploadResult.message || 'Failed to upload avatar');
       }
-    } catch (err: any) {
-      Alert.alert('Error', 'Failed to choose photo: ' + err.message);
     }
-  };
+  } catch (err: any) {
+    Alert.alert('Error', 'Failed to take photo: ' + err.message);
+  }
+};
+
+const handleChooseGroupPhoto = async () => {
+  try {
+    const photo = await pickImageFromGallery();
+    if (photo) {
+      const result = await uploadGroupAvatarToCloudinary(groupId, photo);
+      // ✅ Check result.success first, then access data
+       const uploadResult = result as UploadResponse;
+      if (uploadResult.success && uploadResult.data?.avatarUrl) {
+        updateGroupAvatar(uploadResult.data.avatarUrl);
+        Alert.alert('Success', 'Group avatar updated successfully');
+      } else {
+        Alert.alert('Error', result.message || 'Failed to upload avatar');
+      }
+    }
+  } catch (err: any) {
+    Alert.alert('Error', 'Failed to choose photo: ' + err.message);
+  }
+};
 
   const handleRemoveGroupAvatar = async () => {
     Alert.alert(

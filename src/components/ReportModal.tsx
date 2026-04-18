@@ -33,7 +33,7 @@ const REPORT_REASONS = [
 
 interface ReportModalProps {
   visible: boolean;
-  onClose: () => void;
+  onClose: () => void; 
   groupId: string;
   groupName: string;
   onSubmit: (data: { type: string; description: string }) => Promise<void>;
@@ -71,42 +71,57 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     return hasToken;
   }, []);
 
-  // ✅ Check if user can report based on stored time
-  const checkLastReportTime = useCallback(async () => {
-    try {
-      const storageKey = `last_report_${groupId}`;
-      const lastTime = await AsyncStorage.getItem(storageKey);
+ // In ReportModal.tsx - Use local date comparison
+const checkLastReportTime = useCallback(async () => {
+  try {
+    const storageKey = `last_report_${groupId}`;
+    const lastTimeStr = await AsyncStorage.getItem(storageKey);
+    
+    if (lastTimeStr) {
+      const lastReportDate = new Date(parseInt(lastTimeStr));
+      const now = new Date();
       
-      if (lastTime) {
-        const lastTimeNum = parseInt(lastTime);
-        const now = Date.now();
-        const hoursPassed = (now - lastTimeNum) / (1000 * 60 * 60);
+      // ✅ Use LOCAL date (not UTC)
+      const isSameDay = 
+        lastReportDate.getFullYear() === now.getFullYear() &&
+        lastReportDate.getMonth() === now.getMonth() &&
+        lastReportDate.getDate() === now.getDate();
+      
+      if (isSameDay) {
+        // Calculate time until LOCAL midnight
+        const endOfDay = new Date(now);
+        endOfDay.setHours(23, 59, 59, 999);
+        const remainingMs = endOfDay.getTime() - now.getTime();
+        const remainingHours = Math.ceil(remainingMs / (1000 * 60 * 60));
         
-        if (hoursPassed < 24) {
-          const remainingHours = Math.ceil(24 - hoursPassed);
-          setTimeRemaining(remainingHours);
-          setCanReport(false);
-          setLastReportTime(lastTimeNum);
-          return false;
-        } else {
-          // Clear expired storage
-          await AsyncStorage.removeItem(storageKey);
-          setCanReport(true);
-          setTimeRemaining(0);
-          setLastReportTime(null);
-          return true;
-        }
+        setTimeRemaining(remainingHours);
+        setCanReport(false);
+        return false;
       } else {
+        await AsyncStorage.removeItem(storageKey);
         setCanReport(true);
         setTimeRemaining(0);
-        setLastReportTime(null);
         return true;
       }
-    } catch (error) {
-      console.error('Error checking last report time:', error);
-      return true; // Allow on error
+    } else {
+      setCanReport(true);
+      return true;
     }
-  }, [groupId]);
+  } catch (error) {
+    console.error('Error checking last report time:', error);
+    return true;
+  }
+}, [groupId]);
+
+// ✅ Update getTimeRemainingText to show time until midnight
+const getTimeRemainingText = () => {
+  if (!canReport && timeRemaining > 0) {
+    if (timeRemaining >= 24) return 'Tomorrow';
+    if (timeRemaining >= 1) return `${timeRemaining}h`;
+    return `${Math.ceil(timeRemaining * 60)}min`;
+  }
+  return '';
+};
 
   // ✅ Store report time after successful submission
   const storeReportTime = useCallback(async () => {
@@ -130,20 +145,14 @@ export const ReportModal: React.FC<ReportModalProps> = ({
 
   // ✅ Show warning if cannot report and modal is open
   useEffect(() => {
-    if (visible && !canReport && !submitting) {
-      Alert.alert(
-        '⚠️ Cannot Submit Report',
-        `You have already reported this group.\n\nPlease wait ${timeRemaining} hour${timeRemaining !== 1 ? 's' : ''} before submitting another report.`,
-        [
-          { 
-            text: 'OK', 
-            onPress: () => {
-              handleClose();
-            }
-          }
-        ]
-      );
-    }
+// Update the warning alert
+if (visible && !canReport && !submitting) {
+  Alert.alert(
+    '⚠️ Cannot Submit Report',
+    `You have already reported this group today.\n\nPlease try again ${timeRemaining >= 24 ? 'tomorrow' : `in ${timeRemaining} hour${timeRemaining !== 1 ? 's' : ''}`}.`,
+    [{ text: 'OK', onPress: handleClose }]
+  );
+}
   }, [visible, canReport, timeRemaining]);
 
   useEffect(() => {
@@ -282,12 +291,6 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     return null;
   }
 
-  // Format time remaining for display
-  const getTimeRemainingText = () => {
-    if (timeRemaining >= 24) return 'Tomorrow';
-    if (timeRemaining >= 1) return `${timeRemaining}h`;
-    return `${Math.ceil(timeRemaining * 60)}min`;
-  };
 
   return (
     <Modal
@@ -740,7 +743,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: '#fff',
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '600', 
   },
   submitButtonDisabled: {
     opacity: 0.7,

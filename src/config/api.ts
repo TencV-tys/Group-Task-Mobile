@@ -13,7 +13,7 @@ export const getBackendIP = (): string => {
   
   // If device is on 192.168.1.x (office WiFi), backend is at 192.168.1.29
   if (currentIP.startsWith('192.168.1.')) {
-    return process.env.EXPO_PUBLIC_WIFI_IP || '192.168.1.18';
+    return process.env.EXPO_PUBLIC_WIFI_IP || '192.168.1.20';
   }
   
   // If device is on 10.219.65.x (your hotspot), backend is at 10.219.65.2

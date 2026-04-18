@@ -387,7 +387,7 @@ const uploadTaskPhotoToCloudinary = async (imageUri: string) => {
     uploadGroupAvatar,
     deleteGroupAvatar,
     
-     uploadAvatarToCloudinary,
+  uploadAvatarToCloudinary,
   uploadGroupAvatarToCloudinary,
   uploadTaskPhotoToCloudinary,
   };

@@ -301,34 +301,45 @@ export class UploadService {
     }
   }
 
-  static async uploadAvatarCloudinary(fileUri: string): Promise<UploadResponse> {
+// src/uploadService/UploadService.ts - Update cloudinary upload
+
+static async uploadAvatarCloudinary(fileUri: string): Promise<UploadResponse> {
   try {
-    const token = await TokenUtils.getAccessToken();
-    const formData = new FormData();
+    console.log('📤 Uploading avatar to Cloudinary (public endpoint)...');
     
+    const formData = new FormData();
     const filename = fileUri.split('/').pop() || 'avatar.jpg';
     
-    // ✅ CHANGE THIS:
-    formData.append('file', {  // ← 'file' not 'avatar'
+    const getMimeType = (uri: string): string => {
+      const extension = uri.split('.').pop()?.toLowerCase();
+      return extension === 'png' ? 'image/png' : 'image/jpeg';
+    };
+
+    const mimeType = getMimeType(fileUri);
+    
+    formData.append('file', {
       uri: fileUri,
-      type: 'image/jpeg',
+      type: mimeType,
       name: filename,
     } as any);
 
-    const headers: HeadersInit = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${API_URL}/avatar`, {
+    // ✅ Use PUBLIC endpoint (no auth required)
+    const response = await fetch(`${API_URL}/avatar/cloudinary`, {
       method: 'POST',
-      headers,
       body: formData,
     });
 
-    return await response.json();
+    const result = await response.json();
+    console.log('📥 Cloudinary upload response:', result);
+    
+    return result;
+
   } catch (error: any) {
-    return { success: false, message: error.message };
+    console.error('❌ Cloudinary upload error:', error);
+    return { 
+      success: false, 
+      message: error.message || 'Network error' 
+    };
   }
 }
 
@@ -428,5 +439,7 @@ static async uploadTaskPhotoCloudinary(fileUri: string): Promise<UploadResponse>
     };
   }
 }
+
+
 
 }

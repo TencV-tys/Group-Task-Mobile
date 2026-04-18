@@ -207,7 +207,6 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
   }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft, isTaskDeleted, isAdmin, isOwner]);
 
   // In useAssignmentDetails.ts - REPLACE these three functions
-
 const getStatusText = useCallback(() => {
   if (isTaskDeleted) return 'Task Deleted';
   
@@ -224,74 +223,77 @@ const getStatusText = useCallback(() => {
   const dueDateUTC = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
   const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   
-  // If due date is from a previous day, it's expired
   if (dueDateUTC < todayUTC && !assignment?.completed) return 'Expired';
   
-  // ✅ PRIORITY 4: Check expired flag (for same-day cron updates)
+  // ✅ PRIORITY 4: Check expired flag
   if (assignment?.expired === true) return 'Expired';
   
   const missedSlotIds = assignment?.missedTimeSlotIds || [];
   const currentTimeSlotId = assignment?.timeSlot?.id;
   if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'Missed';
   
-  // ✅ PRIORITY 5: Check completed
+  // ✅ PRIORITY 5: Check submission status (THIS IS THE KEY!)
+  if (submissionStatus === 'available') {
+    return isLate ? 'Late' : 'Started';  // ✅ Shows "Started" during time slot
+  }
+  
+  if (submissionStatus === 'waiting') return 'Not Started';
+  
+  // ✅ PRIORITY 6: Check completed
   if (assignment?.completed === true) return 'Completed';
   
-  return 'Not Started'; 
-}, [assignment, isTaskDeleted]);
+  return 'Not Started';
+}, [assignment, isTaskDeleted, submissionStatus, isLate]); // ✅ Added submissionStatus and isLate
 
 const getStatusColor = useCallback(() => {
   if (isTaskDeleted) return '#868e96';
   
-  // ✅ PRIORITY 1: Verified - green
   if (assignment?.verified === true) return '#2b8a3e';
-  
-  // ✅ PRIORITY 2: Rejected - red
   if (assignment?.verified === false) return '#fa5252';
   
-  // ✅ PRIORITY 3: Pending verification - orange
   if (assignment?.completed === true && assignment?.verified === null) return '#e67700';
-  
-  // ✅ PRIORITY 4: Expired/Missed - gray/red (only if not verified)
   if (assignment?.expired === true) return '#868e96';
   
   const missedSlotIds = assignment?.missedTimeSlotIds || [];
   const currentTimeSlotId = assignment?.timeSlot?.id;
   if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return '#868e96';
   
-  // ✅ PRIORITY 5: Completed - green
+  // ✅ Add submissionStatus check
+  if (submissionStatus === 'available') {
+    return isLate ? '#e67700' : '#2b8a3e';
+  }
+  
+  if (submissionStatus === 'waiting') return '#e67700';
+  
   if (assignment?.completed === true) return '#2b8a3e';
   
-  // ✅ Default - gray
   return '#868e96';
-}, [assignment, isTaskDeleted]);
+}, [assignment, isTaskDeleted, submissionStatus, isLate]); // ✅ Added dependencies
 
 const getStatusIcon = useCallback(() => {
   if (isTaskDeleted) return 'delete';
   
-  // ✅ PRIORITY 1: Verified - check circle
   if (assignment?.verified === true) return 'check-circle';
-  
-  // ✅ PRIORITY 2: Rejected - close circle
   if (assignment?.verified === false) return 'close-circle';
   
-  // ✅ PRIORITY 3: Pending verification - clock check
   if (assignment?.completed === true && assignment?.verified === null) return 'clock-check';
-  
-  // ✅ PRIORITY 4: Expired/Missed - timer off (only if not verified)
   if (assignment?.expired === true) return 'timer-off';
   
   const missedSlotIds = assignment?.missedTimeSlotIds || [];
   const currentTimeSlotId = assignment?.timeSlot?.id;
   if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'timer-off';
   
-  // ✅ PRIORITY 5: Completed - check circle
+  // ✅ Add submissionStatus check
+  if (submissionStatus === 'available') {
+    return isLate ? 'timer-alert' : 'check-circle';
+  }
+  
+  if (submissionStatus === 'waiting') return 'clock-outline';
+  
   if (assignment?.completed === true) return 'check-circle';
   
-  // ✅ Default - clock outline
   return 'clock-outline';
-}, [assignment, isTaskDeleted]);
-
+}, [assignment, isTaskDeleted, submissionStatus, isLate]); // ✅ Added dependencies
 
   const getTimeDifference = useCallback((dueDate: string, completedAt: string) => {
     const due = new Date(dueDate);

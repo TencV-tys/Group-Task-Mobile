@@ -1,8 +1,10 @@
-// src/hooks/useMyGroups.ts - UPDATED with TokenUtils
+// src/hooks/useMyGroups.ts - UPDATED with socket listener for group creation
+
 import { useState, useCallback, useEffect } from 'react';
 import { GroupService } from '../services/GroupService';
 import { GroupMembersService } from '../services/GroupMemberService';
-import { TokenUtils } from '../utils/tokenUtils'; // 👈 Import TokenUtils
+import { TokenUtils } from '../utils/tokenUtils';
+import { useSocket } from '../context/SocketContext'; // ✅ Add this import
 
 export function useMyGroups() {
   const [groups, setGroups] = useState<any[]>([]);
@@ -11,7 +13,10 @@ export function useMyGroups() {
   const [error, setError] = useState<string | null>(null);
   const [authError, setAuthError] = useState<boolean>(false);
 
-  // ✅ UPDATED: Use TokenUtils.checkToken()
+  // ✅ Get socket connection
+  const { socket, isConnected, on, off } = useSocket();
+
+  // Check token
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
       showAlert: false,
@@ -27,7 +32,6 @@ export function useMyGroups() {
 
   // Fetch groups from API
   const fetchGroups = useCallback(async (isRefreshing = false) => {
-    // Check token first
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
@@ -49,20 +53,16 @@ export function useMyGroups() {
       console.log("📦 useMyGroups: Fetch result:", result);
       
       if (result.success) {
-        // Handle different response structures
         let groupsArray: any[] = [];
         
         if (result.groups) {
           groupsArray = result.groups;
         } else if (result.group) {
-          // If single group returned, wrap in array
           groupsArray = [result.group];
         } else if (Array.isArray(result)) {
-          // If result is directly an array
           groupsArray = result;
         }
         
-        // Ensure each group has avatarUrl property
         const groupsWithAvatars = groupsArray.map(group => ({
           ...group,
           avatarUrl: group.avatarUrl || group.avatar || null
@@ -75,7 +75,6 @@ export function useMyGroups() {
         setError(result.message || 'Failed to load groups');
         setGroups([]);
         
-        // Check if error is auth-related
         if (result.message?.toLowerCase().includes('token') || 
             result.message?.toLowerCase().includes('auth') ||
             result.message?.toLowerCase().includes('unauthorized')) {
@@ -93,18 +92,16 @@ export function useMyGroups() {
     }
   }, [checkToken]);
 
-  // Refresh groups (pull to refresh)
+  // Refresh groups
   const refreshGroups = () => {
     fetchGroups(true);
   };
 
-  // Add a new group (after creation)
+  // Add a new group
   const addGroup = (newGroup: any) => {
     setGroups(prev => {
-      // Check if group already exists
       const exists = prev.some(group => group.id === newGroup.id);
       if (exists) {
-        // Update existing group
         return prev.map(group => 
           group.id === newGroup.id ? {
             ...newGroup,
@@ -112,7 +109,6 @@ export function useMyGroups() {
           } : group
         );
       }
-      // Add new group at the beginning
       return [{
         ...newGroup,
         avatarUrl: newGroup.avatarUrl || newGroup.avatar || null
@@ -167,7 +163,7 @@ export function useMyGroups() {
     }
   }, [checkToken]);
 
-  // Upload group avatar (with base64)
+  // Upload group avatar
   const uploadGroupAvatar = useCallback(async (groupId: string, base64Image: string) => {
     try {
       const hasToken = await checkToken();
@@ -176,7 +172,6 @@ export function useMyGroups() {
       const result = await GroupMembersService.uploadGroupAvatar(groupId, base64Image);
       
       if (result.success && result.group) {
-        // Update the group in local state
         setGroups(prev => prev.map(group => 
           group.id === groupId ? { 
             ...group, 
@@ -204,7 +199,6 @@ export function useMyGroups() {
       const result = await GroupMembersService.deleteGroupAvatar(groupId);
       
       if (result.success) {
-        // Update the group in local state
         setGroups(prev => prev.map(group => 
           group.id === groupId ? { ...group, avatarUrl: null } : group
         ));
@@ -233,6 +227,60 @@ export function useMyGroups() {
     );
   }, [groups]);
 
+  // ✅ Listen for real-time group creation (from other users)
+  useEffect(() => {
+    if (!socket || !isConnected) {
+      console.log('⚠️ Socket not connected, skipping group creation listener');
+      return;
+    }
+
+    console.log('🎧 Setting up group creation listener...');
+
+    const handleGroupCreated = (data: any) => {
+      console.log('📢 Real-time: New group created!', data);
+      
+      // Create a group object that matches our UI structure
+      const newGroup = {
+        id: data.groupId,
+        name: data.groupName,
+        description: '',
+        avatarUrl: null,
+        inviteCode: '',
+        userRole: data.userRole || 'MEMBER',
+        memberCount: 1,
+        taskCount: 0,
+        createdAt: data.createdAt || new Date().toISOString(),
+        createdById: data.userId,
+        createdByName: data.userName
+      };
+      
+      // Add to groups list (only if not already present)
+      setGroups(prev => {
+        const exists = prev.some(g => g.id === data.groupId);
+        if (!exists) {
+          console.log(`✅ Adding new group to list: ${data.groupName}`);
+          return [newGroup, ...prev];
+        }
+        return prev;
+      });
+      
+      // Show alert for real-time update (optional - can be removed)
+      // Alert.alert(
+      //   '📢 New Group Created',
+      //   `${data.userName} created a new group: "${data.groupName}"`,
+      //   [{ text: 'OK' }]
+      // );
+    };
+
+    // Register listener for group:created event
+    on('group:created', handleGroupCreated);
+
+    return () => {
+      console.log('🔌 Cleaning up group creation listener');
+      off('group:created', handleGroupCreated);
+    };
+  }, [socket, isConnected, on, off]);
+
   // Load groups on mount
   useEffect(() => {
     fetchGroups();
@@ -248,11 +296,11 @@ export function useMyGroups() {
     refreshGroups,
     addGroup,
     removeGroup,
-    updateGroupAvatar,  // For direct URL updates
-    updateGroup,        // For updating group info
-    uploadGroupAvatar,  // For uploading base64 images
-    deleteGroupAvatar,  // For removing avatar
-    getGroupById,       // Get specific group
-    searchGroups        // Search groups
+    updateGroupAvatar,
+    updateGroup,
+    uploadGroupAvatar,
+    deleteGroupAvatar,
+    getGroupById,
+    searchGroups
   };
 }

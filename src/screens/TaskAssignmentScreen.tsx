@@ -190,7 +190,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
       item.userAssignment?.swappedFromName ||
       null;
 
-    return (
+    return ( 
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => {

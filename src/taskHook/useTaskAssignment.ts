@@ -1,4 +1,4 @@
-// src/hooks/useTaskAssignment.ts - WITH FULL DEBUG LOGS
+// src/hooks/useTaskAssignment.ts - UPDATED VERSION
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { TaskService } from '../services/TaskService';
@@ -70,93 +70,25 @@ export const useTaskAssignment = (groupId: string) => {
         tasksCount: tasksResult.tasks?.length || 0
       });
       
-      // Get user tasks (for swap info)
-      console.log('📡 [2] Calling TaskService.getMyTasks...');
-      const myTasksResult = await TaskService.getMyTasks(groupId);
-      console.log(`📡 [2] getMyTasks response:`, {
-        success: myTasksResult.success,
-        tasksCount: myTasksResult.tasks?.length || 0
-      });
-      
       if (tasksResult.success) {
-        // Create a map of taskId -> swap info from user tasks
-        const swapInfoMap = new Map();
+        // ✅ NO NEED to create swapInfoMap from myTasksResult
+        // The swap info is already attached to tasks from getGroupTasks
+        // Just use the tasks directly
         
-        console.log('🔄 [3] Processing myTasksResult for swap info...');
-        
-        if (myTasksResult.success && myTasksResult.tasks) {
-          console.log(`📊 Found ${myTasksResult.tasks.length} user tasks`);
-          
-          myTasksResult.tasks.forEach((myTask: any, index: number) => {
-            console.log(`\n--- Task ${index + 1}: "${myTask.title}" ---`);
-            console.log(`  Task ID: ${myTask.id}`);
-            console.log(`  Has assignment prop: ${!!myTask.assignment}`);
-            console.log(`  assignment.acquiredViaSwap: ${myTask.assignment?.acquiredViaSwap}`);
-            console.log(`  myTask.acquiredViaSwap: ${myTask.acquiredViaSwap}`);
-            console.log(`  assignment.swappedFromName: ${myTask.assignment?.swappedFromName}`);
-            console.log(`  myTask.swappedFromName: ${myTask.swappedFromName}`);
-            console.log(`  assignment.swapScope: ${myTask.assignment?.swapScope}`);
-            console.log(`  myTask.swapScope: ${myTask.swapScope}`);
-            console.log(`  assignment.swapDay: ${myTask.assignment?.swapDay}`);
-            console.log(`  myTask.swapDay: ${myTask.swapDay}`);
-            
-            // Check if this task has swap info
-            const hasSwap = 
-              myTask.assignment?.acquiredViaSwap === true ||
-              myTask.acquiredViaSwap === true;
-            
-            if (hasSwap) {
-              console.log(`✅✅✅ SWAPPED TASK FOUND: ${myTask.title}`);
-              const swapData = {
-                acquiredViaSwap: true,
-                swappedFromName: myTask.assignment?.swappedFromName || myTask.swappedFromName || null,
-                swapScope: myTask.assignment?.swapScope || myTask.swapScope || null,
-                swapDay: myTask.assignment?.swapDay || myTask.swapDay || null
-              };
-              console.log(`  Storing swap data:`, swapData);
-              swapInfoMap.set(myTask.id, swapData);
-            } else {
-              console.log(`  ❌ No swap info for this task`);
-            }
-          });
-        } else {
-          console.log('⚠️ myTasksResult failed or has no tasks:', myTasksResult);
-        }
-        
-        console.log(`\n📊 [4] swapInfoMap size: ${swapInfoMap.size}`);
-        console.log('swapInfoMap contents:', Array.from(swapInfoMap.entries()));
-        
-        // Process tasks - add swap info to each task
-        console.log('\n🔄 [5] Processing group tasks to add swap info...');
-        const processedTasks = (tasksResult.tasks || []).map((task: any, index: number) => {
-          const swapInfo = swapInfoMap.get(task.id);
-          
-          console.log(`\n--- Group Task ${index + 1}: "${task.title}" (ID: ${task.id}) ---`);
-          console.log(`  Found swap info: ${!!swapInfo}`);
-          if (swapInfo) {
-            console.log(`  ✅ ADDING SWAP INFO to task:`, swapInfo);
-          } else {
-            console.log(`  ❌ No swap info for this task`);
-          }
-          
-          return {
-            ...task,
-            acquiredViaSwap: swapInfo?.acquiredViaSwap || false,
-            swappedFromName: swapInfo?.swappedFromName || null,
-            swapScope: swapInfo?.swapScope || null,
-            swapDay: swapInfo?.swapDay || null
-          };
+        console.log('\n📊 [2] Tasks from getGroupTasks (with swap info already attached):');
+        tasksResult.tasks?.forEach((task: any, idx: number) => {
+          console.log(`   Task ${idx + 1}: "${task.title}"`);
+          console.log(`      acquiredViaSwap: ${task.acquiredViaSwap}`);
+          console.log(`      swapScope: ${task.swapScope}`);
+          console.log(`      swappedFromName: ${task.swappedFromName}`);
         });
         
-        setTasks(processedTasks);
-        console.log('\n✅ [6] FINAL PROCESSED TASKS:');
-        console.log(`  Total tasks: ${processedTasks.length}`);
-        console.log(`  Swapped tasks: ${processedTasks.filter((t: any) => t.acquiredViaSwap).length}`);
-        processedTasks.forEach((task: any) => {
-          if (task.acquiredViaSwap) {
-            console.log(`  🔄 SWAPPED: "${task.title}" - from: ${task.swappedFromName}, scope: ${task.swapScope}`);
-          }
-        });
+        setTasks(tasksResult.tasks || []);
+        
+        const swappedCount = tasksResult.tasks?.filter((t: any) => t.acquiredViaSwap).length || 0;
+        console.log(`\n✅ [3] FINAL PROCESSED TASKS:`);
+        console.log(`  Total tasks: ${tasksResult.tasks?.length || 0}`);
+        console.log(`  Swapped tasks: ${swappedCount}`);
         
       } else {
         console.log('❌ tasksResult.success is false:', tasksResult);
@@ -167,7 +99,7 @@ export const useTaskAssignment = (groupId: string) => {
         }
       }
 
-      console.log('\n📡 [7] Getting members...');
+      console.log('\n📡 [4] Getting members...');
       const membersResult = await GroupMembersService.getGroupMembers(groupId);
       if (membersResult.success) {
         setMembers(membersResult.members || []);
@@ -178,7 +110,7 @@ export const useTaskAssignment = (groupId: string) => {
         setAuthError(true);
       }
 
-      console.log('\n📡 [8] Getting group info...');
+      console.log('\n📡 [5] Getting group info...');
       const groupResult = await GroupMembersService.getGroupInfo(groupId);
       if (groupResult.success) {
         setGroupInfo(groupResult.group);

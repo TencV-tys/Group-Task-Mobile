@@ -1,9 +1,9 @@
-// App.tsx - CLEAN VERSION (No Network Banner)
+// App.tsx - WITH AUTO-LOGIN
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import * as Linking from 'expo-linking';
-import { Text, View, Platform } from 'react-native';
+import { Text, View, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
@@ -12,7 +12,9 @@ import AppNavigator from './src/navigation/AppNavigator';
 import { SocketProvider } from './src/context/SocketContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { TokenUtils } from './src/utils/tokenUtils';
+import { AuthService } from './src/services/AuthService';
 import { API_BASE_URL } from './src/config/api';
+import { SocketAuthBridge } from './src/components/SocketAuthBridge';
 
 // Create navigation ref for handling notification taps
 export const navigationRef = React.createRef<any>();
@@ -240,38 +242,76 @@ async function handleNotificationResponse(response: Notifications.NotificationRe
 export default function App() {
   const notificationListener = useRef<any>(null);
   const responseListener = useRef<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [initialRoute, setInitialRoute] = useState<'Login' | 'Home'>('Login');
 
-  useEffect(() => {
-    registerForPushNotifications();
+ useEffect(() => {
+  const checkAutoLogin = async () => {
+    console.log('🔍 Checking for existing session...');
     
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('📨 Notification received in foreground:', notification);
-    });
+    // Small delay for storage to be ready
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const result = await AuthService.autoLogin();
+    
+    if (result.success) {
+      console.log('✅ Auto-login successful!');
+      setInitialRoute('Home');
+      
+      // Register push notifications after successful auto-login
+      registerForPushNotifications();
+    } else {
+      console.log('❌ No existing session or auto-login failed:', result.message);
+      setInitialRoute('Login');
+    }
+    
+    setIsLoading(false);
+  };
+  
+  checkAutoLogin();
+  
+  // Set up notification listeners
+  const notificationSubscription = Notifications.addNotificationReceivedListener(notification => {
+    console.log('📨 Notification received in foreground:', notification);
+  });
 
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(
-      handleNotificationResponse
+  const responseSubscription = Notifications.addNotificationResponseReceivedListener(
+    handleNotificationResponse
+  );
+  
+  return () => {
+    notificationSubscription.remove();
+    responseSubscription.remove();
+  };
+}, []);
+
+  // Show loading screen while checking auto-login
+  if (isLoading) {
+    return (
+      <SafeAreaProvider>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+          <ActivityIndicator size="large" color="#4F46E5" />
+          <Text style={{ marginTop: 20, color: '#6B7280', fontSize: 14 }}>Checking session...</Text>
+        </View>
+      </SafeAreaProvider>
     );
-    
-    return () => {
-      notificationListener.current = null;
-      responseListener.current = null;
-    };
-  }, []);
+  }
 
   return (
     <SafeAreaProvider>
       <ThemeProvider>
         <SocketProvider>
+            <SocketAuthBridge /> 
           <NavigationContainer
             ref={navigationRef}
             linking={linking}
             fallback={
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ marginTop: 50, textAlign: 'center' }}>Loading...</Text>
+                <Text>Loading...</Text>
               </View>
             }
           >
-            <AppNavigator />
+            <AppNavigator initialRoute={initialRoute} />
           </NavigationContainer>
         </SocketProvider>
       </ThemeProvider>

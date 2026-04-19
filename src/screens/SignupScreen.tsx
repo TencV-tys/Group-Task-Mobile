@@ -539,7 +539,7 @@ export default function SignupScreen({ navigation }: any) {
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Password *</Text>
                 <PasswordInput
-                  placeholder="At least 8 chars, 1 uppercase, 1 number, 1 special"
+                  placeholder="Enter password"
                   value={formData.password}
                   onChangeText={(t: string) => { handleChange('password', t); touch('password'); }}
                   editable={!loading}

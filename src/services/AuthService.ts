@@ -10,11 +10,11 @@ const API_URL = `${API_BASE_URL}/api/auth/users`;
 let socketLoginCallback: (() => Promise<void>) | null = null;
 let socketLogoutCallback: (() => void) | null = null;
 
-export const setSocketLoginCallback = (callback: () => Promise<void>) => {
+export const setSocketLoginCallback = (callback: (() => Promise<void>) | null) => {
   socketLoginCallback = callback;
 };
 
-export const setSocketLogoutCallback = (callback: () => void) => {
+export const setSocketLogoutCallback = (callback: (() => void) | null) => {
   socketLogoutCallback = callback;
 };
 
@@ -578,4 +578,98 @@ static async signup(data: {
             };
         }
     }
+
+    // Add this method to your AuthService class (after isAuthenticated or before login)
+
+static async autoLogin(): Promise<any> {
+  try {
+    console.log('🔄 Attempting auto-login...');
+    
+    // Check if tokens exist
+    const accessToken = await this.getAccessToken();
+    const refreshToken = await this.getRefreshToken();
+    
+    if (!accessToken || !refreshToken) {
+      console.log('❌ No tokens found, skipping auto-login');
+      return { success: false, message: "No saved session" };
+    }
+    
+    console.log('✅ Tokens found, verifying with server...');
+    
+    // Try to fetch user data with existing token
+    const response = await fetch(`${API_URL}/me`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // If token is expired, try to refresh
+    if (response.status === 401) {
+      console.log('🔑 Access token expired, attempting refresh...');
+      const newToken = await this.refreshAccessToken();
+      
+      if (newToken) {
+        // Retry with new token
+        const retryResponse = await fetch(`${API_URL}/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${newToken}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const retryResult = await retryResponse.json();
+        
+        if (retryResult.success && retryResult.user) {
+          await storeUserData(retryResult.user, newToken, refreshToken);
+          console.log('✅ Auto-login successful (refreshed token)');
+          
+          // Connect socket after auto-login
+          if (socketLoginCallback) {
+            await socketLoginCallback();
+          }
+          
+          return {
+            success: true,
+            user: retryResult.user,
+            message: "Auto-login successful"
+          };
+        }
+      }
+      
+      return { success: false, message: "Session expired, please login again" };
+    }
+    
+    const result = await response.json();
+    
+    if (result.success && result.user) {
+      // Update stored user data
+      await storeUserData(result.user, accessToken, refreshToken);
+      console.log('✅ Auto-login successful');
+      
+      // Connect socket after auto-login
+      if (socketLoginCallback) {
+        await socketLoginCallback();
+      }
+      
+      return {
+        success: true,
+        user: result.user,
+        message: "Auto-login successful"
+      };
+    }
+    
+    console.log('❌ Auto-login failed:', result.message);
+    return { success: false, message: result.message || "Auto-login failed" };
+    
+  } catch (error: any) {
+    console.error('Auto-login error:', error);
+    return {
+      success: false,
+      message: "Cannot connect to server"
+    };
+  }
+}
 }

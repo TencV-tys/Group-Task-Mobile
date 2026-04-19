@@ -53,9 +53,10 @@ import { FullLeaderboardScreen } from '../screens/FullLeaderboardScreen';
 
 const Stack = createStackNavigator();
 
-export default function AppNavigator() {
+
+export default function AppNavigator({ initialRoute = 'Login' }: { initialRoute?: string }) {
   return (
-    <Stack.Navigator initialRouteName="Login">
+    <Stack.Navigator initialRouteName={initialRoute}>
       {/* Auth Screens */}
       <Stack.Screen
         name="Login"

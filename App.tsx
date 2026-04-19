@@ -15,6 +15,7 @@ import { TokenUtils } from './src/utils/tokenUtils';
 import { AuthService } from './src/services/AuthService';
 import { API_BASE_URL } from './src/config/api';
 import { SocketAuthBridge } from './src/components/SocketAuthBridge';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Create navigation ref for handling notification taps
 export const navigationRef = React.createRef<any>();
@@ -83,6 +84,22 @@ const linking = {
   },
 };
 
+// Add this to clear all report keys on app start (temporary fix)
+const clearAllReportKeys = async () => {
+  try {
+    const allKeys = await AsyncStorage.getAllKeys();
+    const reportKeys = allKeys.filter(key => key.includes('last_report_'));
+    for (const key of reportKeys) {
+      await AsyncStorage.removeItem(key);
+      console.log(`🧹 Cleared report key: ${key}`);
+    }
+  } catch (error) {
+    console.error('Error clearing report keys:', error);
+  }
+};
+
+// Call this once when app starts
+clearAllReportKeys();
 // Register for push notifications
 async function registerForPushNotifications() {
   if (!Device.isDevice) {
@@ -301,7 +318,7 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <SocketProvider>
-            <SocketAuthBridge /> 
+          <SocketAuthBridge /> 
           <NavigationContainer
             ref={navigationRef}
             linking={linking}

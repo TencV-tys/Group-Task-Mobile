@@ -10,13 +10,13 @@ import {
   TextInput,
   ScrollView,
   Alert,
-  ActivityIndicator,
+  ActivityIndicator, 
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons'; 
 import { TokenUtils } from '../utils/tokenUtils';
 import { useTheme } from '../context/ThemeContext';
 import { useSocket } from '../context/SocketContext';
@@ -71,47 +71,6 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     return hasToken;
   }, []);
 
- // In ReportModal.tsx - Use local date comparison
-const checkLastReportTime = useCallback(async () => {
-  try {
-    const storageKey = `last_report_${groupId}`;
-    const lastTimeStr = await AsyncStorage.getItem(storageKey);
-    
-    if (lastTimeStr) {
-      const lastReportDate = new Date(parseInt(lastTimeStr));
-      const now = new Date();
-      
-      // ✅ Use LOCAL date (not UTC)
-      const isSameDay = 
-        lastReportDate.getFullYear() === now.getFullYear() &&
-        lastReportDate.getMonth() === now.getMonth() &&
-        lastReportDate.getDate() === now.getDate();
-      
-      if (isSameDay) {
-        // Calculate time until LOCAL midnight
-        const endOfDay = new Date(now);
-        endOfDay.setHours(23, 59, 59, 999);
-        const remainingMs = endOfDay.getTime() - now.getTime();
-        const remainingHours = Math.ceil(remainingMs / (1000 * 60 * 60));
-        
-        setTimeRemaining(remainingHours);
-        setCanReport(false);
-        return false;
-      } else {
-        await AsyncStorage.removeItem(storageKey);
-        setCanReport(true);
-        setTimeRemaining(0);
-        return true;
-      }
-    } else {
-      setCanReport(true);
-      return true;
-    }
-  } catch (error) {
-    console.error('Error checking last report time:', error);
-    return true;
-  }
-}, [groupId]);
 
 // ✅ Update getTimeRemainingText to show time until midnight
 const getTimeRemainingText = () => {
@@ -122,19 +81,146 @@ const getTimeRemainingText = () => {
   }
   return '';
 };
+// In ReportModal.tsx - REPLACE these functions
 
-  // ✅ Store report time after successful submission
-  const storeReportTime = useCallback(async () => {
-    try {
-      const storageKey = `last_report_${groupId}`;
-      await AsyncStorage.setItem(storageKey, Date.now().toString());
-      setCanReport(false);
-      setTimeRemaining(24);
-      setLastReportTime(Date.now());
-    } catch (error) {
-      console.error('Error storing report time:', error);
+// In ReportModal.tsx - REPLACE checkLastReportTime with this
+
+const checkLastReportTime = useCallback(async () => {
+  try {
+    // Get current user ID
+    const user = await TokenUtils.getUser();
+    const userId = user?.id || 'unknown';
+    
+    // ✅ ONLY check for the CURRENT group, not all groups
+    const storageKey = `last_report_${groupId}_${userId}`;
+    
+    const lastTimeStr = await AsyncStorage.getItem(storageKey);
+    
+    if (lastTimeStr) {
+      const lastReportDate = new Date(parseInt(lastTimeStr));
+      const now = new Date();
+      
+      // Check if same LOCAL day
+      const isSameDay = 
+        lastReportDate.getFullYear() === now.getFullYear() &&
+        lastReportDate.getMonth() === now.getMonth() &&
+        lastReportDate.getDate() === now.getDate();
+      
+      if (isSameDay) {
+        // Calculate hours until midnight LOCAL
+        const endOfDay = new Date(now);
+        endOfDay.setHours(23, 59, 59, 999);
+        const remainingMs = endOfDay.getTime() - now.getTime();
+        const remainingHours = Math.ceil(remainingMs / (1000 * 60 * 60));
+        
+        setTimeRemaining(remainingHours);
+        setCanReport(false);
+        console.log(`⚠️ Already reported group ${groupId} today. Hours remaining: ${remainingHours}`);
+        return false;
+      } else {
+        // Different day, clear the old key
+        await AsyncStorage.removeItem(storageKey);
+        setCanReport(true);
+        setTimeRemaining(0);
+        console.log(`✅ Cleared old report key for group ${groupId}`);
+        return true;
+      }
+    } else {
+      console.log(`✅ No report found for group ${groupId}, can report`);
+      setCanReport(true);
+      return true;
     }
-  }, [groupId]);
+  } catch (error) {
+    console.error('Error checking last report time:', error);
+    setCanReport(true); // Default to allowing report on error
+    return true;
+  }
+}, [groupId]);
+
+// Add this temporarily to debug
+const debugStorage = useCallback(async () => {
+  const user = await TokenUtils.getUser();
+  const userId = user?.id || 'unknown';
+  const storageKey = `last_report_${groupId}_${userId}`;
+  const value = await AsyncStorage.getItem(storageKey);
+  console.log(`🔍 Storage key: ${storageKey}, value: ${value}`);
+  
+  // List all report-related keys
+  const allKeys = await AsyncStorage.getAllKeys();
+  const reportKeys = allKeys.filter(key => key.includes('last_report'));
+  console.log('🔍 All report keys:', reportKeys);
+}, [groupId]);
+
+// Call this in a useEffect to debug
+useEffect(() => {
+  if (visible) {
+    debugStorage();
+  }
+}, [visible, debugStorage]);
+
+// Add this to clear any stale report data from previous users
+useEffect(() => {
+  const clearStaleData = async () => {
+    try {
+      const user = await TokenUtils.getUser();
+      const userId = user?.id;
+      if (!userId) return;
+      
+      const storageKey = `last_report_${groupId}_${userId}`;
+      const existing = await AsyncStorage.getItem(storageKey);
+      
+      // If there's a value but it's from more than 24 hours ago, clear it
+      if (existing) {
+        const reportDate = new Date(parseInt(existing));
+        const now = new Date();
+        const diffHours = (now.getTime() - reportDate.getTime()) / (1000 * 60 * 60);
+        
+        if (diffHours > 24) {
+          await AsyncStorage.removeItem(storageKey);
+          console.log('✅ Cleared stale report data');
+        }
+      }
+    } catch (error) {
+      console.error('Error clearing stale data:', error);
+    }
+  };
+  
+  if (visible) {
+    clearStaleData();
+    checkLastReportTime();
+  }
+}, [visible, groupId, checkLastReportTime]);
+
+// ✅ Store report time with user-specific key
+const storeReportTime = useCallback(async () => {
+  try {
+    const user = await TokenUtils.getUser();
+    const userId = user?.id || 'unknown';
+    const storageKey = `last_report_${groupId}_${userId}`;
+    await AsyncStorage.setItem(storageKey, Date.now().toString());
+    setCanReport(false);
+    setTimeRemaining(24);
+    setLastReportTime(Date.now());
+    console.log(`✅ Stored report time for user ${userId}, group ${groupId}`);
+  } catch (error) {
+    console.error('Error storing report time:', error);
+  }
+}, [groupId]);
+
+// ✅ Clear the stored report time (for debugging)
+const clearReportTime = useCallback(async () => {
+  try {
+    const user = await TokenUtils.getUser();
+    const userId = user?.id || 'unknown';
+    const storageKey = `last_report_${groupId}_${userId}`;
+    await AsyncStorage.removeItem(storageKey);
+    setCanReport(true);
+    setTimeRemaining(0);
+    console.log(`✅ Cleared report time for user ${userId}, group ${groupId}`);
+  } catch (error) {
+    console.error('Error clearing report time:', error);
+  }
+}, [groupId]);
 
   // ✅ Check rate limit when modal opens
   useEffect(() => {

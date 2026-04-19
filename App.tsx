@@ -1,4 +1,4 @@
-// App.tsx - FINAL CLEAN VERSION
+// App.tsx - FULLY FIXED WITH SOCKET CONNECTION
 
 import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -257,13 +257,26 @@ export default function App() {
     cleanup();
   }, []);
 
-  // Main app initialization
+  // Set up notification listeners
+  useEffect(() => {
+    const notificationSubscription = Notifications.addNotificationReceivedListener(notification => {
+      console.log('📨 Notification received in foreground:', notification);
+    });
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
+      handleNotificationResponse
+    );
+    
+    return () => {
+      notificationSubscription.remove();
+      responseSubscription.remove();
+    };
+  }, []);
+
+  // Auto-login check
   useEffect(() => { 
     const checkAutoLogin = async () => {
       console.log('🔍 Checking for existing session...');
-      
-      // Give time for SocketAuthBridge to register callbacks
-      await new Promise(resolve => setTimeout(resolve, 1500));
       
       const result = await AuthService.autoLogin();
       
@@ -280,30 +293,23 @@ export default function App() {
     };
     
     checkAutoLogin();
-    
-    // Set up notification listeners
-    const notificationSubscription = Notifications.addNotificationReceivedListener(notification => {
-      console.log('📨 Notification received in foreground:', notification);
-    });
-
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
-      handleNotificationResponse
-    );
-    
-    return () => {
-      notificationSubscription.remove();
-      responseSubscription.remove();
-    }; 
   }, []);
 
   // Show loading screen while checking auto-login
+  // ✅ IMPORTANT: SocketAuthBridge is INSIDE the loading screen
+  // This ensures it mounts BEFORE auto-login completes
   if (isLoading) {
     return (
       <SafeAreaProvider>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
-          <ActivityIndicator size="large" color="#4F46E5" />
-          <Text style={{ marginTop: 20, color: '#6B7280', fontSize: 14 }}>Checking session...</Text>
-        </View>
+        <ThemeProvider>
+          <SocketProvider>
+            <SocketAuthBridge />
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+              <ActivityIndicator size="large" color="#4F46E5" />
+              <Text style={{ marginTop: 20, color: '#6B7280', fontSize: 14 }}>Checking session...</Text>
+            </View>
+          </SocketProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     );
   }
@@ -312,14 +318,14 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <SocketProvider>
-          <SocketAuthBridge /> 
+          <SocketAuthBridge />
           <NavigationContainer
             ref={navigationRef}
             linking={linking}
             fallback={
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <Text>Loading...</Text>
-              </View> 
+              </View>
             }
           >
             <AppNavigator initialRoute={initialRoute} />

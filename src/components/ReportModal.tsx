@@ -158,6 +158,7 @@ useEffect(() => {
   }
 }, [visible, debugStorage]);
 
+
 // Add this to clear any stale report data from previous users
 useEffect(() => {
   const clearStaleData = async () => {
@@ -262,95 +263,95 @@ if (visible && !canReport && !submitting) {
     }
   }, [authError, visible, navigation, onClose]);
 
-  const handleSubmit = async () => {
-    const hasToken = await checkToken();
-    if (!hasToken) return;
+ // In ReportModal.tsx - Fix the handleSubmit function
 
-    // ✅ Check rate limit BEFORE sending request
-    if (!canReport) {
+const handleSubmit = async () => {
+  const hasToken = await checkToken();
+  if (!hasToken) return;
+
+  // ✅ Check rate limit BEFORE sending request
+  if (!canReport) {
+    Alert.alert(
+      'Rate Limit Exceeded',
+      `You have already reported this group. Please wait ${timeRemaining} hour${timeRemaining !== 1 ? 's' : ''} before submitting another report.`,
+      [{ text: 'OK', onPress: () => handleClose() }]
+    );
+    return;
+  }
+
+  if (!selectedReason) {
+    Alert.alert('Error', 'Please select a reason');
+    return;
+  }
+  if (step === 'reason') {
+    setStep('description');
+    return;
+  }
+  if (!description.trim()) {
+    Alert.alert('Error', 'Please provide a description');
+    return;
+  }
+
+  setSubmitting(true);
+  try {
+    await onSubmit({ type: selectedReason, description: description.trim() });
+    
+    // ✅ ONLY store the report time on SUCCESSFUL submission
+    // Remove the automatic storeReportTime() call - let the backend tell us if it was successful
+    
+    Alert.alert(
+      'Report Submitted',
+      `Thank you for helping keep our community safe.\n\nYour report has been submitted and will be reviewed by our team.${
+        isConnected ? ' You will receive updates in real-time.' : ' You will be notified when a decision is made.'
+      }`,
+      [{ text: 'OK', onPress: handleClose }]
+    );
+  } catch (error: any) {
+    console.error('❌ Report submission error:', error);
+    
+    const errorMessage = error?.message || error?.toString() || 'Unknown error';
+    const errorLower = errorMessage.toLowerCase();
+    
+    // ✅ Handle backend rate limit error
+    if (errorMessage.includes('429') || errorLower.includes('rate limit') || errorLower.includes('wait 24 hours')) {
       Alert.alert(
-        'Rate Limit Exceeded',
-        `You have already reported this group. Please wait ${timeRemaining} hour${timeRemaining !== 1 ? 's' : ''} before submitting another report.`,
-        [{ text: 'OK', onPress: () => handleClose() }]
+        '⚠️ Rate Limit Exceeded',
+        'You have already reported this group recently.\n\nPlease wait 24 hours before submitting another report.',
+        [{ text: 'OK', onPress: () => {
+          // Refresh the rate limit check from backend
+          checkLastReportTime();
+        }}]
       );
-      return;
-    }
-
-    if (!selectedReason) {
-      Alert.alert('Error', 'Please select a reason');
-      return;
-    }
-    if (step === 'reason') {
-      setStep('description');
-      return;
-    }
-    if (!description.trim()) {
-      Alert.alert('Error', 'Please provide a description');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await onSubmit({ type: selectedReason, description: description.trim() });
-      
-      // ✅ Store the report time on successful submission
-      await storeReportTime();
-      
+    } 
+    else if (errorLower.includes('already reported')) {
+      // ✅ Backend says already reported - store the time from backend response
       Alert.alert(
-        'Report Submitted',
-        `Thank you for helping keep our community safe.\n\nYour report has been submitted and will be reviewed by our team.${
-          isConnected ? ' You will receive updates in real-time.' : ' You will be notified when a decision is made.'
-        }`,
+        'Already Reported',
+        'You have already reported this group. Our team is reviewing your previous report.',
         [{ text: 'OK', onPress: handleClose }]
       );
-    } catch (error: any) {
-      console.error('❌ Report submission error:', error);
-      
-      const errorMessage = error?.message || error?.toString() || 'Unknown error';
-      const errorLower = errorMessage.toLowerCase();
-      
-      // ✅ Handle backend rate limit error (just in case)
-      if (errorMessage.includes('429') || errorLower.includes('rate limit') || errorLower.includes('wait 24 hours')) {
-        // Store the time even if backend rejected? No, only store on success
-        Alert.alert(
-          '⚠️ Rate Limit Exceeded',
-          'You have already reported this group recently.\n\nPlease wait 24 hours before submitting another report.',
-          [{ text: 'OK', onPress: () => {
-            // Refresh the rate limit check
-            checkLastReportTime();
-            handleClose();
-          }}]
-        );
-      } 
-      else if (errorLower.includes('already reported')) {
-        await storeReportTime(); // Store time since backend says already reported
-        Alert.alert(
-          'Already Reported',
-          'You have already reported this group. Our team is reviewing your previous report.',
-          [{ text: 'OK', onPress: handleClose }]
-        );
-      }
-      else if (errorLower.includes('token') || errorLower.includes('auth') || errorLower.includes('unauthorized')) {
-        setAuthError(true);
-      }
-      else if (errorLower.includes('network') || errorLower.includes('connection')) {
-        Alert.alert(
-          'Network Error',
-          'Unable to submit report. Please check your internet connection and try again.',
-          [{ text: 'OK' }]
-        );
-      }
-      else {
-        Alert.alert(
-          'Submission Failed',
-          errorMessage || 'Failed to submit report. Please try again later.',
-          [{ text: 'OK' }]
-        );
-      }
-    } finally {
-      setSubmitting(false);
     }
-  };
+    else if (errorLower.includes('token') || errorLower.includes('auth') || errorLower.includes('unauthorized')) {
+      setAuthError(true);
+    }
+    else if (errorLower.includes('network') || errorLower.includes('connection')) {
+      Alert.alert(
+        'Network Error',
+        'Unable to submit report. Please check your internet connection and try again.',
+        [{ text: 'OK' }]
+      );
+    } 
+    else {
+      Alert.alert(
+        'Submission Failed',
+        errorMessage || 'Failed to submit report. Please try again later.',
+        [{ text: 'OK' }]
+      );
+    }
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const handleClose = () => {
     setSelectedReason('');

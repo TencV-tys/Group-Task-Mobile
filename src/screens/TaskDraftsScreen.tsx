@@ -1,4 +1,4 @@
-// screens/TaskDraftsScreen.tsx - FIXED VERSION (no function in params)
+// screens/TaskDraftsScreen.tsx - WITH FLOATING ACTION BUTTON
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -17,14 +17,15 @@ import { useFocusEffect } from '@react-navigation/native';
 import { TaskDraftService, TaskDraft } from '../services/TaskDraftService';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TaskDraftsScreen({ navigation, route }: any) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { groupId, groupName } = route.params || {};
   const [drafts, setDrafts] = useState<TaskDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [hasNavigated, setHasNavigated] = useState(false);
 
   const loadDrafts = useCallback(async () => {
     try {
@@ -36,20 +37,13 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
       }
       console.log('📋 Loaded drafts:', draftsList.length);
       setDrafts(draftsList);
-      
-      // ✅ FIXED: Don't auto-redirect, just show empty state
-      // Let the user manually create a task
-      if (draftsList.length === 0 && groupId && !hasNavigated) {
-        console.log('📋 No drafts found, showing empty state');
-        // Don't auto-redirect - just show empty state
-      }
     } catch (error) {
       console.error('Error loading drafts:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [groupId, hasNavigated]);
+  }, [groupId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -77,7 +71,6 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
 
   const handleCreateFromDraft = (draft: TaskDraft) => {
     console.log('🚀 Creating from draft:', draft.title);
-    // ✅ FIXED: Don't pass functions as params
     navigation.navigate('CreateTask', {
       groupId: draft.groupId,
       groupName: draft.groupName,
@@ -87,7 +80,6 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
   };
 
   const handleCreateNewTask = () => {
-    // ✅ FIXED: Don't pass functions as params
     navigation.navigate('CreateTask', {
       groupId,
       groupName
@@ -212,23 +204,39 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={drafts}
-          renderItem={renderDraft}
-          keyExtractor={item => item.id}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => {
-                setRefreshing(true);
-                loadDrafts();
-              }}
-              colors={[theme.primary]}
-              tintColor={theme.primary}
-            />
-          }
-          contentContainerStyle={styles.listContainer}
-        />
+        <>
+          <FlatList
+            data={drafts}
+            renderItem={renderDraft}
+            keyExtractor={item => item.id}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  setRefreshing(true);
+                  loadDrafts();
+                }}
+                colors={[theme.primary]}
+                tintColor={theme.primary}
+              />
+            }
+            contentContainerStyle={styles.listContainer}
+          />
+          
+          {/* ✅ FLOATING ACTION BUTTON - Always visible when there are drafts */}
+          <View style={[styles.fabContainer, { bottom: 20 + insets.bottom }]}>
+            <TouchableOpacity onPress={handleCreateNewTask}>
+              <LinearGradient
+                colors={[theme.primary, theme.primaryDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.fab}
+              >
+                <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </>
       )}
     </ScreenWrapper>
   );
@@ -285,6 +293,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 16,
+    paddingBottom: 80,
   },
   draftCard: {
     borderRadius: 12,
@@ -395,5 +404,23 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
+  },
+  // ✅ Floating Action Button styles
+  fabContainer: {
+    position: 'absolute',
+    right: 20,
+    zIndex: 100,
+  },
+  fab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
 });

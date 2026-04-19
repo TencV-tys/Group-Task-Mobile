@@ -12,6 +12,7 @@ interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
   isNetworkAvailable: boolean;
+   isAuthenticated: boolean;
   networkType: string | null;
   joinGroup: (groupId: string) => void;
   leaveGroup: (groupId: string) => void;
@@ -102,6 +103,25 @@ const rejoinGroups = useCallback(async () => {
   return true;
 }, [socket]);
 
+// In SocketContext.tsx - Add this to prevent duplicate connections
+
+useEffect(() => {
+  // Cleanup function for component unmount
+  return () => {
+    console.log('🧹 SocketContext unmounting, cleaning up...');
+    if (socket) {
+      socket.removeAllListeners();
+      socket.disconnect();
+    }
+    if (pingIntervalRef.current) {
+      clearInterval(pingIntervalRef.current);
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+    isConnectingRef.current = false;
+  };
+}, [socket]);
 
   // ✅ Connect socket function - ONLY called when authenticated
   const connectSocket = useCallback(async () => {
@@ -138,6 +158,7 @@ const rejoinGroups = useCallback(async () => {
         socket.connect();
         return;
       }
+  
 
       isConnectingRef.current = true;
       console.log(`🔌 Socket: Connecting to ${API_BASE_URL}`);
@@ -548,6 +569,7 @@ useEffect(() => {
     <SocketContext.Provider value={{
       socket,
       isConnected,
+       isAuthenticated,
       isNetworkAvailable,
       networkType,
       joinGroup,

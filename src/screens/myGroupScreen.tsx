@@ -147,11 +147,26 @@ export default function MyGroupsScreen({ navigation }: any) {
     setReportModalVisible(true);
   };
 
-  const handleSubmitReport = async (data: { type: string; description: string }) => {
-    if (!selectedGroupForReport) return;
+// In MyGroupsScreen.tsx - Update handleSubmitReport
+
+const handleSubmitReport = async (data: { type: string; description: string }) => {
+  if (!selectedGroupForReport) return;
+  
+  try {
+    const result = await ReportService.submitGroupReport(selectedGroupForReport.id, data);
     
-    await ReportService.submitGroupReport(selectedGroupForReport.id, data);
-  };
+    if (!result.success) {
+      // ✅ Throw error with the message from backend
+      throw new Error(result.message || 'Failed to submit report');
+    }
+    
+    // ✅ Only store on success - let the backend response determine success
+    return result;
+  } catch (error: any) {
+    console.error('Report submission error:', error);
+    throw error;
+  }
+};
 
   const filteredGroups = groups.filter(group => 
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

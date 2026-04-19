@@ -738,4 +738,19 @@ export const makeCreateTaskStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '500',
     lineHeight: 16,
   },
+addMembersButton: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+  borderRadius: 8,
+  gap: 8,
+  alignSelf: 'flex-start',
+},
+addMembersButtonText: {
+  color: '#fff',
+  fontSize: 13,
+  fontWeight: '600',
+},
 });

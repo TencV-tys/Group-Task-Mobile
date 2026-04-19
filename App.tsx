@@ -1,4 +1,4 @@
-// App.tsx - WITH AUTO-LOGIN
+// App.tsx - FINAL CLEAN VERSION
 
 import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -84,22 +84,6 @@ const linking = {
   },
 };
 
-// Add this to clear all report keys on app start (temporary fix)
-const clearAllReportKeys = async () => {
-  try {
-    const allKeys = await AsyncStorage.getAllKeys();
-    const reportKeys = allKeys.filter(key => key.includes('last_report_'));
-    for (const key of reportKeys) {
-      await AsyncStorage.removeItem(key);
-      console.log(`🧹 Cleared report key: ${key}`);
-    }
-  } catch (error) {
-    console.error('Error clearing report keys:', error);
-  }
-};
-
-// Call this once when app starts
-clearAllReportKeys();
 // Register for push notifications
 async function registerForPushNotifications() {
   if (!Device.isDevice) {
@@ -257,50 +241,60 @@ async function handleNotificationResponse(response: Notifications.NotificationRe
 }
 
 export default function App() {
-  const notificationListener = useRef<any>(null);
-  const responseListener = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState<'Login' | 'Home'>('Login');
 
- useEffect(() => {
-  const checkAutoLogin = async () => {
-    console.log('🔍 Checking for existing session...');
-    
-    // Small delay for storage to be ready
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const result = await AuthService.autoLogin();
-    
-    if (result.success) {
-      console.log('✅ Auto-login successful!');
-      setInitialRoute('Home');
-      
-      // Register push notifications after successful auto-login
-      registerForPushNotifications();
-    } else {
-      console.log('❌ No existing session or auto-login failed:', result.message);
-      setInitialRoute('Login');
-    }
-    
-    setIsLoading(false);
-  };
-  
-  checkAutoLogin();
-  
-  // Set up notification listeners
-  const notificationSubscription = Notifications.addNotificationReceivedListener(notification => {
-    console.log('📨 Notification received in foreground:', notification);
-  });
+  // Clean up report keys on mount
+  useEffect(() => {
+    const cleanup = async () => {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const reportKeys = allKeys.filter(key => key.includes('last_report_'));
+      for (const key of reportKeys) {
+        await AsyncStorage.removeItem(key);
+        console.log(`🧹 Cleared report key: ${key}`);
+      }
+    };
+    cleanup();
+  }, []);
 
-  const responseSubscription = Notifications.addNotificationResponseReceivedListener(
-    handleNotificationResponse
-  );
-  
-  return () => {
-    notificationSubscription.remove();
-    responseSubscription.remove();
-  };
-}, []);
+  // Main app initialization
+  useEffect(() => { 
+    const checkAutoLogin = async () => {
+      console.log('🔍 Checking for existing session...');
+      
+      // Give time for SocketAuthBridge to register callbacks
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const result = await AuthService.autoLogin();
+      
+      if (result.success) {
+        console.log('✅ Auto-login successful!');
+        setInitialRoute('Home');
+        registerForPushNotifications();
+      } else {
+        console.log('❌ No existing session or auto-login failed:', result.message);
+        setInitialRoute('Login');
+      }
+      
+      setIsLoading(false);
+    };
+    
+    checkAutoLogin();
+    
+    // Set up notification listeners
+    const notificationSubscription = Notifications.addNotificationReceivedListener(notification => {
+      console.log('📨 Notification received in foreground:', notification);
+    });
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
+      handleNotificationResponse
+    );
+    
+    return () => {
+      notificationSubscription.remove();
+      responseSubscription.remove();
+    }; 
+  }, []);
 
   // Show loading screen while checking auto-login
   if (isLoading) {
@@ -325,7 +319,7 @@ export default function App() {
             fallback={
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
                 <Text>Loading...</Text>
-              </View>
+              </View> 
             }
           >
             <AppNavigator initialRoute={initialRoute} />

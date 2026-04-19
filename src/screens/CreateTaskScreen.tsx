@@ -1,4 +1,4 @@
-// src/screens/CreateTaskScreen.tsx - WITH UNIQUE POINTS WARNING
+// src/screens/CreateTaskScreen.tsx - WITH MEMBERS IN ROTATION INDICATOR
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-
+ 
 import { useTheme } from '../context/ThemeContext';
 import { makeCreateTaskStyles } from '../styles/createTask.styles';
 import { useCreateTask } from '../taskHook/useCreateTask';
@@ -25,7 +25,8 @@ import { TimeSlotModal } from '../components/TimeSlotModal';
 import { DAY_OF_WEEK_OPTIONS } from '../utils/timeUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { TaskDraftService } from '../services/TaskDraftService';
-import { TaskService } from '../services/TaskService'; // ✅ ADD THIS IMPORT
+import { TaskService } from '../services/TaskService';
+import { GroupMembersService } from '../services/GroupMemberService';
 
 type Category = 'Work' | 'Study' | 'Chores' | 'Other' | '';
 
@@ -102,8 +103,13 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [customCategory, setCustomCategory] = useState('');
   
-  // ✅ ADD THIS: State for existing points in the group
+  // Existing points in the group
   const [existingPoints, setExistingPoints] = useState<number[]>([]);
+  
+  // ✅ NEW: Members in rotation state
+  const [hasMembersInRotation, setHasMembersInRotation] = useState<boolean>(true);
+  const [memberCount, setMemberCount] = useState<number>(0);
+  const [membersInRotationCount, setMembersInRotationCount] = useState<number>(0);
 
   const totalPoints = parseInt(form.points, 10) || 0;
   const usedPoints = form.timeSlots.reduce(
@@ -113,7 +119,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
   const remainingPoints = totalPoints - usedPoints;
   const canAddMoreSlots = remainingPoints > 0 && form.timeSlots.length < 10;
 
-  // ✅ ADD THIS: Fetch existing task points when component mounts
+  // Fetch existing task points when component mounts
   useEffect(() => {
     const fetchExistingPoints = async () => {
       if (!groupId) return;
@@ -131,6 +137,27 @@ export default function CreateTaskScreen({ navigation, route }: any) {
       }
     };
     fetchExistingPoints();
+  }, [groupId]);
+
+  // ✅ NEW: Fetch members to check if there are members in rotation
+  useEffect(() => {
+    const fetchMembers = async () => {
+      if (!groupId) return;
+      try {
+        const result = await GroupMembersService.getGroupMembers(groupId);
+        if (result.success && result.members) {
+          const allMembers = result.members.filter((m: any) => m.isActive === true);
+          const membersInRotation = allMembers.filter((m: any) => m.inRotation === true);
+          setMemberCount(allMembers.length);
+          setMembersInRotationCount(membersInRotation.length);
+          setHasMembersInRotation(membersInRotation.length > 0);
+          console.log('📊 Members in rotation:', membersInRotation.length, 'Total members:', allMembers.length);
+        }
+      } catch (err) {
+        console.error('Error fetching members:', err);
+      }
+    };
+    fetchMembers();
   }, [groupId]);
 
   const getSuggestedPoints = useCallback(() => {
@@ -358,7 +385,8 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     (form.executionFrequency === 'DAILY' && form.timeSlots.length === 0) ||
     !weeklyDaysOk ||
     loading ||
-    existingPoints.includes(totalPoints); // ✅ DISABLE if points already taken
+    existingPoints.includes(totalPoints) ||
+    (!hasMembersInRotation && memberCount <= 1); // ✅ Disable if no members in rotation
 
   const isDraftDisabled = () =>
     !form.title.trim() ||
@@ -443,7 +471,25 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     if (!groupId) return Alert.alert('Error', 'Group ID is missing');
     if (!form.title.trim()) return Alert.alert('Error', 'Please enter a task title');
 
-    // ✅ Check if points are unique before submitting
+    // ✅ Check if there are members in rotation
+    if (!hasMembersInRotation && memberCount <= 1) {
+      Alert.alert(
+        '⚠️ Cannot Create Task',
+        memberCount === 1
+          ? "You are the only member in this group. Add members to rotation before creating tasks, otherwise tasks won't be assigned."
+          : "This group has no members. Invite members first before creating tasks.",
+        [
+          { 
+            text: 'Go to Members', 
+            onPress: () => navigation.navigate('GroupMembers', { groupId, groupName, userRole: 'ADMIN' })
+          },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+      return;
+    }
+
+    // Check if points are unique before submitting
     if (existingPoints.includes(totalPoints)) {
       Alert.alert(
         '❌ Points Already Used',
@@ -530,8 +576,61 @@ export default function CreateTaskScreen({ navigation, route }: any) {
               </LinearGradient>
             )}
 
-            {/* Rotation Warning */}
-            {status && !status.hasEnoughTasks && status.totalTasks > 0 && (
+            {/* ✅ NO MEMBERS IN ROTATION WARNING */}
+            {!hasMembersInRotation && memberCount === 1 && (
+              <LinearGradient
+                colors={[theme.errorBg, theme.errorBg]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.warningContainer, { borderColor: theme.errorBorder, marginBottom: 16 }]}
+              >
+                <View style={styles.warningContent}>
+                  <MaterialCommunityIcons name="account-alert" size={24} color={theme.error} />
+                  <View style={styles.warningTextContainer}>
+                    <Text style={[styles.warningTitle, { color: theme.error }]}>⚠️ No Members in Rotation</Text>
+                    <Text style={[styles.warningMessage, { color: theme.error }]}>
+                      You are the only member in this group. Add members to rotation before creating tasks, otherwise tasks won't be assigned.
+                    </Text>
+                    <TouchableOpacity 
+                      style={[styles.addMembersButton, { backgroundColor: theme.error, marginTop: 8 }]}
+                      onPress={() => navigation.navigate('GroupMembers', { groupId, groupName, userRole: 'ADMIN' })}
+                    >
+                      <MaterialCommunityIcons name="account-plus" size={16} color="#fff" />
+                      <Text style={styles.addMembersButtonText}>Add Members to Rotation</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </LinearGradient>
+            )}
+
+            {!hasMembersInRotation && memberCount === 0 && (
+              <LinearGradient
+                colors={[theme.errorBg, theme.errorBg]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={[styles.warningContainer, { borderColor: theme.errorBorder, marginBottom: 16 }]}
+              >
+                <View style={styles.warningContent}>
+                  <MaterialCommunityIcons name="account-group" size={24} color={theme.error} />
+                  <View style={styles.warningTextContainer}>
+                    <Text style={[styles.warningTitle, { color: theme.error }]}>⚠️ No Members in Group</Text>
+                    <Text style={[styles.warningMessage, { color: theme.error }]}>
+                      This group has no members. Invite members first before creating tasks.
+                    </Text>
+                    <TouchableOpacity 
+                      style={[styles.addMembersButton, { backgroundColor: theme.error, marginTop: 8 }]}
+                      onPress={() => navigation.navigate('GroupMembers', { groupId, groupName, userRole: 'ADMIN' })}
+                    >
+                      <MaterialCommunityIcons name="account-plus" size={16} color="#fff" />
+                      <Text style={styles.addMembersButtonText}>Invite Members</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </LinearGradient>
+            )}
+
+            {/* Rotation Warning - only show if there ARE members in rotation */}
+            {hasMembersInRotation && status && !status.hasEnoughTasks && status.totalTasks > 0 && (
               <LinearGradient
                 colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
@@ -549,7 +648,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
             )}
 
             {/* No Tasks Info */}
-            {status && status.totalTasks === 0 && (
+            {hasMembersInRotation && status && status.totalTasks === 0 && (
               <LinearGradient
                 colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
@@ -641,7 +740,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                 </View>
 
                 {/* Points Suggestion Banner */}
-                {pointsSuggestion && (
+                {hasMembersInRotation && pointsSuggestion && (
                   <LinearGradient
                     colors={[theme.primaryLight, theme.primaryLight]}
                     start={{ x: 0, y: 0 }}
@@ -694,7 +793,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
                   <Text style={styles.errorText}>Points must be between 1 and 10</Text>
                 )}
 
-                {/* ✅ UNIQUE POINTS WARNING */}
+                {/* Unique Points Warning */}
                 {isPointAlreadyUsed && (
                   <LinearGradient
                     colors={[theme.errorBg, theme.errorBg]}

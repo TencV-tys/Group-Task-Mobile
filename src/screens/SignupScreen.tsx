@@ -533,7 +533,7 @@ export default function SignupScreen({ navigation }: any) {
                 selectedValue={formData.gender}
                 onValueChange={(v: string) => handleChange('gender', v)}
                 disabled={loading}
-              />
+              /> 
 
               {/* Password */}
               <View style={styles.inputGroup}>

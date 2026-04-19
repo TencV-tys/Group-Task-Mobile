@@ -78,29 +78,30 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     checkAuth();
   }, []);
 
-  // ✅ Function to re-join all previously joined groups
-  const rejoinGroups = useCallback(async () => {
-    if (!socket?.connected) {
-      console.log('⚠️ Cannot rejoin groups - socket not connected');
-      return false;
-    }
+const rejoinGroups = useCallback(async () => {
+  // Wait a bit for socket to be fully ready
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  if (!socket?.connected) {
+    console.log('⚠️ Cannot rejoin groups - socket not connected');
+    return false;
+  }
 
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const groups = Array.from(joinedGroupsRef.current);
-    if (groups.length === 0) {
-      return true;
-    }
-
-    console.log(`🔄 Rejoining ${groups.length} groups:`, groups);
-    
-    for (const groupId of groups) {
-      socket.emit('join-group', groupId);
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-    
+  const groups = Array.from(joinedGroupsRef.current);
+  if (groups.length === 0) {
     return true;
-  }, [socket]);
+  }
+
+  console.log(`🔄 Rejoining ${groups.length} groups:`, groups);
+  
+  for (const groupId of groups) {
+    socket.emit('join-group', groupId);
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  return true;
+}, [socket]);
+
 
   // ✅ Connect socket function - ONLY called when authenticated
   const connectSocket = useCallback(async () => {
@@ -165,23 +166,35 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
       }, 15000);
 
-      socketInstance.on('connect', async () => {
-        clearTimeout(connectionTimeout);
-        console.log('✅ Socket connected:', socketInstance.id);
-        setIsConnected(true);
-        setConnectionStats(prev => ({ ...prev, lastError: undefined }));
-        isConnectingRef.current = false;
-        networkReconnectAttempts.current = 0;
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        await rejoinGroups();
-        
-        listenersRef.current.forEach((callbacks, event) => {
-          callbacks.forEach(callback => {
-            socketInstance.on(event, callback as any);
-          });
-        });
-      });
+      // In connectSocket, after setting up the socket, add:
+socketInstance.on('connect', async () => {
+  clearTimeout(connectionTimeout);
+  console.log('✅ Socket connected:', socketInstance.id);
+  setIsConnected(true);
+  setConnectionStats(prev => ({ ...prev, lastError: undefined }));
+  isConnectingRef.current = false;
+  networkReconnectAttempts.current = 0;
+  
+  // Small delay to ensure socket is fully ready
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // Rejoin groups
+  const groups = Array.from(joinedGroupsRef.current);
+  if (groups.length > 0) {
+    console.log(`🔄 Rejoining ${groups.length} groups after connection`);
+    for (const groupId of groups) {
+      socketInstance.emit('join-group', groupId);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+  
+  // Re-register listeners
+  listenersRef.current.forEach((callbacks, event) => {
+    callbacks.forEach(callback => {
+      socketInstance.on(event, callback as any);
+    });
+  });
+});
 
       socketInstance.on('registered', (data) => {
         console.log('✅ Socket registered:', { userId: data.userId, groups: data.groups?.length });
@@ -309,6 +322,31 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [socket, connectSocket, isNetworkAvailable]);
 
+  // Add this useEffect to your SocketContext.tsx
+// This will attempt to reconnect when the app comes back to foreground
+useEffect(() => {
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  
+  const checkAndReconnect = async () => {
+    if (isAuthenticated && isNetworkAvailable) {
+      if (!socket?.connected) {
+        console.log('🔄 Socket disconnected, attempting to reconnect...');
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          connectSocket();
+        }, 1000);
+      }
+    }
+  };
+  
+  // Check periodically when socket is supposed to be connected
+  const interval = setInterval(checkAndReconnect, 5000);
+  
+  return () => {
+    clearInterval(interval);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+  };
+}, [isAuthenticated, isNetworkAvailable, socket?.connected, connectSocket]);
 
   // ✅ Monitor network status
   useEffect(() => {

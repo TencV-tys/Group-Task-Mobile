@@ -1,12 +1,12 @@
 // src/screens/CreateGroupScreen.tsx - Upgraded with Dark Mode & Performance
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo,useEffect } from 'react';
 import { 
   View, 
   Text, 
   TextInput, 
   TouchableOpacity, 
   Alert, 
-  ActivityIndicator,
+  ActivityIndicator, 
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -65,6 +65,20 @@ export default function CreateGroupScreen({ navigation }: any) {
       Alert.alert('Error', result.message || 'Failed to create group');
     }
   }, [groupName, description, createGroup, reset, navigation]);
+
+  // Add this useEffect to your CreateGroupScreen
+useEffect(() => {
+  // Set up a navigation focus listener to refresh the previous screen when we come back
+  const unsubscribe = navigation.addListener('blur', () => {
+    // When leaving CreateGroup screen, trigger refresh in the previous screen
+    const previousRoute = navigation.getState().routes[navigation.getState().index - 1];
+    if (previousRoute && previousRoute.params?.refreshGroups) {
+      previousRoute.params.refreshGroups();
+    }
+  });
+  
+  return unsubscribe;
+}, [navigation]);
 
   const handleCancel = useCallback(() => {
     reset();

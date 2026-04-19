@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { AssignmentService } from '../services/AssignmentService';
 import { TokenUtils } from '../utils/tokenUtils';
+import { UploadService } from '../uploadService/UploadService';
 
 export const useCompleteAssignment = (
   assignmentId: string, 
@@ -269,118 +270,140 @@ const startCountdownTimer = useCallback(() => {
     return Object.keys(newErrors).length === 0;
   }, [photo, notes]);
 
-  // Submit completion - RETURNS success status
-  const submitCompletion = useCallback(async (timeSlotId?: string | null): Promise<{ success: boolean; message?: string }> => {
-    console.log('\n🚀🚀🚀 [SUBMIT COMPLETION] START 🚀🚀🚀');
-    console.log('   isSubmittable:', isSubmittable);
-    console.log('   timeStatus:', timeStatus);
-    console.log('   isLate:', isLate);
-    console.log('   hasPhoto:', !!photo);
-    console.log('   notes length:', notes.length);
+  // hooks/useCompleteAssignment.ts - UPDATED submitCompletion
+
+const submitCompletion = useCallback(async (timeSlotId?: string | null): Promise<{ success: boolean; message?: string }> => {
+  console.log('\n🚀🚀🚀 [SUBMIT COMPLETION] START 🚀🚀🚀');
+  console.log('   isSubmittable:', isSubmittable);
+  console.log('   timeStatus:', timeStatus);
+  console.log('   isLate:', isLate);
+  console.log('   hasPhoto:', !!photo);
+  console.log('   notes length:', notes.length);
+  console.log('   timeSlotId:', timeSlotId);
+  
+  // Check token first
+  const hasToken = await TokenUtils.checkToken({
+    showAlert: false,
+    onAuthError: () => setAuthError(true)
+  });
+  
+  if (!hasToken) {
+    console.log('❌ [SUBMIT] No valid token');
+    Alert.alert('Authentication Error', 'Please log in again');
+    return { success: false, message: 'No valid token' };
+  }
+
+  if (!isSubmittable) {
+    const statusMsg = getTimeStatusMessage();
+    console.log('❌ [SUBMIT] Not submittable:', statusMsg.message);
+    Alert.alert(
+      'Cannot Submit',
+      statusMsg.message,
+      [{ text: 'OK' }]
+    );
+    return { success: false, message: statusMsg.message };
+  }
+
+  if (!validateSubmission()) {
+    console.log('❌ [SUBMIT] Validation failed');
+    return { success: false, message: 'Validation failed' };
+  }
+   
+  setSubmitting(true);
+  
+  try {
+    let finalPhotoUrl: string | undefined = undefined;
+    
+    // ✅ STEP 1: Upload photo to Cloudinary if exists
+    if (photo) {
+      console.log('📸 [SUBMIT] Uploading photo to Cloudinary...');
+      console.log('   Original photo URI:', photo);
+      
+      const uploadResult = await UploadService.uploadTaskPhotoCloudinary(photo);
+      
+      if (uploadResult.success && uploadResult.data?.photoUrl) {
+        finalPhotoUrl = uploadResult.data.photoUrl;
+        console.log('✅ [SUBMIT] Photo uploaded to Cloudinary:', finalPhotoUrl);
+      } else {
+        console.error('❌ [SUBMIT] Failed to upload photo:', uploadResult.message);
+        Alert.alert('Upload Error', 'Failed to upload photo. Please try again.');
+        setSubmitting(false);
+        return { success: false, message: 'Photo upload failed' };
+      }
+    }
+    
+    // ✅ STEP 2: Submit assignment with Cloudinary URL
+    console.log('📤 [SUBMIT] Calling AssignmentService.completeAssignment...');
+    console.log('   Assignment ID:', assignmentId);
+    console.log('   Photo URL (Cloudinary):', finalPhotoUrl);
     console.log('   timeSlotId:', timeSlotId);
     
-    // Check token first
-    const hasToken = await TokenUtils.checkToken({
-      showAlert: false,
-      onAuthError: () => setAuthError(true)
+    const result = await AssignmentService.completeAssignment(assignmentId, {
+      notes: notes.trim(),
+      photoUri: finalPhotoUrl,  // ← Now this is Cloudinary URL, not local file
+      timeSlotId: timeSlotId || undefined,
     });
     
-    if (!hasToken) {
-      console.log('❌ [SUBMIT] No valid token');
-      Alert.alert('Authentication Error', 'Please log in again');
-      return { success: false, message: 'No valid token' };
-    }
-
-    if (!isSubmittable) {
-      const statusMsg = getTimeStatusMessage();
-      console.log('❌ [SUBMIT] Not submittable:', statusMsg.message);
-      Alert.alert(
-        'Cannot Submit',
-        statusMsg.message,
-        [{ text: 'OK' }]
-      );
-      return { success: false, message: statusMsg.message };
-    }
-
-    if (!validateSubmission()) {
-      console.log('❌ [SUBMIT] Validation failed');
-      return { success: false, message: 'Validation failed' };
-    }
-   
-    setSubmitting(true);
+    console.log('📥 [SUBMIT] Result from server:', JSON.stringify(result, null, 2));
     
-    try { 
-      console.log('📤 [SUBMIT] Calling AssignmentService.completeAssignment...');
-      console.log('   Assignment ID:', assignmentId);
-      console.log('   Photo URI exists:', !!photo);
-      console.log('   timeSlotId:', timeSlotId);
+    if (result.success) {
+      console.log('✅ [SUBMIT] Submission successful!');
+      console.log('   isLate:', result.isLate);
+      console.log('   originalPoints:', result.originalPoints);
+      console.log('   finalPoints:', result.finalPoints);
       
-      const result = await AssignmentService.completeAssignment(assignmentId, {
-        notes: notes.trim(),
-        photoUri: photo || undefined,
-        timeSlotId: timeSlotId || undefined,
-      });
+      setLastSubmitSuccess(true);
       
-      console.log('📥 [SUBMIT] Result from server:', JSON.stringify(result, null, 2));
-      
-      if (result.success) {
-        console.log('✅ [SUBMIT] Submission successful!');
-        console.log('   isLate:', result.isLate);
-        console.log('   originalPoints:', result.originalPoints);
-        console.log('   finalPoints:', result.finalPoints);
-        
-        setLastSubmitSuccess(true); // ✅ Track success
-        
-        Alert.alert(
-          'Success!',
-          result.isLate 
-            ? `Assignment submitted late. Points reduced from ${result.originalPoints} to ${result.finalPoints}. Waiting for admin verification.`
-            : 'Assignment submitted successfully. Waiting for admin verification.',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                if (onCompleted) onCompleted();
-                setPhoto(null);
-                setNotes('');
-              }
+      Alert.alert(
+        'Success!',
+        result.isLate 
+          ? `Assignment submitted late. Points reduced from ${result.originalPoints} to ${result.finalPoints}. Waiting for admin verification.`
+          : 'Assignment submitted successfully. Waiting for admin verification.',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              if (onCompleted) onCompleted();
+              setPhoto(null);
+              setNotes('');
             }
-          ]
+          }
+        ]
+      );
+      
+      return { success: true, message: 'Submission successful' };
+    } else {
+      console.log('❌ [SUBMIT] Submission failed:', result.message);
+      
+      if (result.message?.toLowerCase().includes('late') || 
+          result.message?.toLowerCase().includes('time') ||
+          result.message?.toLowerCase().includes('window')) {
+        Alert.alert(
+          'Submission Time Error',
+          result.message + '\n\nPlease check the time window requirements.',
+          [{ text: 'OK' }]
         );
-        
-        return { success: true, message: 'Submission successful' };
+      } else if (result.message?.toLowerCase().includes('token') || 
+                 result.message?.toLowerCase().includes('auth') ||
+                 result.message?.toLowerCase().includes('unauthorized')) {
+        setAuthError(true);
+        Alert.alert('Session Expired', 'Please log in again');
       } else {
-        console.log('❌ [SUBMIT] Submission failed:', result.message);
-        
-        if (result.message?.toLowerCase().includes('late') || 
-            result.message?.toLowerCase().includes('time') ||
-            result.message?.toLowerCase().includes('window')) {
-          Alert.alert(
-            'Submission Time Error',
-            result.message + '\n\nPlease check the time window requirements.',
-            [{ text: 'OK' }]
-          );
-        } else if (result.message?.toLowerCase().includes('token') || 
-                   result.message?.toLowerCase().includes('auth') ||
-                   result.message?.toLowerCase().includes('unauthorized')) {
-          setAuthError(true);
-          Alert.alert('Session Expired', 'Please log in again');
-        } else {
-          Alert.alert('Error', result.message || 'Failed to submit assignment');
-        }
-        
-        return { success: false, message: result.message || 'Submission failed' };
+        Alert.alert('Error', result.message || 'Failed to submit assignment');
       }
-    } catch (error: any) {
-      console.error('❌❌❌ [SUBMIT] Error submitting assignment:', error);
-      Alert.alert('Error', error.message || 'Network error. Please check your connection.');
-      return { success: false, message: error.message || 'Network error' };
-    } finally { 
-      setSubmitting(false);
-      console.log('🏁 [SUBMIT] Submission flow completed');
+      
+      return { success: false, message: result.message || 'Submission failed' };
     }
-  }, [assignmentId, notes, photo, isSubmittable, validateSubmission, getTimeStatusMessage, onCompleted]);
-
+  } catch (error: any) {
+    console.error('❌❌❌ [SUBMIT] Error submitting assignment:', error);
+    Alert.alert('Error', error.message || 'Network error. Please check your connection.');
+    return { success: false, message: error.message || 'Network error' };
+  } finally { 
+    setSubmitting(false);
+    console.log('🏁 [SUBMIT] Submission flow completed');
+  }
+}, [assignmentId, notes, photo, isSubmittable, validateSubmission, getTimeStatusMessage, onCompleted]);
+ 
   // Reset success state
   const resetSubmitSuccess = useCallback(() => {
     setLastSubmitSuccess(false);
@@ -415,4 +438,4 @@ const startCountdownTimer = useCallback(() => {
     resetSubmitSuccess, // ✅ Reset function
     clearAuthError: () => setAuthError(false)
   };
-};
+}; 

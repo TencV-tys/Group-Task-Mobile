@@ -215,9 +215,8 @@ export interface TodayAssignment {
  
 export class AssignmentService {
   
-// services/AssignmentService.ts - ensure photo is sent with correct field name
 
-// services/AssignmentService.ts - FIXED completeAssignment method
+  // services/AssignmentService.ts - FIXED with null checks
 
 static async completeAssignment(
   assignmentId: string, 
@@ -243,33 +242,34 @@ static async completeAssignment(
     
     let response;
     
-    if (data.photoUri) {
+    // ✅ Check if photoUri exists and is a local file
+    const isLocalFile = data.photoUri && 
+                        !data.photoUri.startsWith('http://') && 
+                        !data.photoUri.startsWith('https://');
+    
+    const isRemoteUrl = data.photoUri && 
+                        (data.photoUri.startsWith('http://') || data.photoUri.startsWith('https://'));
+    
+    if (isLocalFile && data.photoUri) {
+      // ✅ Local file - upload as multipart/form-data
+      console.log('📸 Local file detected - uploading as FormData');
+      
       const formData = new FormData();
       
-      // Add notes
       if (data.notes) {
         formData.append('notes', data.notes);
       }
       
-      // ✅ ADD timeSlotId for multi-slot tasks
       if (data.timeSlotId) {
         formData.append('timeSlotId', data.timeSlotId);
         console.log('⏰ Adding timeSlotId to formData:', data.timeSlotId);
       }
       
-      // Get the file name and type from URI
       const uri = data.photoUri;
       const filename = uri.split('/').pop() || 'photo.jpg';
       const match = /\.(\w+)$/.exec(filename);
       const mimeType = match ? `image/${match[1]}` : 'image/jpeg';
       
-      console.log('📸 Photo details:', {
-        filename,
-        mimeType,
-        uri: uri.substring(0, 100) + '...'
-      });
-      
-      // IMPORTANT: The field name must be 'photo' to match multer configuration
       formData.append('file', {
         uri: uri,
         name: filename,
@@ -291,24 +291,25 @@ static async completeAssignment(
           body: formData,
           signal: controller.signal,
         });
-        
         clearTimeout(timeoutId);
-        console.log('✅ Response status:', response.status);
-        
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
-        console.error('❌ Fetch error:', fetchError);
         throw fetchError;
       }
       
     } else {
-      // No photo - send as JSON
+      // ✅ Remote URL (Cloudinary) or no photo - send as JSON
+      console.log('📸 Remote URL or no photo - sending as JSON');
+      
       const headers = await TokenUtils.getAuthHeaders(true);
       
-      // ✅ ADD timeSlotId to JSON body
       const requestBody: any = { notes: data.notes };
       if (data.timeSlotId) {
         requestBody.timeSlotId = data.timeSlotId;
+      }
+      if (isRemoteUrl && data.photoUri) {
+        requestBody.photoUrl = data.photoUri;  // ← Send Cloudinary URL as photoUrl
+        console.log('📸 Sending Cloudinary URL:', data.photoUri);
       }
       
       console.log('📤 Sending JSON body:', requestBody);
@@ -323,13 +324,15 @@ static async completeAssignment(
           body: JSON.stringify(requestBody),
           signal: controller.signal,
         });
-        
         clearTimeout(timeoutId);
-        
       } catch (fetchError: any) {
         clearTimeout(timeoutId);
         throw fetchError;
       }
+    }
+    
+    if (!response) {
+      throw new Error('No response from server');
     }
     
     const responseText = await response.text();
@@ -351,7 +354,7 @@ static async completeAssignment(
         success: false,
         message: result.message || `HTTP ${response.status}: ${response.statusText}`
       };
-    }
+    } 
     
     return result;
 

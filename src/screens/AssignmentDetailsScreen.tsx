@@ -157,7 +157,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
       )}
     </View>
   );
-
+ 
   // ===== RENDER PHOTO MODAL =====
   const renderPhotoModal = () => (
     <Modal
@@ -604,7 +604,7 @@ const renderVerificationControls = () => {
     if (!assignment?.photoUrl) return null;
 
     const fullImageUrl = getFullImageUrl(assignment?.photoUrl);
-
+  console.log('📸 [renderPhotoSection] fullImageUrl:', fullImageUrl);
     if (!fullImageUrl) return null;
 
     return (

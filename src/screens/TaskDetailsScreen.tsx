@@ -54,7 +54,7 @@ const formatUTCDate = (dateString: string) => {
   
   return `${monthNames[month]} ${day}, ${year}`;
 };
-
+ 
 const formatTimeTo12Hour = (time24: string) => {
   if (!time24) return '';
   const [hours, minutes] = time24.split(':').map(Number);
@@ -67,7 +67,7 @@ const formatTimeTo12Hour = (time24: string) => {
 const formatUTCDateTime = (dateString: string) => {
   const date = new Date(dateString);
   const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
+  const month = date.getUTCMonth(); 
   const day = date.getUTCDate();
   const hours = date.getUTCHours();
   const minutes = date.getUTCMinutes();
@@ -340,7 +340,7 @@ const isDueTodayUTC = (dueDate: string) => {
   const now = new Date();
   const assignmentDate = new Date(taskData.userAssignment.dueDate);
   
-  // Compare UTC dates
+  // Compare UTC dates (just the date part)
   const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
   
@@ -352,36 +352,69 @@ const isDueTodayUTC = (dueDate: string) => {
   }
 
   if (taskData.userAssignment.timeSlot) {
+    // Get the time slot times (already in PHT)
+    const [startHour, startMinute] = taskData.userAssignment.timeSlot.startTime.split(':').map(Number);
     const [endHour, endMinute] = taskData.userAssignment.timeSlot.endTime.split(':').map(Number);
     
     // Convert PHT to UTC (subtract 8 hours)
-    const endTime = new Date(Date.UTC(
+    const startTimeUTC = new Date(Date.UTC(
+      assignmentDate.getUTCFullYear(),
+      assignmentDate.getUTCMonth(),
+      assignmentDate.getUTCDate(),
+      startHour - 8, startMinute, 0, 0
+    ));
+    
+    const endTimeUTC = new Date(Date.UTC(
       assignmentDate.getUTCFullYear(),
       assignmentDate.getUTCMonth(),
       assignmentDate.getUTCDate(),
       endHour - 8, endMinute, 0, 0
     ));
     
-    const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
-    const gracePeriodEnd = new Date(endTime.getTime() + 30 * 60000);
+    const gracePeriodEndUTC = new Date(endTimeUTC.getTime() + 30 * 60000);
+    const lateThresholdUTC = new Date(endTimeUTC.getTime() + 25 * 60000);
     
-    const currentTime = now.getTime();
+    const currentTimeMs = now.getTime();
+    const startTimeMs = startTimeUTC.getTime();
+    const endTimeMs = endTimeUTC.getTime();
+    const graceEndMs = gracePeriodEndUTC.getTime();
+    const lateThresholdMs = lateThresholdUTC.getTime();
     
-    if (currentTime < endTime.getTime()) {
+    // Check if before time slot starts
+    if (currentTimeMs < startTimeMs) {
       setIsSubmittable(false);
+      setCurrentTimeSlot(null);
       setSubmissionStatus('waiting');
-      setTimeLeft(Math.floor((endTime.getTime() - currentTime) / 1000));
-    } else if (currentTime >= endTime.getTime() && currentTime <= gracePeriodEnd.getTime()) {
+      const timeUntilStart = Math.floor((startTimeMs - currentTimeMs) / 1000);
+      setTimeLeft(timeUntilStart);
+    }
+    // Check if during time slot
+    else if (currentTimeMs >= startTimeMs && currentTimeMs < endTimeMs) {
       setIsSubmittable(true);
+      setCurrentTimeSlot(taskData.userAssignment.timeSlot);
       setSubmissionStatus('available');
-      setTimeLeft(Math.floor((gracePeriodEnd.getTime() - currentTime) / 1000));
-    } else {
+      const timeUntilEnd = Math.floor((endTimeMs - currentTimeMs) / 1000);
+      setTimeLeft(timeUntilEnd);
+    }
+    // Check if during grace period (after time slot)
+    else if (currentTimeMs >= endTimeMs && currentTimeMs <= graceEndMs) {
+      const isLateSubmission = currentTimeMs > lateThresholdMs;
+      setIsSubmittable(true);
+      setCurrentTimeSlot(taskData.userAssignment.timeSlot);
+      setSubmissionStatus('available');
+      const timeLeftMs = graceEndMs - currentTimeMs;
+      setTimeLeft(Math.floor(timeLeftMs / 1000));
+    }
+    // After grace period - expired
+    else {
       setIsSubmittable(false);
+      setCurrentTimeSlot(null);
       setSubmissionStatus('expired');
       setTimeLeft(0);
     }
   } else {
     setIsSubmittable(true);
+    setCurrentTimeSlot(null);
     setSubmissionStatus('available');
     setTimeLeft(null);
   }

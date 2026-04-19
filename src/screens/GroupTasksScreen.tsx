@@ -161,6 +161,17 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         swapDay: item.assignment?.swapDay || null
       });
     }
+
+    console.log('🔍 MY TASKS WITH SWAP INFO:', myTasks.map(t => ({
+  title: t.title,
+  acquiredViaSwap: t.acquiredViaSwap,
+  swapScope: t.swapScope,
+  swappedFromName: t.swappedFromName,
+  assignment: t.assignment ? {
+    acquiredViaSwap: t.assignment.acquiredViaSwap,
+    swapScope: t.assignment.swapScope
+  } : null
+})));
     
     const taskData = taskMap.get(taskId);
     const assignment = item.assignment || item;

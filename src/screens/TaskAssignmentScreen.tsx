@@ -18,7 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTaskAssignment } from '../taskHook/useTaskAssignment';
 import { ScreenWrapper } from '../components/ScreenWrapper';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../context/ThemeContext'; 
 import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
 
@@ -183,7 +183,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
       (item.acquiredViaSwap === true && item.swapScope === 'week') ||
       (item.assignment?.acquiredViaSwap === true && item.assignment?.swapScope === 'week') ||
       (item.userAssignment?.acquiredViaSwap === true && item.userAssignment?.swapScope === 'week');
-    
+    console.log('🔍 Task:', item.title, 'isAcquiredViaWeekSwap:', isAcquiredViaWeekSwap);
     const swappedFromName = 
       item.swappedFromName ||
       item.assignment?.swappedFromName ||

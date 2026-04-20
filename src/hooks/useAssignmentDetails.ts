@@ -209,10 +209,15 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     }
   }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft, isTaskDeleted, isAdmin, isOwner]);
 
+
   const getStatusText = useCallback(() => {
   if (isTaskDeleted) return 'Task Deleted';
   
-  // ✅ Parse completedTimeSlotIds (handle both string and array)
+  // ✅ PRIORITY 1: Check VERIFIED by admin FIRST (most important)
+  if (assignment?.verified === true) return 'Verified';
+  if (assignment?.verified === false) return 'Rejected';
+  
+  // ✅ PRIORITY 2: Parse completedTimeSlotIds for multi-slot tasks
   let completedSlotIds: string[] = [];
   const rawCompleted = assignment?.completedTimeSlotIds;
   
@@ -231,15 +236,13 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
   const currentTimeSlotId = assignment?.timeSlot?.id;
   const isCurrentSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
   
-  // ✅ PRIORITY 1: Completed time slot (multi-slot task)
+  // ✅ PRIORITY 3: Completed time slot (submitted but not verified yet)
   if (isCurrentSlotCompleted) {
-    return 'Submitted';
+    return 'Pending';
   }
   
-  // ✅ PRIORITY 2: Admin View (special display)
+  // ✅ PRIORITY 4: Admin View (special display)
   if (isAdmin && !isOwner) {
-    if (assignment?.verified === true) return 'Verified';
-    if (assignment?.verified === false) return 'Rejected';
     if (assignment?.completed === true && assignment?.verified === null) return 'Pending Verification';
     if (assignment?.completed === true) return 'Completed';
     
@@ -258,14 +261,10 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     return 'Not Started (Admin)';
   }
   
-  // ✅ PRIORITY 3: Regular user view - Verified/Rejected first
-  if (assignment?.verified === true) return 'Verified';
-  if (assignment?.verified === false) return 'Rejected';
-  
-  // ✅ PRIORITY 4: Pending verification
+  // ✅ PRIORITY 5: Pending verification
   if (assignment?.completed === true && assignment?.verified === null) return 'Pending Verification';
   
-  // ✅ PRIORITY 5: Check if due date has passed
+  // ✅ PRIORITY 6: Check if due date has passed
   const now = new Date();
   const dueDate = new Date(assignment?.dueDate);
   const dueDateUTC = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
@@ -274,11 +273,11 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
   if (dueDateUTC < todayUTC && !assignment?.completed) return 'Expired';
   if (assignment?.expired === true) return 'Expired';
   
-  // ✅ PRIORITY 6: Missed time slot
+  // ✅ PRIORITY 7: Missed time slot
   const missedSlotIds = assignment?.missedTimeSlotIds || [];
   if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'Missed';
   
-  // ✅ PRIORITY 7: Submission status (during the day)
+  // ✅ PRIORITY 8: Submission status (during the day)
   if (submissionStatus === 'available') {
     return isLate ? 'Late' : 'Started';
   }
@@ -291,79 +290,87 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     return 'Not Started';
   }
   
-  // ✅ PRIORITY 8: Completed (but not verified yet - handled above)
+  // ✅ PRIORITY 9: Completed (but not verified yet - handled above)
   if (assignment?.completed === true) return 'Completed';
   
   // ✅ Default
   return 'Not Started';
 }, [assignment, isTaskDeleted, submissionStatus, isLate, isAdmin, isOwner]);
 
-  const getStatusColor = useCallback(() => {
-    if (isTaskDeleted) return '#868e96';
-    
-    const completedSlotIds = assignment?.completedTimeSlotIds || [];
-    const currentTimeSlotId = assignment?.timeSlot?.id;
-    const isCurrentSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
-    
-    if (isCurrentSlotCompleted) return '#2b8a3e';
-    
-    if (assignment?.verified === true) return '#2b8a3e';
-    if (assignment?.verified === false) return '#fa5252';
-    if (assignment?.completed === true && assignment?.verified === null) return '#e67700';
-    if (assignment?.expired === true) return '#868e96';
-    
-    const missedSlotIds = assignment?.missedTimeSlotIds || [];
-    if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return '#868e96';
-    
-    if (submissionStatus === 'available') {
-      return isLate ? '#e67700' : '#2b8a3e';
-    }
-    if (submissionStatus === 'waiting') return '#e67700';
-    if (assignment?.completed === true) return '#2b8a3e';
-    
-    return '#868e96';
-  }, [assignment, isTaskDeleted, submissionStatus, isLate]);
 
-  const getStatusIcon = useCallback(() => {
-    if (isTaskDeleted) return 'delete';
-    
-    const completedSlotIds = assignment?.completedTimeSlotIds || [];
-    const currentTimeSlotId = assignment?.timeSlot?.id;
-    const isCurrentSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
-    
-    if (isCurrentSlotCompleted) return 'check-circle';
-    
-    if (assignment?.verified === true) return 'check-circle';
-    if (assignment?.verified === false) return 'close-circle';
-    if (assignment?.completed === true && assignment?.verified === null) return 'clock-check';
-    if (assignment?.expired === true) return 'timer-off';
-    
-    const missedSlotIds = assignment?.missedTimeSlotIds || [];
-    if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'timer-off';
-    
-    if (submissionStatus === 'available') {
-      return isLate ? 'timer-alert' : 'check-circle';
-    }
-    if (submissionStatus === 'waiting') return 'clock-outline';
-    if (assignment?.completed === true) return 'check-circle'; 
-    
-    return 'clock-outline';
-  }, [assignment, isTaskDeleted, submissionStatus, isLate]);
+const getStatusColor = useCallback(() => {
+  if (isTaskDeleted) return '#868e96';
+  
+  // ✅ PRIORITY 1: Verified/Rejected by admin
+  if (assignment?.verified === true) return '#2b8a3e';
+  if (assignment?.verified === false) return '#fa5252';
+  
+  // ✅ PRIORITY 2: Check completed slot
+  const completedSlotIds = assignment?.completedTimeSlotIds || [];
+  const currentTimeSlotId = assignment?.timeSlot?.id;
+  const isCurrentSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
+  
+  if (isCurrentSlotCompleted) return '#e67700';
+  
+  if (assignment?.completed === true && assignment?.verified === null) return '#e67700';
+  if (assignment?.expired === true) return '#868e96';
+  
+  const missedSlotIds = assignment?.missedTimeSlotIds || [];
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return '#868e96';
+  
+  if (submissionStatus === 'available') {
+    return isLate ? '#e67700' : '#2b8a3e';
+  }
+  if (submissionStatus === 'waiting') return '#e67700';
+  if (assignment?.completed === true) return '#2b8a3e';
+  
+  return '#868e96';
+}, [assignment, isTaskDeleted, submissionStatus, isLate]);
 
-  const getTimeDifference = useCallback((dueDate: string, completedAt: string) => {
-    const due = new Date(dueDate);
-    const completed = new Date(completedAt);
-    const diffMs = completed.getTime() - due.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    
-    if (diffHours < 0) {
-      return `${Math.abs(diffHours)} hours early`;
-    } else if (diffHours === 0) {
-      return "on time";
-    } else {
-      return `${diffHours} hours late`;
-    }
-  }, []);
+const getStatusIcon = useCallback(() => {
+  if (isTaskDeleted) return 'delete';
+  
+  // ✅ PRIORITY 1: Verified/Rejected by admin
+  if (assignment?.verified === true) return 'check-circle';
+  if (assignment?.verified === false) return 'close-circle';
+  
+  // ✅ PRIORITY 2: Check completed slot
+  const completedSlotIds = assignment?.completedTimeSlotIds || [];
+  const currentTimeSlotId = assignment?.timeSlot?.id;
+  const isCurrentSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
+  
+  if (isCurrentSlotCompleted) return 'clock-check';
+  
+  if (assignment?.completed === true && assignment?.verified === null) return 'clock-check';
+  if (assignment?.expired === true) return 'timer-off';
+  
+  const missedSlotIds = assignment?.missedTimeSlotIds || [];
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'timer-off';
+  
+  if (submissionStatus === 'available') {
+    return isLate ? 'timer-alert' : 'check-circle';
+  }
+  if (submissionStatus === 'waiting') return 'clock-outline';
+  if (assignment?.completed === true) return 'check-circle'; 
+  
+  return 'clock-outline';
+}, [assignment, isTaskDeleted, submissionStatus, isLate]);
+
+const getTimeDifference = useCallback((dueDate: string, completedAt: string) => {
+  const due = new Date(dueDate);
+  const completed = new Date(completedAt);
+  const diffMs = completed.getTime() - due.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  
+  if (diffHours < 0) {
+    return `${Math.abs(diffHours)} hours early`;
+  } else if (diffHours === 0) {
+    return "on time";
+  } else {
+    return `${diffHours} hours late`;
+  }
+}, []);
+
 
   // ✅ UPDATED: Check time validity with completed slot detection
   const checkTimeValidity = useCallback((assignmentData: any) => {

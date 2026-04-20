@@ -414,56 +414,82 @@ const findTodayAssignment = (taskData: any) => {
     }
   };
 
-  // ===== GET VERIFICATION STATUS =====
-  const getVerificationStatus = (assignment: any) => {
-    let completedSlotIds: string[] = [];
-    const rawCompleted = assignment.completedTimeSlotIds;
-    
-    if (rawCompleted) {
-      if (typeof rawCompleted === 'string') {
-        try {
-          completedSlotIds = JSON.parse(rawCompleted);
-        } catch (e) {
-          completedSlotIds = [];
-        }
-      } else if (Array.isArray(rawCompleted)) {
-        completedSlotIds = rawCompleted;
+  // ===== GET VERIFICATION STATUS - FIXED (Check verified FIRST) =====
+const getVerificationStatus = (assignment: any) => {
+  // ✅ PRIORITY 1: Check if VERIFIED by admin (most important)
+  if (assignment.verified === true) {
+    return { status: 'verified', color: '#2b8a3e', icon: 'check-circle', text: 'Verified' };
+  }
+  
+  // ✅ PRIORITY 2: Check if REJECTED by admin
+  if (assignment.verified === false) {
+    return { status: 'rejected', color: theme.error, icon: 'close-circle', text: 'Rejected' };
+  }
+  
+  // ✅ PRIORITY 3: Parse completedTimeSlotIds for multi-slot tasks
+  let completedSlotIds: string[] = [];
+  const rawCompleted = assignment.completedTimeSlotIds;
+  
+  if (rawCompleted) {
+    if (typeof rawCompleted === 'string') {
+      try {
+        completedSlotIds = JSON.parse(rawCompleted);
+      } catch (e) {
+        completedSlotIds = [];
       }
+    } else if (Array.isArray(rawCompleted)) {
+      completedSlotIds = rawCompleted;
     }
-    
-    const currentTimeSlotId = assignment.timeSlot?.id;
-    const isCurrentSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
-    
-    if (isCurrentSlotCompleted) {
-      return { status: 'submitted', color: '#2b8a3e', icon: 'check-circle', text: 'Submitted' };
-    }
-    
-    if (assignment.verified === true) return { status: 'verified', color: theme.primary, icon: 'check-circle', text: 'Verified' };
-    if (assignment.verified === false) return { status: 'rejected', color: theme.error, icon: 'close-circle', text: 'Rejected' };
-    if (assignment.expired === true) return { status: 'expired', color: theme.error, icon: 'timer-off', text: 'Expired' };
-    
-    const missedSlotIds = assignment.missedTimeSlotIds || [];
-    if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
-      return { status: 'missed', color: theme.error, icon: 'close-circle', text: 'Missed' };
-    }
-    
-    if (assignment.completed === true && assignment.verified === null) {
-      return { status: 'pending_verification', color: theme.primary, icon: 'clock-check', text: 'Pending' };
-    }
-    
-    if (assignment.completed === true) return { status: 'completed', color: theme.primary, icon: 'check-circle', text: 'Done' };
-    
-    const dueDate = new Date(assignment.dueDate);
-    const now = new Date();
-    const dueDateUTC = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
-    const nowUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-    const isOverdue = dueDateUTC < nowUTC;
-    
-    if (isOverdue) return { status: 'overdue', color: theme.error, icon: 'alert-circle', text: 'Late' };
-    if (isDueTodayUTC(assignment.dueDate)) return { status: 'due_today', color: theme.primary, icon: 'clock-alert', text: 'Today' };
-    
-    return { status: 'pending', color: theme.textSecondary, icon: 'clock-outline', text: 'Wait' };
-  };
+  }
+  
+  const currentTimeSlotId = assignment.timeSlot?.id;
+  const isCurrentSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
+  
+  // ✅ PRIORITY 4: Check if this specific time slot is completed (submitted but not verified)
+  if (isCurrentSlotCompleted) {
+    return { status: 'submitted', color: '#e67700', icon: 'clock-check', text: 'Pending' };
+  }
+  
+  // ✅ PRIORITY 5: Check if EXPIRED
+  if (assignment.expired === true) {
+    return { status: 'expired', color: theme.error, icon: 'timer-off', text: 'Expired' };
+  }
+  
+  // ✅ PRIORITY 6: Check if MISSED
+  const missedSlotIds = assignment.missedTimeSlotIds || [];
+  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
+    return { status: 'missed', color: theme.error, icon: 'close-circle', text: 'Missed' };
+  }
+  
+  // ✅ PRIORITY 7: Check if COMPLETED (but not verified)
+  if (assignment.completed === true && assignment.verified === null) {
+    return { status: 'pending_verification', color: theme.primary, icon: 'clock-check', text: 'Pending' };
+  }
+  
+  if (assignment.completed === true) {
+    return { status: 'completed', color: theme.primary, icon: 'check-circle', text: 'Done' };
+  }
+  
+  // ✅ PRIORITY 8: Check if OVERDUE
+  const dueDate = new Date(assignment.dueDate);
+  const now = new Date();
+  const dueDateUTC = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
+  const nowUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const isOverdue = dueDateUTC < nowUTC;
+  
+  if (isOverdue) {
+    return { status: 'overdue', color: theme.error, icon: 'alert-circle', text: 'Late' };
+  }
+  
+  // ✅ PRIORITY 9: Check if DUE TODAY
+  if (isDueTodayUTC(assignment.dueDate)) {
+    return { status: 'due_today', color: theme.primary, icon: 'clock-alert', text: 'Today' };
+  }
+  
+  // ✅ Default
+  return { status: 'pending', color: theme.textSecondary, icon: 'clock-outline', text: 'Wait' };
+};
+
 
   // ===== GET SUBMISSION STATUS INFO =====
   const getSubmissionStatusInfo = () => {
@@ -920,14 +946,74 @@ const renderAllWeekAssignments = () => {
     );
   };
 
-  // ===== ADMIN VIEW =====
-  const renderAdminView = () => (
+  // ===== ADMIN VIEW - FIXED WITH SORTING =====
+const renderAdminView = () => {
+  const currentWeek = task?.group?.currentRotationWeek || 1;
+  
+  let allAdminAssignments = task?.assignments?.filter((a: any) => 
+    a.rotationWeek === currentWeek
+  ) || [];
+  
+  if (allAdminAssignments.length === 0) {
+    return (
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.sectionIcon}>
+            <MaterialCommunityIcons name="shield-account" size={16} color={theme.textSecondary} />
+          </LinearGradient>
+          <Text style={styles.sectionTitle}>Admin View</Text>
+        </View>
+        <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.adminInfoBox}>
+          <MaterialCommunityIcons name="shield-account" size={18} color={theme.primary} />
+          <View style={styles.adminInfoContent}>
+            <Text style={styles.adminInfoTitle}>Admin Information</Text>
+            <Text style={styles.adminInfoText}>
+              You have full control over this task. Click on assignments to verify/reject submissions.
+            </Text>
+          </View>
+        </LinearGradient>
+        <Text style={styles.noAssignments}>No assignments yet this week</Text>
+      </View>
+    );
+  }
+  
+  // ✅ FIXED: Sort assignments by dueDate (earliest first)
+  const sortedAssignments = [...allAdminAssignments].sort((a, b) => {
+    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+  });
+  
+  // ✅ Group by day for better organization
+  const groupedByDay = new Map();
+  
+  sortedAssignments.forEach((assignment: any) => {
+    const dueDate = new Date(assignment.dueDate);
+    const dateKey = dueDate.toISOString().split('T')[0];
+    const dayName = dueDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+    const displayDate = formatUTCDate(assignment.dueDate);
+    
+    if (!groupedByDay.has(dateKey)) {
+      groupedByDay.set(dateKey, {
+        dateKey: dateKey,
+        displayDate: displayDate,
+        dayName: dayName,
+        assignments: []
+      });
+    }
+    groupedByDay.get(dateKey).assignments.push(assignment);
+  });
+  
+  // Sort days by date
+  const groupedDays = Array.from(groupedByDay.values()).sort((a, b) => {
+    return a.dateKey.localeCompare(b.dateKey);
+  });
+  
+  return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.sectionIcon}>
           <MaterialCommunityIcons name="shield-account" size={16} color={theme.textSecondary} />
         </LinearGradient>
-        <Text style={styles.sectionTitle}>Admin View</Text>
+        <Text style={styles.sectionTitle}>Admin View - All Assignments</Text>
       </View>
       
       <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.adminInfoBox}>
@@ -940,83 +1026,112 @@ const renderAllWeekAssignments = () => {
         </View>
       </LinearGradient>
 
-      {task.assignments?.length > 0 ? (
-        <View style={styles.assignmentsContainer}>
-          <Text style={styles.assignmentsSubtitle}>All Assignments (Current Week):</Text>
-          {task.assignments
-            .filter((a: any) => a.rotationWeek === (task.group?.currentRotationWeek || 1))
-            .slice(0, 10)
-            .map((assignment: any, index: number) => {
-              const status = getVerificationStatus(assignment);
-              const dueToday = isDueTodayUTC(assignment.dueDate);
-              
-              return (
-                <TouchableOpacity
-                  key={assignment.id || index}
-                  style={[styles.adminAssignmentCard, dueToday && styles.todayAdminCard]}
-                  onPress={() => handleViewAssignmentDetails(assignment)}
-                  activeOpacity={0.7}
+      <View style={styles.assignmentsContainer}>
+        {groupedDays.map((dayGroup: any, dayIndex: number) => {
+          const isToday = isDueTodayUTC(dayGroup.assignments[0].dueDate);
+          
+          return (
+            <View key={dayIndex} style={styles.dayGroupContainer}>
+              <View style={styles.dayGroupHeader}>
+                <LinearGradient
+                  colors={isToday ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
+                  style={[styles.dayGroupBadge, isToday && styles.todayDayGroupBadge]}
                 >
-                  {dueToday && (
-                    <LinearGradient colors={[theme.error, theme.error]} style={styles.todayAdminBadge}>
-                      <MaterialCommunityIcons name="clock-alert" size={10} color="#fff" />
-                      <Text style={styles.todayAdminBadgeText}>Due Today</Text>
-                    </LinearGradient>
-                  )}
-                  
-                  <View style={styles.adminAssignmentHeader}>
-                    <View style={styles.userInfo}>
-                      <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.userAvatar}>
-                        {assignment.user?.avatarUrl ? (
-                          <Image source={{ uri: assignment.user.avatarUrl }} style={styles.avatarImage} />
-                        ) : (
-                          <Text style={styles.userAvatarText}>
-                            {assignment.user?.fullName?.charAt(0) || 'U'}
-                          </Text>
-                        )}
+                  <Text style={[styles.dayGroupTitle, isToday && { color: theme.primary }]}>
+                    {dayGroup.dayName}
+                  </Text>
+                  <Text style={[styles.dayGroupDate, isToday && { color: theme.primary }]}>
+                    {dayGroup.displayDate}
+                  </Text>
+                </LinearGradient>
+              </View>
+              
+              {dayGroup.assignments.map((assignment: any, idx: number) => {
+                const status = getVerificationStatus(assignment);
+                const dueToday = isDueTodayUTC(assignment.dueDate);
+                const userName = assignment.user?.fullName || 'Unknown';
+                const userInitial = userName.charAt(0).toUpperCase();
+                const userAvatarUrl = assignment.user?.avatarUrl;
+                
+                return (
+                  <TouchableOpacity
+                    key={assignment.id || idx}
+                    style={[styles.adminAssignmentCard, dueToday && styles.todayAdminCard]}
+                    onPress={() => handleViewAssignmentDetails(assignment)}
+                    activeOpacity={0.7}
+                  >
+                    {dueToday && (
+                      <LinearGradient colors={[theme.error, theme.error]} style={styles.todayAdminBadge}>
+                        <MaterialCommunityIcons name="clock-alert" size={10} color="#fff" />
+                        <Text style={styles.todayAdminBadgeText}>Due Today</Text>
                       </LinearGradient>
-                      <View style={styles.userDetails}>
-                        <Text style={styles.userName}>{assignment.user?.fullName || 'Unknown User'}</Text>
-                        <Text style={styles.assignmentDateSmall}>
-                          Due: {formatUTCDate(assignment.dueDate)}
-                          {assignment.timeSlot && ` • ${formatTimeTo12Hour(assignment.timeSlot.startTime)}`}
-                          {assignment.rotationWeek && ` • Week ${assignment.rotationWeek}`}
-                          {dueToday && <Text style={styles.todaySmallText}> (Today)</Text>}
-                        </Text>
+                    )}
+                    
+                    <View style={styles.adminAssignmentHeader}>
+                      <View style={styles.userInfo}>
+                        {userAvatarUrl ? (
+                          <Image source={{ uri: userAvatarUrl }} style={styles.avatarImage} />
+                        ) : (
+                          <LinearGradient
+                            colors={[theme.bgSecondary, theme.bgTertiary]}
+                            style={styles.userAvatar}
+                          >
+                            <Text style={styles.userAvatarText}>{userInitial}</Text>
+                          </LinearGradient>
+                        )}
+                        <View style={styles.userDetails}>
+                          <Text style={styles.userName}>{userName}</Text>
+                          <Text style={styles.assignmentDateSmall}>
+                            Due: {formatUTCDate(assignment.dueDate)}
+                            {assignment.timeSlot && ` • ${formatTimeTo12Hour(assignment.timeSlot.startTime)}`}
+                            {dueToday && <Text style={styles.todaySmallText}> (Today)</Text>}
+                          </Text>
+                        </View>
                       </View>
+                      <LinearGradient
+                        colors={[status.color + '20', status.color + '10']}
+                        style={[styles.statusBadge, { borderColor: status.color + '40' }]}
+                      >
+                        <MaterialCommunityIcons name={status.icon as any} size={10} color={status.color} />
+                        <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
+                      </LinearGradient>
                     </View>
-                    <LinearGradient colors={[status.color + '20', status.color + '10']} style={styles.statusBadge}>
-                      <MaterialCommunityIcons name={status.icon as any} size={10} color={status.color} />
-                      <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
-                    </LinearGradient>
-                  </View>
-                  
-                  {assignment.completed && (
-                    <View style={styles.adminAssignmentDetails}>
-                      <Text style={styles.completedText}>Submitted: {formatUTCDate(assignment.completedAt)}</Text>
-                      {assignment.photoUrl && (
-                        <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.hasPhotoBadge}>
-                          <MaterialCommunityIcons name="image" size={8} color={theme.primary} />
-                          <Text style={styles.hasPhotoText}>Photo</Text>
-                        </LinearGradient>
-                      )}
-                      {assignment.notes && (
-                        <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.hasNotesBadge}>
-                          <MaterialCommunityIcons name="note-text" size={8} color={theme.primary} />
-                          <Text style={styles.hasNotesText}>Notes</Text>
-                        </LinearGradient>
-                      )}
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-        </View>
-      ) : (
-        <Text style={styles.noAssignments}>No assignments yet</Text>
-      )}
+                    
+                    {assignment.completed && (
+                      <View style={styles.adminAssignmentDetails}>
+                        <Text style={styles.completedText}>
+                          Submitted: {formatUTCDate(assignment.completedAt)}
+                        </Text>
+                        {assignment.photoUrl && (
+                          <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.hasPhotoBadge}>
+                            <MaterialCommunityIcons name="image" size={8} color={theme.primary} />
+                            <Text style={styles.hasPhotoText}>Photo</Text>
+                          </LinearGradient>
+                        )}
+                        {assignment.notes && (
+                          <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.hasNotesBadge}>
+                            <MaterialCommunityIcons name="note-text" size={8} color={theme.primary} />
+                            <Text style={styles.hasNotesText}>Notes</Text>
+                          </LinearGradient>
+                        )}
+                      </View>
+                    )}
+                    
+                    {assignment.adminNotes && (
+                      <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.adminNotesPreview}>
+                        <Text style={styles.adminNotesPreviewText} numberOfLines={1}>{assignment.adminNotes}</Text>
+                      </LinearGradient>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
+};
 
   // ===== LOADING AND ERROR STATES =====
   if (loading) {

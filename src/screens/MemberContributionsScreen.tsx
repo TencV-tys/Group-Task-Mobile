@@ -235,7 +235,7 @@ if (isExpired && !assignment.verified) {  // Use !assignment.verified instead
             <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
               <Text style={[styles.statNumber, { color: theme.textSecondary }]}>{pendingSlotsCount}</Text>
             </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Pending</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Submitted</Text>
           </View>
           
           <View style={styles.statBox}>
@@ -276,167 +276,261 @@ if (isExpired && !assignment.verified) {  // Use !assignment.verified instead
   };
  
   const renderWeekDetails = (week: any) => {
-    const isExpanded = selectedWeek === week.week;
+  const isExpanded = selectedWeek === week.week;
+  
+  const verifiedCount = week.assignments.filter((a: any) => a.verified === true).length;
+  const pendingCount = week.assignments.filter((a: any) => a.completed === true && a.verified === null).length;
+  const rejectedCount = week.assignments.filter((a: any) => a.verified === false).length;
+  
+  // ✅ Add SUBMITTED count (slot completed but not verified)
+  const submittedCount = week.assignments.filter((a: any) => {
+    // Parse completedTimeSlotIds if it's a string
+    let completedSlotIds: string[] = [];
+    const rawCompleted = a.completedTimeSlotIds;
+    if (rawCompleted) {
+      if (typeof rawCompleted === 'string') {
+        try {
+          completedSlotIds = JSON.parse(rawCompleted);
+        } catch (e) {
+          completedSlotIds = [];
+        }
+      } else if (Array.isArray(rawCompleted)) {
+        completedSlotIds = rawCompleted;
+      }
+    }
     
-    const verifiedCount = week.assignments.filter((a: any) => a.verified === true).length;
-    const pendingCount = week.assignments.filter((a: any) => a.completed === true && a.verified === null).length;
-    const rejectedCount = week.assignments.filter((a: any) => a.verified === false).length;
-   
-    const expiredCount = week.assignments.filter((a: any) => 
-  (a.isMissed === true || a.expired === true) && !a.verified  // !a.verified works for both null, false, and 0
-).length;
-    const notStartedCount = week.assignments.filter((a: any) => !a.completed && !a.isMissed && !a.expired).length;
-
-    return (
-      <LinearGradient
-        key={week.week}
-        colors={[theme.card, theme.bgSecondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.weekCard, { borderColor: theme.border }]}
-      >
-        <TouchableOpacity onPress={() => handleWeekPress(week.week)} activeOpacity={0.7}>
-          <View style={[styles.weekHeader, { backgroundColor: theme.bgSecondary }]}>
-            <View style={styles.weekTitleContainer}>
-              <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.weekIcon}>
-                <MaterialCommunityIcons name="calendar-week" size={18} color="#fff" />
-              </LinearGradient>
-              <Text style={[styles.weekTitle, { color: theme.text }]}>Week {week.week}</Text>
-            </View>
-            <MaterialCommunityIcons name={isExpanded ? "chevron-up" : "chevron-down"} size={24} color={theme.textMuted} />
-          </View>
-
-          <View style={styles.statusChipsContainer}>
-            <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
-              <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
-              <Text style={[styles.statusChipText, { color: theme.primary }]}>{verifiedCount}</Text>
-            </View>
-            {pendingCount > 0 && (
-              <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
-                <MaterialCommunityIcons name="clock-check" size={12} color={theme.textSecondary} />
-                <Text style={[styles.statusChipText, { color: theme.textSecondary }]}>{pendingCount}</Text>
-              </View>
-            )}
-            {rejectedCount > 0 && (
-              <View style={[styles.statusChip, { backgroundColor: theme.errorBg }]}>
-                <MaterialCommunityIcons name="close-circle" size={12} color={theme.error} />
-                <Text style={[styles.statusChipText, { color: theme.error }]}>{rejectedCount}</Text>
-              </View>
-            )}
-            {expiredCount > 0 && (
-              <View style={[styles.statusChip, { backgroundColor: theme.bgTertiary }]}>
-                <MaterialCommunityIcons name="clock-alert" size={12} color={theme.textMuted} />
-                <Text style={[styles.statusChipText, { color: theme.textMuted }]}>{expiredCount}</Text>
-              </View>
-            )}
-            {notStartedCount > 0 && (
-              <View style={[styles.statusChip, { backgroundColor: theme.bgTertiary }]}>
-                <MaterialCommunityIcons name="clock-outline" size={12} color={theme.textMuted} />
-                <Text style={[styles.statusChipText, { color: theme.textMuted }]}>{notStartedCount}</Text>
-              </View>
-            )}
-            <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
-              <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
-              <Text style={[styles.statusChipText, { color: theme.primary }]}>{week.earnedPoints}</Text>
-            </View>
-          </View>
-        </TouchableOpacity>
-
-        {isExpanded && (
-          <View style={[styles.weekDetails, { borderTopColor: theme.border }]}>
-            {week.assignments.map((assignment: any, index: number) => {
-  const isExpired = (assignment.isMissed === true || assignment.expired === true) && !assignment.verified;
-  const isVerified = assignment.verified === true;
-  const isRejected = assignment.verified === false;
-  const isPending = assignment.completed === true && assignment.verified === null;
+    // Parse timeSlot if it's a string or get the id
+    let timeSlotId = a.timeSlot?.id;
+    if (a.timeSlot && typeof a.timeSlot === 'string') {
+      try {
+        const parsed = JSON.parse(a.timeSlot);
+        timeSlotId = parsed?.id;
+      } catch (e) {
+        timeSlotId = null;
+      }
+    }
+    
+    return timeSlotId && completedSlotIds.includes(timeSlotId) && a.verified === null;
+  }).length;
   
-  let statusGradient: [string, string];
-  let statusIcon: string;
-  let statusText: string;
-  let statusColor: string;
-  
-  if (isExpired) {
-    statusGradient = [theme.bgTertiary, theme.bgTertiary];
-    statusIcon = 'clock-alert';
-    statusText = 'Missed';
-    statusColor = theme.textMuted;
-  } else if (isVerified) {
-    statusGradient = [theme.primaryLight, theme.primaryLight];
-    statusIcon = 'check-circle';
-    statusText = 'Verified';
-    statusColor = theme.primary;
-  } else if (isRejected) {
-    statusGradient = [theme.errorBg, theme.errorBg];
-    statusIcon = 'close-circle';
-    statusText = 'Rejected';
-    statusColor = theme.error;
-  } else if (isPending) {
-    statusGradient = [theme.primaryLight, theme.primaryLight];
-    statusIcon = 'clock-check';
-    statusText = 'Pending';
-    statusColor = theme.textSecondary;
-  } else {
-    statusGradient = [theme.bgSecondary, theme.bgTertiary];
-    statusIcon = 'clock-outline';
-    statusText = 'Not Started';
-    statusColor = theme.textMuted;
-  }
-              
-              return (
-                <TouchableOpacity
-                  key={assignment.id}
-                  style={[
-                    styles.assignmentItem,
-                    index === week.assignments.length - 1 && styles.lastItem,
-                    { borderBottomColor: theme.border }
-                  ]}
-                  onPress={() => navigation.navigate('AssignmentDetails', {
-                    assignmentId: assignment.id,
-                    isAdmin: userRole === 'ADMIN'
-                  })}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.assignmentContent}>
-                    <View style={styles.assignmentHeader}>
-                      <Text style={[styles.assignmentTitle, { color: isExpired ? theme.textMuted : theme.text }]}>
-                        {assignment.taskTitle}
-                      </Text>
-                      <LinearGradient colors={statusGradient} style={styles.statusBadge}>
-                        <MaterialCommunityIcons name={statusIcon as any} size={10} color={statusColor} />
-                        <Text style={[styles.statusBadgeText, { color: statusColor }]}>{statusText}</Text>
-                      </LinearGradient>
-                    </View>
-                    
-                    <Text style={[styles.assignmentDate, { color: theme.textMuted }]}>
-                      Due: {formatDate(assignment.dueDate)}
+  const expiredCount = week.assignments.filter((a: any) => 
+    (a.isMissed === true || a.expired === true) && !a.verified
+  ).length;
+  const notStartedCount = week.assignments.filter((a: any) => 
+    !a.completed && !a.isMissed && !a.expired && 
+    !(a.completedTimeSlotIds?.includes(a.timeSlot?.id))
+  ).length;
+
+  return (
+    <LinearGradient
+      key={week.week}
+      colors={[theme.card, theme.bgSecondary]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.weekCard, { borderColor: theme.border }]}
+    >
+      <TouchableOpacity onPress={() => handleWeekPress(week.week)} activeOpacity={0.7}>
+        <View style={[styles.weekHeader, { backgroundColor: theme.bgSecondary }]}>
+          <View style={styles.weekTitleContainer}>
+            <LinearGradient colors={[theme.primary, theme.primaryDark]} style={styles.weekIcon}>
+              <MaterialCommunityIcons name="calendar-week" size={18} color="#fff" />
+            </LinearGradient>
+            <Text style={[styles.weekTitle, { color: theme.text }]}>Week {week.week}</Text>
+          </View>
+          <MaterialCommunityIcons name={isExpanded ? "chevron-up" : "chevron-down"} size={24} color={theme.textMuted} />
+        </View>
+
+        <View style={styles.statusChipsContainer}>
+          <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
+            <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
+            <Text style={[styles.statusChipText, { color: theme.primary }]}>{verifiedCount}</Text>
+          </View>
+          
+          {submittedCount > 0 && (
+            <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="clock-check" size={12} color={theme.textSecondary} />
+              <Text style={[styles.statusChipText, { color: theme.textSecondary }]}>{submittedCount}</Text>
+            </View>
+          )}
+          
+          {pendingCount > 0 && (
+            <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
+              <MaterialCommunityIcons name="clock-check" size={12} color={theme.textSecondary} />
+              <Text style={[styles.statusChipText, { color: theme.textSecondary }]}>{pendingCount}</Text>
+            </View>
+          )}
+          
+          {rejectedCount > 0 && (
+            <View style={[styles.statusChip, { backgroundColor: theme.errorBg }]}>
+              <MaterialCommunityIcons name="close-circle" size={12} color={theme.error} />
+              <Text style={[styles.statusChipText, { color: theme.error }]}>{rejectedCount}</Text>
+            </View>
+          )}
+          
+          {expiredCount > 0 && (
+            <View style={[styles.statusChip, { backgroundColor: theme.bgTertiary }]}>
+              <MaterialCommunityIcons name="clock-alert" size={12} color={theme.textMuted} />
+              <Text style={[styles.statusChipText, { color: theme.textMuted }]}>{expiredCount}</Text>
+            </View>
+          )}
+          
+          {notStartedCount > 0 && (
+            <View style={[styles.statusChip, { backgroundColor: theme.bgTertiary }]}>
+              <MaterialCommunityIcons name="clock-outline" size={12} color={theme.textMuted} />
+              <Text style={[styles.statusChipText, { color: theme.textMuted }]}>{notStartedCount}</Text>
+            </View>
+          )}
+          
+          <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
+            <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+            <Text style={[styles.statusChipText, { color: theme.primary }]}>{week.earnedPoints}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      {isExpanded && (
+        <View style={[styles.weekDetails, { borderTopColor: theme.border }]}>
+          {week.assignments.map((assignment: any, index: number) => {
+            // ✅ Parse completedTimeSlotIds
+            let completedSlotIds: string[] = [];
+            const rawCompleted = assignment.completedTimeSlotIds;
+            if (rawCompleted) {
+              if (typeof rawCompleted === 'string') {
+                try {
+                  completedSlotIds = JSON.parse(rawCompleted);
+                } catch (e) {
+                  completedSlotIds = [];
+                }
+              } else if (Array.isArray(rawCompleted)) {
+                completedSlotIds = rawCompleted;
+              }
+            }
+            
+            // ✅ Parse timeSlot (handle string or object)
+            let timeSlot = assignment.timeSlot;
+            let timeSlotId = null;
+            let startTime = '';
+            let endTime = '';
+            
+            if (timeSlot) {
+              if (typeof timeSlot === 'string') {
+                try {
+                  const parsed = JSON.parse(timeSlot);
+                  timeSlotId = parsed.id;
+                  startTime = parsed.startTime || '';
+                  endTime = parsed.endTime || '';
+                } catch (e) {
+                  console.error('Failed to parse timeSlot:', e);
+                }
+              } else {
+                timeSlotId = timeSlot.id;
+                startTime = timeSlot.startTime || '';
+                endTime = timeSlot.endTime || '';
+              }
+            }
+            
+            const isSubmitted = timeSlotId && completedSlotIds.includes(timeSlotId) && assignment.verified === null;
+            const isExpired = (assignment.isMissed === true || assignment.expired === true) && !assignment.verified;
+            const isVerified = assignment.verified === true;
+            const isRejected = assignment.verified === false;
+            const isPending = assignment.completed === true && assignment.verified === null && !isSubmitted;
+            
+            let statusGradient: [string, string];
+            let statusIcon: string;
+            let statusText: string;
+            let statusColor: string;
+            
+            if (isVerified) {
+              statusGradient = [theme.primaryLight, theme.primaryLight];
+              statusIcon = 'check-circle';
+              statusText = 'Verified';
+              statusColor = theme.primary;
+            } else if (isRejected) {
+              statusGradient = [theme.errorBg, theme.errorBg];
+              statusIcon = 'close-circle';
+              statusText = 'Rejected';
+              statusColor = theme.error;
+            } else if (isSubmitted) {
+              statusGradient = [theme.primaryLight, theme.primaryLight];
+              statusIcon = 'clock-check';
+              statusText = 'Submitted';
+              statusColor = theme.textSecondary;
+            } else if (isPending) {
+              statusGradient = [theme.primaryLight, theme.primaryLight];
+              statusIcon = 'clock-check';
+              statusText = 'Pending';
+              statusColor = theme.textSecondary;
+            } else if (isExpired) {
+              statusGradient = [theme.bgTertiary, theme.bgTertiary];
+              statusIcon = 'clock-alert';
+              statusText = 'Missed';
+              statusColor = theme.textMuted;
+            } else {
+              statusGradient = [theme.bgSecondary, theme.bgTertiary];
+              statusIcon = 'clock-outline';
+              statusText = 'Not Started';
+              statusColor = theme.textMuted;
+            }
+            
+            // Format time slot display
+            const timeSlotDisplay = startTime && endTime ? ` • ${startTime} - ${endTime}` : '';
+            
+            return (
+              <TouchableOpacity
+                key={assignment.id}
+                style={[
+                  styles.assignmentItem,
+                  index === week.assignments.length - 1 && styles.lastItem,
+                  { borderBottomColor: theme.border }
+                ]}
+                onPress={() => navigation.navigate('AssignmentDetails', {
+                  assignmentId: assignment.id,
+                  isAdmin: userRole === 'ADMIN'
+                })}
+                activeOpacity={0.7}
+              >
+                <View style={styles.assignmentContent}>
+                  <View style={styles.assignmentHeader}>
+                    <Text style={[styles.assignmentTitle, { color: isExpired ? theme.textMuted : theme.text }]}>
+                      {assignment.taskTitle}
                     </Text>
-                    
-                    <View style={styles.assignmentFooter}>
-                      {!isExpired && !isRejected && assignment.points > 0 && (
-                        <View style={styles.pointsContainer}>
-                          <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
-                          <Text style={[styles.pointsText, { color: theme.primary }]}>
-                            {isVerified ? '+' : ''}{assignment.points} pts
-                          </Text>
-                        </View>
-                      )}
-                      {assignment.isLate && !isExpired && !isVerified && (
-                        <View style={styles.lateContainer}>
-                          <MaterialCommunityIcons name="timer-alert" size={10} color={theme.textSecondary} />
-                          <Text style={[styles.lateText, { color: theme.textSecondary }]}>Late</Text>
-                        </View>
-                      )}
-                    </View>
+                    <LinearGradient colors={statusGradient} style={styles.statusBadge}>
+                      <MaterialCommunityIcons name={statusIcon as any} size={10} color={statusColor} />
+                      <Text style={[styles.statusBadgeText, { color: statusColor }]}>{statusText}</Text>
+                    </LinearGradient>
                   </View>
-                  <MaterialCommunityIcons name="chevron-right" size={20} color={theme.textMuted} />
-                </TouchableOpacity>
-              );
-            })}
-          </View> 
-        )}
-      </LinearGradient>
-    );
-  };
+                  
+                  <Text style={[styles.assignmentDate, { color: theme.textMuted }]}>
+                    Due: {formatDate(assignment.dueDate)}
+                    {timeSlotDisplay}
+                  </Text>
+                  
+                  <View style={styles.assignmentFooter}>
+                    {!isExpired && !isRejected && assignment.points > 0 && (
+                      <View style={styles.pointsContainer}>
+                        <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                        <Text style={[styles.pointsText, { color: theme.primary }]}>
+                          {isVerified ? '+' : ''}{assignment.points} pts
+                        </Text>
+                      </View>
+                    )}
+                    {assignment.isLate && !isExpired && !isVerified && !isRejected && (
+                      <View style={styles.lateContainer}>
+                        <MaterialCommunityIcons name="timer-alert" size={10} color={theme.textSecondary} />
+                        <Text style={[styles.lateText, { color: theme.textSecondary }]}>Late</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <MaterialCommunityIcons name="chevron-right" size={20} color={theme.textMuted} />
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+    </LinearGradient>
+  );
+};
 
   const renderHeader = () => (
     <LinearGradient

@@ -603,4 +603,10 @@ export const makeAssignmentDetailsStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '600',
     marginTop: 4,
   },
+  alreadyProcessedText: {
+  fontSize: 12,
+  textAlign: 'center',
+  marginTop: 12,
+  marginBottom: 4,
+},
 });

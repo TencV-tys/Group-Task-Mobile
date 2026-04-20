@@ -467,4 +467,17 @@ export const makeHomeStyles = (theme: Theme) => StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
+  multiSlotBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+  borderRadius: 4,
+  marginLeft: 6,
+},
+multiSlotBadgeText: {
+  fontSize: 9,
+  fontWeight: '500',
+  marginLeft: 2,
+},
 });

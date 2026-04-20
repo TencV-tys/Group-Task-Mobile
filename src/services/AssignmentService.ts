@@ -500,7 +500,7 @@ static async getUserAssignments(
 static async getTodayAssignments(groupId?: string) {
   console.log('🔵🔵🔵 [FRONTEND] getTodayAssignments CALLED 🔵🔵🔵');
   console.log('   Group ID:', groupId);
-  console.log('   Current time:', new Date().toLocaleString());
+  console.log('   Current time:', new Date().toISOString());
   
   try {
     console.log('📅 Getting today\'s assignments for group:', groupId);
@@ -545,20 +545,28 @@ static async getTodayAssignments(groupId?: string) {
       });
     }
     
-    // Calculate today's date range
+    // ✅ FIXED: Use UTC for today's date range (consistent with backend)
     const now = new Date();
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
+    const startOfDayUTC = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      0, 0, 0, 0
+    ));
+    const endOfDayUTC = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      23, 59, 59, 999
+    ));
     
-    console.log('📅 Today\'s date range:', {
-      start: startOfDay.toISOString(),
-      end: endOfDay.toISOString(),
+    console.log('📅 Today\'s UTC date range:', {
+      start: startOfDayUTC.toISOString(),
+      end: endOfDayUTC.toISOString(),
       current: now.toISOString()
     });
     
-    // Filter assignments due today and not completed
+    // Filter assignments due today using UTC comparison
     const todayAssignments = allAssignments.filter((assignment: any) => {
       // Skip completed assignments
       if (assignment.completed) {
@@ -571,15 +579,16 @@ static async getTodayAssignments(groupId?: string) {
       }
       
       const dueDate = new Date(assignment.dueDate);
-      const isDueToday = dueDate >= startOfDay && dueDate <= endOfDay;
+      // ✅ FIXED: Use UTC comparison
+      const isDueToday = dueDate >= startOfDayUTC && dueDate <= endOfDayUTC;
       
       // Filter by group if specified
       const belongsToGroup = !groupId || assignment.group?.id === groupId;
       
       if (isDueToday) {
         console.log(`✅✅✅ DUE TODAY: ${assignment.taskTitle} (${assignment.id})`);
-        console.log(`   Due date: ${dueDate.toLocaleString()}`);
-        console.log(`   Current: ${now.toLocaleString()}`);
+        console.log(`   Due date UTC: ${dueDate.toISOString()}`);
+        console.log(`   Current UTC: ${now.toISOString()}`);
       }
       
       return isDueToday && belongsToGroup;
@@ -756,48 +765,57 @@ static async getTodayAssignments(groupId?: string) {
     }
   }
 
-  // ========== GET UPCOMING ASSIGNMENTS ==========
   static async getUpcomingAssignments(options?: { groupId?: string; limit?: number; }) {
-    try {
-      let url = `${API_URL}/upcoming`;
-      const params = new URLSearchParams();
-      
-      if (options?.groupId) params.append('groupId', options.groupId);
-      if (options?.limit) params.append('limit', options.limit?.toString() || '10');
-      
-      const queryString = params.toString();
-      if (queryString) url += `?${queryString}`;
+  try {
+    let url = `${API_URL}/upcoming`;
+    const params = new URLSearchParams();
+    
+    if (options?.groupId) params.append('groupId', options.groupId);
+    if (options?.limit) params.append('limit', options.limit?.toString() || '10');
+    
+    const queryString = params.toString();
+    if (queryString) url += `?${queryString}`;
 
-      console.log('AssignmentService: Getting upcoming assignments', url);
-      
-      // ✅ Use TokenUtils.getAuthHeaders() with false for GET requests
-      const headers = await TokenUtils.getAuthHeaders(false);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
+    console.log('AssignmentService: Getting upcoming assignments', url);
+    
+    const headers = await TokenUtils.getAuthHeaders(false);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+    });
 
-      if (!response.ok) {
-        console.error('Response not OK:', response.status);
-        return {
-          success: false,
-          data: { assignments: [], currentTime: new Date().toISOString(), total: 0 }
-        };
-      }
-      
-      const result = await response.json();
-      console.log('AssignmentService: Upcoming response', result);
-      return result;
-
-    } catch (error: any) {
-      console.error('AssignmentService.getUpcomingAssignments error:', error);
+    if (!response.ok) {
+      console.error('Response not OK:', response.status);
       return {
         success: false,
         data: { assignments: [], currentTime: new Date().toISOString(), total: 0 }
       };
     }
+    
+    const result = await response.json();
+    
+    // ✅ FIXED: Ensure dates are properly formatted for display
+    if (result.success && result.data?.assignments) {
+      result.data.assignments = result.data.assignments.map((assignment: any) => ({
+        ...assignment,
+        dueDate: assignment.dueDate,
+        // Add local time display property if needed
+        dueDateLocal: new Date(assignment.dueDate).toLocaleString()
+      }));
+    }
+    
+    console.log('AssignmentService: Upcoming response', result);
+    return result;
+
+  } catch (error: any) {
+    console.error('AssignmentService.getUpcomingAssignments error:', error);
+    return {
+      success: false,
+      data: { assignments: [], currentTime: new Date().toISOString(), total: 0 }
+    };
   }
+}
 
   // ========== GET USER NEGLECTED TASKS ==========
   static async getUserNeglectedTasks(filters?: {

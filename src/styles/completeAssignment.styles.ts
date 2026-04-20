@@ -411,4 +411,48 @@ export const makeCompleteAssignmentStyles = (theme: Theme) => StyleSheet.create(
     fontStyle: 'italic',
     color: theme.error,
   },
+  // Add these to your styles object
+completedTimeSlotCard: {
+  opacity: 0.7,
+  borderWidth: 1,
+},
+completedBadge: {
+  fontSize: 11,
+  fontWeight: '600',
+  marginTop: 4,
+},
+completedTimeInfoContainer: {
+  borderWidth: 1,
+  borderColor: '#b2f2bb',
+},
+completedMessage: {
+  fontSize: 16,
+  fontWeight: '600',
+  textAlign: 'center',
+  marginVertical: 8,
+},
+completedSubMessage: {
+  fontSize: 12,
+  textAlign: 'center',
+  marginBottom: 12,
+},
+submitButtonCompleted: {
+  opacity: 0.8,
+},
+completedFooter: {
+  fontSize: 12,
+  textAlign: 'center',
+  marginTop: 12,
+  marginBottom: 8,
+},
+loadingContainer: {
+  flex: 1,
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: 20,
+},
+loadingText: {
+  marginTop: 12,
+  fontSize: 14,
+},
 });

@@ -1,4 +1,4 @@
-// src/styles/taskDetails.styles.ts - COMPLETE WITH DARK MODE
+// src/styles/taskDetails.styles.ts - COMPLETE WITH DARK MODE ADAPTATION
 
 import { StyleSheet } from 'react-native';
 import { Theme } from '../context/ThemeContext';
@@ -48,7 +48,7 @@ export const makeTaskDetailsStyles = (theme: Theme) => StyleSheet.create({
   },
   editButtonDisabled: {
     opacity: 0.5,
-  }, 
+  },
   deleteButtonDisabled: {
     opacity: 0.5,
   },
@@ -56,10 +56,10 @@ export const makeTaskDetailsStyles = (theme: Theme) => StyleSheet.create({
     color: theme.textPlaceholder,
   },
   weekAssignmentAvatarImage: {
-  width: 36,
-  height: 36,
-  borderRadius: 18,
-},
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+  },
   backButton: {
     width: 36,
     height: 36,
@@ -299,7 +299,7 @@ export const makeTaskDetailsStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '500',
   },
   todayDayText: {
-    color: theme.primary,
+    color: theme.primary, 
     fontWeight: '700',
   },
   todayDayLabel: {
@@ -462,16 +462,16 @@ export const makeTaskDetailsStyles = (theme: Theme) => StyleSheet.create({
     marginTop: 10,
     marginLeft: 50,
   },
-  waitingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 16,
-    alignSelf: 'flex-start',
-    gap: 4,
-    backgroundColor: theme.primaryLight,
-  },
+ waitingBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 10,
+  paddingVertical: 4,
+  borderRadius: 16,
+  alignSelf: 'flex-start',
+  gap: 4,
+  backgroundColor: theme.bgSecondary,
+},
   waitingText: {
     fontSize: 12,
     color: theme.primary,
@@ -1020,7 +1020,7 @@ export const makeTaskDetailsStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '600',
   },
   todayAssignmentTitle: {
-    color: theme.error,
+    color: theme.text,
     fontSize: 15,
     fontWeight: '600',
   },

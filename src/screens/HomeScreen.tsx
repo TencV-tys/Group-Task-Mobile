@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Image,
-  Alert,
+  Image, 
+  Alert, 
   Animated,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -43,7 +43,7 @@ const isToday = (date: Date | string): boolean => {
 const isTomorrow = (date: Date | string): boolean => {
   const d = new Date(date);
   const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
   return (
     d.getUTCFullYear() === tomorrow.getUTCFullYear() &&
     d.getUTCMonth()    === tomorrow.getUTCMonth()    &&
@@ -56,6 +56,43 @@ const dueLabelText = (task: any): string => {
   if (isTomorrow(task.dueDate))  return 'Tomorrow';
   if (task.daysLeft !== undefined) return `${task.daysLeft}d left`;
   return '';
+};
+
+// Add this helper function at the top of HomeScreen (outside component)
+const convertUTCToPHT = (utcDateString: string): { date: string; time: string } => {
+  const date = new Date(utcDateString);
+  // Add 8 hours to convert UTC to PHT
+  const phtDate = new Date(date.getTime() + 8 * 60 * 60 * 1000);
+  
+  const year = phtDate.getUTCFullYear();
+  const month = phtDate.getUTCMonth();
+  const day = phtDate.getUTCDate();
+  const hours = phtDate.getUTCHours();
+  const minutes = phtDate.getUTCMinutes();
+  
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  
+  return {
+    date: `${monthNames[month]} ${day}, ${year}`,
+    time: `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`
+  };
+};
+
+// Helper to format time slot to PHT
+const formatTimeSlotToPHT = (timeSlot: any) => {
+  if (!timeSlot) return '';
+  
+  // Convert start time (PHT string) to display format
+  const formatTime = (time24: string) => {
+    const [hours, minutes] = time24.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const hours12 = hours % 12 || 12;
+    return `${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
+  
+  return `${formatTime(timeSlot.startTime)} - ${formatTime(timeSlot.endTime)}`;
 };
 
 // ─── component ───────────────────────────────────────────────────────────────
@@ -272,54 +309,73 @@ export default function HomeScreen({ navigation }: any) {
     );
   }, [rotationAlerts, styles, navigation, groups, handleDismissRotationAlert]);
 
-  // ── task card ────────────────────────────────────────────────────────────
-  const renderTaskCard = useCallback((task: any) => {
-    const dueToday    = isToday(task.dueDate);
-    const dueTomorrow = isTomorrow(task.dueDate);
-    const label       = dueLabelText(task);
+ const renderTaskCard = useCallback((task: any) => {
+  const dueToday    = isToday(task.dueDate);
+  const dueTomorrow = isTomorrow(task.dueDate);
+  const label       = dueLabelText(task);
+  const dueColor = dueToday ? theme.error : dueTomorrow ? '#e67700' : theme.textMuted;
+  
+  // Get time slot display text in PHT
+  const timeSlotText = task.timeSlot ? formatTimeSlotToPHT(task.timeSlot) : '';
+  
+  // Convert due date to PHT for display
+  const phtDisplay = convertUTCToPHT(task.dueDate);
+  const displayDate = dueToday ? 'Today' : dueTomorrow ? 'Tomorrow' : phtDisplay.date;
+  
+  return (
+    <TouchableOpacity
+      key={task.id}
+      style={styles.taskCard}
+      onPress={() => {
+        console.log(`📱 [HomeScreen] Opening task:`, {
+          taskId: task.taskId,
+          title: task.title,
+          assignmentId: task.id,
+          timeSlot: timeSlotText
+        });
+        
+        // ✅ Navigate to TaskDetails for ALL tasks - it handles everything correctly
+        navigation.navigate('TaskDetails', {
+          taskId: task.taskId,
+          groupId: task.groupId,
+          userRole: 'MEMBER',
+        });
+      }}
+      activeOpacity={0.7}
+    >
+      {/* left accent dot */}
+      <View style={[styles.taskDot, { backgroundColor: dueToday ? theme.error : theme.primary }]} />
 
-    const dueColor = dueToday
-      ? theme.error
-      : dueTomorrow
-        ? '#e67700'
-        : theme.textMuted;
-
-    return (
-      <TouchableOpacity
-        key={task.id}
-        style={styles.taskCard}
-        onPress={() => navigation.navigate('AssignmentDetails', { assignmentId: task.id, isAdmin: false })}
-        activeOpacity={0.7}
-      >
-        {/* left accent dot */}
-        <View style={[styles.taskDot, { backgroundColor: dueToday ? theme.error : theme.primary }]} />
-
-        {/* content */}
-        <View style={styles.taskContent}>
-          <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
-          <View style={styles.taskMetaRow}>
-            {/* group pill */}
-            <View style={[styles.groupPill, { backgroundColor: theme.primaryLight }]}>
-              <Text style={[styles.groupPillText, { color: theme.primary }]} numberOfLines={1}>
-                {task.groupName}
-              </Text>
-            </View>
-            {task.timeOfDay ? (
-              <Text style={styles.taskMetaText}>{task.timeOfDay.toLowerCase()}</Text>
-            ) : null}
+      {/* content */}
+      <View style={styles.taskContent}>
+        <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
+        <View style={styles.taskMetaRow}>
+          {/* group pill */}
+          <View style={[styles.groupPill, { backgroundColor: theme.primaryLight }]}>
+            <Text style={[styles.groupPillText, { color: theme.primary }]} numberOfLines={1}>
+              {task.groupName}
+            </Text>
           </View>
-        </View>
-
-        {/* right side */}
-        <View style={styles.taskRight}>
-          <Text style={styles.taskPoints}>+{task.points} pts</Text>
-          {label ? (
-            <Text style={[styles.taskDueLabel, { color: dueColor }]}>{label}</Text>
+          {/* Show time slot if available (PHT format) */}
+          {timeSlotText ? (
+            <Text style={[styles.taskMetaText, { color: theme.textMuted }]}>{timeSlotText}</Text>
           ) : null}
         </View>
-      </TouchableOpacity>
-    );
-  }, [theme, styles, navigation]);
+      </View>
+
+      {/* right side */}
+      <View style={styles.taskRight}>
+        <Text style={styles.taskPoints}>+{task.points} pts</Text>
+        {label ? (
+          <Text style={[styles.taskDueLabel, { color: dueColor }]}>{label}</Text>
+        ) : (
+          <Text style={[styles.taskDueLabel, { color: theme.textMuted }]}>{displayDate}</Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}, [theme, styles, navigation]);
+
 
   // ── loading / error states ───────────────────────────────────────────────
   if (loading && !refreshing) {

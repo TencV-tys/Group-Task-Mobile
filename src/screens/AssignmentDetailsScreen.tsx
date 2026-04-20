@@ -23,7 +23,7 @@ import { useTheme } from '../context/ThemeContext';
 import { makeAssignmentDetailsStyles } from '../styles/assignmentDetails.styles';
 import { getFullImageUrl } from '../utils/imageUrl';
 import { formatUTCDate, formatUTCDayAndDate, getUTCRelativeTime } from '../utils/timeUtils';
-
+import { useFocusEffect } from '@react-navigation/native';
 const { width, height } = Dimensions.get('window');
 
 export default function AssignmentDetailsScreen({ navigation, route }: any) {
@@ -100,6 +100,16 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     }
   }, [assignment]);
 
+  // Refresh when screen comes into focus
+useFocusEffect(
+  React.useCallback(() => {
+    if (assignmentId) {
+      console.log('🔄 Screen focused, refreshing assignment details');
+      fetchAssignmentDetails();
+    }
+  }, [assignmentId, fetchAssignmentDetails])
+);
+
   // ===== AUTH ERROR HANDLER =====
   useEffect(() => {
     if (authError) {
@@ -163,7 +173,7 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
     <Modal
       visible={photoModalVisible}
       transparent={true}
-      animationType="fade"
+      animationType="fade" 
       onRequestClose={closePhotoModal}
     >
       <TouchableOpacity
@@ -465,24 +475,41 @@ export default function AssignmentDetailsScreen({ navigation, route }: any) {
 
 // In AssignmentDetailsScreen.tsx - UPDATE renderVerificationControls
 
-// ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) =====
+// ===== RENDER VERIFICATION CONTROLS (ADMIN ONLY) - FIXED =====
 const renderVerificationControls = () => {
   if (!isAdmin) return null;
   
   // ✅ If already verified, don't show controls
-  if (assignment?.verified === true) return null;
+  if (assignment?.verified === true) {
+    console.log('✅ Assignment already verified, hiding controls');
+    return null;
+  }
   
-  // ✅ If fully completed, don't show controls
-  if (assignment?.completed === true) return null;
+  // ✅ If already rejected, don't show controls (CRITICAL FIX)
+  if (assignment?.verified === false) {
+    console.log('❌ Assignment already rejected, hiding controls');
+    return null;
+  }
+  
+  // ✅ If fully completed (and not verified/rejected yet), show controls
+  if (assignment?.completed === true && assignment?.verified === null) {
+    console.log('📋 Assignment completed, showing verification controls');
+    // Continue to show controls
+  }
   
   const hasSubmission = assignment?.photoUrl !== null && assignment?.photoUrl !== undefined;
-  const notVerified = assignment?.verified === null;
   
   // For multi-slot tasks, also show if partially completed
   const isMultiSlot = assignment?.task?.timeSlots?.length > 1;
-  const isPartial = !assignment?.completed && isMultiSlot && hasSubmission;
+  const isPartial = !assignment?.completed && isMultiSlot && hasSubmission && assignment?.verified === null;
   
-  if ((!hasSubmission || !notVerified) && !isPartial) return null;
+  // If no submission or already processed, don't show controls
+  if ((!hasSubmission || assignment?.verified !== null) && !isPartial) {
+    console.log('⏭️ No pending submission, hiding controls');
+    return null;
+  }
+
+  console.log('🎯 Showing verification controls for assignment:', assignment.id);
 
   return (
     <View style={styles.verificationSection}>
@@ -555,9 +582,21 @@ const renderVerificationControls = () => {
           </LinearGradient>
         </TouchableOpacity>
       </View>
+      
+      {/* ✅ Show status message */}
+      {assignment?.verified === true && (
+        <Text style={[styles.alreadyProcessedText, { color: '#2b8a3e', textAlign: 'center', marginTop: 12 }]}>
+          ✓ This assignment has been verified
+        </Text>
+      )}
+      {assignment?.verified === false && (
+        <Text style={[styles.alreadyProcessedText, { color: '#fa5252', textAlign: 'center', marginTop: 12 }]}>
+          ✗ This assignment has been rejected
+        </Text>
+      )}
     </View>
   );
-}; 
+};
 
   
 

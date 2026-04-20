@@ -1,7 +1,8 @@
-// hooks/useAssignmentDetails.ts - COMPLETE WITH UTC FIXES
+// hooks/useAssignmentDetails.ts - COMPLETE FIXED VERSION
 
 import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { AssignmentService } from '../services/AssignmentService';
 import { SwapRequestService } from '../services/SwapRequestService';
 import { TokenUtils } from '../utils/tokenUtils';
@@ -70,9 +71,9 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
           if (onVerified) onVerified();
         }
       }
-    },
+    },   
     showAlerts: true
-  });
+  }); 
 
   // Format time left
   const formatTimeLeft = useCallback((seconds: number) => {
@@ -113,6 +114,19 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
         icon: 'delete',
         description: 'The task associated with this assignment has been deleted.',
         buttonText: 'Not Available',
+        canSubmit: false
+      };
+    }
+    
+    if (submissionStatus === 'completed') {
+      return {
+        label: '✓ COMPLETED',
+        color: '#2b8a3e',
+        bgColor: '#d3f9d8',
+        borderColor: '#b2f2bb',
+        icon: 'check-circle',
+        description: 'This time slot has already been submitted. Waiting for admin verification.',
+        buttonText: 'Already Submitted',
         canSubmit: false
       };
     }
@@ -181,17 +195,6 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
           buttonText: 'Not Due',
           canSubmit: false
         }; 
-      case 'completed':
-        return {
-          label: '✓ COMPLETED',
-          color: '#2b8a3e',
-          bgColor: '#d3f9d8',
-          borderColor: '#b2f2bb',
-          icon: 'check-circle',
-          description: 'Already submitted',
-          buttonText: 'Completed',
-          canSubmit: false
-        };
       default:
         return {
           label: '⏳ CHECKING',
@@ -206,126 +209,146 @@ export const useAssignmentDetails = (assignmentId: string, isAdminProp: boolean 
     }
   }, [submissionStatus, isLate, penaltyInfo, timeLeft, assignment, formatTimeLeft, isTaskDeleted, isAdmin, isOwner]);
 
-  // In useAssignmentDetails.ts - REPLACE these three functions
-// In useAssignmentDetails.ts - REPLACE getStatusText with this:
-
-const getStatusText = useCallback(() => {
+  const getStatusText = useCallback(() => {
   if (isTaskDeleted) return 'Task Deleted';
-    // ✅ For Admin View (admin but not owner)
+  
+  // ✅ Parse completedTimeSlotIds (handle both string and array)
+  let completedSlotIds: string[] = [];
+  const rawCompleted = assignment?.completedTimeSlotIds;
+  
+  if (rawCompleted) {
+    if (typeof rawCompleted === 'string') {
+      try {
+        completedSlotIds = JSON.parse(rawCompleted);
+      } catch (e) {
+        completedSlotIds = [];
+      }
+    } else if (Array.isArray(rawCompleted)) {
+      completedSlotIds = rawCompleted;
+    }
+  }
+  
+  const currentTimeSlotId = assignment?.timeSlot?.id;
+  const isCurrentSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
+  
+  // ✅ PRIORITY 1: Completed time slot (multi-slot task)
+  if (isCurrentSlotCompleted) {
+    return 'Submitted';
+  }
+  
+  // ✅ PRIORITY 2: Admin View (special display)
   if (isAdmin && !isOwner) {
-    // Show the actual status from the assignment
     if (assignment?.verified === true) return 'Verified';
     if (assignment?.verified === false) return 'Rejected';
     if (assignment?.completed === true && assignment?.verified === null) return 'Pending Verification';
     if (assignment?.completed === true) return 'Completed';
     
-    // Show when the user can submit
     const now = new Date();
     const dueDate = new Date(assignment?.dueDate);
     const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
     const dueUTC = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
     
     if (todayUTC === dueUTC) {
-      return 'Available for User';  // User can submit today
+      return 'Available for User';
     } else if (dueUTC < todayUTC && !assignment?.completed) {
       return 'Expired';
     } else if (dueUTC > todayUTC) {
       return 'Upcoming';
     }
-    
     return 'Not Started (Admin)';
   }
-  // ✅ PRIORITY 1: Check verified/rejected first
+  
+  // ✅ PRIORITY 3: Regular user view - Verified/Rejected first
   if (assignment?.verified === true) return 'Verified';
   if (assignment?.verified === false) return 'Rejected';
   
-  // ✅ PRIORITY 2: Check pending verification
+  // ✅ PRIORITY 4: Pending verification
   if (assignment?.completed === true && assignment?.verified === null) return 'Pending Verification';
   
-  // ✅ PRIORITY 3: Check if due date has passed (different day)
+  // ✅ PRIORITY 5: Check if due date has passed
   const now = new Date();
   const dueDate = new Date(assignment?.dueDate);
   const dueDateUTC = Date.UTC(dueDate.getUTCFullYear(), dueDate.getUTCMonth(), dueDate.getUTCDate());
   const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
   
   if (dueDateUTC < todayUTC && !assignment?.completed) return 'Expired';
-  
-  // ✅ PRIORITY 4: Check expired flag
   if (assignment?.expired === true) return 'Expired';
   
+  // ✅ PRIORITY 6: Missed time slot
   const missedSlotIds = assignment?.missedTimeSlotIds || [];
-  const currentTimeSlotId = assignment?.timeSlot?.id;
   if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'Missed';
   
-  // ✅ PRIORITY 5: Check submission status (THIS IS THE KEY!)
+  // ✅ PRIORITY 7: Submission status (during the day)
   if (submissionStatus === 'available') {
-    return isLate ? 'Late' : 'Started';  // ✅ "Started" during time slot
+    return isLate ? 'Late' : 'Started';
   }
   
   if (submissionStatus === 'waiting') {
-    // ✅ Check if it's the right day but before time slot
     const isRightDay = dueDateUTC === todayUTC;
     if (isRightDay) {
-      return 'Not Started';  // ✅ Shows "Not Started" before time slot opens
+      return 'Not Started';
     }
     return 'Not Started';
   }
   
-  // ✅ PRIORITY 6: Check completed
+  // ✅ PRIORITY 8: Completed (but not verified yet - handled above)
   if (assignment?.completed === true) return 'Completed';
   
+  // ✅ Default
   return 'Not Started';
 }, [assignment, isTaskDeleted, submissionStatus, isLate, isAdmin, isOwner]);
 
-const getStatusColor = useCallback(() => {
-  if (isTaskDeleted) return '#868e96';
-  
-  if (assignment?.verified === true) return '#2b8a3e';
-  if (assignment?.verified === false) return '#fa5252';
-  
-  if (assignment?.completed === true && assignment?.verified === null) return '#e67700';
-  if (assignment?.expired === true) return '#868e96';
-  
-  const missedSlotIds = assignment?.missedTimeSlotIds || [];
-  const currentTimeSlotId = assignment?.timeSlot?.id;
-  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return '#868e96';
-  
-  // ✅ Add submissionStatus check
-  if (submissionStatus === 'available') {
-    return isLate ? '#e67700' : '#2b8a3e';
-  }
-  
-  if (submissionStatus === 'waiting') return '#e67700';
-  
-  if (assignment?.completed === true) return '#2b8a3e';
-  
-  return '#868e96';
-}, [assignment, isTaskDeleted, submissionStatus, isLate]); // ✅ Added dependencies
+  const getStatusColor = useCallback(() => {
+    if (isTaskDeleted) return '#868e96';
+    
+    const completedSlotIds = assignment?.completedTimeSlotIds || [];
+    const currentTimeSlotId = assignment?.timeSlot?.id;
+    const isCurrentSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
+    
+    if (isCurrentSlotCompleted) return '#2b8a3e';
+    
+    if (assignment?.verified === true) return '#2b8a3e';
+    if (assignment?.verified === false) return '#fa5252';
+    if (assignment?.completed === true && assignment?.verified === null) return '#e67700';
+    if (assignment?.expired === true) return '#868e96';
+    
+    const missedSlotIds = assignment?.missedTimeSlotIds || [];
+    if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return '#868e96';
+    
+    if (submissionStatus === 'available') {
+      return isLate ? '#e67700' : '#2b8a3e';
+    }
+    if (submissionStatus === 'waiting') return '#e67700';
+    if (assignment?.completed === true) return '#2b8a3e';
+    
+    return '#868e96';
+  }, [assignment, isTaskDeleted, submissionStatus, isLate]);
 
-const getStatusIcon = useCallback(() => {
-  if (isTaskDeleted) return 'delete';
-  
-  if (assignment?.verified === true) return 'check-circle';
-  if (assignment?.verified === false) return 'close-circle';
-  
-  if (assignment?.completed === true && assignment?.verified === null) return 'clock-check';
-  if (assignment?.expired === true) return 'timer-off';
-  
-  const missedSlotIds = assignment?.missedTimeSlotIds || [];
-  const currentTimeSlotId = assignment?.timeSlot?.id;
-  if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'timer-off';
-   
-  // ✅ Add submissionStatus check
-  if (submissionStatus === 'available') {
-    return isLate ? 'timer-alert' : 'check-circle';
-  }
-  
-  if (submissionStatus === 'waiting') return 'clock-outline';
-  
-  if (assignment?.completed === true) return 'check-circle'; 
-  
-  return 'clock-outline';
-}, [assignment, isTaskDeleted, submissionStatus, isLate]); // ✅ Added dependencies
+  const getStatusIcon = useCallback(() => {
+    if (isTaskDeleted) return 'delete';
+    
+    const completedSlotIds = assignment?.completedTimeSlotIds || [];
+    const currentTimeSlotId = assignment?.timeSlot?.id;
+    const isCurrentSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
+    
+    if (isCurrentSlotCompleted) return 'check-circle';
+    
+    if (assignment?.verified === true) return 'check-circle';
+    if (assignment?.verified === false) return 'close-circle';
+    if (assignment?.completed === true && assignment?.verified === null) return 'clock-check';
+    if (assignment?.expired === true) return 'timer-off';
+    
+    const missedSlotIds = assignment?.missedTimeSlotIds || [];
+    if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) return 'timer-off';
+    
+    if (submissionStatus === 'available') {
+      return isLate ? 'timer-alert' : 'check-circle';
+    }
+    if (submissionStatus === 'waiting') return 'clock-outline';
+    if (assignment?.completed === true) return 'check-circle'; 
+    
+    return 'clock-outline';
+  }, [assignment, isTaskDeleted, submissionStatus, isLate]);
 
   const getTimeDifference = useCallback((dueDate: string, completedAt: string) => {
     const due = new Date(dueDate);
@@ -342,239 +365,218 @@ const getStatusIcon = useCallback(() => {
     }
   }, []);
 
-
-// In useAssignmentDetails.ts - Ensure checkTimeValidity runs when needed
-
-// Replace your checkTimeValidity function with this:
-
-const checkTimeValidity = useCallback((assignmentData: any) => {
-  if (isAdmin && !isOwner) {
-    setIsSubmittable(false);
-    setSubmissionStatus('waiting');
-    return;
-  }
-  
-  if (isTaskDeleted) {
-    setIsSubmittable(false);
-    setSubmissionStatus('completed');
-    return;
-  }
-  
-  if (!assignmentData || assignmentData.completed) {
-    setIsSubmittable(false);
-    setSubmissionStatus('completed');
-    return;
-  }
-
-  const now = new Date();
-  const assignmentDate = new Date(assignmentData.dueDate);
-  
-  // Compare UTC dates (just the date part)
-  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
-  
-  console.log('🔍 [checkTimeValidity] Debug:', {
-    nowUTC: now.toISOString(),
-    assignmentDateUTC: assignmentDate.toISOString(),
-    todayUTC: new Date(todayUTC).toISOString(),
-    assignmentUTC: new Date(assignmentUTC).toISOString(),
-    isSameDay: todayUTC === assignmentUTC
-  });
-  
-  if (todayUTC !== assignmentUTC) {
-    setIsSubmittable(false);
-    setSubmissionStatus('wrong_day');
-    console.log('📅 Not due today, setting status to wrong_day');
-    return;
-  }
-
-  if (assignmentData.timeSlot) {
-    // Get the time slot times (already in PHT)
-    const [startHour, startMinute] = assignmentData.timeSlot.startTime.split(':').map(Number);
-    const [endHour, endMinute] = assignmentData.timeSlot.endTime.split(':').map(Number);
-    
-    // Convert PHT to UTC (subtract 8 hours)
-    // Start time in UTC
-    const startTimeUTC = new Date(Date.UTC(
-      assignmentDate.getUTCFullYear(),
-      assignmentDate.getUTCMonth(),
-      assignmentDate.getUTCDate(),
-      startHour - 8, startMinute, 0, 0
-    ));
-    
-    // End time in UTC
-    const endTimeUTC = new Date(Date.UTC(
-      assignmentDate.getUTCFullYear(),
-      assignmentDate.getUTCMonth(),
-      assignmentDate.getUTCDate(),
-      endHour - 8, endMinute, 0, 0
-    ));
-    
-    // Grace period ends 30 minutes after end time
-    const gracePeriodEndUTC = new Date(endTimeUTC.getTime() + 30 * 60000);
-    // Late threshold (25 minutes after end time)
-    const lateThresholdUTC = new Date(endTimeUTC.getTime() + 25 * 60000);
-    
-    const currentTimeMs = now.getTime();
-    const startTimeMs = startTimeUTC.getTime();
-    const endTimeMs = endTimeUTC.getTime();
-    const graceEndMs = gracePeriodEndUTC.getTime();
-    const lateThresholdMs = lateThresholdUTC.getTime();
-    
-    console.log('⏰ [checkTimeValidity] Time slot check:', {
-      startTime: startTimeUTC.toISOString(),
-      endTime: endTimeUTC.toISOString(),
-      graceEnd: gracePeriodEndUTC.toISOString(),
-      currentTime: now.toISOString(),
-      isBeforeStart: currentTimeMs < startTimeMs,
-      isDuringSlot: currentTimeMs >= startTimeMs && currentTimeMs < endTimeMs,
-      isDuringGrace: currentTimeMs >= endTimeMs && currentTimeMs <= graceEndMs,
-      isAfterGrace: currentTimeMs > graceEndMs
-    });
-    
-    // Check if before time slot starts
-    if (currentTimeMs < startTimeMs) {
+  // ✅ UPDATED: Check time validity with completed slot detection
+  const checkTimeValidity = useCallback((assignmentData: any) => {
+    if (isAdmin && !isOwner) {
       setIsSubmittable(false);
       setSubmissionStatus('waiting');
-      setIsLate(false);
-      setPenaltyInfo(null);
-      const timeUntilStart = Math.floor((startTimeMs - currentTimeMs) / 1000);
-      setTimeLeft(timeUntilStart);
-      console.log('⏳ Before time slot starts, waiting for:', timeUntilStart, 'seconds');
+      return;
     }
-    // Check if during time slot
-    else if (currentTimeMs >= startTimeMs && currentTimeMs < endTimeMs) {
-      setIsSubmittable(true);
-      setSubmissionStatus('available');
-      setIsLate(false);
-      setPenaltyInfo(null);
-      const timeUntilEnd = Math.floor((endTimeMs - currentTimeMs) / 1000);
-      setTimeLeft(timeUntilEnd);
-      console.log('✅ During time slot, available for:', timeUntilEnd, 'seconds');
-    }
-    // Check if during grace period (after time slot)
-    else if (currentTimeMs >= endTimeMs && currentTimeMs <= graceEndMs) {
-      const isLateSubmission = currentTimeMs > lateThresholdMs;
-      setIsSubmittable(true);
-      setSubmissionStatus('available');
-      setIsLate(isLateSubmission);
-      
-      if (isLateSubmission && assignmentData.points) {
-        const penaltyAmount = Math.floor(assignmentData.points * 0.5);
-        setPenaltyInfo({
-          originalPoints: assignmentData.points,
-          finalPoints: assignmentData.points - penaltyAmount,
-          penaltyAmount
-        });
-      } else {
-        setPenaltyInfo(null);
-      }
-      
-      const timeLeftMs = graceEndMs - currentTimeMs;
-      setTimeLeft(Math.floor(timeLeftMs / 1000));
-      console.log('⚠️ During grace period, late:', isLateSubmission, 'timeLeft:', timeLeftMs / 1000, 'seconds');
-    }
-    // After grace period - expired
-    else {
-      setIsSubmittable(false);
-      setSubmissionStatus('expired');
-      setIsLate(false);
-      setPenaltyInfo(null);
-      setTimeLeft(0);
-      console.log('❌ After grace period, expired');
-    }
-  } else {
-    // No time slot - always submittable
-    setIsSubmittable(true);
-    setSubmissionStatus('available');
-    setTimeLeft(null);
-    setIsLate(false);
-    setPenaltyInfo(null);
-    console.log('✅ No time slot, always available');
-  }
-}, [isAdmin, isOwner, isTaskDeleted]);
-
-
-// In useAssignmentDetails.ts - Add this useEffect to debug
-
-useEffect(() => {
-  console.log('📊 [Status Debug]', {
-    submissionStatus,
-    isSubmittable,
-    isLate,
-    timeLeft,
-    assignmentDay: assignment?.assignmentDay,
-    dueDate: assignment?.dueDate,
-    taskTitle: assignment?.task?.title
-  });
-}, [submissionStatus, isSubmittable, isLate, timeLeft, assignment]);
-
-const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
-  if (isAdmin && !isOwner) {
-    setIsSubmittable(false);
-    setSubmissionStatus('waiting');
-    return;
-  }
-  
-  if (isTaskDeleted) {
-    setIsSubmittable(false);
-    setSubmissionStatus('completed');
-    return;
-  }
-  
-  try {
-    const result = await AssignmentService.checkSubmissionTime(assignmentData.id);
     
-    if (result.success && result.data) {
-      setIsSubmittable(result.data.canSubmit);
-      setTimeLeft(result.data.timeLeft || null);
+    if (isTaskDeleted) {
+      setIsSubmittable(false);
+      setSubmissionStatus('completed');
+      return;
+    }
+    
+    if (!assignmentData || assignmentData.completed) {
+      setIsSubmittable(false);
+      setSubmissionStatus('completed');
+      return;
+    }
+
+    // ✅ CRITICAL: Check if this specific time slot is already completed
+    const completedSlotIds = assignmentData.completedTimeSlotIds || [];
+    const currentTimeSlotId = assignmentData.timeSlot?.id;
+    
+    if (currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId)) {
+      console.log('⚠️ This time slot is already completed! Setting status to completed.');
+      setIsSubmittable(false);
+      setSubmissionStatus('completed');
+      setTimeLeft(null);
+      setIsLate(false);
+      setPenaltyInfo(null);
+      return;
+    }
+
+    const now = new Date();
+    const assignmentDate = new Date(assignmentData.dueDate);
+    
+    const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const assignmentUTC = Date.UTC(assignmentDate.getUTCFullYear(), assignmentDate.getUTCMonth(), assignmentDate.getUTCDate());
+    
+    console.log('🔍 [checkTimeValidity] Debug:', {
+      nowUTC: now.toISOString(),
+      assignmentDateUTC: assignmentDate.toISOString(),
+      todayUTC: new Date(todayUTC).toISOString(),
+      assignmentUTC: new Date(assignmentUTC).toISOString(),
+      isSameDay: todayUTC === assignmentUTC,
+      completedSlotIds,
+      currentTimeSlotId,
+      isSlotCompleted: currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId)
+    });
+    
+    if (todayUTC !== assignmentUTC) {
+      setIsSubmittable(false);
+      setSubmissionStatus('wrong_day');
+      console.log('📅 Not due today, setting status to wrong_day');
+      return;
+    }
+
+    if (assignmentData.timeSlot) {
+      const [startHour, startMinute] = assignmentData.timeSlot.startTime.split(':').map(Number);
+      const [endHour, endMinute] = assignmentData.timeSlot.endTime.split(':').map(Number);
       
-      const now = new Date();
-      const dueDate = new Date(assignmentData.dueDate);
-      const [endHour, endMinute] = assignmentData.timeSlot?.endTime.split(':').map(Number) || [0, 0];
-      
-      // ✅ Convert PHT to UTC
-      const endTime = new Date(Date.UTC(
-        dueDate.getUTCFullYear(),
-        dueDate.getUTCMonth(),
-        dueDate.getUTCDate(),
+      const endTimeUTC = new Date(Date.UTC(
+        assignmentDate.getUTCFullYear(),
+        assignmentDate.getUTCMonth(),
+        assignmentDate.getUTCDate(),
         endHour - 8, endMinute, 0, 0
       ));
       
-      const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
-      const isLateSubmission = now.getTime() > lateThreshold.getTime();
-      setIsLate(isLateSubmission);
+      const gracePeriodEndUTC = new Date(endTimeUTC.getTime() + 30 * 60000);
+      const lateThresholdUTC = new Date(endTimeUTC.getTime() + 25 * 60000);
       
-      if (isLateSubmission && assignmentData.points) {
-        const penaltyAmount = Math.floor(assignmentData.points * 0.5);
-        setPenaltyInfo({
-          originalPoints: assignmentData.points,
-          finalPoints: assignmentData.points - penaltyAmount,
-          penaltyAmount
-        });
-      } else {
-        setPenaltyInfo(null);
-      }
+      const currentTimeMs = now.getTime();
+      const endTimeMs = endTimeUTC.getTime();
+      const graceEndMs = gracePeriodEndUTC.getTime();
+      const lateThresholdMs = lateThresholdUTC.getTime();
       
-      if (result.data.canSubmit) {
-        setSubmissionStatus('available');
-      } else if (result.data.reason === 'Not due date') {
-        setSubmissionStatus('wrong_day');
-      } else if (result.data.reason === 'Submission not open yet') {
+      console.log('⏰ [checkTimeValidity] Time slot check:', {
+        startTime: `${startHour}:${startMinute} PHT`,
+        endTime: `${endHour}:${endMinute} PHT`,
+        endTimeUTC: endTimeUTC.toISOString(),
+        graceEndUTC: gracePeriodEndUTC.toISOString(),
+        currentTime: now.toISOString(),
+        isBeforeEnd: currentTimeMs < endTimeMs,
+        isDuringGrace: currentTimeMs >= endTimeMs && currentTimeMs <= graceEndMs,
+        isAfterGrace: currentTimeMs > graceEndMs
+      });
+      
+      if (currentTimeMs < endTimeMs) {
+        setIsSubmittable(false);
         setSubmissionStatus('waiting');
-      } else {
+        setIsLate(false);
+        setPenaltyInfo(null);
+        const timeUntilOpen = Math.floor((endTimeMs - currentTimeMs) / 1000);
+        setTimeLeft(timeUntilOpen);
+        console.log('⏳ Submission window opens at end time, waiting for:', timeUntilOpen, 'seconds');
+      }
+      else if (currentTimeMs >= endTimeMs && currentTimeMs <= graceEndMs) {
+        const isLateSubmission = currentTimeMs > lateThresholdMs;
+        setIsSubmittable(true);
+        setSubmissionStatus('available');
+        setIsLate(isLateSubmission);
+        
+        if (isLateSubmission && assignmentData.points) {
+          const penaltyAmount = Math.floor(assignmentData.points * 0.5);
+          setPenaltyInfo({
+            originalPoints: assignmentData.points,
+            finalPoints: assignmentData.points - penaltyAmount,
+            penaltyAmount
+          });
+        } else {
+          setPenaltyInfo(null);
+        }
+        
+        const timeLeftMs = graceEndMs - currentTimeMs;
+        setTimeLeft(Math.floor(timeLeftMs / 1000));
+        console.log('⚠️ During grace period, late:', isLateSubmission, 'timeLeft:', timeLeftMs / 1000, 'seconds');
+      }
+      else {
+        setIsSubmittable(false);
         setSubmissionStatus('expired');
+        setIsLate(false);
+        setPenaltyInfo(null);
+        setTimeLeft(0);
+        console.log('❌ After grace period, expired');
       }
     } else {
+      setIsSubmittable(true);
+      setSubmissionStatus('available');
+      setTimeLeft(null);
+      setIsLate(false);
+      setPenaltyInfo(null);
+      console.log('✅ No time slot, always available');
+    }
+  }, [isAdmin, isOwner, isTaskDeleted]);
+
+  useEffect(() => {
+    console.log('📊 [Status Debug]', {
+      submissionStatus,
+      isSubmittable,
+      isLate,
+      timeLeft,
+      assignmentDay: assignment?.assignmentDay,
+      dueDate: assignment?.dueDate,
+      taskTitle: assignment?.task?.title
+    });
+  }, [submissionStatus, isSubmittable, isLate, timeLeft, assignment]);
+
+  const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
+    if (isAdmin && !isOwner) {
+      setIsSubmittable(false);
+      setSubmissionStatus('waiting');
+      return;
+    }
+    
+    if (isTaskDeleted) {
+      setIsSubmittable(false);
+      setSubmissionStatus('completed');
+      return;
+    }
+    
+    try {
+      const result = await AssignmentService.checkSubmissionTime(assignmentData.id);
+      
+      if (result.success && result.data) {
+        setIsSubmittable(result.data.canSubmit);
+        setTimeLeft(result.data.timeLeft || null);
+        
+        const now = new Date();
+        const dueDate = new Date(assignmentData.dueDate);
+        const [endHour, endMinute] = assignmentData.timeSlot?.endTime.split(':').map(Number) || [0, 0];
+        
+        const endTime = new Date(Date.UTC(
+          dueDate.getUTCFullYear(),
+          dueDate.getUTCMonth(),
+          dueDate.getUTCDate(),
+          endHour - 8, endMinute, 0, 0
+        ));
+        
+        const lateThreshold = new Date(endTime.getTime() + 25 * 60000);
+        const isLateSubmission = now.getTime() > lateThreshold.getTime();
+        setIsLate(isLateSubmission);
+        
+        if (isLateSubmission && assignmentData.points) {
+          const penaltyAmount = Math.floor(assignmentData.points * 0.5);
+          setPenaltyInfo({
+            originalPoints: assignmentData.points,
+            finalPoints: assignmentData.points - penaltyAmount,
+            penaltyAmount
+          });
+        } else {
+          setPenaltyInfo(null);
+        }
+        
+        if (result.data.canSubmit) {
+          setSubmissionStatus('available');
+        } else if (result.data.reason === 'Not due date') {
+          setSubmissionStatus('wrong_day');
+        } else if (result.data.reason === 'Submission not open yet') {
+          setSubmissionStatus('waiting');
+        } else {
+          setSubmissionStatus('expired');
+        }
+      } else {
+        checkTimeValidity(assignmentData);
+      }
+    } catch (error) {
+      console.error(`❌ Server check failed, falling back to local:`, error);
       checkTimeValidity(assignmentData);
     }
-  } catch (error) {
-    console.error(`❌ Server check failed, falling back to local:`, error);
-    checkTimeValidity(assignmentData);
-  }
-}, [checkTimeValidity, isTaskDeleted, isAdmin, isOwner]);
+  }, [checkTimeValidity, isTaskDeleted, isAdmin, isOwner]);
 
-  // ✅ FIXED: Get UTC day name helper
   const getUTCDayNameFromDate = useCallback((dateString: string): string => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -582,171 +584,185 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
     return days[date.getUTCDay()];
   }, []);
 
-  // Fetch assignment details
   const fetchAssignmentDetails = useCallback(async () => {
-    console.log('🔄 [fetchAssignmentDetails] START loading');
-    setLoading(true);
-    setError(null);
+  console.log('🔄 [fetchAssignmentDetails] START loading');
+  setLoading(true);
+  setError(null);
 
-    try {
-      const result = await AssignmentService.getAssignmentDetails(assignmentId);
-      console.log('📦 [fetchAssignmentDetails] API response received');
+  try {
+    const result = await AssignmentService.getAssignmentDetails(assignmentId);
+    console.log('📦 [fetchAssignmentDetails] API response received');
+    
+    if (result.success) {
+      console.log('✅ [fetchAssignmentDetails] Success, setting data');
       
-      if (result.success) {
-        console.log('✅ [fetchAssignmentDetails] Success, setting data');
+      const assignmentData = result.assignment;
+      
+      // ✅ FIX: Parse completedTimeSlotIds (handle both string and array)
+      let parsedCompletedSlotIds: string[] = [];
+      const rawCompleted = assignmentData.completedTimeSlotIds;
+      
+      console.log('📊 Raw completedTimeSlotIds type:', typeof rawCompleted);
+      console.log('📊 Raw completedTimeSlotIds value:', rawCompleted);
+      
+      if (rawCompleted) {
+        if (typeof rawCompleted === 'string') {
+          try {
+            parsedCompletedSlotIds = JSON.parse(rawCompleted);
+            console.log('📊 Parsed from string:', parsedCompletedSlotIds);
+          } catch (e) {
+            console.error('Failed to parse completedTimeSlotIds:', e);
+            parsedCompletedSlotIds = [];
+          }
+        } else if (Array.isArray(rawCompleted)) {
+          parsedCompletedSlotIds = rawCompleted;
+          console.log('📊 Already array:', parsedCompletedSlotIds);
+        }
+      }
+      
+      // Replace with parsed version
+      assignmentData.completedTimeSlotIds = parsedCompletedSlotIds;
+      
+      const assignmentWithUTCDay = {
+        ...assignmentData,
+        assignmentDay: assignmentData.assignmentDay || getUTCDayNameFromDate(assignmentData.dueDate)
+      };
+      
+      console.log('✅ [fetchAssignmentDetails] Assignment data:', {
+        id: assignmentWithUTCDay.id,
+        dueDate: assignmentWithUTCDay.dueDate,
+        assignmentDay: assignmentWithUTCDay.assignmentDay,
+        taskTitle: assignmentWithUTCDay.task?.title, 
+        timeSlot: assignmentWithUTCDay.timeSlot,
+        userId: assignmentWithUTCDay.userId,
+        isOwner: assignmentWithUTCDay.userId === currentUserId,
+        completedSlotIds: parsedCompletedSlotIds,
+        currentTimeSlotId: assignmentWithUTCDay.timeSlot?.id,
+        isSlotCompleted: parsedCompletedSlotIds.includes(assignmentWithUTCDay.timeSlot?.id)
+      });
+      
+      setIsAdmin(assignmentWithUTCDay.isAdmin || isAdminProp);
+      setIsOwner(assignmentWithUTCDay.userId === currentUserId);
+      
+      if (assignmentWithUTCDay.isTaskDeleted || (!assignmentWithUTCDay.task && assignmentWithUTCDay.taskTitle)) {
+        setIsTaskDeleted(true);
+        setDeletedTaskTitle(assignmentWithUTCDay.taskTitle || 'Deleted Task');
         
-        const assignmentData = result.assignment;
-        
-        // ✅ FIXED: Ensure assignmentDay uses UTC
-        const assignmentWithUTCDay = {
-          ...assignmentData,
-          assignmentDay: assignmentData.assignmentDay || getUTCDayNameFromDate(assignmentData.dueDate)
-        };
-        
-        console.log('✅ [fetchAssignmentDetails] Assignment data:', {
-          id: assignmentWithUTCDay.id,
-          dueDate: assignmentWithUTCDay.dueDate,
-          assignmentDay: assignmentWithUTCDay.assignmentDay,
-          taskTitle: assignmentWithUTCDay.task?.title, 
-          timeSlot: assignmentWithUTCDay.timeSlot,
-          userId: assignmentWithUTCDay.userId,
-          isOwner: assignmentWithUTCDay.userId === currentUserId
+        setAssignment({
+          ...assignmentWithUTCDay,
+          isTaskDeleted: true,
+          taskTitle: assignmentWithUTCDay.taskTitle || 'Deleted Task'
         });
+        setVerificationStatus(
+          assignmentWithUTCDay.verified ? 'verified' : 
+          assignmentWithUTCDay.verified === false ? 'rejected' : 'pending'
+        );
+        setAdminNotes(assignmentWithUTCDay.adminNotes || '');
+        setSubmissionStatus('completed');
+        setIsSubmittable(false);
         
-        // Set admin/owner flags from server
-        setIsAdmin(assignmentWithUTCDay.isAdmin || isAdminProp);
-        setIsOwner(assignmentWithUTCDay.userId === currentUserId);
+        Alert.alert(
+          'Task Deleted',
+          `The task "${assignmentWithUTCDay.taskTitle || 'Unknown Task'}" has been deleted.\n\nYou can view the submission details but cannot make changes.`,
+          [{ text: 'OK' }]
+        );
+      } else {
+        setIsTaskDeleted(false);
+        setAssignment(assignmentWithUTCDay);
+        setVerificationStatus(
+          assignmentWithUTCDay.verified ? 'verified' : 
+          assignmentWithUTCDay.verified === false ? 'rejected' : 'pending'
+        );
+        setAdminNotes(assignmentWithUTCDay.adminNotes || '');
         
-        if (assignmentWithUTCDay.isTaskDeleted || (!assignmentWithUTCDay.task && assignmentWithUTCDay.taskTitle)) {
-          setIsTaskDeleted(true);
-          setDeletedTaskTitle(assignmentWithUTCDay.taskTitle || 'Deleted Task');
-          
-          setAssignment({
-            ...assignmentWithUTCDay,
-            isTaskDeleted: true,
-            taskTitle: assignmentWithUTCDay.taskTitle || 'Deleted Task'
-          });
-          setVerificationStatus(
-            assignmentWithUTCDay.verified ? 'verified' : 
-            assignmentWithUTCDay.verified === false ? 'rejected' : 'pending'
-          );
-          setAdminNotes(assignmentWithUTCDay.adminNotes || '');
+        // ✅ Check if this specific time slot is already completed
+        const currentTimeSlotId = assignmentWithUTCDay.timeSlot?.id;
+        
+        if (currentTimeSlotId && parsedCompletedSlotIds.includes(currentTimeSlotId)) {
+          console.log('⚠️ This time slot is already completed! Setting status to completed.');
           setSubmissionStatus('completed');
           setIsSubmittable(false);
-          
-          Alert.alert(
-            'Task Deleted',
-            `The task "${assignmentWithUTCDay.taskTitle || 'Unknown Task'}" has been deleted.\n\nYou can view the submission details but cannot make changes.`,
-            [{ text: 'OK' }]
-          );
+        } else if (assignmentWithUTCDay.completed) {
+          setSubmissionStatus('completed');
+          setIsSubmittable(false);
         } else {
-          setIsTaskDeleted(false);
-          setAssignment(assignmentWithUTCDay);
-          setVerificationStatus(
-            assignmentWithUTCDay.verified ? 'verified' : 
-            assignmentWithUTCDay.verified === false ? 'rejected' : 'pending'
-          );
-          setAdminNotes(assignmentWithUTCDay.adminNotes || '');
-          
-          if (!assignmentWithUTCDay.completed) {
-            await checkTimeValidityWithServer(assignmentWithUTCDay);
-          } else {
-            setSubmissionStatus('completed');
-          }
+          await checkTimeValidityWithServer(assignmentWithUTCDay);
         }
-      } else {
-        if (result.message?.includes('400') || result.message?.includes('404') || result.message?.includes('deleted')) {
-          setError('This assignment is no longer available (may have been deleted).');
-        } else if (result.message?.toLowerCase().includes('token') || 
-            result.message?.toLowerCase().includes('auth') ||
-            result.message?.toLowerCase().includes('unauthorized')) {
-          setAuthError(true);
-        } else {
-          setError(result.message || 'Failed to load assignment details');
-        }
-      } 
-    } catch (err: any) {
-      console.error('Error fetching assignment:', err);
-      setError(err.message || 'Network error');
-    } finally { 
-      console.log('🏁 [fetchAssignmentDetails] END loading');
-      setLoading(false);
-    }
-  }, [assignmentId, checkTimeValidityWithServer, isAdminProp, currentUserId, getUTCDayNameFromDate]);
-
-  
-  const handleCompleteAssignment = useCallback((navigation: any, onComplete?: () => void) => {
-  if (!isOwner) {
-    Alert.alert(
-      'Cannot Submit',
-      'You can only submit your own assignments.',
-      [{ text: 'OK' }]
-    );
-    return;
-  }
-  
-  if (isTaskDeleted) {
-    Alert.alert(
-      'Cannot Submit',
-      'This assignment is for a deleted task. You cannot submit or modify it.',
-      [{ text: 'OK' }]
-    );
-    return;
-  }
-  
-  if (!assignment || !isSubmittable) {
-    const statusInfo = getSubmissionStatusInfo();
-    Alert.alert(
-      'Cannot Submit',
-      statusInfo.description,
-      [{ text: 'OK' }]
-    );
-    return;
-  }
-  
-  const navigateToComplete = () => {
-    // ✅ Pass all time slots to CompleteAssignment screen
-    const timeSlots = assignment.task?.timeSlots || [];
-    const hasMultipleSlots = timeSlots.length > 1;
-    
-    console.log('🎯 [handleCompleteAssignment] Navigating to CompleteAssignment with:', {
-      assignmentId: assignment.id,
-      taskTitle: assignment.task?.title,
-      dueDate: assignment.dueDate,
-      timeSlot: assignment.timeSlot,
-      timeSlotsCount: timeSlots.length,
-      hasMultipleSlots
-    });
-    
-    navigation.navigate('CompleteAssignment', {
-      assignmentId: assignment.id,
-      taskTitle: assignment.task?.title || 'Unknown Task',
-      dueDate: assignment.dueDate,
-      timeSlot: assignment.timeSlot,
-      timeSlots: timeSlots,  // ✅ Pass all time slots for multi-slot tasks
-      onCompleted: () => {
-        fetchAssignmentDetails();
-        if (onVerified) onVerified?.();
-        if (onComplete) onComplete();
       }
-    });
-  };
-  
-  if (isLate && penaltyInfo) {
-    Alert.alert(
-      'Late Submission',
-      `You are submitting late.\n\nYou will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}.\n\nDo you want to continue?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Submit Anyway', onPress: navigateToComplete }
-      ]
-    ); 
-  } else {
-    navigateToComplete();
+    } else {
+    setError(result.message || 'Failed to load assignment details');
+    }
+  } catch (err: any) {
+    console.error('Error fetching assignment:', err);
+    setError(err.message || 'Network error');
+  } finally {
+    setLoading(false);
   }
-}, [assignment, isSubmittable, isLate, penaltyInfo, getSubmissionStatusInfo, fetchAssignmentDetails, onVerified, isTaskDeleted, isOwner]);
+}, [assignmentId, checkTimeValidityWithServer, isAdminProp, currentUserId, getUTCDayNameFromDate]);
 
-  // Handle request swap - only for owner
+  const handleCompleteAssignment = useCallback((navigation: any, onComplete?: () => void) => {
+    if (!isOwner) {
+      Alert.alert(
+        'Cannot Submit',
+        'You can only submit your own assignments.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    if (isTaskDeleted) {
+      Alert.alert(
+        'Cannot Submit',
+        'This assignment is for a deleted task. You cannot submit or modify it.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    if (!assignment || !isSubmittable) {
+      const statusInfo = getSubmissionStatusInfo();
+      Alert.alert(
+        'Cannot Submit',
+        statusInfo.description,
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
+    const navigateToComplete = () => {
+      const timeSlots = assignment.task?.timeSlots || [];
+      
+      console.log('🎯 [handleCompleteAssignment] Navigating to CompleteAssignment');
+      
+      navigation.navigate('CompleteAssignment', {
+        assignmentId: assignment.id,
+        taskTitle: assignment.task?.title || 'Unknown Task',
+        dueDate: assignment.dueDate,
+        timeSlot: assignment.timeSlot,
+        timeSlots: timeSlots,
+        onCompleted: () => {
+          console.log('🔄 [onCompleted] Called - refreshing assignment details');
+          fetchAssignmentDetails();
+          if (onVerified) onVerified?.();
+          if (onComplete) onComplete();
+        }
+      });
+    };
+    
+    if (isLate && penaltyInfo) {
+      Alert.alert(
+        'Late Submission',
+        `You are submitting late.\n\nYou will receive ${penaltyInfo.finalPoints} points instead of ${penaltyInfo.originalPoints}.\n\nDo you want to continue?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Submit Anyway', onPress: navigateToComplete }
+        ]
+      ); 
+    } else {
+      navigateToComplete();
+    }
+  }, [assignment, isSubmittable, isLate, penaltyInfo, getSubmissionStatusInfo, fetchAssignmentDetails, onVerified, isTaskDeleted, isOwner]);
+
   const handleRequestSwap = useCallback((navigation: any, preSelectedScope?: 'week' | 'day') => {
     return async () => {
       if (!isOwner) {
@@ -782,7 +798,6 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
           return;
         }
         
-        // ✅ FIXED: Use UTC day name
         const assignmentDay = assignment.assignmentDay || getUTCDayNameFromDate(assignment.dueDate);
         
         navigation.navigate('CreateSwapRequest', {
@@ -805,7 +820,6 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
     };
   }, [assignment, isTaskDeleted, isOwner, getUTCDayNameFromDate]);
 
-  // Handle verify - only for admin
   const handleVerify = useCallback(async (verified: boolean) => {
     if (!isAdmin) {
       Alert.alert(
@@ -861,7 +875,6 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
     }
   }, [assignment, assignmentId, adminNotes, fetchAssignmentDetails, onVerified, isTaskDeleted, isAdmin]);
 
-  // Handle view photo
   const handleViewPhoto = useCallback(() => {
     if (assignment?.photoUrl) {
       const fullUrl = getFullImageUrl(assignment.photoUrl);
@@ -877,7 +890,6 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
     }
   }, [assignment]);
 
-  // Close photo modal
   const closePhotoModal = useCallback(() => {
     setPhotoModalVisible(false);
     setSelectedPhotoUrl(null);
@@ -920,9 +932,13 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
     }
   }, [assignmentEvents.assignmentRejected, assignmentId, fetchAssignmentDetails, onVerified, clearAssignmentRejected]);
 
-  // Start countdown timer - only for owner
+  // Start countdown timer - only for owner and if slot not completed
   useEffect(() => {
-    if (assignment && !assignment.completed && !isTaskDeleted && isOwner) {
+    const completedSlotIds = assignment?.completedTimeSlotIds || [];
+    const currentTimeSlotId = assignment?.timeSlot?.id;
+    const isSlotCompleted = currentTimeSlotId && completedSlotIds.includes(currentTimeSlotId);
+    
+    if (assignment && !assignment.completed && !isTaskDeleted && isOwner && !isSlotCompleted) {
       const timer = setInterval(() => {
         if (assignment && !assignment.completed && !isTaskDeleted && isOwner) {
           checkTimeValidity(assignment);
@@ -940,7 +956,6 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
   }, [assignmentId, fetchAssignmentDetails]);
 
   return {
-    // State
     loading,
     verifying,
     assignment,
@@ -955,32 +970,20 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
     authError,
     isTaskDeleted,
     deletedTaskTitle,
-    
-    // Admin/Owner flags
     isAdmin,
     isOwner,
-    
-    // Photo modal state
     photoModalVisible,
     selectedPhotoUrl,
     closePhotoModal,
-    
-    // Setters
     setAdminNotes,
-    
-    // Data
     hasPendingRequest: hasPendingRequest(assignmentId),
     pendingRequest: getPendingRequestForAssignment(assignmentId),
-    
-    // Helper functions
     getStatusColor,
     getStatusIcon,
     getStatusText,
     getTimeDifference,
     getSubmissionStatusInfo,
     formatTimeLeft, 
-     
-    // Actions
     fetchAssignmentDetails,
     handleCompleteAssignment, 
     handleRequestSwap,
@@ -988,4 +991,4 @@ const checkTimeValidityWithServer = useCallback(async (assignmentData: any) => {
     handleViewPhoto,
     clearAuthError: () => setAuthError(false)
   };
-}; 
+};

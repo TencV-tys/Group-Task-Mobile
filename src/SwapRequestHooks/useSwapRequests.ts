@@ -471,10 +471,7 @@ export const useSwapRequests = () => {
     }
   }, [loadMyRequests, loadPendingForMe, checkToken]);
 
- 
-  // useSwapRequests.ts - FIXED acceptSwapRequest and rejectSwapRequest
-
-const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () => void) => {
+ const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () => void) => {
   const hasToken = await checkToken();
   if (!hasToken) return { success: false, message: 'Authentication required', authError: true };
 
@@ -490,8 +487,18 @@ const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () =
       if (onSuccess) onSuccess();
 
       // ✅ IMMEDIATELY update local state to remove the accepted request
-      setPendingForMe(prev => prev.filter(req => req.id !== requestId));
-      setTotalPendingForMe(prev => Math.max(0, prev - 1));
+      setPendingForMe(prev => {
+        const newState = prev.filter(req => req.id !== requestId);
+        console.log(`📊 PendingForMe updated: ${prev.length} -> ${newState.length}`);
+        return newState;
+      });
+      
+      // ✅ Update total count directly
+      setTotalPendingForMe(prev => {
+        const newCount = Math.max(0, prev - 1);
+        console.log(`📊 totalPendingForMe updated: ${prev} -> ${newCount}`);
+        return newCount;
+      });
       
       // Also update myRequests if this was my outgoing request
       setMyRequests(prev => prev.map(req => 
@@ -500,8 +507,9 @@ const acceptSwapRequest = useCallback(async (requestId: string, onSuccess?: () =
           : req
       ));
 
-      // ✅ Refresh from server after a short delay (but badge already updated)
+      // ✅ Refresh from server after a delay (but badge already updated)
       setTimeout(async () => {
+        console.log('🔄 Refreshing swap data from server...');
         await Promise.all([
           loadMyRequests(undefined, true),
           loadPendingForMe(undefined, true)
@@ -560,8 +568,18 @@ const rejectSwapRequest = useCallback(async (requestId: string, reason?: string)
 
     if (response.success) {
       // ✅ IMMEDIATELY update local state to remove the rejected request
-      setPendingForMe(prev => prev.filter(req => req.id !== requestId));
-      setTotalPendingForMe(prev => Math.max(0, prev - 1));
+      setPendingForMe(prev => {
+        const newState = prev.filter(req => req.id !== requestId);
+        console.log(`📊 PendingForMe updated: ${prev.length} -> ${newState.length}`);
+        return newState;
+      });
+      
+      // ✅ Update total count directly
+      setTotalPendingForMe(prev => {
+        const newCount = Math.max(0, prev - 1);
+        console.log(`📊 totalPendingForMe updated: ${prev} -> ${newCount}`);
+        return newCount;
+      });
       
       // Also update myRequests if this was my outgoing request
       setMyRequests(prev => prev.map(req => 
@@ -570,8 +588,9 @@ const rejectSwapRequest = useCallback(async (requestId: string, reason?: string)
           : req
       ));
 
-      // ✅ Refresh from server after a short delay
+      // ✅ Refresh from server after a delay
       setTimeout(async () => {
+        console.log('🔄 Refreshing swap data from server...');
         await Promise.all([
           loadMyRequests(undefined, true),
           loadPendingForMe(undefined, true)

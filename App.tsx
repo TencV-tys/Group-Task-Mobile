@@ -1,4 +1,4 @@
-// App.tsx - FULLY FIXED WITH SOCKET CONNECTION
+// App.tsx - NOTIFICATIONS KEPT, NAVIGATION REMOVED
 
 import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -17,8 +17,8 @@ import { API_BASE_URL } from './src/config/api';
 import { SocketAuthBridge } from './src/components/SocketAuthBridge';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Create navigation ref for handling notification taps
-export const navigationRef = React.createRef<any>();
+// Navigation ref removed - not needed anymore
+// export const navigationRef = React.createRef<any>();
 
 // Configure notification handler for when app is in foreground
 Notifications.setNotificationHandler({
@@ -134,110 +134,14 @@ async function registerForPushNotifications() {
   }
 }
 
-// Handle navigation when user taps on notification
+// Handle notification tap - NAVIGATION REMOVED, just log it
 async function handleNotificationResponse(response: Notifications.NotificationResponse) {
   const { data } = response.notification.request.content;
-  console.log('🔘 Notification tapped:', data);
+  console.log('🔘 Notification tapped (navigation disabled):', data);
+  console.log('📱 App will open to last screen - navigation removed');
   
-  if (!navigationRef.current) {
-    console.log('⏳ Navigation not ready, waiting...');
-    setTimeout(() => handleNotificationResponse(response), 500);
-    return;
-  }
-  
-  switch (data.type) {
-    case 'SUBMISSION_VERIFIED':
-    case 'SUBMISSION_REJECTED':
-    case 'SUBMISSION_PENDING':
-      if (data.assignmentId) {
-        navigationRef.current?.navigate('AssignmentDetails', {
-          assignmentId: data.assignmentId,
-          isAdmin: data.isAdmin === 'true' || data.isAdmin === true
-        });
-      } else if (data.taskId) {
-        navigationRef.current?.navigate('TaskDetails', {
-          taskId: data.taskId,
-          groupId: data.groupId
-        });
-      }
-      break;
-      
-    case 'TASK_ASSIGNED':
-    case 'TASK_CREATED':
-      if (data.taskId) {
-        navigationRef.current?.navigate('TaskDetails', {
-          taskId: data.taskId,
-          groupId: data.groupId
-        });
-      } else if (data.groupId) {
-        navigationRef.current?.navigate('GroupTasks', {
-          groupId: data.groupId,
-          groupName: data.groupName || 'Group',
-          userRole: 'MEMBER',
-          tab: 'my'
-        });
-      }
-      break;
-      
-    case 'SWAP_ACCEPTED':
-    case 'SWAP_REQUEST':
-    case 'SWAP_COMPLETED':
-      if (data.swapRequestId) {
-        navigationRef.current?.navigate('SwapRequestDetails', {
-          requestId: data.swapRequestId
-        });
-      } else {
-        navigationRef.current?.navigate('MySwapRequests', {
-          groupId: data.groupId,
-          groupName: data.groupName
-        });
-      }
-      break;
-      
-    case 'NEGLECT_DETECTED':
-    case 'TASK_MISSED':
-    case 'SLOT_MISSED':
-      navigationRef.current?.navigate('NeglectedTasks', {
-        groupId: data.groupId,
-        groupName: data.groupName,
-        userRole: 'MEMBER'
-      });
-      break;
-      
-    case 'TASK_REMINDER':
-    case 'TASK_ACTIVE':
-      if (data.assignmentId) {
-        navigationRef.current?.navigate('CompleteAssignment', {
-          assignmentId: data.assignmentId,
-          taskTitle: data.taskTitle,
-          dueDate: data.dueDate
-        });
-      } else {
-        navigationRef.current?.navigate('TodayAssignments', {
-          groupId: data.groupId,
-          groupName: data.groupName
-        });
-      }
-      break;
-      
-    case 'POINTS_EARNED':
-      navigationRef.current?.navigate('FullLeaderboard', {
-        groupId: data.groupId,
-        groupName: data.groupName
-      });
-      break;
-      
-    default:
-      if (data.groupId) {
-        navigationRef.current?.navigate('GroupTasks', {
-          groupId: data.groupId,
-          groupName: data.groupName || 'Group'
-        });
-      } else {
-        navigationRef.current?.navigate('Home');
-      }
-      break;
-  }
+  // No navigation code - just log and let app open normally
+  // The app will open to whatever screen was last active
 }
 
 export default function App() {
@@ -296,8 +200,6 @@ export default function App() {
   }, []);
 
   // Show loading screen while checking auto-login
-  // ✅ IMPORTANT: SocketAuthBridge is INSIDE the loading screen
-  // This ensures it mounts BEFORE auto-login completes
   if (isLoading) {
     return (
       <SafeAreaProvider>
@@ -320,7 +222,7 @@ export default function App() {
         <SocketProvider>
           <SocketAuthBridge />
           <NavigationContainer
-            ref={navigationRef}
+    
             linking={linking}
             fallback={
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -331,7 +233,7 @@ export default function App() {
             <AppNavigator initialRoute={initialRoute} />
           </NavigationContainer>
         </SocketProvider>
-      </ThemeProvider>
+      </ThemeProvider> 
     </SafeAreaProvider>
   );
 }

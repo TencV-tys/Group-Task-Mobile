@@ -769,7 +769,7 @@ const renderLeaderboardItem = (item: any, index: number) => {
                 </LinearGradient>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>History</Text>
               </View>
-
+               {!isAdmin &&
               <TouchableOpacity onPress={handleMySubmissions} style={styles.menuItem}>
     <View style={styles.menuItemLeft}>
       <MaterialCommunityIcons name="clipboard-list" size={18} color={theme.primary} />
@@ -777,7 +777,7 @@ const renderLeaderboardItem = (item: any, index: number) => {
     </View>
     <MaterialCommunityIcons name="chevron-right" size={18} color={theme.textMuted} />
   </TouchableOpacity>
-
+}
               <TouchableOpacity onPress={handleTaskCompletionHistory} style={styles.menuItem}>
                 <View style={styles.menuItemLeft}>
                   <MaterialCommunityIcons name="clipboard-list" size={18} color={theme.primary} />

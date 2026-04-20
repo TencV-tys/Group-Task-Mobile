@@ -382,6 +382,22 @@ export const makeRotationScheduleStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 10,
     fontStyle: 'italic',
   },
+timeSlotContainer: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 8,
+  marginTop: 8,
+  marginBottom: 8,
+  paddingHorizontal: 12,
+  paddingVertical: 6,
+  borderRadius: 8,
+  alignSelf: 'flex-start',
+},
+
+timeSlotText: {
+  fontSize: 12,
+  fontWeight: '500',
+},
   explanationCard: {
     borderRadius: 16,
     padding: 16,

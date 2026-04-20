@@ -169,10 +169,10 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   swappedFromName: t.swappedFromName,
   assignment: t.assignment ? {
     acquiredViaSwap: t.assignment.acquiredViaSwap,
-    swapScope: t.assignment.swapScope
+    swapScope: t.assignment.swapScope 
   } : null
 })));
-    
+     
     const taskData = taskMap.get(taskId);
     const assignment = item.assignment || item;
     const points = assignment.points || 0;
@@ -644,7 +644,7 @@ const groupedAllTasks = useMemo(() => {
     if (groupId && !loadingUser && !initialLoadDone.current) {
       fetchTasks();
       fetchMembers();
-      loadPendingForMe(groupId);
+      loadPendingForMe(groupId,true);
       fetchPendingVerificationsCount();
     }
   }, [groupId, loadingUser, fetchTasks, fetchMembers, loadPendingForMe, fetchPendingVerificationsCount]);
@@ -741,20 +741,6 @@ const groupedAllTasks = useMemo(() => {
     if (groupId && userRole === 'ADMIN') checkStatus();
   }, [groupId, tasks.length, checkStatus, userRole]);
 
-  useEffect(() => {
-    if (groupId && !loadingUser && !initialLoadDone.current) {
-      fetchTasks();
-      fetchMembers();
-      loadPendingForMe(groupId);
-    }
-  }, [groupId, loadingUser, fetchTasks, fetchMembers, loadPendingForMe]);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      if (groupId && !loadingUser) refreshTasks();
-    });
-    return unsubscribe;
-  }, [navigation, groupId, loadingUser, refreshTasks]);
 
   useEffect(() => {
     if (swapEvents.swapResponded) {
@@ -762,6 +748,19 @@ const groupedAllTasks = useMemo(() => {
       clearSwapResponded();
     }
   }, [swapEvents.swapResponded, refreshTasks, clearSwapResponded]);
+
+  useEffect(() => {
+  const unsubscribe = navigation.addListener('focus', () => {
+    // Refresh swap count and tasks when returning to this screen
+    if (groupId && !loadingUser) {
+      console.log('🔄 Screen focused - refreshing swap count');
+      loadPendingForMe(groupId, true); // Force refresh
+      refreshTasks();
+    }
+  });
+  
+  return unsubscribe;
+}, [navigation, groupId, loadingUser, loadPendingForMe, refreshTasks]);
 
   // ===== HANDLER FUNCTIONS =====
   
@@ -835,18 +834,6 @@ const groupedAllTasks = useMemo(() => {
     navigation.navigate('CreateTask', { groupId, groupName, onTaskCreated: refreshTasks });
   };
 
-  const handleCompleteNow = async (task: any) => {
-    if (!await checkToken()) return;
-    if (!task.userAssignment) {
-      Alert.alert('Error', 'No assignment found');
-      return;
-    }
-    navigation.navigate('AssignmentDetails', {
-      assignmentId: task.userAssignment.id,
-      isAdmin: false,
-      onVerified: refreshTasks
-    });
-  };
 
   const handleNavigateToSwapRequests = async () => {
     if (await checkToken()) navigation.navigate('PendingSwapRequests');
@@ -1374,19 +1361,6 @@ const groupedAllTasks = useMemo(() => {
                 {effectiveVerified === 0 ? 'Not verified yet' : 'Verified'}
               </Text>
             </View>
-          )}
-          
-          {isMyTasksView && !isFullyCompleted && validation.isSubmittableNow && (
-            <TouchableOpacity onPress={() => handleCompleteNow(item)}>
-              <LinearGradient colors={validation.willBePenalized ? [theme.primary, theme.primaryDark] : [theme.primary, theme.primaryDark]} style={styles.completeNowButton}>
-                <View style={styles.completeNowContent}>
-                  <MaterialCommunityIcons name={validation.willBePenalized ? "timer-alert" : "check-circle"} size={20} color="white" />
-                  <Text style={styles.completeNowText}>
-                    {validation.willBePenalized ? 'Submit Late' : 'Complete Now'}
-                  </Text>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
           )}
           
           <View style={styles.taskFooter}>

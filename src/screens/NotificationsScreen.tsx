@@ -1,4 +1,5 @@
-// src/screens/NotificationsScreen.tsx - COMPLETE FIXED VERSION
+// src/screens/NotificationsScreen.tsx - FIXED with UTC to PHT conversion
+
 import React, { useState } from 'react';
 import {
   View,
@@ -17,6 +18,37 @@ import { NotificationTypes } from '../services/NotificationService';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
 
+// ✅ Helper to convert UTC to PHT (Philippine Time)
+const formatTimeToPHT = (utcDateString: string) => {
+  const utcDate = new Date(utcDateString);
+  // Add 8 hours to convert UTC to PHT
+  const phtDate = new Date(utcDate.getTime() + 8 * 60 * 60 * 1000);
+  
+  const now = new Date();
+  const nowPHT = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+  
+  const diffMs = nowPHT.getTime() - phtDate.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  
+  // Format full date in PHT
+  const year = phtDate.getFullYear();
+  const month = phtDate.getMonth() + 1;
+  const day = phtDate.getDate();
+  const hours = phtDate.getHours();
+  const minutes = phtDate.getMinutes();
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  
+  return `${month}/${day}/${year} ${hours12}:${minutes.toString().padStart(2, '0')} ${period}`;
+};
+
 export default function NotificationsScreen({ navigation }: any) {
   const { theme } = useTheme();
   
@@ -28,7 +60,7 @@ export default function NotificationsScreen({ navigation }: any) {
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    deleteAllNotifications,  // ✅ This already has its own alert
+    deleteAllNotifications,
     refreshNotifications,
     loadNotifications
   } = useNotifications();
@@ -47,7 +79,6 @@ export default function NotificationsScreen({ navigation }: any) {
     }
   };
 
-  // ✅ Just mark as read and show alert
   const handleNotificationPress = async (notification: any) => {
     if (!notification.read) {
       await markAsRead(notification.id);
@@ -75,8 +106,6 @@ export default function NotificationsScreen({ navigation }: any) {
       ]
     );
   };
-
-  // ✅ REMOVED handleDeleteAll - using deleteAllNotifications directly from hook
 
   const getNotificationIcon = (type: string): string => {
     const icons: Record<string, string> = {
@@ -149,21 +178,6 @@ export default function NotificationsScreen({ navigation }: any) {
     return colors[type] || theme.primary;
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
-  };
-
   const renderNotification = ({ item }: { item: any }) => {
     const iconName = getNotificationIcon(item.type);
     const iconColor = getNotificationColor(item.type);
@@ -205,7 +219,7 @@ export default function NotificationsScreen({ navigation }: any) {
               {item.title}
             </Text>
             <Text style={[styles.timeText, { color: theme.textMuted }]}>
-              {formatTime(item.createdAt)}
+              {formatTimeToPHT(item.createdAt)} {/* ✅ Use PHT formatter */}
             </Text>
           </View>
           
@@ -285,7 +299,6 @@ export default function NotificationsScreen({ navigation }: any) {
         </View>
         
         <View style={styles.headerButtons}>
-          {/* Mark All as Read Button */}
           <TouchableOpacity 
             onPress={handleMarkAllAsRead}
             style={[styles.headerButton, unreadCount === 0 && styles.disabledButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
@@ -298,9 +311,8 @@ export default function NotificationsScreen({ navigation }: any) {
             />
           </TouchableOpacity>
           
-          {/* Delete All Button - Direct call, no wrapper */}
           <TouchableOpacity 
-            onPress={deleteAllNotifications}  // ✅ Direct call
+            onPress={deleteAllNotifications}
             style={[styles.headerButton, notifications.length === 0 && styles.disabledButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
             disabled={notifications.length === 0}
           >

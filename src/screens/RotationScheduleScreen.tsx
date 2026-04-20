@@ -13,7 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRotationSchedule } from '../taskHook/useRotationSchedule';
-import { TokenUtils } from '../utils/tokenUtils';
+import { TokenUtils } from '../utils/tokenUtils'; 
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
 import { makeRotationScheduleStyles } from '../styles/rotationSchedule.styles';
@@ -174,6 +174,29 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     setPredictions(preds);
     setRotationCycle(taskCount);
   };
+
+  // ✅ Helper function to convert 24h time to 12h AM/PM format
+const formatTo12Hour = (time24: string) => {
+  if (!time24) return '';
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  const minutesStr = minutes?.toString().padStart(2, '0') || '00';
+  return `${hours12}:${minutesStr} ${period}`;
+};
+
+// ✅ Helper to convert UTC date to PHT and format time slot
+const formatTimeSlotToPHT = (timeSlot: any) => {
+  if (!timeSlot) return '';
+  if (timeSlot.startTime && timeSlot.endTime) {
+    return `${formatTo12Hour(timeSlot.startTime)} - ${formatTo12Hour(timeSlot.endTime)}`;
+  }
+  // If it's just a single time string
+  if (typeof timeSlot === 'string') {
+    return formatTo12Hour(timeSlot);
+  }
+  return '';
+};
 
   const getTaskRankColor = (rank: number, total: number) => {
     if (rank === 1) return theme.error;
@@ -450,116 +473,127 @@ const getVerifiedDistributionByDay = () => {
     );
   };
 
-  // ✅ Render single task item
-  const renderTaskItem = (item: any, index: number) => {
-    const isCurrentWeekTask = currentWeek === item.week;
-    const totalTaskPoints = item.points || 0;
-    
-    const allTasksInWeek = getSelectedWeekTasks();
-    const allPoints = allTasksInWeek.map((t: any) => t.points || 0).sort((a: number, b: number) => b - a);
-    const rank = allPoints.indexOf(totalTaskPoints) + 1;
-    const rankColor = getTaskRankColor(rank, allPoints.length);
-    const rankIcon = getTaskRankIcon(rank, allPoints.length);
-    
-    const slotCount = item.timeSlots?.length || 0;
-    const hasMultipleSlots = slotCount > 1;
-    
-    return (
-      <TouchableOpacity
-        key={`${item.taskId}-${item.week}-${index}`}
-        style={[
-          styles.taskCard,
-          isCurrentWeekTask && styles.currentWeekTask,
-          { borderColor: theme.border }
-        ]}
-        onPress={() => navigation.navigate('TaskDetails', { 
-          taskId: item.taskId, 
-          groupId, 
-          userRole 
-        })}
-        activeOpacity={0.7}
+  // ✅ UPDATED renderTaskItem - Removed day name, added PHT time conversion
+const renderTaskItem = (item: any, index: number) => {
+  const isCurrentWeekTask = currentWeek === item.week;
+  const totalTaskPoints = item.points || 0;
+  
+  const allTasksInWeek = getSelectedWeekTasks();
+  const allPoints = allTasksInWeek.map((t: any) => t.points || 0).sort((a: number, b: number) => b - a);
+  const rank = allPoints.indexOf(totalTaskPoints) + 1;
+  const rankColor = getTaskRankColor(rank, allPoints.length);
+  const rankIcon = getTaskRankIcon(rank, allPoints.length);
+  
+  const slotCount = item.timeSlots?.length || 0;
+  const hasMultipleSlots = slotCount > 1;
+  
+  // Get time slot display in PHT format
+  let timeSlotDisplay = '';
+  if (item.scheduledTime) {
+    timeSlotDisplay = formatTo12Hour(item.scheduledTime);
+  } else if (item.timeSlots && item.timeSlots.length > 0) {
+    const firstSlot = item.timeSlots[0];
+    if (firstSlot.startTime && firstSlot.endTime) {
+      timeSlotDisplay = `${formatTo12Hour(firstSlot.startTime)} - ${formatTo12Hour(firstSlot.endTime)}`;
+    } else if (firstSlot.startTime) {
+      timeSlotDisplay = formatTo12Hour(firstSlot.startTime);
+    }
+  }
+  
+  return (
+    <TouchableOpacity
+      key={`${item.taskId}-${item.week}-${index}`}
+      style={[
+        styles.taskCard,
+        isCurrentWeekTask && styles.currentWeekTask,
+        { borderColor: theme.border }
+      ]}
+      onPress={() => navigation.navigate('TaskDetails', { 
+        taskId: item.taskId, 
+        groupId, 
+        userRole 
+      })}
+      activeOpacity={0.7}
+    >
+      <LinearGradient
+        colors={isCurrentWeekTask ? [theme.primaryLight, theme.primaryLight] : [theme.card, theme.bgSecondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.taskGradient}
       >
-        <LinearGradient
-          colors={isCurrentWeekTask ? [theme.primaryLight, theme.primaryLight] : [theme.card, theme.bgSecondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.taskGradient}
-        >
-          <View style={styles.taskHeader}>
-            <View style={styles.taskTitleContainer}>
-              <LinearGradient
-                colors={[rankColor + '20', rankColor + '10']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={[styles.rankBadge, { borderColor: rankColor }]}
-              >
-                <MaterialCommunityIcons name={rankIcon} size={10} color={rankColor} />
-                <Text style={[styles.rankText, { color: rankColor }]}>
-                  #{rank}
-                </Text>
-              </LinearGradient>
-              <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
-                {item.taskTitle}
-              </Text>
-            </View>
-            
+        <View style={styles.taskHeader}>
+          <View style={styles.taskTitleContainer}>
             <LinearGradient
-              colors={[theme.primaryLight, theme.primaryLight]}
+              colors={[rankColor + '20', rankColor + '10']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.pointsBadge}
+              style={[styles.rankBadge, { borderColor: rankColor }]}
             >
-              <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
-              <Text style={[styles.pointsText, { color: theme.primary }]}>{totalTaskPoints} pts</Text>
+              <MaterialCommunityIcons name={rankIcon} size={10} color={rankColor} />
+              <Text style={[styles.rankText, { color: rankColor }]}>
+                #{rank}
+              </Text>
             </LinearGradient>
+            <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
+              {item.taskTitle}
+            </Text>
           </View>
           
-          {hasMultipleSlots && (
-            <View style={styles.timeSlotBreakdown}>
-              <MaterialCommunityIcons name="clock-outline" size={12} color={theme.textMuted} />
-              <Text style={[styles.timeSlotBreakdownText, { color: theme.textMuted }]}>
-                {slotCount} slot{slotCount > 1 ? 's' : ''}: 
-                {item.timeSlots.map((slot: any, idx: number) => (
-                  <Text key={idx}>
-                    {idx > 0 ? ', ' : ' '}
-                    {slot.points || 0} pts
-                  </Text>
-                ))}
-              </Text>
-            </View>
-          )}
-          
-          <View style={styles.taskDetails}>
-            <View style={styles.assigneeContainer}>
-              <MaterialCommunityIcons name="account" size={14} color={theme.textMuted} />
-              <Text style={[styles.assigneeText, { color: theme.textMuted }]} numberOfLines={1}>
-                {item.assigneeName || 'Unassigned'}
-              </Text>
-            </View>
-            
-            <View style={styles.timeContainer}>
-              {item.dayOfWeek && (
-                <>
-                  <MaterialCommunityIcons name="calendar" size={12} color={theme.textMuted} />
-                  <Text style={[styles.timeText, { color: theme.textMuted }]}>
-                    {item.dayOfWeek}
-                    {item.scheduledTime ? ` • ${item.scheduledTime}` : ''}
-                  </Text>
-                </>
-              )}
-            </View>
+          <LinearGradient
+            colors={[theme.primaryLight, theme.primaryLight]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.pointsBadge}
+          >
+            <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+            <Text style={[styles.pointsText, { color: theme.primary }]}>{totalTaskPoints} pts</Text>
+          </LinearGradient>
+        </View>
+        
+        {/* Time Slot Display - PHT format */}
+        {timeSlotDisplay && (
+          <View style={[styles.timeSlotContainer, { backgroundColor: theme.bgSecondary }]}>
+            <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+            <Text style={[styles.timeSlotText, { color: theme.textSecondary }]}>
+              {timeSlotDisplay}
+            </Text>
           </View>
-          
-          {item.category && (
-            <View style={styles.categoryContainer}>
-              <MaterialCommunityIcons name="tag" size={10} color={theme.textMuted} />
-              <Text style={[styles.categoryText, { color: theme.textMuted }]}>{item.category}</Text>
-            </View>
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
-    );
-  };
+        )}
+        
+        {hasMultipleSlots && (
+          <View style={styles.timeSlotBreakdown}>
+            <MaterialCommunityIcons name="clock-outline" size={12} color={theme.textMuted} />
+            <Text style={[styles.timeSlotBreakdownText, { color: theme.textMuted }]}>
+              {slotCount} slot{slotCount > 1 ? 's' : ''}: 
+              {item.timeSlots.map((slot: any, idx: number) => (
+                <Text key={idx}>
+                  {idx > 0 ? ', ' : ' '}
+                  {slot.points || 0} pts
+                </Text>
+              ))}
+            </Text>
+          </View>
+        )}
+        
+        <View style={styles.taskDetails}>
+          <View style={styles.assigneeContainer}>
+            <MaterialCommunityIcons name="account" size={14} color={theme.textMuted} />
+            <Text style={[styles.assigneeText, { color: theme.textMuted }]} numberOfLines={1}>
+              {item.assigneeName || 'Unassigned'}
+            </Text>
+          </View>
+        </View>
+        
+        {item.category && (
+          <View style={styles.categoryContainer}>
+            <MaterialCommunityIcons name="tag" size={10} color={theme.textMuted} />
+            <Text style={[styles.categoryText, { color: theme.textMuted }]}>{item.category}</Text>
+          </View>
+        )}
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+};
 
   if (loading && !refreshing) {
     return (

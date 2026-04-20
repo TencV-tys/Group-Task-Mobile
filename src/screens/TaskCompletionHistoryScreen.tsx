@@ -1,4 +1,4 @@
-// src/screens/TaskCompletionHistoryScreen.tsx - COMPLETELY FIXED
+// src/screens/TaskCompletionHistoryScreen.tsx - FIXED
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -27,47 +27,29 @@ import { useTheme } from '../context/ThemeContext';
 
 const { height: screenHeight } = Dimensions.get('window');
 
-// ✅ FIXED: More robust PHT timezone conversion
+// ✅ Convert UTC date string to PHT (UTC+8)
 const formatDatePHT = (dateString: string) => {
   if (!dateString) return '';
-  try {
-    const date = new Date(dateString);
-    // Check if date is valid
-    if (isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('en-PH', {
-      timeZone: 'Asia/Manila',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  } catch (error) {
-    console.error('Date formatting error:', error);
-    return '';
-  }
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-PH', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 };
 
 const formatDateTimePHT = (dateString: string) => {
   if (!dateString) return '';
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return '';
-    
-    // ✅ Force UTC to PHT conversion explicitly
-    const options: Intl.DateTimeFormatOptions = {
-      timeZone: 'Asia/Manila',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    };
-    
-    return date.toLocaleString('en-PH', options);
-  } catch (error) {
-    console.error('DateTime formatting error:', error);
-    return '';
-  }
+  const date = new Date(dateString);
+  return date.toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
 };
 
 export default function TaskCompletionHistoryScreen({ navigation, route }: any) {
@@ -83,11 +65,14 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   const [showTaskSelector, setShowTaskSelector] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [authError, setAuthError] = useState(false);
-  
-  // ✅ FIX: Use object for expanded state to ensure reactivity
-  const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
-  const isFirstLoad = useRef(true);
-  const lastFilterKey = useRef<string>('');
+
+  // ✅ FIX: Default is an empty Set — all task cards start CLOSED.
+  // Never auto-expand on fetch. Only toggled by user interaction.
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+
+  // ✅ FIX: Removed isFirstLoad ref entirely — it was the root cause of the
+  // broken default-closed behaviour. The useEffect that flipped it ran after
+  // fetchHistory already read it, so the auto-expand guard never fired correctly.
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
@@ -117,20 +102,17 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     initialize();
   }, [groupId]);
 
-  // ✅ FIX: Reset expanded state when filters change
+  // ✅ Re-fetch when filters change (selectedTaskId / selectedWeek).
+  // We use a mounted ref only to skip the very first render — this is safe
+  // because the initialize() above already calls fetchHistory() on mount.
+  const mountedRef = useRef(false);
   useEffect(() => {
-    const filterKey = `${selectedTaskId}-${selectedWeek}`;
-    if (lastFilterKey.current !== filterKey && !isFirstLoad.current) {
-      // Filters changed, reset expanded state and refetch
-      setExpandedTasks({});
-      fetchHistory();
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
     }
-    lastFilterKey.current = filterKey;
+    fetchHistory();
   }, [selectedTaskId, selectedWeek]);
-
-  useEffect(() => {
-    isFirstLoad.current = false;
-  }, []);
 
   const fetchTasks = async () => {
     try {
@@ -173,17 +155,10 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
 
         setHistoryData({ ...result.data, tasks: filteredTasks });
 
-        // ✅ FIX: Auto-expand tasks with 3 or fewer completions on every filter change
-        const newExpanded: Record<string, boolean> = {};
-        filteredTasks.forEach((taskGroup: any) => {
-          if (taskGroup.completions.length <= 3) {
-            newExpanded[taskGroup.taskId] = true;
-          } else {
-            newExpanded[taskGroup.taskId] = false;
-          }
-        });
-        setExpandedTasks(newExpanded);
-        
+        // ✅ FIX: No auto-expand here at all. expandedTasks stays as-is (empty
+        // Set on first load, or whatever the user has toggled). Cards are closed
+        // by default and only open when the user taps them.
+
       } else {
         setError(result.message || 'Failed to load completion history');
         if (result.message?.toLowerCase().includes('token') ||
@@ -199,33 +174,33 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     }
   };
 
+  // ✅ Functional update prevents stale-closure bugs
   const toggleTaskExpanded = useCallback((taskId: string) => {
-  console.log('🔘 Toggling task:', taskId);
-  setExpandedTasks(prev => {
-    const current = prev[taskId];
-    console.log('   Current state:', current);
-    console.log('   New state:', !current);
-    return {
-      ...prev,
-      [taskId]: !current
-    };
-  });
-}, []);
- 
+    setExpandedTasks(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  }, []);
+
   const getWeekOptions = () => {
     const weeks: number[] = [];
-    // Generate weeks from current week down to week 1
-    const maxWeek = historyData?.tasks?.[0]?.completions?.[0]?.week || 20;
-    for (let i = maxWeek; i >= 1; i--) {
+    const currentWeek = historyData?.tasks?.[0]?.completions?.[0]?.week || 1;
+    for (let i = currentWeek; i >= Math.max(1, currentWeek - 10); i--) {
       weeks.push(i);
     }
-    return weeks.slice(0, 12); // Show last 12 weeks
+    return weeks;
   };
 
   const filteredTasksList = tasks.filter(task =>
     task.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // ✅ Clear search when modal closes
   const closeTaskSelector = () => {
     setShowTaskSelector(false);
     setSearchQuery('');
@@ -245,11 +220,6 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
         <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
           Completion History
         </Text>
-        {groupName && (
-          <Text style={[styles.subtitle, { color: theme.textMuted }]} numberOfLines={1}>
-            {groupName}
-          </Text>
-        )}
       </View>
       <TouchableOpacity
         onPress={() => fetchHistory(true)}
@@ -290,11 +260,13 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
         animationType="slide"
         onRequestClose={closeTaskSelector}
       >
+        {/* Overlay tap closes modal AND clears search */}
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={closeTaskSelector}
         >
+          {/* Stop propagation so tapping inside modal doesn't close it */}
           <TouchableOpacity
             activeOpacity={1}
             onPress={e => e.stopPropagation()}
@@ -418,7 +390,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
                   style={styles.weekButtonGradient}
                 >
                   <Text style={[styles.weekButtonText, { color: selectedWeek === week ? '#fff' : theme.textSecondary }]}>
-                    Week {week}
+                    W{week}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -426,38 +398,10 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
           </View>
         </ScrollView>
       </View>
-      
-      {/* ✅ Show active filters badge */}
-      {(selectedTaskId || selectedWeek) && (
-        <View style={styles.activeFilters}>
-          <Text style={[styles.activeFiltersText, { color: theme.textMuted }]}>Active filters:</Text>
-          {selectedTaskId && (
-            <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.filterBadge}>
-              <Text style={[styles.filterBadgeText, { color: theme.primary }]}>
-                {tasks.find(t => t.id === selectedTaskId)?.title || 'Task'}
-              </Text>
-              <TouchableOpacity onPress={() => setSelectedTaskId(null)}>
-                <MaterialCommunityIcons name="close-circle" size={14} color={theme.primary} />
-              </TouchableOpacity>
-            </LinearGradient>
-          )}
-          {selectedWeek && (
-            <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.filterBadge}>
-              <Text style={[styles.filterBadgeText, { color: theme.primary }]}>Week {selectedWeek}</Text>
-              <TouchableOpacity onPress={() => setSelectedWeek(null)}>
-                <MaterialCommunityIcons name="close-circle" size={14} color={theme.primary} />
-              </TouchableOpacity>
-            </LinearGradient>
-          )}
-        </View>
-      )}
     </LinearGradient>
   );
 
-  // Just show the date without time, or remove it entirely
-
-const renderCompletionItem = (completion: any, taskTitle: string) => {
-  return (
+  const renderCompletionItem = (completion: any, taskTitle: string) => (
     <TouchableOpacity
       key={completion.assignmentId}
       onPress={() =>
@@ -495,7 +439,9 @@ const renderCompletionItem = (completion: any, taskTitle: string) => {
               <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
                 {completion.userName}
               </Text>
-              {/* ✅ Removed the date/time line completely */}
+              <Text style={[styles.completionDate, { color: theme.textMuted }]}>
+                {formatDateTimePHT(completion.completedAt)}
+              </Text>
             </View>
           </View>
           <View style={styles.completionMeta}>
@@ -535,14 +481,35 @@ const renderCompletionItem = (completion: any, taskTitle: string) => {
               <Text style={[styles.detailText, { color: theme.primary }]}>Partial</Text>
             </View>
           )}
+          {completion.timeSlot && (
+            <View style={styles.detailRow}>
+              <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.detailIcon}>
+                <MaterialCommunityIcons name="clock" size={12} color={theme.textMuted} />
+              </LinearGradient>
+              <Text style={[styles.detailText, { color: theme.textMuted }]}>
+                {completion.timeSlot.startTime} - {completion.timeSlot.endTime}
+              </Text>
+            </View>
+          )}
+          {completion.dueDate && (
+            <View style={styles.detailRow}>
+              <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.detailIcon}>
+                <MaterialCommunityIcons name="calendar" size={12} color={theme.textMuted} />
+              </LinearGradient>
+              <Text style={[styles.detailText, { color: theme.textMuted }]}>
+                Due {formatDatePHT(completion.dueDate)}
+              </Text>
+            </View>
+          )}
         </View>
       </LinearGradient>
     </TouchableOpacity>
   );
-};
 
   const renderTaskGroup = ({ item: taskGroup }: { item: any }) => {
-    const isExpanded = expandedTasks[taskGroup.taskId] || false;
+    // ✅ FIX: Default is CLOSED. expandedTasks starts as empty Set, so
+    // isExpanded is false for every card until the user taps to open it.
+    const isExpanded = expandedTasks.has(taskGroup.taskId);
     const completionCount = taskGroup.completions.length;
     const displayedCompletions = isExpanded
       ? taskGroup.completions
@@ -556,6 +523,7 @@ const renderCompletionItem = (completion: any, taskTitle: string) => {
         end={{ x: 1, y: 1 }}
         style={[styles.taskGroup, { shadowColor: theme.shadow }]}
       >
+        {/* Header tap toggles expand/collapse */}
         <TouchableOpacity onPress={() => toggleTaskExpanded(taskGroup.taskId)} activeOpacity={0.7}>
           <View style={[styles.taskGroupHeader, { borderBottomColor: theme.border }]}>
             <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.taskGroupIcon}>
@@ -575,13 +543,17 @@ const renderCompletionItem = (completion: any, taskTitle: string) => {
           </View>
         </TouchableOpacity>
 
-        <View style={styles.completionsList}>
-          {displayedCompletions.map((completion: any) =>
-            renderCompletionItem(completion, taskGroup.taskTitle)
-          )}
-        </View>
+        {/* ✅ Only render completions list when expanded */}
+        {isExpanded && (
+          <View style={styles.completionsList}>
+            {displayedCompletions.map((completion: any) =>
+              renderCompletionItem(completion, taskGroup.taskTitle)
+            )}
+          </View>
+        )}
 
-        {hasMore && (
+        {/* Show more / Show less — only visible when expanded and has overflow */}
+        {isExpanded && hasMore && (
           <TouchableOpacity
             style={styles.showMoreButton}
             onPress={() => toggleTaskExpanded(taskGroup.taskId)}
@@ -590,14 +562,8 @@ const renderCompletionItem = (completion: any, taskTitle: string) => {
               colors={[theme.bgSecondary, theme.bgTertiary]}
               style={[styles.showMoreGradient, { borderColor: theme.border }]}
             >
-              <MaterialCommunityIcons
-                name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                size={16}
-                color={theme.primary}
-              />
-              <Text style={[styles.showMoreText, { color: theme.primary }]}>
-                {isExpanded ? 'Show less' : `Show ${completionCount - 3} more`}
-              </Text>
+              <MaterialCommunityIcons name="chevron-up" size={16} color={theme.primary} />
+              <Text style={[styles.showMoreText, { color: theme.primary }]}>Show less</Text>
             </LinearGradient>
           </TouchableOpacity>
         )}
@@ -698,7 +664,6 @@ const styles = StyleSheet.create({
   backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   titleContainer: { flex: 1, alignItems: 'center' },
   title: { fontSize: 18, fontWeight: '600' },
-  subtitle: { fontSize: 12, marginTop: 2 },
   refreshButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
   rotating: { transform: [{ rotate: '45deg' }] },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
@@ -770,26 +735,6 @@ const styles = StyleSheet.create({
   weekButton: { borderRadius: 16, overflow: 'hidden' },
   weekButtonGradient: { paddingHorizontal: 12, paddingVertical: 6 },
   weekButtonText: { fontSize: 12, fontWeight: '500' },
-  activeFilters: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.05)',
-  },
-  activeFiltersText: { fontSize: 12 },
-  filterBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  filterBadgeText: { fontSize: 11, fontWeight: '500' },
   taskList: { paddingBottom: 20 },
   taskGroup: {
     borderRadius: 12,

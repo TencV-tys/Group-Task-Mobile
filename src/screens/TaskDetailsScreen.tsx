@@ -201,11 +201,11 @@ const findTodayAssignment = (taskData: any) => {
     return;
   }
 
-  // ✅ FIX: Sort by end time (LATEST FIRST - descending order)
+  // ✅ FIX: Sort by end time (EARLIEST FIRST - ascending order)
   todayAssignments.sort((a: any, b: any) => {
     const timeA = a.timeSlot?.endTime ? convertTimeToMinutes(a.timeSlot.endTime) : 0;
     const timeB = b.timeSlot?.endTime ? convertTimeToMinutes(b.timeSlot.endTime) : 0;
-    return timeB - timeA; // DESCENDING - latest first
+    return timeA - timeB; // ASCENDING - earliest first
   });
 
   const currentTimeMs = now.getTime();
@@ -232,13 +232,14 @@ const findTodayAssignment = (taskData: any) => {
   }
   
   if (activeAssignment) {
+    console.log('📅 Found active time slot:', activeAssignment.timeSlot?.endTime);
     setTodayAssignment(activeAssignment);
     return;
   }
   
-  // ✅ Then, find the LATEST upcoming slot (not the earliest)
-  let latestUpcomingAssignment = null;
-  let largestTimeDiff = -Infinity;
+  // ✅ Then, find the NEXT upcoming slot (positive time difference, smallest first)
+  let nextUpcomingAssignment = null;
+  let smallestPositiveDiff = Infinity;
   
   for (const assignment of todayAssignments) {
     if (!assignment.timeSlot) continue;
@@ -253,31 +254,29 @@ const findTodayAssignment = (taskData: any) => {
     ));
     const timeDiff = endTimeUTC.getTime() - currentTimeMs;
     
-    // Find the next upcoming slot (positive time difference)
-    // We want the LATEST one that hasn't passed yet
-    if (timeDiff > 0 && timeDiff > largestTimeDiff) {
-      largestTimeDiff = timeDiff;
-      latestUpcomingAssignment = assignment;
+    // Find the next upcoming slot (positive time difference, smallest first)
+    if (timeDiff > 0 && timeDiff < smallestPositiveDiff) {
+      smallestPositiveDiff = timeDiff;
+      nextUpcomingAssignment = assignment;
     }
   }
   
-  // If found upcoming assignment, show the LATEST one
-  if (latestUpcomingAssignment) {
-    console.log('📅 Latest upcoming time slot:', latestUpcomingAssignment.timeSlot?.endTime);
-    setTodayAssignment(latestUpcomingAssignment);
+  // If found upcoming assignment, show that one
+  if (nextUpcomingAssignment) {
+    console.log('📅 Next upcoming time slot:', nextUpcomingAssignment.timeSlot?.endTime);
+    setTodayAssignment(nextUpcomingAssignment);
     return;
   }
   
-  // ✅ If no active and no upcoming, show the LATEST slot (last of the day)
-  // This will be the last time slot of the day
+  // ✅ If no active and no upcoming, show the FIRST slot (earliest of the day)
   if (todayAssignments.length > 0) {
-    console.log('📅 Showing latest slot as fallback');
-    setTodayAssignment(todayAssignments[0]); // Already sorted descending, first is latest
+    console.log('📅 Showing first (earliest) slot as fallback');
+    setTodayAssignment(todayAssignments[0]); // Already sorted ascending, first is earliest
   } else {
     setTodayAssignment(null);
   }
 };
- 
+
   // ===== CHECK TIME VALIDITY =====
   const checkTimeValidity = () => {
     if (!todayAssignment || todayAssignment.completed) {

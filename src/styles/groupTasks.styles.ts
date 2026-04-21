@@ -10,6 +10,9 @@ export const makeGroupTasksStyles = (theme: Theme) => StyleSheet.create({
     flex: 1,
     backgroundColor: theme.bgSecondary,
   },
+  helpButton: {
+  padding: 8,
+},
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

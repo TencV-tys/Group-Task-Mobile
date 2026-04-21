@@ -30,6 +30,7 @@ import { TokenUtils } from '../utils/tokenUtils';
 import { useTheme } from '../context/ThemeContext';
 import { makeGroupTasksStyles } from '../styles/groupTasks.styles';
 import { AssignmentService } from '../services/AssignmentService';
+import { HelpGuideModal } from '../components/HelpGuideModal';
 
 type TabType = 'all' | 'my';
 type UrgencyLevel = 'none' | 'urgent' | 'late' | 'warning' | 'expired' | 'completed';
@@ -79,6 +80,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const [tasksNeeded, setTasksNeeded] = useState(0);
   const [membersInRotation, setMembersInRotation] = useState<any[]>([]);
   const [pendingVerificationsCount, setPendingVerificationsCount] = useState(0);
+
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   // ===== CUSTOM HOOKS =====
   const { status: rotationStatus, checkStatus } = useRotationStatus(groupId);
@@ -1093,7 +1096,7 @@ const groupedAllTasks = useMemo(() => {
   const renderHeader = () => (
     <LinearGradient colors={[theme.card, theme.bgSecondary]} style={styles.header}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
       </TouchableOpacity>
       <View style={styles.titleContainer}>
         <Text style={styles.title} numberOfLines={1}>{groupName || 'Tasks'}</Text>
@@ -1471,39 +1474,77 @@ const groupedAllTasks = useMemo(() => {
     );
   };
 
-  // ===== BOTTOM TABS =====
-  const renderBottomTabs = () => {
-    return (
+// ===== BOTTOM TABS - UPDATED WITH HELP TAB =====
+const renderBottomTabs = () => {
+  return (
+    <>
       <LinearGradient
         colors={[theme.card, theme.bgSecondary]}
         style={[styles.bottomTab, { height: 70 + insets.bottom, paddingBottom: insets.bottom }]}
       >
         {isAdmin ? (
+          // ADMIN: Dashboard + All Tasks + Help
           <>
             <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="view-dashboard" size={24} color={selectedTab === 'all' ? theme.textMuted : theme.textMuted} />
+              <MaterialCommunityIcons 
+                name="view-dashboard" 
+                size={24} 
+                color={selectedTab === 'all' ? theme.primary : theme.primary} 
+              />
               <Text style={styles.tabText}>Dashboard</Text>
             </TouchableOpacity>
+            
             <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('all')} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="format-list-bulleted" size={24} color={selectedTab === 'all' ? theme.primary : theme.textMuted} />
+              <MaterialCommunityIcons 
+                name="format-list-bulleted" 
+                size={24} 
+                color={selectedTab === 'all' ? theme.primary : theme.textMuted} 
+              />
               <Text style={[styles.tabText, selectedTab === 'all' && styles.activeTabText]}>All Tasks</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.tabButton} onPress={() => setShowHelpModal(true)} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="help-circle" size={24} color={theme.primary} />
+              <Text style={styles.tabText}>Help</Text>
             </TouchableOpacity>
           </>
         ) : (
+          // MEMBER: Dashboard + My Tasks + Help
           <>
             <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="view-dashboard" size={24} color={selectedTab === 'my' ? theme.textMuted : theme.textMuted} />
+              <MaterialCommunityIcons 
+                name="view-dashboard" 
+                size={24} 
+                color={selectedTab === 'my' ? theme.primary : theme.primary} 
+              />
               <Text style={styles.tabText}>Dashboard</Text>
             </TouchableOpacity>
+            
             <TouchableOpacity style={styles.tabButton} onPress={() => setSelectedTab('my')} activeOpacity={0.7}>
-              <MaterialCommunityIcons name="clipboard-check" size={24} color={selectedTab === 'my' ? theme.primary : theme.textMuted} />
+              <MaterialCommunityIcons 
+                name="clipboard-check" 
+                size={24} 
+                color={selectedTab === 'my' ? theme.primary : theme.textMuted} 
+              />
               <Text style={[styles.tabText, selectedTab === 'my' && styles.activeTabText]}>My Tasks</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.tabButton} onPress={() => setShowHelpModal(true)} activeOpacity={0.7}>
+              <MaterialCommunityIcons name="help-circle" size={24} color={theme.primary} />
+              <Text style={styles.tabText}>Help</Text>
             </TouchableOpacity>
           </>
         )}
       </LinearGradient>
-    );
-  };
+      
+      <HelpGuideModal 
+        visible={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        userRole={userRole}
+      />
+    </>
+  );
+};
 
   // ===== LOADING STATES =====
   if (loadingUser) {

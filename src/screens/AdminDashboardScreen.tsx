@@ -739,7 +739,6 @@ const StatCard = ({
             value={pendingVerificationsCount}
             icon="clipboard-check"
             color={theme.error}
-            badge={pendingVerificationsCount}
             navigateTo="PendingVerifications"
             navigationParams={{ groupId, groupName, userRole: 'ADMIN' }}
           />

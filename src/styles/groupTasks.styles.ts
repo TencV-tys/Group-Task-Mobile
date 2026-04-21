@@ -312,6 +312,49 @@ export const makeGroupTasksStyles = (theme: Theme) => StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
   },
+    // ===== ADD THESE STYLES AT THE END OF makeGroupTasksStyles =====
+  
+  // Single slot status styles
+  singleSlotStatus: {
+    marginTop: 8,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  singleSlotBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+    alignSelf: 'center',
+  },
+  singleSlotStatusText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  
+  // Completion badge styles
+  completionBadgeContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  completionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+    alignSelf: 'center',
+  },
+  completionBadgeText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
   floatingButtonsContainer: {
     position: 'absolute',
     bottom: 90,

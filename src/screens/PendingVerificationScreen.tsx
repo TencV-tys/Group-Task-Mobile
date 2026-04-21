@@ -1,4 +1,4 @@
-// src/screens/PendingVerificationsScreen.tsx - FIXED PAGINATION
+// src/screens/PendingVerificationsScreen.tsx - FILTER OUT DELETED TASKS FROM ALL TABS
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -34,18 +34,15 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   const [filter, setFilter] = useState<'pending' | 'verified' | 'rejected'>('pending');
   const [stats, setStats] = useState<any>(null);
   
-  // ✅ FIXED: Track total count from API
   const [totalCount, setTotalCount] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   
-  // ✅ FIXED: Use ref for current page to avoid stale closures
   const currentPageRef = useRef(0);
   const isLoadingRef = useRef(false);
    
   const isAdmin = userRole === 'ADMIN';
 
-  // ✅ FIXED: Reset everything when filter changes
   useEffect(() => {
     if (!isAdmin) {
       Alert.alert('Access Denied', 'Only administrators can access this screen');
@@ -53,7 +50,6 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
       return;
     }
     
-    // Reset pagination state on filter change
     currentPageRef.current = 0;
     setSubmissions([]);
     setTotalCount(0);
@@ -61,198 +57,193 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     setLoading(true);
     
     fetchStats();
-    fetchSubmissions(0, true); // Fetch first page with reset
+    fetchSubmissions(0, true);
   }, [groupId, filter]);
 
- // In PendingVerificationsScreen.tsx - REPLACE fetchStats with this
-
-const fetchStats = async () => {
-  const hasToken = await TokenUtils.checkToken({
-    showAlert: false,
-    onAuthError: () => setAuthError(true)
-  });
-  
-  if (!hasToken) return;
-
-  try {
-    // ✅ Get pending count from dedicated endpoint
-    const pendingResult = await AssignmentService.getPendingVerifications(groupId, {
-      limit: 1,
-      offset: 0
+  const fetchStats = async () => {
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
     });
     
-    // Get verified/rejected counts from existing stats
-    const statsResult = await AssignmentService.getAssignmentStats(groupId);
+    if (!hasToken) return;
+
+    try {
+      const pendingResult = await AssignmentService.getPendingVerifications(groupId, {
+        limit: 1,
+        offset: 0
+      });
+      
+      const statsResult = await AssignmentService.getAssignmentStats(groupId);
+      
+      console.log('📊 Stats results:', {
+        pendingCount: pendingResult.data?.total || 0,
+        verifiedCount: statsResult.data?.summary?.verifiedAssignments || 0,
+        rejectedCount: statsResult.data?.summary?.rejectedAssignments || 0
+      });
+      
+      if (pendingResult.success && statsResult.success) {
+        setStats({
+          pendingVerification: pendingResult.data?.total || 0,
+          verifiedAssignments: statsResult.data?.summary?.verifiedAssignments || 0,
+          rejectedAssignments: statsResult.data?.summary?.rejectedAssignments || 0
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+    }
+  };
+
+  const isDeletedTask = (assignment: any): boolean => {
+    // Check if task is deleted
+    const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
+    const isHistorical = assignment.isHistorical === true;
+    const hasTaskTitleOnly = assignment.taskTitle && !assignment.taskId;
     
-    console.log('📊 Stats results:', {
-      pendingCount: pendingResult.data?.total || 0,
-      verifiedCount: statsResult.data?.summary?.verifiedAssignments || 0,
-      rejectedCount: statsResult.data?.summary?.rejectedAssignments || 0
+    return isTaskDeleted || isHistorical || hasTaskTitleOnly;
+  };
+
+  const fetchSubmissions = async (page: number, reset = false) => {
+    if (isLoadingRef.current && !reset) return;
+    
+    const hasToken = await TokenUtils.checkToken({
+      showAlert: false,
+      onAuthError: () => setAuthError(true)
     });
     
-    if (pendingResult.success && statsResult.success) {
-      setStats({
-        pendingVerification: pendingResult.data?.total || 0,
-        verifiedAssignments: statsResult.data?.summary?.verifiedAssignments || 0,
-        rejectedAssignments: statsResult.data?.summary?.rejectedAssignments || 0
-      });
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      setIsLoadingMore(false);
+      return;
     }
-  } catch (err) {
-    console.error('Error fetching stats:', err);
-  }
-};
 
-   // In PendingVerificationsScreen.tsx - UPDATE fetchSubmissions function
-
-   // In PendingVerificationsScreen.tsx - FIXED fetchSubmissions function
-
-const fetchSubmissions = async (page: number, reset = false) => {
-  // Prevent duplicate requests
-  if (isLoadingRef.current && !reset) return;
-  
-  const hasToken = await TokenUtils.checkToken({
-    showAlert: false,
-    onAuthError: () => setAuthError(true)
-  });
-  
-  if (!hasToken) {
-    setLoading(false);
-    setRefreshing(false);
-    setIsLoadingMore(false);
-    return;
-  }
-
-  isLoadingRef.current = true;
-  
-  if (reset) {
-    setLoading(true);
-  } else {
-    setIsLoadingMore(true);
-  }
-  
-  setError(null); 
-  
-  try {
-    const offset = page * PAGE_SIZE;
+    isLoadingRef.current = true;
     
-    console.log(`📥 Fetching ${filter} submissions for group: ${groupId}, page: ${page}, offset: ${offset}`);
-    
-    let result;
-    
-    // ✅ USE DEDICATED ENDPOINT FOR PENDING
-    if (filter === 'pending') {
-      result = await AssignmentService.getPendingVerifications(groupId, {
-        limit: PAGE_SIZE,
-        offset: offset 
-      });
-      console.log('📥 Pending result structure:', {
-        hasData: !!result.data,
-        assignmentsCount: result.data?.assignments?.length,
-        total: result.data?.total
-      });
-    } else if (filter === 'verified') {
-  result = await AssignmentService.getGroupAssignments(groupId, {
-    status: 'verified',
-    limit: PAGE_SIZE,
-    offset: offset
-  });
-  console.log('📥 Verified result:', {
-    success: result.success,
-    total: result.total,
-    assignmentsCount: result.assignments?.length,
-    firstAssignment: result.assignments?.[0] ? {
-      id: result.assignments[0].id,
-      verified: result.assignments[0].verified,
-      completed: result.assignments[0].completed
-    } : null
-  });
-} else if (filter === 'rejected') {
-      result = await AssignmentService.getGroupAssignments(groupId, {
-        status: 'rejected',
-        limit: PAGE_SIZE,
-        offset: offset
-      });
+    if (reset) {
+      setLoading(true);
+    } else {
+      setIsLoadingMore(true);
     }
     
-    if (result.success) {
-      // ✅ CORRECT response structure handling
-      let assignments = [];
-      let total = 0;
+    setError(null); 
+    
+    try {
+      const offset = page * PAGE_SIZE;
+      
+      console.log(`📥 Fetching ${filter} submissions for group: ${groupId}, page: ${page}, offset: ${offset}`);
+      
+      let result;
       
       if (filter === 'pending') {
-        // Pending endpoint returns data.assignments
-        assignments = result.data?.assignments || [];
-        total = result.data?.total || 0;
-      } else {
-        // Other endpoints return assignments directly
-        assignments = result.assignments || [];
-        total = result.total || 0;
+        result = await AssignmentService.getPendingVerifications(groupId, {
+          limit: PAGE_SIZE,
+          offset: offset 
+        });
+        console.log('📥 Pending result structure:', {
+          hasData: !!result.data,
+          assignmentsCount: result.data?.assignments?.length,
+          total: result.data?.total
+        });
+      } else if (filter === 'verified') {
+        result = await AssignmentService.getGroupAssignments(groupId, {
+          status: 'verified',
+          limit: PAGE_SIZE,
+          offset: offset
+        });
+        console.log('📥 Verified result:', {
+          success: result.success,
+          total: result.total,
+          assignmentsCount: result.assignments?.length
+        });
+      } else if (filter === 'rejected') {
+        result = await AssignmentService.getGroupAssignments(groupId, {
+          status: 'rejected',
+          limit: PAGE_SIZE,
+          offset: offset
+        });
       }
       
-      console.log(`📥 Got ${assignments.length} assignments, total: ${total}`);
-      
-      const processed = assignments.map((assignment: any) => {
-        const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
-        const taskTitle = assignment.task?.title || assignment.taskTitle || 'Unknown Task';
-        const isDeletedTask = assignment.isHistorical === true || (isTaskDeleted && assignment.taskTitle);
+      if (result.success) {
+        let assignments = [];
+        let total = 0;
         
-        return {
-          ...assignment,
-          id: assignment.id,
-          userName: assignment.user?.fullName || assignment.userName || 'Unknown User',
-          userAvatar: assignment.user?.avatarUrl || assignment.userAvatar,
-          userId: assignment.user?.id || assignment.userId,
-          taskId: assignment.task?.id || assignment.taskId,
-          taskTitle: isDeletedTask ? `🗑️ ${taskTitle} (Deleted)` : taskTitle,
-          taskPoints: assignment.task?.points || assignment.taskPoints || 0,
-          submittedAt: assignment.submittedAt ? new Date(assignment.submittedAt) : 
-                      (assignment.completedAt ? new Date(assignment.completedAt) : null),
-          dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
-          completed: assignment.completed || false,
-          verified: assignment.verified,
-          photoUrl: assignment.photoUrl,
-          notes: assignment.notes,
-          adminNotes: assignment.adminNotes,
-          timeSlot: assignment.timeSlot,
-          isTaskDeleted: isDeletedTask,
-          isPartial: assignment.isPartial || false,
-          slotsCompleted: assignment.slotsCompleted || 0,
-          totalSlots: assignment.totalSlots || 1
-        };
-      });
-      
-      setTotalCount(total);
-      const newHasMore = (offset + processed.length) < total;
-      setHasMore(newHasMore);
-      
-      if (reset) {
-        setSubmissions(processed);
+        if (filter === 'pending') {
+          assignments = result.data?.assignments || [];
+          total = result.data?.total || 0;
+        } else {
+          assignments = result.assignments || [];
+          total = result.total || 0;
+        }
+        
+        // ✅ FILTER OUT DELETED TASKS FROM ALL ASSIGNMENTS
+        const filteredAssignments = assignments.filter((assignment: any) => {
+          const isDeleted = isDeletedTask(assignment);
+          if (isDeleted) {
+            console.log(`🗑️ Filtering out deleted task: ${assignment.taskTitle || assignment.task?.title}`);
+          }
+          return !isDeleted;
+        });
+        
+        console.log(`📥 Got ${assignments.length} assignments, filtered to ${filteredAssignments.length}, total: ${total}`);
+        
+        const processed = filteredAssignments.map((assignment: any) => {
+          const isDeleted = isDeletedTask(assignment);
+          const taskTitle = assignment.task?.title || assignment.taskTitle || 'Unknown Task';
+          
+          return {
+            ...assignment,
+            id: assignment.id,
+            userName: assignment.user?.fullName || assignment.userName || 'Unknown User',
+            userAvatar: assignment.user?.avatarUrl || assignment.userAvatar,
+            userId: assignment.user?.id || assignment.userId,
+            taskId: assignment.task?.id || assignment.taskId,
+            taskTitle: isDeleted ? `🗑️ ${taskTitle} (Deleted)` : taskTitle,
+            taskPoints: assignment.task?.points || assignment.taskPoints || 0,
+            submittedAt: assignment.submittedAt ? new Date(assignment.submittedAt) : 
+                        (assignment.completedAt ? new Date(assignment.completedAt) : null),
+            dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
+            completed: assignment.completed || false,
+            verified: assignment.verified,
+            photoUrl: assignment.photoUrl,
+            notes: assignment.notes,
+            adminNotes: assignment.adminNotes,
+            timeSlot: assignment.timeSlot,
+            isTaskDeleted: isDeleted,
+            isPartial: assignment.isPartial || false,
+            slotsCompleted: assignment.slotsCompleted || 0,
+            totalSlots: assignment.totalSlots || 1
+          };
+        });
+        
+        // Update total count to exclude deleted tasks
+        const newTotal = total - (assignments.length - filteredAssignments.length);
+        setTotalCount(newTotal);
+        const newHasMore = (offset + processed.length) < newTotal;
+        setHasMore(newHasMore);
+        
+        if (reset) {
+          setSubmissions(processed);
+        } else {
+          setSubmissions(prev => [...prev, ...processed]);
+        }
+        
+        console.log(`✅ Loaded ${processed.length} items (deleted filtered out). Total: ${newTotal}, HasMore: ${newHasMore}`);
       } else {
-        setSubmissions(prev => [...prev, ...processed]);
+        setError(result.message || 'Failed to load submissions');
       }
-      
-      console.log(`✅ Loaded ${processed.length} items. Total: ${total}, HasMore: ${newHasMore}`);
-    } else {
-      setError(result.message || 'Failed to load submissions');
+    } catch (err: any) {
+      console.error('Error fetching submissions:', err);
+      setError(err.message || 'Network error');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+      setIsLoadingMore(false);
+      isLoadingRef.current = false;
     }
-  } catch (err: any) {
-    console.error('Error fetching submissions:', err);
-    setError(err.message || 'Network error');
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-    setIsLoadingMore(false);
-    isLoadingRef.current = false;
-  }
-};
+  };
 
-  // ✅ FIXED: Load more function
   const handleLoadMore = useCallback(() => {
-    // Don't load if:
-    // - Already loading more
-    // - No more items to load
-    // - Currently loading or refreshing
-    // - Total loaded equals total count
     if (isLoadingMore || !hasMore || loading || refreshing) {
       console.log('🚫 Skip load more:', { isLoadingMore, hasMore, loading, refreshing });
       return;
@@ -261,7 +252,6 @@ const fetchSubmissions = async (page: number, reset = false) => {
     const nextPage = currentPageRef.current + 1;
     const offset = nextPage * PAGE_SIZE;
     
-    // Check if we've already loaded everything
     if (offset >= totalCount && totalCount > 0) {
       console.log('🏁 Already loaded all items');
       setHasMore(false);
@@ -273,15 +263,14 @@ const fetchSubmissions = async (page: number, reset = false) => {
     fetchSubmissions(nextPage, false);
   }, [isLoadingMore, hasMore, loading, refreshing, totalCount]);
 
-  // ✅ FIXED: Refresh function
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     currentPageRef.current = 0;
     setHasMore(true);
     fetchSubmissions(0, true);
+    fetchStats();
   }, []);
 
-  // ✅ FIXED: Filter change handler
   const handleFilterChange = (newFilter: 'pending' | 'verified' | 'rejected') => {
     if (newFilter === filter) return;
     setFilter(newFilter);
@@ -301,7 +290,6 @@ const fetchSubmissions = async (page: number, reset = false) => {
       assignmentId: assignment.id,
       isAdmin: true,
       onVerified: () => {
-        // Refresh after verification
         currentPageRef.current = 0;
         setHasMore(true);
         fetchSubmissions(0, true);
@@ -344,7 +332,6 @@ const fetchSubmissions = async (page: number, reset = false) => {
               
               if (result.success) {
                 Alert.alert('Success', 'Submission approved successfully');
-                // Refresh after approval
                 currentPageRef.current = 0;
                 setHasMore(true);
                 fetchSubmissions(0, true);
@@ -395,7 +382,6 @@ const fetchSubmissions = async (page: number, reset = false) => {
               
               if (result.success) {
                 Alert.alert('Success', 'Submission rejected');
-                // Refresh after rejection
                 currentPageRef.current = 0;
                 setHasMore(true);
                 fetchSubmissions(0, true);
@@ -522,7 +508,6 @@ const fetchSubmissions = async (page: number, reset = false) => {
     </View>
   );
 
-  // ✅ FIXED: Footer component for load more indicator
   const renderFooter = () => {
     if (!isLoadingMore) return null;
     
@@ -534,45 +519,46 @@ const fetchSubmissions = async (page: number, reset = false) => {
     );
   };
 
- const renderEmpty = () => (
-  <View style={styles.emptyContainer}>
-    <MaterialCommunityIcons 
-      name={
-        filter === 'pending' ? 'clock-check-outline' : 
-        filter === 'verified' ? 'check-circle-outline' : 
-        'close-circle-outline'
-      } 
-      size={64} 
-      color={theme.border} 
-    />
-    <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-      {filter === 'pending' ? 'No pending submissions' : 
-       filter === 'verified' ? 'No verified submissions' : 
-       'No rejected submissions'}
-    </Text>
-    <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
-      {filter === 'pending' 
-        ? 'When members submit assignments, they will appear here'
-        : 'No submissions in this category'}
-    </Text>
-  </View>
-);
-
+  const renderEmpty = () => (
+    <View style={styles.emptyContainer}>
+      <MaterialCommunityIcons 
+        name={
+          filter === 'pending' ? 'clock-check-outline' : 
+          filter === 'verified' ? 'check-circle-outline' : 
+          'close-circle-outline'
+        } 
+        size={64} 
+        color={theme.border} 
+      />
+      <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+        {filter === 'pending' ? 'No pending submissions' : 
+         filter === 'verified' ? 'No verified submissions' : 
+         'No rejected submissions'}
+      </Text>
+      <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
+        {filter === 'pending' 
+          ? 'When members submit assignments, they will appear here'
+          : 'No submissions in this category'}
+      </Text>
+    </View>
+  );
 
   const renderSubmissionItem = ({ item }: any) => {
     const isPending = filter === 'pending';
     const isSubmitted = item.completed === true && item.verified === null;
     const isDeletedTask = item.isTaskDeleted === true;
     
+    // ✅ Don't render if it's a deleted task (they are filtered out anyway, but as safety)
+    if (isDeletedTask) return null;
+    
     return (
       <TouchableOpacity
         style={[
           styles.submissionCard,
-          isDeletedTask && styles.deletedTaskCard,
           { backgroundColor: theme.card, shadowColor: theme.shadow }
         ]}
         onPress={() => handleViewSubmission(item)}
-        activeOpacity={isDeletedTask ? 0.8 : 0.7}
+        activeOpacity={0.7}
       >
         <View style={styles.cardHeader}>
           <View style={styles.userInfo}>
@@ -602,19 +588,7 @@ const fetchSubmissions = async (page: number, reset = false) => {
             </View>
           </View>
           
-          {isDeletedTask && (
-            <LinearGradient
-              colors={[theme.bgSecondary, theme.bgTertiary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.deletedBadge}
-            >
-              <MaterialCommunityIcons name="delete" size={12} color={theme.error} />
-              <Text style={[styles.deletedBadgeText, { color: theme.error }]}>Deleted</Text>
-            </LinearGradient>
-          )}
-          
-          {!isDeletedTask && isPending && item.completed === true && item.verified === null && (
+          {isPending && item.completed === true && item.verified === null && (
             <LinearGradient
               colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
@@ -625,7 +599,7 @@ const fetchSubmissions = async (page: number, reset = false) => {
               <Text style={[styles.pendingBadgeText, { color: theme.primary }]}>Pending</Text>
             </LinearGradient>
           )}
-          {!isDeletedTask && filter === 'verified' && (
+          {filter === 'verified' && (
             <LinearGradient
               colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
@@ -636,7 +610,7 @@ const fetchSubmissions = async (page: number, reset = false) => {
               <Text style={[styles.verifiedBadgeText, { color: theme.primary }]}>Verified</Text>
             </LinearGradient>
           )}
-          {!isDeletedTask && filter === 'rejected' && (
+          {filter === 'rejected' && (
             <LinearGradient
               colors={[theme.errorBg, theme.errorBg]}
               start={{ x: 0, y: 0 }}
@@ -650,17 +624,17 @@ const fetchSubmissions = async (page: number, reset = false) => {
         </View>
 
         <LinearGradient
-          colors={isDeletedTask ? [theme.bgSecondary, theme.bgTertiary] : [theme.bgSecondary, theme.bgTertiary]}
+          colors={[theme.bgSecondary, theme.bgTertiary]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
-          style={[styles.taskInfo, isDeletedTask && styles.deletedTaskInfo, { borderColor: theme.border }]}
+          style={[styles.taskInfo, { borderColor: theme.border }]}
         >
           <MaterialCommunityIcons 
-            name={isDeletedTask ? "delete" : "format-list-checks"} 
+            name="format-list-checks" 
             size={16} 
-            color={isDeletedTask ? theme.error : theme.textSecondary} 
+            color={theme.textSecondary} 
           />
-          <Text style={[styles.taskTitle, isDeletedTask && styles.deletedTaskTitle, { color: isDeletedTask ? theme.textMuted : theme.text }]} numberOfLines={2}>
+          <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
             {item.taskTitle}
           </Text>
         </LinearGradient>
@@ -726,7 +700,7 @@ const fetchSubmissions = async (page: number, reset = false) => {
           ) : null}
         </View>
 
-        {isPending && isSubmitted && !isDeletedTask && (
+        {isPending && isSubmitted && (
           <View style={[styles.quickActions, { borderTopColor: theme.borderLight }]}>
             <TouchableOpacity
               style={styles.quickRejectButton}
@@ -764,20 +738,6 @@ const fetchSubmissions = async (page: number, reset = false) => {
               </LinearGradient>
             </TouchableOpacity>
           </View>
-        )}
-
-        {isDeletedTask && (
-          <LinearGradient
-            colors={[theme.errorBg, theme.errorBg]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.deletedWarning, { borderColor: theme.errorBorder }]}
-          >
-            <MaterialCommunityIcons name="alert-circle" size={14} color={theme.error} />
-            <Text style={[styles.deletedWarningText, { color: theme.error }]}>
-              This task has been deleted. Cannot verify this submission.
-            </Text>
-          </LinearGradient>
         )}
 
         {item.adminNotes && (
@@ -1071,38 +1031,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-  },
-  deletedTaskCard: {
-    opacity: 0.8,
-  },
-  deletedTaskInfo: {},
-  deletedTaskTitle: {
-    textDecorationLine: 'line-through',
-  },
-  deletedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
-  },
-  deletedBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  deletedWarning: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 12,
-    borderWidth: 1,
-  },
-  deletedWarningText: {
-    flex: 1,
-    fontSize: 12,
   },
   cardHeader: {
     flexDirection: 'row',

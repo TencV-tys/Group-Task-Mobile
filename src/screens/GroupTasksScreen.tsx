@@ -114,7 +114,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return false;
   }, []);
 
-  const groupedMyTasks = useMemo(() => {
+  
+const groupedMyTasks = useMemo(() => {
   if (selectedTab !== 'my') return [];
   
   const taskMap = new Map();
@@ -161,17 +162,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
         swapDay: item.assignment?.swapDay || null
       });
     }
-
-    console.log('🔍 MY TASKS WITH SWAP INFO:', myTasks.map(t => ({
-  title: t.title,
-  acquiredViaSwap: t.acquiredViaSwap,
-  swapScope: t.swapScope,
-  swappedFromName: t.swappedFromName,
-  assignment: t.assignment ? {
-    acquiredViaSwap: t.assignment.acquiredViaSwap,
-    swapScope: t.assignment.swapScope 
-  } : null
-})));
      
     const taskData = taskMap.get(taskId);
     const assignment = item.assignment || item;
@@ -179,7 +169,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     
     taskData.rawAssignments.push(assignment);
     
-    // ✅ Count correctly
     if (assignment.verified === true) {
       taskData.verifiedCount++;
       taskData.earnedPoints += points;
@@ -199,7 +188,6 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   
   const result = Array.from(taskMap.values()).map(task => {
     const totalRawSlots = task.rawAssignments.length;
-    // ✅ Remove BOTH missed AND rejected from total
     const effectiveTotal = totalRawSlots - task.missedCount - task.rejectedCount;
     const effectiveVerified = task.verifiedCount;
     const effectiveRejected = task.rejectedCount;
@@ -208,24 +196,52 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     const isFullyCompleted = effectiveTotal > 0 && effectiveVerified === effectiveTotal;
     const progressPercentage = effectiveTotal > 0 ? (effectiveVerified / effectiveTotal) * 100 : 0;
     
+    // ✅ Determine if this is a single-slot or multi-slot task
+    const isSingleSlot = totalRawSlots === 1;
+    
     let displayText = '';
     let statusEmoji = '';
     
-    if (effectiveMissed > 0 && effectiveRejected > 0) {
-      statusEmoji = '⚠️';
-      displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveRejected} rejected • ${effectiveMissed} missed`;
-    } else if (effectiveMissed > 0) {
-      statusEmoji = '⚠️';
-      displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveMissed} missed`;
-    } else if (effectiveRejected > 0) {
-      statusEmoji = '❌';
-      displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveRejected} rejected`;
-    } else if (task.pendingCount > 0 && effectiveVerified === 0) {
-      statusEmoji = '⏳';
-      displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.pendingCount} pending`;
+    if (isSingleSlot) {
+      // Single-slot task - show simple status
+      if (effectiveVerified > 0) {
+        statusEmoji = '✅';
+        displayText = `Verified • ${task.earnedPoints}/${task.totalPoints} pts`;
+      } else if (task.missedCount > 0) {
+        statusEmoji = '❌';
+        displayText = 'Missed';
+      } else if (task.rejectedCount > 0) {
+        statusEmoji = '❌';
+        displayText = 'Rejected';
+      } else if (task.pendingCount > 0) {
+        statusEmoji = '⏳';
+        displayText = 'Pending Verification';
+      } else {
+        statusEmoji = '⏳';
+        displayText = 'Not Started';
+      }
     } else {
-      statusEmoji = '⭐';
-      displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.earnedPoints}/${task.totalPoints} pts`;
+      // Multi-slot task - show slot breakdown
+  if (effectiveMissed > 0 && effectiveRejected > 0) {
+    statusEmoji = '⚠️';
+    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveRejected} rejected • ${effectiveMissed} missed`;
+  } else if (effectiveMissed > 0) {
+    statusEmoji = '⚠️';
+    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveMissed} missed`;
+  } else if (effectiveRejected > 0) {
+    statusEmoji = '❌';
+    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveRejected} rejected`;
+  } else if (task.pendingCount > 0 && effectiveVerified === 0) {
+    statusEmoji = '⏳';
+    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.pendingCount} pending`;
+  } else if (effectiveVerified === effectiveTotal && effectiveTotal > 0) {
+    // ✅ FULLY COMPLETED - show simple success message
+    statusEmoji = '✅';
+    displayText = `All ${effectiveTotal} slots verified • ${task.earnedPoints}/${task.totalPoints} pts`;
+  } else {
+    statusEmoji = '⭐';
+    displayText = `${effectiveVerified}/${effectiveTotal} slots • ${task.earnedPoints}/${task.totalPoints} pts`;
+  }
     }
     
     return {
@@ -237,7 +253,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
       isFullyCompleted,
       progressPercentage,
       displayText,
-      statusEmoji
+      statusEmoji,
+      isSingleSlot  // ✅ Add this flag for rendering
     };
   });
   
@@ -303,22 +320,44 @@ const groupedAllTasks = useMemo(() => {
   
   const result = Array.from(taskMap.values()).map(task => {
     const totalRawSlots = task.rawAssignments.length;
-    // ✅ Remove BOTH missed AND rejected from total (same as member view)
     const effectiveTotal = totalRawSlots - task.missedCount - task.rejectedCount;
     const effectiveVerified = task.verifiedCount;
     
     const isFullyCompleted = effectiveTotal > 0 && effectiveVerified === effectiveTotal;
     const progressPercentage = effectiveTotal > 0 ? (effectiveVerified / effectiveTotal) * 100 : 0;
     
+    // ✅ Determine if this is a single-slot or multi-slot task
+    const isSingleSlot = totalRawSlots === 1;
+    
     let displayText = '';
-    if (task.missedCount > 0 && task.rejectedCount > 0) {
-      displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.rejectedCount} rejected • ${task.missedCount} missed`;
-    } else if (task.missedCount > 0) {
-      displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.missedCount} missed`;
-    } else if (task.rejectedCount > 0) {
-      displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.rejectedCount} rejected`;
+    
+    if (isSingleSlot) {
+      // Single-slot task - show simple status
+      if (task.verifiedCount > 0) {
+        displayText = `✅ Verified • ${task.earnedPoints}/${task.totalPoints} pts`;
+      } else if (task.missedCount > 0) {
+        displayText = `❌ Missed`;
+      } else if (task.rejectedCount > 0) {
+        displayText = `❌ Rejected`;
+      } else if (task.rawAssignments.some((a: any) => a.photoUrl !== null && a.verified === null)) {
+        displayText = `⏳ Pending Review`;
+      } else {
+        displayText = `⏳ Not Started`;
+      }
     } else {
-      displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.earnedPoints}/${task.totalPoints} pts`;
+     // Multi-slot task - show slot breakdown
+  if (task.missedCount > 0 && task.rejectedCount > 0) {
+    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.rejectedCount} rejected • ${task.missedCount} missed`;
+  } else if (task.missedCount > 0) {
+    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.missedCount} missed`;
+  } else if (task.rejectedCount > 0) {
+    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.rejectedCount} rejected`;
+  } else if (effectiveVerified === effectiveTotal && effectiveTotal > 0) {
+    // ✅ FULLY COMPLETED - show simple success message
+    displayText = `✅ All ${effectiveTotal} slots verified • ${task.earnedPoints}/${task.totalPoints} pts`;
+  } else {
+    displayText = `${effectiveVerified}/${effectiveTotal} slots • ${task.earnedPoints}/${task.totalPoints} pts`;
+  }
     }
     
     return {
@@ -327,7 +366,8 @@ const groupedAllTasks = useMemo(() => {
       effectiveVerified,
       isFullyCompleted,
       progressPercentage,
-      displayText
+      displayText,
+      isSingleSlot
     };
   });
   
@@ -722,6 +762,17 @@ const groupedAllTasks = useMemo(() => {
       clearAssignmentCompleted();
     }
   }, [assignmentEvents.assignmentCompleted, refreshTasks, clearAssignmentCompleted]);
+
+  // In GroupTasksScreen.tsx - add focus listener to refresh pending count
+useEffect(() => {
+  const unsubscribe = navigation.addListener('focus', () => {
+    if (isAdmin) {
+      fetchPendingVerificationsCount();  // ← Refresh on focus
+    }
+  });
+  
+  return unsubscribe;
+}, [navigation, isAdmin, fetchPendingVerificationsCount]);
 
   useEffect(() => {
     if (assignmentEvents.assignmentVerified) {
@@ -1196,183 +1247,189 @@ const groupedAllTasks = useMemo(() => {
     );
   };
 
+
   const renderTask = ({ item }: any) => {
-    const isMyTasksView = selectedTab === 'my';
-    const taskIsAssigned = isTaskAssigned(item);
-    
-    const isAcquiredViaSwap = item.acquiredViaSwap === true;
-    const swappedFromName = item.swappedFromName || 'another member';
-    const swapRequestId = item.swapRequestId;
-    const swapScope = item.swapScope;
-    const swapDay = item.swapDay;
-    
-    const isAssignedToCurrentUser = 
-      item.isAssignedToUser === true || 
-      !!item.userAssignment || 
-      (item.assignments && item.assignments.some((a: any) => a.userId === currentUserId));
-    
-    const isClickable = isAdmin || isMyTasksView || isAssignedToCurrentUser;
-    
-    const effectiveTotal = item.effectiveTotal || 0;
-    const effectiveVerified = item.effectiveVerified || 0;
-    const earnedPoints = item.earnedPoints || 0;
-    const totalPoints = item.totalPoints || 0;
-    const isFullyCompleted = item.isFullyCompleted || false;
-    const progressPercentage = item.progressPercentage || 0;
-    const displayText = item.displayText || '';
-    
-    const validation = validateTaskTime(item);
-    
-    const getGradientColors = (): [string, string] => {
-      if (!isClickable) return [theme.bgSecondary, theme.bgTertiary];
-      if (isFullyCompleted) return [theme.bgSecondary, theme.bgTertiary];
-      if (isMyTasksView && validation.isSubmittableNow) {
-        return validation.willBePenalized ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight];
-      }
-      return [theme.card, theme.bgSecondary];
-    };
+  const isMyTasksView = selectedTab === 'my';
+  const taskIsAssigned = isTaskAssigned(item);
+  
+  const isAcquiredViaSwap = item.acquiredViaSwap === true;
+  const swappedFromName = item.swappedFromName || 'another member';
+  const swapRequestId = item.swapRequestId;
+  const swapScope = item.swapScope;
+  const swapDay = item.swapDay;
+  
+  const isAssignedToCurrentUser = 
+    item.isAssignedToUser === true || 
+    !!item.userAssignment || 
+    (item.assignments && item.assignments.some((a: any) => a.userId === currentUserId));
+  
+  const isClickable = isAdmin || isMyTasksView || isAssignedToCurrentUser;
+  
+  const effectiveTotal = item.effectiveTotal || 0;
+  const effectiveVerified = item.effectiveVerified || 0;
+  const earnedPoints = item.earnedPoints || 0;
+  const totalPoints = item.totalPoints || 0;
+  const isFullyCompleted = item.isFullyCompleted || false;
+  const progressPercentage = item.progressPercentage || 0;
+  const displayText = item.displayText || '';
+  const isSingleSlot = item.isSingleSlot || false;  // ✅ Use this flag
+  
+  const validation = validateTaskTime(item);
+  
+  const getGradientColors = (): [string, string] => {
+    if (!isClickable) return [theme.bgSecondary, theme.bgTertiary];
+    if (isFullyCompleted) return [theme.bgSecondary, theme.bgTertiary];
+    if (isMyTasksView && validation.isSubmittableNow) {
+      return validation.willBePenalized ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight];
+    }
+    return [theme.card, theme.bgSecondary];
+  };
 
-    return (
-      <TouchableOpacity
-        onPress={() => handleViewTaskDetails(item)}
-        onLongPress={() => {
-          if (!isAdmin || isMyTasksView) return;
+  return (
+    <TouchableOpacity
+      onPress={() => handleViewTaskDetails(item)}
+      onLongPress={() => {
+        if (!isAdmin || isMyTasksView) return;
 
-          if (!taskIsAssigned) {
-            Alert.alert('Task Options', `"${item.title}"`, [
-              { text: 'Edit', onPress: () => handleEditTask(item) },
-              { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item) },
-              { text: 'Cancel', style: 'cancel' }
-            ]);
-          } else {
-            Alert.alert('Task Options', `"${item.title}"`, [
-              { 
-                text: 'Edit ⚠️', 
-                onPress: () => Alert.alert(
-                  'Cannot Edit Assigned Task',
-                  'This task is already assigned. Editing could break the rotation system.\n\nConsider creating a new task instead.',
-                  [{ text: 'OK' }]
-                )
-              },
-              { 
-                text: 'Delete', 
-                style: 'destructive', 
-                onPress: () => handleDeleteTask(item) 
-              },
-              { text: 'Cancel', style: 'cancel' }
-            ]);
-          }
-        }}
-        activeOpacity={isClickable ? 0.7 : 1}
-      > 
-        <LinearGradient 
-          colors={getGradientColors()} 
-          style={[
-            styles.taskCard,
-            !isClickable && styles.disabledTaskCard,
-            isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && styles.swappedTaskCard
-          ]}
-        >
-          <View style={styles.taskHeader}>
-            <LinearGradient 
-              colors={isFullyCompleted ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]} 
-              style={styles.taskIcon}
-            >
-              <MaterialCommunityIcons 
-                name={isFullyCompleted ? "check-circle" : "format-list-checks"} 
-                size={20} 
-                color={isFullyCompleted ? "#fff" : theme.textMuted} 
-              />
-            </LinearGradient>
-            <View style={styles.taskInfo}>
-              <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
-                {item.title}
-              </Text>
-              <View style={styles.taskMeta}>
-                <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pointsBadge}>
-                  <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
-                  <Text style={styles.taskPoints}>{displayText}</Text>
+        if (!taskIsAssigned) {
+          Alert.alert('Task Options', `"${item.title}"`, [
+            { text: 'Edit', onPress: () => handleEditTask(item) },
+            { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item) },
+            { text: 'Cancel', style: 'cancel' }
+          ]);
+        } else {
+          Alert.alert('Task Options', `"${item.title}"`, [
+            { 
+              text: 'Edit ⚠️', 
+              onPress: () => Alert.alert(
+                'Cannot Edit Assigned Task',
+                'This task is already assigned. Editing could break the rotation system.\n\nConsider creating a new task instead.',
+                [{ text: 'OK' }]
+              )
+            },
+            { 
+              text: 'Delete', 
+              style: 'destructive', 
+              onPress: () => handleDeleteTask(item) 
+            },
+            { text: 'Cancel', style: 'cancel' }
+          ]);
+        }
+      }}
+      activeOpacity={isClickable ? 0.7 : 1}
+    > 
+      <LinearGradient 
+        colors={getGradientColors()} 
+        style={[
+          styles.taskCard,
+          !isClickable && styles.disabledTaskCard,
+          isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && styles.swappedTaskCard
+        ]}
+      >
+        <View style={styles.taskHeader}>
+          <LinearGradient 
+            colors={isFullyCompleted ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]} 
+            style={styles.taskIcon}
+          >
+            <MaterialCommunityIcons 
+              name={isFullyCompleted ? "check-circle" : "format-list-checks"} 
+              size={20} 
+              color={isFullyCompleted ? "#fff" : theme.textMuted} 
+            />
+          </LinearGradient>
+          <View style={styles.taskInfo}>
+            <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <View style={styles.taskMeta}>
+              <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pointsBadge}>
+                <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                <Text style={styles.taskPoints}>{displayText}</Text>
+              </LinearGradient>
+              
+              {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
+                <LinearGradient
+                  colors={['#F59E0B', '#F59E0B']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.swapIndicatorBadge}
+                >
+                  <MaterialCommunityIcons name="swap-horizontal" size={10} color="#fff" />
+                  <Text style={styles.swapIndicatorText}>
+                    {swapScope === 'week' ? 'Week Swap' : `${swapDay || 'Day'} Swap`}
+                  </Text>
                 </LinearGradient>
-                
-                {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
-                  <LinearGradient
-                    colors={['#F59E0B', '#F59E0B']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.swapIndicatorBadge}
-                  >
-                    <MaterialCommunityIcons name="swap-horizontal" size={10} color="#fff" />
-                    <Text style={styles.swapIndicatorText}>
-                      {swapScope === 'week' ? 'Week Swap' : `${swapDay || 'Day'} Swap`}
-                    </Text>
-                  </LinearGradient>
-                )}
-              </View>
+              )}
             </View>
           </View>
-          
-          {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
+        </View>
+        
+        {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
+          <LinearGradient
+            colors={[theme.primaryLight, theme.primaryLight]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.swapInfoTooltip, { borderColor: theme.primaryBorder }]}
+          >
+            <MaterialCommunityIcons name="information" size={14} color={theme.primary} />
+            <Text style={[styles.swapInfoText, { color: theme.primary }]}>
+              {swapScope === 'week' 
+                ? `Full week swap with ${swappedFromName} - you exchanged all your tasks` 
+                : `Day swap from ${swappedFromName} for ${swapDay || 'this day'}`
+              }
+            </Text>
+            {swapRequestId && (
+              <TouchableOpacity 
+                onPress={(e) => {
+                  e.stopPropagation();
+                  navigation.navigate('SwapRequestDetails', { requestId: swapRequestId });
+                }}
+              >
+                <Text style={[styles.viewSwapLink, { color: theme.primary }]}>View →</Text>
+              </TouchableOpacity>
+            )}
+          </LinearGradient>
+        )}
+        
+        {renderAssignmentInfo(item)}
+        
+        {/* ✅ Progress Bar - ONLY for multi-slot tasks (effectiveTotal > 1) */}
+        {effectiveTotal > 1 && !isFullyCompleted && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+            </View>
+            <Text style={styles.progressText}>
+              {displayText}
+            </Text>
+          </View>
+        )}
+        
+        {/* ✅ For multi-slot tasks that are fully completed - show completion badge */}
+        {effectiveTotal > 1 && isFullyCompleted && (
+          <View style={styles.completionBadgeContainer}>
             <LinearGradient
               colors={[theme.primaryLight, theme.primaryLight]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.swapInfoTooltip, { borderColor: theme.primaryBorder }]}
+              style={styles.completionBadge}
             >
-              <MaterialCommunityIcons name="information" size={14} color={theme.primary} />
-              <Text style={[styles.swapInfoText, { color: theme.primary }]}>
-                {swapScope === 'week' 
-                  ? `Full week swap with ${swappedFromName} - you exchanged all your tasks` 
-                  : `Day swap from ${swappedFromName} for ${swapDay || 'this day'}`
-                }
+              <MaterialCommunityIcons name="check-circle" size={14} color={theme.primary} />
+              <Text style={[styles.completionBadgeText, { color: theme.primary }]}>
+                All {effectiveTotal} slots verified! ✅
               </Text>
-              {swapRequestId && (
-                <TouchableOpacity 
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    navigation.navigate('SwapRequestDetails', { requestId: swapRequestId });
-                  }}
-                >
-                  <Text style={[styles.viewSwapLink, { color: theme.primary }]}>View →</Text>
-                </TouchableOpacity>
-              )}
             </LinearGradient>
-          )}
-          
-          {renderAssignmentInfo(item)}
-          
-          {((isMyTasksView && effectiveTotal > 1 && !isFullyCompleted) ||
-            (!isMyTasksView && effectiveTotal > 1 && !isFullyCompleted)) && (
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
-              </View>
-              <Text style={styles.progressText}>
-                {displayText}
-              </Text>
-            </View>
-          )}
-          
-          {!isMyTasksView && effectiveTotal === 1 && !isFullyCompleted && effectiveTotal > 0 && (
-            <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
-              </View>
-              <Text style={styles.progressText}>
-                {effectiveVerified === 0 ? 'Not verified yet' : 'Verified'}
-              </Text>
-            </View>
-          )}
-          
-          <View style={styles.taskFooter}>
-            <Text style={styles.taskCreator}>
-              <MaterialCommunityIcons name="account" size={12} color={theme.textMuted} /> {item.creator?.fullName || 'Admin'}
-            </Text>
-            <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
           </View>
-        </LinearGradient>
-      </TouchableOpacity>
-    ); 
-  };
+        )} 
+        
+        <View style={styles.taskFooter}>
+          <Text style={styles.taskCreator}>
+            <MaterialCommunityIcons name="account" size={12} color={theme.textMuted} /> {item.creator?.fullName || 'Admin'}
+          </Text>
+          <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
+        </View>
+      </LinearGradient>
+    </TouchableOpacity>
+  ); 
+};
 
   const renderContent = () => {
     let currentTasks = [];

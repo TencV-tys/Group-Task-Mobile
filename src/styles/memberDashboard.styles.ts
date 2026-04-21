@@ -82,6 +82,18 @@ export const makeMemberDashboardStyles = (theme: Theme) => StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  statusBadge: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 6,
+  paddingVertical: 2,
+  borderRadius: 10,
+  gap: 3,
+},
+statusBadgeText: {
+  fontSize: 9,
+  fontWeight: '600',
+},
   refreshButton: {
     width: 36,
     height: 36,

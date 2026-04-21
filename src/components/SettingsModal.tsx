@@ -200,125 +200,153 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   };
 
-  const checkWeekSwapAvailability = (firstTaskDate: Date) => {
-    const now = new Date();
-    const taskCreatedDate = new Date(firstTaskDate);
-    
-    const hoursSinceTaskCreated = (now.getTime() - taskCreatedDate.getTime()) / (1000 * 60 * 60);
-    const isWithinFirst24Hours = hoursSinceTaskCreated >= 0 && hoursSinceTaskCreated <= 24;
-    
-    const taskCreatedDayName = taskCreatedDate.toLocaleDateString('en-US', { weekday: 'long' });
-    
-    if (!isWithinFirst24Hours) { 
-      setCanSwapWeek(false);
-      if (hoursSinceTaskCreated < 0) {
-        setWeekSwapReason(`Week starts on ${taskCreatedDayName} (task not created yet)`);
-      } else {
-        const daysSince = Math.floor(hoursSinceTaskCreated / 24);
-        setWeekSwapReason(`Week swap window closed. Only available within first 24 hours after the first recurring task was created on ${taskCreatedDayName} (${daysSince} day${daysSince > 1 ? 's' : ''} ago)`);
-      }
+const checkWeekSwapAvailability = (firstTaskDate: Date) => {
+  const now = new Date();
+  const taskCreatedDate = new Date(firstTaskDate);
+  
+  const hoursSinceTaskCreated = (now.getTime() - taskCreatedDate.getTime()) / (1000 * 60 * 60);
+  const isWithinFirst24Hours = hoursSinceTaskCreated >= 0 && hoursSinceTaskCreated <= 24;
+  
+  // ✅ Check if user has already submitted/completed any tasks
+  const hasSubmittedTask = myAssignments.some((task: any) => 
+    task.assignment?.completed === true || 
+    task.assignment?.verified !== null ||
+    task.assignment?.photoUrl !== null
+  );
+  
+  // ✅ Check if user has any incomplete tasks to swap
+  const hasIncompleteTasks = myAssignments.some((task: any) => 
+    task.assignment && !task.assignment.completed && task.assignment.verified === null && task.assignment.photoUrl === null
+  );
+  
+  const taskCreatedDayName = taskCreatedDate.toLocaleDateString('en-US', { weekday: 'long' });
+  
+  // ✅ Determine if swap is available
+  if (hasSubmittedTask) {
+    setCanSwapWeek(false);
+    setWeekSwapReason(`Cannot swap week because you have already submitted or completed a task this week.`);
+  } else if (!hasIncompleteTasks) {
+    setCanSwapWeek(false);
+    setWeekSwapReason(`No incomplete tasks to swap. All tasks are completed.`);
+  } else if (!isWithinFirst24Hours) {
+    setCanSwapWeek(false);
+    if (hoursSinceTaskCreated < 0) {
+      setWeekSwapReason(`Week starts on ${taskCreatedDayName} (task not created yet)`);
     } else {
-      setCanSwapWeek(true);
-      const hoursLeft = Math.ceil(24 - hoursSinceTaskCreated);
-      const minutesLeft = Math.ceil((24 - hoursSinceTaskCreated) * 60);
-      
-      if (hoursLeft < 1) {
-        setWeekSwapReason(`${minutesLeft} minutes left to swap this week (based on first task created ${taskCreatedDayName})`);
-      } else {
-        setWeekSwapReason(`${hoursLeft} hour${hoursLeft > 1 ? 's' : ''} left to swap this week (based on first task created ${taskCreatedDayName})`);
-      }
+      const daysSince = Math.floor(hoursSinceTaskCreated / 24);
+      setWeekSwapReason(`Week swap window closed. Only available within first 24 hours after the week starts (${daysSince} day${daysSince > 1 ? 's' : ''} ago)`);
     }
-  };
+  } else {
+    setCanSwapWeek(true);
+    const hoursLeft = Math.ceil(24 - hoursSinceTaskCreated);
+    const minutesLeft = Math.ceil((24 - hoursSinceTaskCreated) * 60);
+    
+    if (hoursLeft < 1) {
+      setWeekSwapReason(`${minutesLeft} minutes left to swap this week`);
+    } else {
+      setWeekSwapReason(`${hoursLeft} hour${hoursLeft > 1 ? 's' : ''} left to swap this week`);
+    }
+  }
+};
 
-  const loadGroupData = async () => {
-    if (!visible) return;
+// Update swap availability when myAssignments changes
+useEffect(() => {
+  if (visible && firstTaskDate && myAssignments.length > 0) {
+    checkWeekSwapAvailability(firstTaskDate);
+  }
+}, [myAssignments, firstTaskDate, visible]);
 
-    const hasToken = await checkToken();
-    if (!hasToken) {
-      Alert.alert(
-        'Authentication Error',
-        'Please log in again',
-        [{ text: 'OK', onPress: onClose }]
+
+ 
+const loadGroupData = async () => {
+  if (!visible) return;
+
+  const hasToken = await checkToken();
+  if (!hasToken) {
+    Alert.alert(
+      'Authentication Error',
+      'Please log in again',
+      [{ text: 'OK', onPress: onClose }]
+    );
+    return;
+  }
+
+  try {
+    setLoadingStats(true);
+    
+    const statsResult = await TaskService.getTaskStatistics(groupId);
+    
+    const leaderboardResult = await GroupActivityService.getLeaderboard(groupId);
+    
+    let totalVerifiedPoints = 0;
+    if (leaderboardResult.success && leaderboardResult.data?.leaderboard) {
+      totalVerifiedPoints = leaderboardResult.data.leaderboard.reduce(
+        (sum: number, member: any) => sum + (member.points || 0), 0
       );
-      return;
+      const top5 = leaderboardResult.data.leaderboard.slice(0, 5);
+      setLeaderboard(top5);
+    }
+    
+    if (statsResult.success) {
+      const mergedStats = {
+        ...statsResult.statistics,
+        currentWeek: {
+          ...statsResult.statistics?.currentWeek,
+          earnedPoints: totalVerifiedPoints,
+          verifiedPoints: totalVerifiedPoints
+        }
+      };
+      setGroupStats(mergedStats);
     }
 
-    try {
-      setLoadingStats(true);
-      
-      const statsResult = await TaskService.getTaskStatistics(groupId);
-      
-      const leaderboardResult = await GroupActivityService.getLeaderboard(groupId);
-      
-      let totalVerifiedPoints = 0;
-      if (leaderboardResult.success && leaderboardResult.data?.leaderboard) {
-        totalVerifiedPoints = leaderboardResult.data.leaderboard.reduce(
-          (sum: number, member: any) => sum + (member.points || 0), 0
-        );
-        const top5 = leaderboardResult.data.leaderboard.slice(0, 5);
-        setLeaderboard(top5);
-      }
-      
-      if (statsResult.success) {
-        const mergedStats = {
-          ...statsResult.statistics,
-          currentWeek: {
-            ...statsResult.statistics?.currentWeek,
-            earnedPoints: totalVerifiedPoints,
-            verifiedPoints: totalVerifiedPoints
-          }
-        };
-        setGroupStats(mergedStats);
-      }
-
-      const groupResult = await GroupMembersService.getGroupInfo(groupId);
-      if (groupResult.success) {
-        setRotationWeek(groupResult.group?.currentRotationWeek || 1);
-      }
-
-      const membersResult = await GroupMembersService.getGroupMembers(groupId);
-      if (membersResult.success) {
-        setMembers(membersResult.members || []);
-      }
-
-      const earliestTaskDate = await getEarliestRecurringTaskDate();
-      setFirstTaskDate(earliestTaskDate);
-      
-      if (earliestTaskDate) {
-        const weekStart = new Date(earliestTaskDate);
-        weekStart.setUTCHours(0, 0, 0, 0);
-        
-        const weekEnd = new Date(weekStart);
-        weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
-        weekEnd.setUTCHours(23, 59, 59, 999);
-        
-        setWeekStartDate(weekStart);
-        setWeekEndDate(weekEnd);
-        
-        checkWeekSwapAvailability(earliestTaskDate);
-      } else {
-        setCanSwapWeek(false);
-        setWeekSwapReason('No recurring tasks found. Create a task first to enable week swaps.');
-        setWeekStartDate(null);
-        setWeekEndDate(null);
-      }
-
-      setLoadingMyTasks(true);
-      const myTasksResult = await TaskService.getMyTasks(groupId);
-      if (myTasksResult.success && myTasksResult.tasks) {
-        setMyAssignments(myTasksResult.tasks);
-      }
-      setLoadingMyTasks(false);
-
-      await fetchPendingVerificationsCount();
-
-    } catch (error) {
-      console.error('Error loading group data:', error);
-    } finally {
-      setLoadingStats(false);
-      setLoadingLeaderboard(false);
+    const groupResult = await GroupMembersService.getGroupInfo(groupId);
+    if (groupResult.success) {
+      setRotationWeek(groupResult.group?.currentRotationWeek || 1);
     }
-  };
+
+    const membersResult = await GroupMembersService.getGroupMembers(groupId);
+    if (membersResult.success) {
+      setMembers(membersResult.members || []);
+    }
+
+    const earliestTaskDate = await getEarliestRecurringTaskDate();
+    setFirstTaskDate(earliestTaskDate);
+    
+    if (earliestTaskDate) {
+      const weekStart = new Date(earliestTaskDate);
+      weekStart.setUTCHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setUTCDate(weekStart.getUTCDate() + 6);
+      weekEnd.setUTCHours(23, 59, 59, 999);
+      
+      setWeekStartDate(weekStart);
+      setWeekEndDate(weekEnd);
+      
+      // Don't call checkWeekSwapAvailability here yet - wait for myAssignments
+    } else {
+      setCanSwapWeek(false);
+      setWeekSwapReason('No recurring tasks found. Create a task first to enable week swaps.');
+      setWeekStartDate(null);
+      setWeekEndDate(null);
+    }
+
+    setLoadingMyTasks(true);
+    const myTasksResult = await TaskService.getMyTasks(groupId);
+    if (myTasksResult.success && myTasksResult.tasks) {
+      setMyAssignments(myTasksResult.tasks);
+    }
+    setLoadingMyTasks(false);
+
+    await fetchPendingVerificationsCount();
+
+  } catch (error) {
+    console.error('Error loading group data:', error);
+  } finally {
+    setLoadingStats(false);
+    setLoadingLeaderboard(false);
+  }
+};
 
   useEffect(() => {
     if (visible) { 

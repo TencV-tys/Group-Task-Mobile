@@ -390,72 +390,120 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     );
   };
 
-  // ✅ UPDATED TaskCard with PHT time conversion
-  const TaskCard = ({ task }: { task: any }) => {
-    const isCompleted = task.completed || task.assignment?.completed;
-    const isDueToday = task.isDueToday || task.assignment?.isDueToday;
-    const dueDate = new Date(task.dueDate || task.assignment?.dueDate);
-    const now = new Date();
-    const isOverdue = !isCompleted && dueDate < now;
-    
-    // Get time slot and convert to PHT
-    const timeSlot = task.timeSlot || task.assignment?.timeSlot;
-    const timeSlotDisplay = timeSlot ? formatTimeSlotToPHT(timeSlot) : '';
+  // ✅ UPDATED TaskCard - NO "Overdue" status
+const TaskCard = ({ task }: { task: any }) => {
+  const isCompleted = task.completed || task.assignment?.completed;
+  const isVerified = task.verified === true;
+  const isRejected = task.verified === false;
+  const isPendingVerification = task.photoUrl !== null && task.verified === null;
+  const isExpired = task.expired === true;
+  const isMissed = task.isMissed === true;
+  
+  const isDueToday = task.isDueToday || task.assignment?.isDueToday;
+  
+  // Determine status display (NO OVERDUE)
+  let statusText = '';
+  let statusColor = '';
+  let statusIcon = '';
+  
+  if (isVerified) {
+    statusText = 'Verified';
+    statusColor = '#2b8a3e';
+    statusIcon = 'check-circle';
+  } else if (isRejected) {
+    statusText = 'Rejected';
+    statusColor = theme.error;
+    statusIcon = 'close-circle';
+  } else if (isPendingVerification) {
+    statusText = 'Pending Review';
+    statusColor = theme.primary;
+    statusIcon = 'clock-check';
+  } else if (isExpired || isMissed) {
+    statusText = 'Missed';
+    statusColor = theme.error;
+    statusIcon = 'timer-off';
+  } else if (isCompleted) {
+    statusText = 'Completed';
+    statusColor = '#2b8a3e';
+    statusIcon = 'check-circle';
+  } else if (isDueToday) {
+    statusText = 'Due Today';
+    statusColor = theme.primary;
+    statusIcon = 'clock-alert';
+  } else {
+    // ✅ Default - just "Pending" (no Overdue)
+    statusText = 'Pending';
+    statusColor = theme.textSecondary;
+    statusIcon = 'clock-outline';
+  }
+  
+  // Get time slot and convert to PHT
+  const timeSlot = task.timeSlot || task.assignment?.timeSlot;
+  const timeSlotDisplay = timeSlot ? formatTimeSlotToPHT(timeSlot) : '';
 
-    return (
-      <TouchableOpacity
-        onPress={() => navigation.navigate('AssignmentDetails', { assignmentId: task.id || task.assignment?.id, isAdmin: false })}
-        activeOpacity={0.7}
+  return (
+    <TouchableOpacity
+      onPress={() => navigation.navigate('AssignmentDetails', { 
+        assignmentId: task.id || task.assignment?.id, 
+        isAdmin: false 
+      })}
+      activeOpacity={0.7}
+    >
+      <LinearGradient
+        colors={isCompleted || isVerified ? [theme.bgSecondary, theme.bgTertiary] : [theme.card, theme.bgSecondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.taskCard, { borderColor: theme.border }]}
       >
-        <LinearGradient
-          colors={isCompleted ? [theme.bgSecondary, theme.bgTertiary] : [theme.card, theme.bgSecondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.taskCard, { borderColor: theme.border }]}
-        >
-          <View style={styles.taskHeader}>
-            <LinearGradient
-              colors={isCompleted ? [theme.textMuted, theme.textMuted] : [theme.primary, theme.primaryDark]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.taskIcon}
-            >
-              <MaterialCommunityIcons name={isCompleted ? "check" : "format-list-checks"} size={20} color="#fff" />
-            </LinearGradient>
-            <View style={styles.taskInfo}>
-              <Text style={[styles.taskTitle, isCompleted && styles.completedTaskTitle, { color: isCompleted ? theme.textMuted : theme.text }]} numberOfLines={1}>
-                {task.title || task.taskTitle}
-              </Text>
-              <View style={styles.taskMeta}>
-                <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pointsBadge}>
-                  <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
-                  <Text style={[styles.pointsText, { color: theme.primary }]}>{task.points || task.assignment?.points || 0} pts</Text>
-                </LinearGradient>
-                {isDueToday && !isCompleted && (
-                  <LinearGradient colors={[theme.error, theme.error]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.dueBadge}>
-                    <Text style={styles.dueBadgeText}>Due Today</Text>
-                  </LinearGradient>
-                )}
-                {isOverdue && !isCompleted && (
-                  <LinearGradient colors={[theme.primary, theme.primaryDark]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.dueBadge}>
-                    <Text style={styles.dueBadgeText}>Overdue</Text>
-                  </LinearGradient>
-                )}
-              </View>
+        <View style={styles.taskHeader}>
+          <LinearGradient
+            colors={isCompleted || isVerified ? [theme.textMuted, theme.textMuted] : [theme.primary, theme.primaryDark]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.taskIcon}
+          >
+            <MaterialCommunityIcons 
+              name={isCompleted || isVerified ? "check" : "format-list-checks"} 
+              size={20} 
+              color="#fff" 
+            />
+          </LinearGradient>
+          <View style={styles.taskInfo}>
+            <Text style={[styles.taskTitle, (isCompleted || isVerified) && styles.completedTaskTitle, { color: (isCompleted || isVerified) ? theme.textMuted : theme.text }]} numberOfLines={1}>
+              {task.title || task.taskTitle}
+            </Text>
+            <View style={styles.taskMeta}>
+              <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pointsBadge}>
+                <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                <Text style={[styles.pointsText, { color: theme.primary }]}>{task.points || task.assignment?.points || 0} pts</Text>
+              </LinearGradient>
+              
+              {/* Status Badge */}
+              <LinearGradient 
+                colors={[statusColor + '20', statusColor + '10']} 
+                start={{ x: 0, y: 0 }} 
+                end={{ x: 1, y: 1 }} 
+                style={styles.statusBadge}
+              >
+                <MaterialCommunityIcons name={statusIcon as any} size={10} color={statusColor} />
+                <Text style={[styles.statusBadgeText, { color: statusColor }]}>{statusText}</Text>
+              </LinearGradient>
             </View>
           </View>
-          {timeSlotDisplay && (
-            <View style={[styles.timeSlotContainer, { backgroundColor: theme.bgSecondary }]}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
-              <Text style={[styles.timeSlotText, { color: theme.textSecondary }]}>
-                {timeSlotDisplay}
-              </Text>
-            </View>
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
-    );
-  };
+        </View>
+        
+        {timeSlotDisplay && (
+          <View style={[styles.timeSlotContainer, { backgroundColor: theme.bgSecondary }]}>
+            <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+            <Text style={[styles.timeSlotText, { color: theme.textSecondary }]}>
+              {timeSlotDisplay}
+            </Text>
+          </View>
+        )}
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+};
 
   if (loading && !refreshing) {
     return (

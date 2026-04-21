@@ -31,17 +31,17 @@ const isDueTodayUTC = (dueDate: string) => {
 };
 
 const getAssignmentStatus = (assignment: any, theme: any) => {
-  // 1. Verified
+  // ✅ 1. Verified
   if (assignment.verified === true) {
     return { 
       status: 'verified', 
-      color: theme.primary, 
+      color: '#2b8a3e',  // Green
       icon: 'check-circle',
       text: 'Verified'
     };
   }
   
-  // 2. Rejected
+  // ✅ 2. Rejected
   if (assignment.verified === false) {
     return { 
       status: 'rejected', 
@@ -51,7 +51,17 @@ const getAssignmentStatus = (assignment: any, theme: any) => {
     };
   }
   
-  // 3. Expired
+  // ✅ 3. Pending Review (has photo, not verified yet)
+  if (assignment.photoUrl !== null && assignment.verified === null) {
+    return { 
+      status: 'pending_verification', 
+      color: theme.primary, 
+      icon: 'clock-check',
+      text: 'Pending Review'
+    };
+  }
+  
+  // ✅ 4. Expired
   if (assignment.expired === true) {
     return { 
       status: 'expired', 
@@ -61,7 +71,7 @@ const getAssignmentStatus = (assignment: any, theme: any) => {
     };
   }
   
-  // 4. Missed
+  // ✅ 5. Missed
   const missedSlotIds = assignment.missedTimeSlotIds || [];
   const currentTimeSlotId = assignment.timeSlot?.id;
   if (currentTimeSlotId && missedSlotIds.includes(currentTimeSlotId)) {
@@ -73,41 +83,7 @@ const getAssignmentStatus = (assignment: any, theme: any) => {
     };
   }
   
-  // 5. Pending Verification (submitted but not verified)
-  if (assignment.completed === true && assignment.verified === null) {
-    return { 
-      status: 'pending_verification', 
-      color: theme.primary, 
-      icon: 'clock-check',
-      text: 'Pending'
-    };
-  }
-  
-  // 6. Completed (fully done)
-  if (assignment.completed === true) {
-    return { 
-      status: 'completed', 
-      color: theme.primary, 
-      icon: 'check-circle',
-      text: 'Completed'
-    };
-  }
-  
-  // 7. Overdue
-  const dueDate = new Date(assignment.dueDate);
-  const now = new Date();
-  const isOverdue = dueDate < now;
-  
-  if (isOverdue) {
-    return { 
-      status: 'overdue', 
-      color: theme.error, 
-      icon: 'alert-circle',
-      text: 'Overdue'
-    };
-  }
-  
-  // 8. Due Today
+  // ✅ 6. Due Today (active, can submit)
   const dueToday = isDueTodayUTC(assignment.dueDate);
   if (dueToday) {
     return { 
@@ -118,7 +94,7 @@ const getAssignmentStatus = (assignment: any, theme: any) => {
     };
   }
   
-  // 9. Default - Pending
+  // ✅ 7. Default - Pending
   return { 
     status: 'pending', 
     color: theme.textSecondary, 
@@ -224,117 +200,111 @@ export default function TodayAssignmentsScreen({ navigation, route }: any) {
   };
 
   const renderAssignment = ({ item }: { item: TodayAssignment }) => {
-    // Get status using the same function as TaskDetailsScreen
-    const status = getAssignmentStatus(item, theme);
-    const timeLeft = item.timeLeft;
-    const isUrgent = timeLeft ? timeLeft < 300 : false;
-    const isLate = item.willBePenalized ?? false;
-    
-    // Get gradient colors based on status
-    const getGradientColors = (): [string, string] => {
-      if (status.status === 'verified' || status.status === 'completed') {
-        return [theme.primaryLight, theme.primaryLight];
-      }
-      if (status.status === 'expired' || status.status === 'missed' || status.status === 'rejected') {
-        return [theme.errorBg, theme.errorBg];
-      }
-      if (isLate) {
-        return [theme.primaryLight, theme.primaryLight];
-      }
-      if (isUrgent) {
-        return [theme.errorBg, theme.errorBg];
-      }
-      if (item.canSubmit) {
-        return [theme.primaryLight, theme.primaryLight];
-      }
-      return [theme.card, theme.bgSecondary];
-    };
-
-    return (
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => handleViewAssignment(item.id)}
-      >
-        <LinearGradient
-          colors={getGradientColors()}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[
-            styles.assignmentCard,
-            { borderColor: theme.border }
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View style={styles.taskInfo}>
-              <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
-                {item.taskTitle}
-              </Text>
-              <Text style={[styles.groupName, { color: theme.textMuted }]}>{item.group?.name || 'Unknown Group'}</Text>
-            </View>
-            
-            {/* ✅ Status Badge - matches TaskDetailsScreen */}
-            <LinearGradient
-              colors={[status.color + '20', status.color + '10']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.statusBadge}
-            >
-              <MaterialCommunityIcons name={status.icon as any} size={14} color={status.color} />
-              <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
-            </LinearGradient>
-          </View>
-
-          <View style={styles.detailsRow}>
-            <View style={styles.timeSlot}>
-              <MaterialCommunityIcons name="clock" size={16} color={theme.textMuted} />
-              <Text style={[styles.timeSlotText, { color: theme.textSecondary }]}>
-                {item.timeSlot 
-                  ? `${item.timeSlot.startTime} - ${item.timeSlot.endTime}`
-                  : 'Anytime today'}
-              </Text>
-            </View>
-
-            <LinearGradient
-              colors={[theme.primaryLight, theme.primaryLight]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.pointsBadge}
-            >
-              <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
-              <Text style={[styles.pointsText, { color: theme.primary }]}>
-                {item.finalPoints || item.taskPoints} pts
-                {item.willBePenalized && item.finalPoints && (
-                  <Text style={[styles.penaltyText, { color: theme.error }]}> (-{item.taskPoints - item.finalPoints})</Text>
-                )}
-              </Text>
-            </LinearGradient>
-          </View>
-
-          {item.timeLeft !== undefined && item.timeLeft > 0 && status.status === 'due_today' && (
-            <LinearGradient
-              colors={isUrgent ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.timerContainer, { borderColor: theme.border }]}
-            >
-              <MaterialCommunityIcons 
-                name={isUrgent ? "timer-alert" : "timer"} 
-                size={16} 
-                color={isUrgent ? theme.error : theme.primary} 
-              />
-              <Text style={[styles.timerText, isUrgent && styles.urgentTimerText, { color: isUrgent ? theme.error : theme.primary }]}>
-                {formatTimeLeft(item.timeLeft)} left
-              </Text>
-            </LinearGradient>
-          )}
-
-          {item.reason && !item.canSubmit && status.status !== 'expired' && status.status !== 'verified' && (
-            <Text style={[styles.reasonText, { color: theme.textMuted }]}>{item.reason}</Text>
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
-    );
+  const status = getAssignmentStatus(item, theme);
+  const timeLeft = item.timeLeft;
+  const isUrgent = timeLeft ? timeLeft < 300 : false;
+  const isLate = item.willBePenalized ?? false;
+  
+  const getGradientColors = (): [string, string] => {
+    if (status.status === 'verified' || status.status === 'completed') {
+      return [theme.primaryLight, theme.primaryLight];
+    }
+    if (status.status === 'expired' || status.status === 'missed' || status.status === 'rejected') {
+      return [theme.errorBg, theme.errorBg];
+    }
+    if (isLate) {
+      return [theme.primaryLight, theme.primaryLight];
+    }
+    if (isUrgent) {
+      return [theme.errorBg, theme.errorBg];
+    }
+    if (item.canSubmit) {
+      return [theme.primaryLight, theme.primaryLight];
+    }
+    return [theme.card, theme.bgSecondary];
   };
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={() => handleViewAssignment(item.id)}
+    >
+      <LinearGradient
+        colors={getGradientColors()}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.assignmentCard, { borderColor: theme.border }]}
+      >
+        <View style={styles.cardHeader}>
+          <View style={styles.taskInfo}>
+            <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
+              {item.taskTitle}
+            </Text>
+            <Text style={[styles.groupName, { color: theme.textMuted }]}>{item.group?.name || 'Unknown Group'}</Text>
+          </View>
+          
+          <LinearGradient
+            colors={[status.color + '20', status.color + '10']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.statusBadge}
+          >
+            <MaterialCommunityIcons name={status.icon as any} size={14} color={status.color} />
+            <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
+          </LinearGradient>
+        </View>
+
+        <View style={styles.detailsRow}>
+          <View style={styles.timeSlot}>
+            <MaterialCommunityIcons name="clock" size={16} color={theme.textMuted} />
+            <Text style={[styles.timeSlotText, { color: theme.textSecondary }]}>
+              {item.timeSlot 
+                ? `${item.timeSlot.startTime} - ${item.timeSlot.endTime}`
+                : 'Anytime today'}
+            </Text>
+          </View>
+
+          <LinearGradient
+            colors={[theme.primaryLight, theme.primaryLight]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.pointsBadge}
+          >
+            <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
+            <Text style={[styles.pointsText, { color: theme.primary }]}>
+              {item.finalPoints || item.taskPoints} pts
+              {item.willBePenalized && item.finalPoints && (
+                <Text style={[styles.penaltyText, { color: theme.error }]}> (-{item.taskPoints - item.finalPoints})</Text>
+              )}
+            </Text>
+          </LinearGradient>
+        </View>
+
+        {item.timeLeft !== undefined && item.timeLeft > 0 && status.status === 'due_today' && (
+          <LinearGradient
+            colors={isUrgent ? [theme.errorBg, theme.errorBg] : [theme.primaryLight, theme.primaryLight]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.timerContainer, { borderColor: theme.border }]}
+          >
+            <MaterialCommunityIcons 
+              name={isUrgent ? "timer-alert" : "timer"} 
+              size={16} 
+              color={isUrgent ? theme.error : theme.primary} 
+            />
+            <Text style={[styles.timerText, isUrgent && styles.urgentTimerText, { color: isUrgent ? theme.error : theme.primary }]}>
+              {formatTimeLeft(item.timeLeft)} left
+            </Text>
+          </LinearGradient>
+        )}
+
+        {item.reason && !item.canSubmit && status.status !== 'expired' && status.status !== 'verified' && (
+          <Text style={[styles.reasonText, { color: theme.textMuted }]}>{item.reason}</Text>
+        )}
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+};
 
   const renderHeader = () => (
     <LinearGradient

@@ -719,7 +719,7 @@ const getVerificationStatus = (assignment: any) => {
   );
 };
 
-// ===== MY ASSIGNMENTS (CURRENT WEEK) - FIXED SORTING =====
+// ===== MY ASSIGNMENTS (CURRENT WEEK) - SORT: TODAY FIRST, THEN FUTURE, THEN PAST =====
 const renderAllWeekAssignments = () => {
   const currentWeek = task?.group?.currentRotationWeek || 1;
   
@@ -735,16 +735,44 @@ const renderAllWeekAssignments = () => {
   
   if (allWeekAssignments.length === 0) return null;
   
-  // ✅ FIXED: Sort assignments by dueDate first (not by formatted string)
+  // Get current UTC date for prioritization
+  const now = new Date();
+  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const todayDateKey = new Date(todayUTC).toISOString().split('T')[0];
+  
+  // ✅ Sort assignments: TODAY first, then FUTURE days, then PAST days at bottom
   const sortedAssignments = [...allWeekAssignments].sort((a, b) => {
-    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    const dueDateA = new Date(a.dueDate);
+    const dueDateB = new Date(b.dueDate);
+    const dueUTC_A = Date.UTC(dueDateA.getUTCFullYear(), dueDateA.getUTCMonth(), dueDateA.getUTCDate());
+    const dueUTC_B = Date.UTC(dueDateB.getUTCFullYear(), dueDateB.getUTCMonth(), dueDateB.getUTCDate());
+    
+    const isTodayA = dueUTC_A === todayUTC;
+    const isTodayB = dueUTC_B === todayUTC;
+    const isFutureA = dueUTC_A > todayUTC;
+    const isFutureB = dueUTC_B > todayUTC;
+    const isPastA = dueUTC_A < todayUTC;
+    const isPastB = dueUTC_B < todayUTC;
+    
+    // TODAY comes first
+    if (isTodayA && !isTodayB) return -1;
+    if (!isTodayA && isTodayB) return 1;
+    
+    // Then FUTURE days (earliest first)
+    if (isFutureA && isFutureB) return dueUTC_A - dueUTC_B;
+    if (isFutureA && !isFutureB) return -1;
+    if (!isFutureA && isFutureB) return 1;
+    
+    // Then PAST days at the bottom (latest first, so recent past shows before older)
+    if (isPastA && isPastB) return dueUTC_B - dueUTC_A;
+    
+    return 0;
   });
   
   const groupedByDay = new Map();
   
   sortedAssignments.forEach((assignment: any) => {
     const dueDate = new Date(assignment.dueDate);
-    // Use UTC date string for grouping (YYYY-MM-DD format for proper sorting)
     const dateKey = dueDate.toISOString().split('T')[0];
     const dayKey = formatUTCDate(assignment.dueDate);
     const dayName = dueDate.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
@@ -760,9 +788,28 @@ const renderAllWeekAssignments = () => {
     groupedByDay.get(dateKey).assignments.push(assignment);
   });
   
-  // ✅ FIXED: Sort days by actual date (dateKey), not display string
+  // Sort days: TODAY first, then FUTURE days, then PAST days at bottom
   const groupedDays = Array.from(groupedByDay.values()).sort((a, b) => {
-    return a.dateKey.localeCompare(b.dateKey);
+    const isTodayA = a.dateKey === todayDateKey;
+    const isTodayB = b.dateKey === todayDateKey;
+    const isFutureA = a.dateKey > todayDateKey;
+    const isFutureB = b.dateKey > todayDateKey;
+    const isPastA = a.dateKey < todayDateKey;
+    const isPastB = b.dateKey < todayDateKey;
+    
+    // TODAY first
+    if (isTodayA && !isTodayB) return -1;
+    if (!isTodayA && isTodayB) return 1;
+    
+    // Then FUTURE days (ascending - earliest future first)
+    if (isFutureA && isFutureB) return a.dateKey.localeCompare(b.dateKey);
+    if (isFutureA && !isFutureB) return -1;
+    if (!isFutureA && isFutureB) return 1;
+    
+    // Then PAST days at the bottom (descending - most recent past first)
+    if (isPastA && isPastB) return b.dateKey.localeCompare(a.dateKey);
+    
+    return 0;
   });
   
   return (
@@ -777,7 +824,7 @@ const renderAllWeekAssignments = () => {
       </View>
       
       {groupedDays.map((dayGroup: any, dayIndex: number) => {
-        const isToday = isDueTodayUTC(dayGroup.assignments[0].dueDate);
+        const isToday = dayGroup.dateKey === todayDateKey;
         
         return (
           <View key={dayIndex} style={styles.dayGroupContainer}>
@@ -945,7 +992,7 @@ const renderAllWeekAssignments = () => {
     );
   };
 
-  // ===== ADMIN VIEW - FIXED WITH SORTING =====
+  // ===== ADMIN VIEW - SORT: TODAY FIRST, THEN FUTURE, THEN PAST =====
 const renderAdminView = () => {
   const currentWeek = task?.group?.currentRotationWeek || 1;
   
@@ -976,12 +1023,41 @@ const renderAdminView = () => {
     );
   }
   
-  // ✅ FIXED: Sort assignments by dueDate (earliest first)
+  // Get current UTC date for prioritization
+  const now = new Date();
+  const todayUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const todayDateKey = new Date(todayUTC).toISOString().split('T')[0];
+  
+  // ✅ Sort assignments: TODAY first, then FUTURE days, then PAST days at bottom
   const sortedAssignments = [...allAdminAssignments].sort((a, b) => {
-    return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    const dueDateA = new Date(a.dueDate);
+    const dueDateB = new Date(b.dueDate);
+    const dueUTC_A = Date.UTC(dueDateA.getUTCFullYear(), dueDateA.getUTCMonth(), dueDateA.getUTCDate());
+    const dueUTC_B = Date.UTC(dueDateB.getUTCFullYear(), dueDateB.getUTCMonth(), dueDateB.getUTCDate());
+    
+    const isTodayA = dueUTC_A === todayUTC;
+    const isTodayB = dueUTC_B === todayUTC;
+    const isFutureA = dueUTC_A > todayUTC;
+    const isFutureB = dueUTC_B > todayUTC;
+    const isPastA = dueUTC_A < todayUTC;
+    const isPastB = dueUTC_B < todayUTC;
+    
+    // TODAY comes first
+    if (isTodayA && !isTodayB) return -1;
+    if (!isTodayA && isTodayB) return 1;
+    
+    // Then FUTURE days (earliest first)
+    if (isFutureA && isFutureB) return dueUTC_A - dueUTC_B;
+    if (isFutureA && !isFutureB) return -1;
+    if (!isFutureA && isFutureB) return 1;
+    
+    // Then PAST days at the bottom (latest first, so recent past shows before older)
+    if (isPastA && isPastB) return dueUTC_B - dueUTC_A;
+    
+    return 0;
   });
   
-  // ✅ Group by day for better organization
+  // Group by day
   const groupedByDay = new Map();
   
   sortedAssignments.forEach((assignment: any) => {
@@ -1001,9 +1077,28 @@ const renderAdminView = () => {
     groupedByDay.get(dateKey).assignments.push(assignment);
   });
   
-  // Sort days by date
+  // Sort days: TODAY first, then FUTURE days, then PAST days at bottom
   const groupedDays = Array.from(groupedByDay.values()).sort((a, b) => {
-    return a.dateKey.localeCompare(b.dateKey);
+    const isTodayA = a.dateKey === todayDateKey;
+    const isTodayB = b.dateKey === todayDateKey;
+    const isFutureA = a.dateKey > todayDateKey;
+    const isFutureB = b.dateKey > todayDateKey;
+    const isPastA = a.dateKey < todayDateKey;
+    const isPastB = b.dateKey < todayDateKey;
+    
+    // TODAY first
+    if (isTodayA && !isTodayB) return -1;
+    if (!isTodayA && isTodayB) return 1;
+    
+    // Then FUTURE days (ascending - earliest future first)
+    if (isFutureA && isFutureB) return a.dateKey.localeCompare(b.dateKey);
+    if (isFutureA && !isFutureB) return -1;
+    if (!isFutureA && isFutureB) return 1;
+    
+    // Then PAST days at the bottom (descending - most recent past first)
+    if (isPastA && isPastB) return b.dateKey.localeCompare(a.dateKey);
+    
+    return 0;
   });
   
   return (
@@ -1027,7 +1122,7 @@ const renderAdminView = () => {
 
       <View style={styles.assignmentsContainer}>
         {groupedDays.map((dayGroup: any, dayIndex: number) => {
-          const isToday = isDueTodayUTC(dayGroup.assignments[0].dueDate);
+          const isToday = dayGroup.dateKey === todayDateKey;
           
           return (
             <View key={dayIndex} style={styles.dayGroupContainer}>

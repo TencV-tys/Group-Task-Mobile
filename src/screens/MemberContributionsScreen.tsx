@@ -1,4 +1,5 @@
-// src/screens/MemberContributionsScreen.tsx - Without Time Slot Parsing
+// src/screens/MemberContributionsScreen.tsx - FULLY UPDATED
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -110,6 +111,25 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     }
   };
 
+
+  useEffect(() => {
+  if (data?.weeks) {
+    console.log('🔍 DEBUG: Weeks data from API:');
+    data.weeks.forEach((week: any) => {
+      console.log(`Week ${week.week}:`);
+      week.assignments.forEach((assignment: any) => {
+        console.log(`  - ${assignment.taskTitle}:`, {
+          verified: assignment.verified,
+          photoUrl: assignment.photoUrl,
+          completed: assignment.completed,
+          isMissed: assignment.isMissed,
+          expired: assignment.expired
+        });
+      });
+    });
+  }
+}, [data]);
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
@@ -190,29 +210,39 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
     const summary = data.summary;
     const weeks = data?.weeks || [];
     
-    let activeAssignmentsCount = 0;
     let verifiedSlotsCount = 0;
-    let expiredSlotsCount = 0;
-    let pendingSlotsCount = 0;
+    let pendingReviewCount = 0;
+    let notStartedCount = 0;
     let rejectedSlotsCount = 0;
+    let expiredSlotsCount = 0;
     
     weeks.forEach((week: any) => {
       week.assignments.forEach((assignment: any) => {
-        if (assignment.verified === true) verifiedSlotsCount++;
-        else if (assignment.verified === false) rejectedSlotsCount++;
-        else if (assignment.completed === true && assignment.verified === null) pendingSlotsCount++;
-        
-        const isExpired = assignment.isMissed === true || assignment.expired === true;
-        if (isExpired && !assignment.verified) {
-          expiredSlotsCount++;
-        } else {
-          activeAssignmentsCount++;
+        if (assignment.verified === true) {
+          verifiedSlotsCount++;
+        } 
+        else if (assignment.verified === false) {
+          rejectedSlotsCount++;
+        } 
+        // ✅ Pending Review = has photo, not verified
+        else if (assignment.photoUrl !== null && assignment.verified === null) {
+          pendingReviewCount++;
+        } 
+        // ✅ Not Started = no submission, not completed, not expired
+        else if (!assignment.completed && !assignment.isMissed && !assignment.expired && !assignment.photoUrl) {
+          notStartedCount++;
+        }
+        else {
+          const isExpired = assignment.isMissed === true || assignment.expired === true;
+          if (isExpired && !assignment.verified) {
+            expiredSlotsCount++;
+          }
         }
       });
     });
-    
-    const completionRate = activeAssignmentsCount > 0 
-      ? Math.round((verifiedSlotsCount / activeAssignmentsCount) * 100) : 0;
+
+    const totalActive = verifiedSlotsCount + pendingReviewCount + notStartedCount;
+    const completionRate = totalActive > 0 ? Math.round((verifiedSlotsCount / totalActive) * 100) : 0;
 
     return (
       <LinearGradient
@@ -233,9 +263,16 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
           
           <View style={styles.statBox}>
             <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
-              <Text style={[styles.statNumber, { color: theme.textSecondary }]}>{pendingSlotsCount}</Text>
+              <Text style={[styles.statNumber, { color: theme.textSecondary }]}>{pendingReviewCount}</Text>
             </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Submitted</Text>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Pending Review</Text>
+          </View>
+          
+          <View style={styles.statBox}>
+            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
+              <Text style={[styles.statNumber, { color: theme.textSecondary }]}>{notStartedCount}</Text>
+            </LinearGradient>
+            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Not Started</Text>
           </View>
           
           <View style={styles.statBox}>
@@ -267,7 +304,7 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
           </View>
           <View style={[styles.statsDividerVertical, { backgroundColor: theme.border }]} />
           <View style={styles.statsRowItem}>
-            <Text style={[styles.statsRowValue, { color: theme.text }]}>{activeAssignmentsCount}</Text>
+            <Text style={[styles.statsRowValue, { color: theme.text }]}>{totalActive}</Text>
             <Text style={[styles.statsRowLabel, { color: theme.textMuted }]}>Active Slots</Text>
           </View>
         </View>
@@ -278,14 +315,17 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
   const renderWeekDetails = (week: any) => {
     const isExpanded = selectedWeek === week.week;
     
+    // ✅ Separate counts
     const verifiedCount = week.assignments.filter((a: any) => a.verified === true).length;
-    const pendingCount = week.assignments.filter((a: any) => a.completed === true && a.verified === null).length;
+    const pendingReviewCount = week.assignments.filter((a: any) => 
+      a.photoUrl !== null && a.verified === null
+    ).length;
+    const notStartedCount = week.assignments.filter((a: any) => 
+      !a.completed && !a.isMissed && !a.expired && !a.photoUrl && a.verified !== true && a.verified !== false
+    ).length;
     const rejectedCount = week.assignments.filter((a: any) => a.verified === false).length;
     const expiredCount = week.assignments.filter((a: any) => 
       (a.isMissed === true || a.expired === true) && !a.verified
-    ).length;
-    const notStartedCount = week.assignments.filter((a: any) => 
-      !a.completed && !a.isMissed && !a.expired
     ).length;
 
     return (
@@ -313,10 +353,17 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
               <Text style={[styles.statusChipText, { color: theme.primary }]}>{verifiedCount}</Text>
             </View>
             
-            {pendingCount > 0 && (
+            {pendingReviewCount > 0 && (
               <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
-                <MaterialCommunityIcons name="clock-check" size={12} color={theme.textSecondary} />
-                <Text style={[styles.statusChipText, { color: theme.textSecondary }]}>{pendingCount}</Text>
+                <MaterialCommunityIcons name="clock-check" size={12} color={theme.primary} />
+                <Text style={[styles.statusChipText, { color: theme.primary }]}>{pendingReviewCount}</Text>
+              </View>
+            )}
+            
+            {notStartedCount > 0 && (
+              <View style={[styles.statusChip, { backgroundColor: theme.bgTertiary }]}>
+                <MaterialCommunityIcons name="clock-outline" size={12} color={theme.textMuted} />
+                <Text style={[styles.statusChipText, { color: theme.textMuted }]}>{notStartedCount}</Text>
               </View>
             )}
             
@@ -334,13 +381,6 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
               </View>
             )}
             
-            {notStartedCount > 0 && (
-              <View style={[styles.statusChip, { backgroundColor: theme.bgTertiary }]}>
-                <MaterialCommunityIcons name="clock-outline" size={12} color={theme.textMuted} />
-                <Text style={[styles.statusChipText, { color: theme.textMuted }]}>{notStartedCount}</Text>
-              </View>
-            )}
-            
             <View style={[styles.statusChip, { backgroundColor: theme.primaryLight }]}>
               <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
               <Text style={[styles.statusChipText, { color: theme.primary }]}>{week.earnedPoints}</Text>
@@ -354,7 +394,11 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
               const isExpired = (assignment.isMissed === true || assignment.expired === true) && !assignment.verified;
               const isVerified = assignment.verified === true;
               const isRejected = assignment.verified === false;
-              const isPending = assignment.completed === true && assignment.verified === null;
+              // ✅ Pending Review = has photo, waiting for admin
+              const isPendingReview = (assignment.photoUrl !== null && assignment.verified === null);
+              // ✅ Not Started = no submission, not completed, not expired
+              const isNotStarted = !assignment.completed && !assignment.isMissed && !assignment.expired && 
+                                   !assignment.photoUrl && assignment.verified !== true && assignment.verified !== false;
               
               let statusGradient: [string, string];
               let statusIcon: string;
@@ -371,20 +415,25 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
                 statusIcon = 'close-circle';
                 statusText = 'Rejected';
                 statusColor = theme.error;
-              } else if (isPending) {
+              } else if (isPendingReview) {
                 statusGradient = [theme.primaryLight, theme.primaryLight];
                 statusIcon = 'clock-check';
                 statusText = 'Pending Review';
-                statusColor = theme.textSecondary;
+                statusColor = theme.primary;
               } else if (isExpired) {
                 statusGradient = [theme.bgTertiary, theme.bgTertiary];
                 statusIcon = 'clock-alert';
                 statusText = 'Missed';
                 statusColor = theme.textMuted;
-              } else {
+              } else if (isNotStarted) {
                 statusGradient = [theme.bgSecondary, theme.bgTertiary];
                 statusIcon = 'clock-outline';
                 statusText = 'Not Started';
+                statusColor = theme.textMuted;
+              } else {
+                statusGradient = [theme.bgSecondary, theme.bgTertiary];
+                statusIcon = 'clock-outline';
+                statusText = 'Pending';
                 statusColor = theme.textMuted;
               }
               

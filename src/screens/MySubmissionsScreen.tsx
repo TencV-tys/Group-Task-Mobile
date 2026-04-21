@@ -1,4 +1,4 @@
-// src/screens/MySubmissionsScreen.tsx - CORRECTED VERSION
+// src/screens/MySubmissionsScreen.tsx - WITH PHT TIME CONVERSION
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -22,6 +22,22 @@ import { useTheme } from '../context/ThemeContext';
 import { formatUTCDate } from '../utils/timeUtils';
 
 const PAGE_SIZE = 20;
+
+// ✅ Helper function to convert 24h time to 12h AM/PM format (PHT)
+const formatTo12Hour = (time24: string) => {
+  if (!time24) return '';
+  const [hours, minutes] = time24.split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  const minutesStr = minutes?.toString().padStart(2, '0') || '00';
+  return `${hours12}:${minutesStr} ${period}`;
+};
+
+// ✅ Helper to format time slot to PHT display
+const formatTimeSlotToPHT = (timeSlot: any) => {
+  if (!timeSlot) return '';
+  return `${formatTo12Hour(timeSlot.startTime)} - ${formatTo12Hour(timeSlot.endTime)}`;
+};
 
 export default function MySubmissionsScreen({ navigation, route }: any) {
   const { theme, isDark } = useTheme();
@@ -62,7 +78,7 @@ export default function MySubmissionsScreen({ navigation, route }: any) {
     fetchStats();
   }, [filter]);
 
- const fetchStats = async () => {
+const fetchStats = async () => {
   try {
     const user = await TokenUtils.getUser();
     if (!user) return;
@@ -72,17 +88,14 @@ export default function MySubmissionsScreen({ navigation, route }: any) {
     if (result.success && result.data?.assignments) {
       const assignments = result.data.assignments;
       
-      // ✅ PENDING = submitted but not verified (completed=true, verified=null)
       const pending = assignments.filter((a: any) => 
-        a.completed === true && a.verified === null
+        a.photoUrl !== null && a.verified === null
       ).length;
       
-      // ✅ VERIFIED = verified === true
       const verified = assignments.filter((a: any) => 
         a.verified === true
       ).length;
       
-      // ✅ REJECTED = verified === false
       const rejected = assignments.filter((a: any) => 
         a.verified === false
       ).length;
@@ -141,12 +154,11 @@ const fetchSubmissions = async (page: number, reset = false) => {
     if (result.success && result.data?.assignments) {
       let assignments = result.data.assignments;
       
-      // ✅ Apply client-side filtering based on the selected tab
       if (filter === 'pending') {
         assignments = assignments.filter((a: any) => 
-          a.completed === true && a.verified === null
+          a.photoUrl !== null && a.verified === null
         );
-        console.log(`📊 Pending filter: ${assignments.length} assignments after filtering`);
+        console.log(`📊 Pending filter: ${assignments.length} assignments (has photo, not verified)`);
       } else if (filter === 'verified') {
         assignments = assignments.filter((a: any) => a.verified === true);
         console.log(`📊 Verified filter: ${assignments.length} assignments`);
@@ -155,16 +167,12 @@ const fetchSubmissions = async (page: number, reset = false) => {
         console.log(`📊 Rejected filter: ${assignments.length} assignments`);
       }
       
-      // ✅ For pending, we need to get the total from the server differently
-      // Since we're filtering client-side, we can't use result.data.total accurately
       let total = 0;
       if (filter === 'pending') {
-        // Get all assignments to count pending (this is a workaround)
-        // Better: Add a dedicated endpoint for pending count
         const allResult = await AssignmentService.getUserAssignments(user.id);
         if (allResult.success && allResult.data?.assignments) {
           total = allResult.data.assignments.filter((a: any) => 
-            a.completed === true && a.verified === null
+            a.photoUrl !== null && a.verified === null
           ).length;
         }
       } else {
@@ -179,6 +187,8 @@ const fetchSubmissions = async (page: number, reset = false) => {
         ...assignment,
         uniqueKey: `${assignment.id}-${filter}-${page}-${idx}`,
         dueDateFormatted: formatUTCDate(assignment.dueDate),
+        // ✅ Format time slot to PHT if exists
+        timeSlotFormatted: assignment.timeSlot ? formatTimeSlotToPHT(assignment.timeSlot) : null,
         status: filter === 'pending' ? 'pending_verification' : 
                 filter === 'verified' ? 'verified' : 'rejected',
         statusText: filter === 'pending' ? 'Pending Verification' :
@@ -212,16 +222,13 @@ const fetchSubmissions = async (page: number, reset = false) => {
   }
 };
 
-
 useEffect(() => {
   return () => {
-    // Cleanup on unmount
     isLoadingRef.current = false;
     setSubmissions([]);
     setStats(null);
   };
 }, []);
-
 
   const handleLoadMore = useCallback(() => {
     if (loadingMore || !hasMore || loading || refreshing) return;
@@ -375,11 +382,12 @@ useEffect(() => {
           <Text style={[styles.detailText, { color: theme.textSecondary }]}>{item.points} pts</Text>
         </View>
         
-        {item.timeSlot && (
+        {/* ✅ Display time slot in PHT format (12-hour with AM/PM) */}
+        {item.timeSlotFormatted && (
           <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
             <MaterialCommunityIcons name="clock" size={14} color={theme.textMuted} />
             <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-              {item.timeSlot.startTime} - {item.timeSlot.endTime}
+              {item.timeSlotFormatted}
             </Text>
           </View>
         )}
@@ -475,33 +483,32 @@ useEffect(() => {
           </TouchableOpacity>
         </View>
       ) : (
-         <FlatList
-  data={submissions}
-  renderItem={renderSubmissionItem}
-  keyExtractor={(item, index) => {
-    // ✅ Use the uniqueKey we created, or fallback to id + index
-    if (item.uniqueKey) {
-      return item.uniqueKey;
-    }
-    if (item.id) {
-      return `${item.id}-${filter}-${index}`;
-    }
-    return `fallback-${Date.now()}-${index}`;
-  }}
-  refreshControl={
-    <RefreshControl
-      refreshing={refreshing}
-      onRefresh={handleRefresh}
-      colors={[theme.primary]}
-      tintColor={theme.primary}
-    />
-  }
-  onEndReached={handleLoadMore}
-  onEndReachedThreshold={0.3}
-  ListFooterComponent={renderFooter}
-  ListEmptyComponent={renderEmpty}
-  contentContainerStyle={styles.listContainer}
-/>
+        <FlatList
+          data={submissions}
+          renderItem={renderSubmissionItem}
+          keyExtractor={(item, index) => {
+            if (item.uniqueKey) {
+              return item.uniqueKey;
+            }
+            if (item.id) {
+              return `${item.id}-${filter}-${index}`;
+            }
+            return `fallback-${Date.now()}-${index}`;
+          }}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={[theme.primary]}
+              tintColor={theme.primary}
+            />
+          }
+          onEndReached={handleLoadMore}
+          onEndReachedThreshold={0.3}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={styles.listContainer}
+        />
       )}
     </ScreenWrapper>
   );

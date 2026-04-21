@@ -509,7 +509,7 @@ export const useCompleteAssignment = (
     formatTime,
     getTimeStatusMessage,
     
-    // Actions
+    // Actions 
     pickImage,
     takePhoto,
     submitCompletion,

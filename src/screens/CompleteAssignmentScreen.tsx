@@ -441,7 +441,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
   const isSubmitDisabled = hasSubmitted || submitting || !isSubmittable || isTimeSlotAlreadyCompleted || 
     (needsManualSelection && !selectedTimeSlotId);
   // ✅ Render loading state while checking status
-  if (checkingStatus) {
+  if (checkingStatus) { 
     return (
       <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
         {renderHeader()}
@@ -450,7 +450,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
           <Text style={[styles.loadingText, { color: theme.textMuted }]}>Checking submission status...</Text>
         </View>
       </ScreenWrapper>
-    );
+    ); 
   }
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>

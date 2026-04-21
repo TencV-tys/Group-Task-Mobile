@@ -201,16 +201,27 @@ export default function HomeScreen({ navigation }: any) {
   const groups          = homeData?.groups          || [];
   const swapRequests    = homeData?.stats?.swapRequests || 0;
 
-  // ── Option C filtering ──────────────────────────────────────────────────
-  const todayTasks = useMemo(
-    () => currentWeekTasks.filter((t: any) => isToday(t.dueDate)),
-    [currentWeekTasks]
-  );
+  const isActionable = (task: any) => {
+  // ✅ Exclude tasks that are already processed
+  if (task.verified === true) return false;      // Already verified
+  if (task.verified === false) return false;     // Rejected
+  if (task.photoUrl !== null && task.verified === null) return false; // Pending verification
+  if (task.expired === true) return false;       // Expired/missed
+  if (task.completed === true) return false;     // Completed
+  
+  return true; // Only show actionable tasks
+};
 
-  const upcomingTasks = useMemo(
-    () => currentWeekTasks.filter((t: any) => !isToday(t.dueDate)),
-    [currentWeekTasks]
-  );
+  // Update the memoized filters
+const todayTasks = useMemo(
+  () => currentWeekTasks.filter((t: any) => isToday(t.dueDate) && isActionable(t)),
+  [currentWeekTasks]
+);
+
+const upcomingTasks = useMemo(
+  () => currentWeekTasks.filter((t: any) => !isToday(t.dueDate) && isActionable(t)),
+  [currentWeekTasks]
+);
 
   // ── handlers ────────────────────────────────────────────────────────────
   const handleRefresh = useCallback(() => {
@@ -309,16 +320,15 @@ export default function HomeScreen({ navigation }: any) {
     );
   }, [rotationAlerts, styles, navigation, groups, handleDismissRotationAlert]);
 
- const renderTaskCard = useCallback((task: any) => {
+
+
+  const renderTaskCard = useCallback((task: any) => {
   const dueToday    = isToday(task.dueDate);
   const dueTomorrow = isTomorrow(task.dueDate);
   const label       = dueLabelText(task);
   const dueColor = dueToday ? theme.error : dueTomorrow ? '#e67700' : theme.textMuted;
   
-  // Get time slot display text in PHT
   const timeSlotText = task.timeSlot ? formatTimeSlotToPHT(task.timeSlot) : '';
-  
-  // Convert due date to PHT for display
   const phtDisplay = convertUTCToPHT(task.dueDate);
   const displayDate = dueToday ? 'Today' : dueTomorrow ? 'Tomorrow' : phtDisplay.date;
   
@@ -327,14 +337,6 @@ export default function HomeScreen({ navigation }: any) {
       key={task.id}
       style={styles.taskCard}
       onPress={() => {
-        console.log(`📱 [HomeScreen] Opening task:`, {
-          taskId: task.taskId,
-          title: task.title,
-          assignmentId: task.id,
-          timeSlot: timeSlotText
-        });
-        
-        // ✅ Navigate to TaskDetails for ALL tasks - it handles everything correctly
         navigation.navigate('TaskDetails', {
           taskId: task.taskId,
           groupId: task.groupId,
@@ -343,27 +345,20 @@ export default function HomeScreen({ navigation }: any) {
       }}
       activeOpacity={0.7}
     >
-      {/* left accent dot */}
       <View style={[styles.taskDot, { backgroundColor: dueToday ? theme.error : theme.primary }]} />
-
-      {/* content */}
       <View style={styles.taskContent}>
         <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
         <View style={styles.taskMetaRow}>
-          {/* group pill */}
           <View style={[styles.groupPill, { backgroundColor: theme.primaryLight }]}>
             <Text style={[styles.groupPillText, { color: theme.primary }]} numberOfLines={1}>
               {task.groupName}
             </Text>
           </View>
-          {/* Show time slot if available (PHT format) */}
           {timeSlotText ? (
             <Text style={[styles.taskMetaText, { color: theme.textMuted }]}>{timeSlotText}</Text>
           ) : null}
         </View>
       </View>
-
-      {/* right side */}
       <View style={styles.taskRight}>
         <Text style={styles.taskPoints}>+{task.points} pts</Text>
         {label ? (

@@ -1,4 +1,4 @@
-// src/screens/GroupTasksScreen.tsx - COMPLETE FINAL VERSION WITH CORRECT COUNTING
+// src/screens/GroupTasksScreen.tsx - COMPLETE FINAL VERSION WITH FIXED REFRESH
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
@@ -56,6 +56,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
+  const isRefreshingRef = useRef(false);
   const isAdmin = userRole === 'ADMIN';
 
   // ===== ALL STATE HOOKS FIRST =====
@@ -196,14 +197,12 @@ const groupedMyTasks = useMemo(() => {
     const isFullyCompleted = effectiveTotal > 0 && effectiveVerified === effectiveTotal;
     const progressPercentage = effectiveTotal > 0 ? (effectiveVerified / effectiveTotal) * 100 : 0;
     
-    // ✅ Determine if this is a single-slot or multi-slot task
     const isSingleSlot = totalRawSlots === 1;
     
     let displayText = '';
     let statusEmoji = '';
     
     if (isSingleSlot) {
-      // Single-slot task - show simple status
       if (effectiveVerified > 0) {
         statusEmoji = '✅';
         displayText = `Verified • ${task.earnedPoints}/${task.totalPoints} pts`;
@@ -221,27 +220,25 @@ const groupedMyTasks = useMemo(() => {
         displayText = 'Not Started';
       }
     } else {
-      // Multi-slot task - show slot breakdown
-  if (effectiveMissed > 0 && effectiveRejected > 0) {
-    statusEmoji = '⚠️';
-    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveRejected} rejected • ${effectiveMissed} missed`;
-  } else if (effectiveMissed > 0) {
-    statusEmoji = '⚠️';
-    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveMissed} missed`;
-  } else if (effectiveRejected > 0) {
-    statusEmoji = '❌';
-    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveRejected} rejected`;
-  } else if (task.pendingCount > 0 && effectiveVerified === 0) {
-    statusEmoji = '⏳';
-    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.pendingCount} pending`;
-  } else if (effectiveVerified === effectiveTotal && effectiveTotal > 0) {
-    // ✅ FULLY COMPLETED - show simple success message
-    statusEmoji = '✅';
-    displayText = `All ${effectiveTotal} slots verified • ${task.earnedPoints}/${task.totalPoints} pts`;
-  } else {
-    statusEmoji = '⭐';
-    displayText = `${effectiveVerified}/${effectiveTotal} slots • ${task.earnedPoints}/${task.totalPoints} pts`;
-  }
+      if (effectiveMissed > 0 && effectiveRejected > 0) {
+        statusEmoji = '⚠️';
+        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveRejected} rejected • ${effectiveMissed} missed`;
+      } else if (effectiveMissed > 0) {
+        statusEmoji = '⚠️';
+        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveMissed} missed`;
+      } else if (effectiveRejected > 0) {
+        statusEmoji = '❌';
+        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveRejected} rejected`;
+      } else if (task.pendingCount > 0 && effectiveVerified === 0) {
+        statusEmoji = '⏳';
+        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.pendingCount} pending`;
+      } else if (effectiveVerified === effectiveTotal && effectiveTotal > 0) {
+        statusEmoji = '✅';
+        displayText = `All ${effectiveTotal} slots verified • ${task.earnedPoints}/${task.totalPoints} pts`;
+      } else {
+        statusEmoji = '⭐';
+        displayText = `${effectiveVerified}/${effectiveTotal} slots • ${task.earnedPoints}/${task.totalPoints} pts`;
+      }
     }
     
     return {
@@ -254,12 +251,13 @@ const groupedMyTasks = useMemo(() => {
       progressPercentage,
       displayText,
       statusEmoji,
-      isSingleSlot  // ✅ Add this flag for rendering
+      isSingleSlot
     };
   });
   
   return result;
 }, [selectedTab, myTasks, tasks]);
+
 
 const groupedAllTasks = useMemo(() => {
   if (selectedTab !== 'all') return [];
@@ -326,13 +324,11 @@ const groupedAllTasks = useMemo(() => {
     const isFullyCompleted = effectiveTotal > 0 && effectiveVerified === effectiveTotal;
     const progressPercentage = effectiveTotal > 0 ? (effectiveVerified / effectiveTotal) * 100 : 0;
     
-    // ✅ Determine if this is a single-slot or multi-slot task
     const isSingleSlot = totalRawSlots === 1;
     
     let displayText = '';
     
     if (isSingleSlot) {
-      // Single-slot task - show simple status
       if (task.verifiedCount > 0) {
         displayText = `✅ Verified • ${task.earnedPoints}/${task.totalPoints} pts`;
       } else if (task.missedCount > 0) {
@@ -345,19 +341,15 @@ const groupedAllTasks = useMemo(() => {
         displayText = `⏳ Not Started`;
       }
     } else {
-     // Multi-slot task - show slot breakdown
-  if (task.missedCount > 0 && task.rejectedCount > 0) {
-    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.rejectedCount} rejected • ${task.missedCount} missed`;
-  } else if (task.missedCount > 0) {
-    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.missedCount} missed`;
-  } else if (task.rejectedCount > 0) {
-    displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.rejectedCount} rejected`;
-  } else if (effectiveVerified === effectiveTotal && effectiveTotal > 0) {
-    // ✅ FULLY COMPLETED - show simple success message
-    displayText = `✅ All ${effectiveTotal} slots verified • ${task.earnedPoints}/${task.totalPoints} pts`;
-  } else {
-    displayText = `${effectiveVerified}/${effectiveTotal} slots • ${task.earnedPoints}/${task.totalPoints} pts`;
-  }
+      if (task.missedCount > 0 && task.rejectedCount > 0) {
+        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.rejectedCount} rejected • ${task.missedCount} missed`;
+      } else if (task.missedCount > 0) {
+        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.missedCount} missed`;
+      } else if (task.rejectedCount > 0) {
+        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.rejectedCount} rejected`;
+      } else {
+        displayText = `${effectiveVerified}/${effectiveTotal} slots • ${task.earnedPoints}/${task.totalPoints} pts`;
+      }
     }
     
     return {
@@ -578,19 +570,20 @@ const groupedAllTasks = useMemo(() => {
     }
   }, [groupId, checkToken]);
 
-  const fetchTasks = useCallback(async (isRefreshing = false) => {
+  // ===== FETCH TASKS - FIXED REFRESH LOGIC =====
+  const fetchTasks = useCallback(async (isRefreshingParam = false) => {
     const hasToken = await checkToken();
     if (!hasToken) {
       setLoading(false);
-      if (isRefreshing) {
+      if (isRefreshingParam) {
         setRefreshing(false);
+        isRefreshingRef.current = false;
       }
       return;
     }
 
-    if (isRefreshing) {
-      // Don't set refreshing here - it's already set by refreshTasks
-    } else if (!initialLoadDone.current) {
+    // Only show loading on initial load, not on refresh
+    if (!isRefreshingParam && !initialLoadDone.current) {
       setLoading(true);
     }
     setError(null);
@@ -617,12 +610,6 @@ const groupedAllTasks = useMemo(() => {
       const myTasksResult = await TaskService.getMyTasks(groupId);
       
       if (myTasksResult.success && myTasksResult.tasks && isMounted.current) {
-        console.log('📊 [DEBUG] First task assignment:', {
-    expired: myTasksResult.tasks[0]?.assignment?.expired,
-    completed: myTasksResult.tasks[0]?.assignment?.completed,
-    verified: myTasksResult.tasks[0]?.assignment?.verified,
-    dueDate: myTasksResult.tasks[0]?.assignment?.dueDate
-  });
         const enhancedTasks = myTasksResult.tasks.map((task: any) => ({
           ...task,
           ...validateTaskTime(task),
@@ -641,18 +628,42 @@ const groupedAllTasks = useMemo(() => {
     } finally {
       if (isMounted.current) {
         setLoading(false);
-        if (isRefreshing) {
+        if (isRefreshingParam) {
           setRefreshing(false);
+          isRefreshingRef.current = false;
         }
       }
     }
   }, [groupId, checkToken, analyzeTaskCreationDays, validateTaskTime, getTaskUrgency, findTodayAssignments, calculateNextActiveTime]);
 
+  // ===== REFRESH TASKS - FIXED =====
   const refreshTasks = useCallback(() => {
+    // Prevent multiple simultaneous refreshes
+    if (isRefreshingRef.current) {
+      console.log('⏳ Refresh already in progress, skipping...');
+      return;
+    }
+    
     console.log('🔄 Refreshing tasks...');
+    isRefreshingRef.current = true;
     setRefreshing(true);
     fetchTasks(true);
   }, [fetchTasks]);
+
+  // ===== SAFETY TIMEOUT FOR REFRESH =====
+  useEffect(() => {
+    if (refreshing) {
+      const timeout = setTimeout(() => {
+        if (refreshing) {
+          console.log('⚠️ Refresh timeout - resetting refreshing state');
+          setRefreshing(false);
+          isRefreshingRef.current = false;
+        }
+      }, 15000); // 15 second timeout
+      
+      return () => clearTimeout(timeout);
+    }
+  }, [refreshing]);
 
   const handleViewTaskDetails = async (item: any) => {
     if (!await checkToken()) return;
@@ -684,7 +695,7 @@ const groupedAllTasks = useMemo(() => {
     if (groupId && !loadingUser && !initialLoadDone.current) {
       fetchTasks();
       fetchMembers();
-      loadPendingForMe(groupId,true);
+      loadPendingForMe(groupId, true);
       fetchPendingVerificationsCount();
     }
   }, [groupId, loadingUser, fetchTasks, fetchMembers, loadPendingForMe, fetchPendingVerificationsCount]);
@@ -763,16 +774,15 @@ const groupedAllTasks = useMemo(() => {
     }
   }, [assignmentEvents.assignmentCompleted, refreshTasks, clearAssignmentCompleted]);
 
-  // In GroupTasksScreen.tsx - add focus listener to refresh pending count
-useEffect(() => {
-  const unsubscribe = navigation.addListener('focus', () => {
-    if (isAdmin) {
-      fetchPendingVerificationsCount();  // ← Refresh on focus
-    }
-  });
-  
-  return unsubscribe;
-}, [navigation, isAdmin, fetchPendingVerificationsCount]);
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (isAdmin) {
+        fetchPendingVerificationsCount();
+      }
+    });
+    
+    return unsubscribe;
+  }, [navigation, isAdmin, fetchPendingVerificationsCount]);
 
   useEffect(() => {
     if (assignmentEvents.assignmentVerified) {
@@ -792,7 +802,6 @@ useEffect(() => {
     if (groupId && userRole === 'ADMIN') checkStatus();
   }, [groupId, tasks.length, checkStatus, userRole]);
 
-
   useEffect(() => {
     if (swapEvents.swapResponded) {
       refreshTasks();
@@ -801,17 +810,16 @@ useEffect(() => {
   }, [swapEvents.swapResponded, refreshTasks, clearSwapResponded]);
 
   useEffect(() => {
-  const unsubscribe = navigation.addListener('focus', () => {
-    // Refresh swap count and tasks when returning to this screen
-    if (groupId && !loadingUser) {
-      console.log('🔄 Screen focused - refreshing swap count');
-      loadPendingForMe(groupId, true); // Force refresh
-      refreshTasks();
-    }
-  });
-  
-  return unsubscribe;
-}, [navigation, groupId, loadingUser, loadPendingForMe, refreshTasks]);
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (groupId && !loadingUser) {
+        console.log('🔄 Screen focused - refreshing swap count');
+        loadPendingForMe(groupId, true);
+        refreshTasks();
+      }
+    });
+    
+    return unsubscribe;
+  }, [navigation, groupId, loadingUser, loadPendingForMe, refreshTasks]);
 
   // ===== HANDLER FUNCTIONS =====
   
@@ -885,7 +893,6 @@ useEffect(() => {
     navigation.navigate('CreateTask', { groupId, groupName, onTaskCreated: refreshTasks });
   };
 
-
   const handleNavigateToSwapRequests = async () => {
     if (await checkToken()) navigation.navigate('PendingSwapRequests');
   };
@@ -923,96 +930,91 @@ useEffect(() => {
     navigation.navigate('TaskDrafts', { groupId, groupName });
   };
 
- 
   const renderAssignmentInfo = (task: any) => {
-  const hasAssignment = task.userAssignment || task.assignments?.length > 0;
-  if (!hasAssignment) {
-    return (
-      <View style={styles.unassignedInfo}>
-        <MaterialCommunityIcons name="account-question" size={16} color={theme.textMuted} />
-        <Text style={styles.unassignedText}>Not assigned to anyone</Text>
-      </View>
-    );
-  }
-
-  let currentAssignment = null;
-  let assigneeName = 'Unknown';
-  let isAssignedToMe = false;
-  // ✅ CHANGE: Use isFullyVerified instead of isCompleted
-  let isFullyVerified = false;
-  
-  if (selectedTab === 'my') {
-    if (task.userAssignment) {
-      currentAssignment = task.userAssignment;
-      isAssignedToMe = true;
-      assigneeName = 'You';
-      // ✅ Check if ALL slots are verified (fully completed)
-      isFullyVerified = task.isFullyCompleted || false;
+    const hasAssignment = task.userAssignment || task.assignments?.length > 0;
+    if (!hasAssignment) {
+      return (
+        <View style={styles.unassignedInfo}>
+          <MaterialCommunityIcons name="account-question" size={16} color={theme.textMuted} />
+          <Text style={styles.unassignedText}>Not assigned to anyone</Text>
+        </View>
+      );
     }
-  } else { 
-    const currentWeekAssignment = task.assignments?.find((a: any) => {
-      const isCurrentWeek = a.rotationWeek === rotationStatus?.currentWeek;
-      const isAssigned = a.userId === task.currentAssignee;
-      return isCurrentWeek && isAssigned;
-    }) || task.assignments?.[0];
-     
-    if (currentWeekAssignment) {
-      currentAssignment = currentWeekAssignment;
-      assigneeName = currentWeekAssignment.user?.fullName || 'Unknown';
-      isAssignedToMe = currentWeekAssignment.userId === currentUserId;
-      // ✅ For admin view, check if this specific assignment is verified
-      isFullyVerified = currentWeekAssignment.verified === true;
-    } else if (task.currentAssignee) {
-      const assignedMember = membersInRotation.find(m => m.userId === task.currentAssignee);
-      if (assignedMember) {
-        assigneeName = assignedMember.fullName;
-        isAssignedToMe = assignedMember.userId === currentUserId;
+
+    let assigneeName = 'Unknown';
+    let isAssignedToMe = false;
+    let isFullyVerified = false;
+    
+    if (selectedTab === 'my') {
+      if (task.userAssignment) {
+        isAssignedToMe = true;
+        assigneeName = 'You';
+        isFullyVerified = task.isFullyCompleted || false;
+      }
+    } else { 
+      const currentWeekAssignment = task.assignments?.find((a: any) => {
+        const isCurrentWeek = a.rotationWeek === rotationStatus?.currentWeek;
+        const isAssigned = a.userId === task.currentAssignee;
+        return isCurrentWeek && isAssigned;
+      }) || task.assignments?.[0];
+       
+      if (currentWeekAssignment) {
+        assigneeName = currentWeekAssignment.user?.fullName || 'Unknown';
+        isAssignedToMe = currentWeekAssignment.userId === currentUserId;
+      } else if (task.currentAssignee) {
+        const assignedMember = membersInRotation.find(m => m.userId === task.currentAssignee);
+        if (assignedMember) {
+          assigneeName = assignedMember.fullName;
+          isAssignedToMe = assignedMember.userId === currentUserId;
+        }
       }
     }
-  }
-  
-  if (!currentAssignment && !task.currentAssignee) {
+    
+    if (!assigneeName && !task.currentAssignee) {
+      return (
+        <View style={styles.unassignedInfo}>
+          <MaterialCommunityIcons name="account-question" size={16} color={theme.textMuted} />
+          <Text style={styles.unassignedText}>Not assigned</Text>
+        </View>
+      );
+    }
+
+    const getIcon = () => {
+      if (selectedTab === 'my' && isFullyVerified) return "check-circle";
+      if (selectedTab === 'my') return "account";
+      return isAssignedToMe ? "account" : "account-clock";
+    };
+
+    const getColor = () => {
+      if (selectedTab === 'my' && isFullyVerified) return theme.primary;
+      if (selectedTab === 'my') return theme.textSecondary;
+      return isAssignedToMe ? theme.textSecondary : theme.textMuted;
+    };
+
+    const getStatusText = () => {
+      if (selectedTab !== 'my') {
+        return `Assigned to ${assigneeName}`;
+      }
+      if (isFullyVerified) return 'All slots verified ✅';
+      return 'Assigned to you';
+    };
+
     return (
-      <View style={styles.unassignedInfo}>
-        <MaterialCommunityIcons name="account-question" size={16} color={theme.textMuted} />
-        <Text style={styles.unassignedText}>Not assigned</Text>
+      <View style={[
+        styles.assignmentInfo,
+        selectedTab === 'my' && isFullyVerified && styles.completedAssignment,
+        selectedTab === 'my' && !isFullyVerified && styles.pendingAssignment,
+        !isFullyVerified && isAssignedToMe && selectedTab === 'all' && styles.myAssignment
+      ]}>
+        <View style={styles.assignmentHeader}>
+          <MaterialCommunityIcons name={getIcon()} size={16} color={getColor()} />
+          <Text style={[styles.assignmentStatus, { color: getColor() }]}>
+            {getStatusText()}
+          </Text>
+        </View>
       </View>
     );
-  }
-
-  const getIcon = () => {
-    if (isFullyVerified) return "check-circle";
-    if (selectedTab === 'my') return "account";
-    return isAssignedToMe ? "account" : "account-clock";
   };
-
-  const getColor = () => {
-    if (isFullyVerified) return theme.primary;
-    if (selectedTab === 'my') return theme.textSecondary;
-    return isAssignedToMe ? theme.textSecondary : theme.textMuted;
-  };
-
-  const getStatusText = () => {
-    if (isFullyVerified) return 'All slots verified ✅';
-    if (selectedTab === 'my') return 'Assigned to you';
-    return `Assigned to ${assigneeName}`;
-  };
-
-  return (
-    <View style={[
-      styles.assignmentInfo,
-      isFullyVerified ? styles.completedAssignment : styles.pendingAssignment,
-      !isFullyVerified && isAssignedToMe && selectedTab === 'all' && styles.myAssignment
-    ]}>
-      <View style={styles.assignmentHeader}>
-        <MaterialCommunityIcons name={getIcon()} size={16} color={getColor()} />
-        <Text style={[styles.assignmentStatus, { color: getColor() }]}>
-          {getStatusText()}
-        </Text>
-      </View>
-    </View>
-  );
-};
 
   const renderCreationDayBanner = () => {
     if (!isAdmin || selectedTab !== 'all' || !tasks.length) return null;
@@ -1247,189 +1249,173 @@ useEffect(() => {
     );
   };
 
-
   const renderTask = ({ item }: any) => {
-  const isMyTasksView = selectedTab === 'my';
-  const taskIsAssigned = isTaskAssigned(item);
-  
-  const isAcquiredViaSwap = item.acquiredViaSwap === true;
-  const swappedFromName = item.swappedFromName || 'another member';
-  const swapRequestId = item.swapRequestId;
-  const swapScope = item.swapScope;
-  const swapDay = item.swapDay;
-  
-  const isAssignedToCurrentUser = 
-    item.isAssignedToUser === true || 
-    !!item.userAssignment || 
-    (item.assignments && item.assignments.some((a: any) => a.userId === currentUserId));
-  
-  const isClickable = isAdmin || isMyTasksView || isAssignedToCurrentUser;
-  
-  const effectiveTotal = item.effectiveTotal || 0;
-  const effectiveVerified = item.effectiveVerified || 0;
-  const earnedPoints = item.earnedPoints || 0;
-  const totalPoints = item.totalPoints || 0;
-  const isFullyCompleted = item.isFullyCompleted || false;
-  const progressPercentage = item.progressPercentage || 0;
-  const displayText = item.displayText || '';
-  const isSingleSlot = item.isSingleSlot || false;  // ✅ Use this flag
-  
-  const validation = validateTaskTime(item);
-  
-  const getGradientColors = (): [string, string] => {
-    if (!isClickable) return [theme.bgSecondary, theme.bgTertiary];
-    if (isFullyCompleted) return [theme.bgSecondary, theme.bgTertiary];
-    if (isMyTasksView && validation.isSubmittableNow) {
-      return validation.willBePenalized ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight];
-    }
-    return [theme.card, theme.bgSecondary];
-  };
+    const isMyTasksView = selectedTab === 'my';
+    const taskIsAssigned = isTaskAssigned(item);
+    
+    const isAcquiredViaSwap = item.acquiredViaSwap === true;
+    const swappedFromName = item.swappedFromName || 'another member';
+    const swapRequestId = item.swapRequestId;
+    const swapScope = item.swapScope;
+    const swapDay = item.swapDay;
+    
+    const isAssignedToCurrentUser = 
+      item.isAssignedToUser === true || 
+      !!item.userAssignment || 
+      (item.assignments && item.assignments.some((a: any) => a.userId === currentUserId));
+    
+    const isClickable = isAdmin || isMyTasksView || isAssignedToCurrentUser;
+    
+    const effectiveTotal = item.effectiveTotal || 0;
+    const effectiveVerified = item.effectiveVerified || 0;
+    const earnedPoints = item.earnedPoints || 0;
+    const totalPoints = item.totalPoints || 0;
+    const isFullyCompleted = item.isFullyCompleted || false;
+    const progressPercentage = item.progressPercentage || 0;
+    const displayText = item.displayText || '';
+    const isSingleSlot = item.isSingleSlot || false;
+    
+    const validation = validateTaskTime(item);
+    
+    const getGradientColors = (): [string, string] => {
+      if (!isClickable) return [theme.bgSecondary, theme.bgTertiary];
+      if (isFullyCompleted) return [theme.bgSecondary, theme.bgTertiary];
+      if (isMyTasksView && validation.isSubmittableNow) {
+        return validation.willBePenalized ? [theme.primaryLight, theme.primaryLight] : [theme.primaryLight, theme.primaryLight];
+      }
+      return [theme.card, theme.bgSecondary];
+    };
 
-  return (
-    <TouchableOpacity
-      onPress={() => handleViewTaskDetails(item)}
-      onLongPress={() => {
-        if (!isAdmin || isMyTasksView) return;
+    return (
+      <TouchableOpacity
+        onPress={() => handleViewTaskDetails(item)}
+        onLongPress={() => {
+          if (!isAdmin || isMyTasksView) return;
 
-        if (!taskIsAssigned) {
-          Alert.alert('Task Options', `"${item.title}"`, [
-            { text: 'Edit', onPress: () => handleEditTask(item) },
-            { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item) },
-            { text: 'Cancel', style: 'cancel' }
-          ]);
-        } else {
-          Alert.alert('Task Options', `"${item.title}"`, [
-            { 
-              text: 'Edit ⚠️', 
-              onPress: () => Alert.alert(
-                'Cannot Edit Assigned Task',
-                'This task is already assigned. Editing could break the rotation system.\n\nConsider creating a new task instead.',
-                [{ text: 'OK' }]
-              )
-            },
-            { 
-              text: 'Delete', 
-              style: 'destructive', 
-              onPress: () => handleDeleteTask(item) 
-            },
-            { text: 'Cancel', style: 'cancel' }
-          ]);
-        }
-      }}
-      activeOpacity={isClickable ? 0.7 : 1}
-    > 
-      <LinearGradient 
-        colors={getGradientColors()} 
-        style={[
-          styles.taskCard,
-          !isClickable && styles.disabledTaskCard,
-          isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && styles.swappedTaskCard
-        ]}
-      >
-        <View style={styles.taskHeader}>
-          <LinearGradient 
-            colors={isFullyCompleted ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]} 
-            style={styles.taskIcon}
-          >
-            <MaterialCommunityIcons 
-              name={isFullyCompleted ? "check-circle" : "format-list-checks"} 
-              size={20} 
-              color={isFullyCompleted ? "#fff" : theme.textMuted} 
-            />
-          </LinearGradient>
-          <View style={styles.taskInfo}>
-            <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
-              {item.title}
-            </Text>
-            <View style={styles.taskMeta}>
-              <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pointsBadge}>
-                <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
-                <Text style={styles.taskPoints}>{displayText}</Text>
-              </LinearGradient>
-              
-              {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
-                <LinearGradient
-                  colors={['#F59E0B', '#F59E0B']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.swapIndicatorBadge}
-                >
-                  <MaterialCommunityIcons name="swap-horizontal" size={10} color="#fff" />
-                  <Text style={styles.swapIndicatorText}>
-                    {swapScope === 'week' ? 'Week Swap' : `${swapDay || 'Day'} Swap`}
-                  </Text>
+          if (!taskIsAssigned) {
+            Alert.alert('Task Options', `"${item.title}"`, [
+              { text: 'Edit', onPress: () => handleEditTask(item) },
+              { text: 'Delete', style: 'destructive', onPress: () => handleDeleteTask(item) },
+              { text: 'Cancel', style: 'cancel' }
+            ]);
+          } else {
+            Alert.alert('Task Options', `"${item.title}"`, [
+              { 
+                text: 'Edit ⚠️', 
+                onPress: () => Alert.alert(
+                  'Cannot Edit Assigned Task',
+                  'This task is already assigned. Editing could break the rotation system.\n\nConsider creating a new task instead.',
+                  [{ text: 'OK' }]
+                )
+              },
+              { 
+                text: 'Delete', 
+                style: 'destructive', 
+                onPress: () => handleDeleteTask(item) 
+              },
+              { text: 'Cancel', style: 'cancel' }
+            ]);
+          }
+        }}
+        activeOpacity={isClickable ? 0.7 : 1}
+      > 
+        <LinearGradient 
+          colors={getGradientColors()} 
+          style={[
+            styles.taskCard,
+            !isClickable && styles.disabledTaskCard,
+            isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && styles.swappedTaskCard
+          ]}
+        >
+          <View style={styles.taskHeader}>
+            <LinearGradient 
+              colors={isFullyCompleted ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]} 
+              style={styles.taskIcon}
+            >
+              <MaterialCommunityIcons 
+                name={isFullyCompleted ? "check-circle" : "format-list-checks"} 
+                size={20} 
+                color={isFullyCompleted ? "#fff" : theme.textMuted} 
+              />
+            </LinearGradient>
+            <View style={styles.taskInfo}>
+              <Text style={[styles.taskTitle, isFullyCompleted && styles.completedTaskTitle]} numberOfLines={2}>
+                {item.title}
+              </Text>
+              <View style={styles.taskMeta}>
+                <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.pointsBadge}>
+                  <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                  <Text style={styles.taskPoints}>{displayText}</Text>
                 </LinearGradient>
-              )}
+                
+                {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
+                  <LinearGradient
+                    colors={['#F59E0B', '#F59E0B']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.swapIndicatorBadge}
+                  >
+                    <MaterialCommunityIcons name="swap-horizontal" size={10} color="#fff" />
+                    <Text style={styles.swapIndicatorText}>
+                      {swapScope === 'week' ? 'Week Swap' : `${swapDay || 'Day'} Swap`}
+                    </Text>
+                  </LinearGradient>
+                )}
+              </View>
             </View>
           </View>
-        </View>
-        
-        {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
-          <LinearGradient
-            colors={[theme.primaryLight, theme.primaryLight]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.swapInfoTooltip, { borderColor: theme.primaryBorder }]}
-          >
-            <MaterialCommunityIcons name="information" size={14} color={theme.primary} />
-            <Text style={[styles.swapInfoText, { color: theme.primary }]}>
-              {swapScope === 'week' 
-                ? `Full week swap with ${swappedFromName} - you exchanged all your tasks` 
-                : `Day swap from ${swappedFromName} for ${swapDay || 'this day'}`
-              }
-            </Text>
-            {swapRequestId && (
-              <TouchableOpacity 
-                onPress={(e) => {
-                  e.stopPropagation();
-                  navigation.navigate('SwapRequestDetails', { requestId: swapRequestId });
-                }}
-              >
-                <Text style={[styles.viewSwapLink, { color: theme.primary }]}>View →</Text>
-              </TouchableOpacity>
-            )}
-          </LinearGradient>
-        )}
-        
-        {renderAssignmentInfo(item)}
-        
-        {/* ✅ Progress Bar - ONLY for multi-slot tasks (effectiveTotal > 1) */}
-        {effectiveTotal > 1 && !isFullyCompleted && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
-            </View>
-            <Text style={styles.progressText}>
-              {displayText}
-            </Text>
-          </View>
-        )}
-        
-        {/* ✅ For multi-slot tasks that are fully completed - show completion badge */}
-        {effectiveTotal > 1 && isFullyCompleted && (
-          <View style={styles.completionBadgeContainer}>
+          
+          {isAcquiredViaSwap && !isFullyCompleted && isMyTasksView && (
             <LinearGradient
               colors={[theme.primaryLight, theme.primaryLight]}
-              style={styles.completionBadge}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.swapInfoTooltip, { borderColor: theme.primaryBorder }]}
             >
-              <MaterialCommunityIcons name="check-circle" size={14} color={theme.primary} />
-              <Text style={[styles.completionBadgeText, { color: theme.primary }]}>
-                All {effectiveTotal} slots verified! ✅
+              <MaterialCommunityIcons name="information" size={14} color={theme.primary} />
+              <Text style={[styles.swapInfoText, { color: theme.primary }]}>
+                {swapScope === 'week' 
+                  ? `Full week swap with ${swappedFromName} - you exchanged all your tasks` 
+                  : `Day swap from ${swappedFromName} for ${swapDay || 'this day'}`
+                }
               </Text>
+              {swapRequestId && (
+                <TouchableOpacity 
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    navigation.navigate('SwapRequestDetails', { requestId: swapRequestId });
+                  }}
+                >
+                  <Text style={[styles.viewSwapLink, { color: theme.primary }]}>View →</Text>
+                </TouchableOpacity>
+              )}
             </LinearGradient>
+          )}
+          
+          {renderAssignmentInfo(item)}
+          
+          {/* Progress Bar - ONLY for multi-slot tasks that are NOT fully completed */}
+          {effectiveTotal > 1 && !isFullyCompleted && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+              </View>
+              <Text style={styles.progressText}>
+                {displayText}
+              </Text>
+            </View>
+          )}
+          
+          <View style={styles.taskFooter}>
+            <Text style={styles.taskCreator}>
+              <MaterialCommunityIcons name="account" size={12} color={theme.textMuted} /> {item.creator?.fullName || 'Admin'}
+            </Text>
+            <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
           </View>
-        )} 
-        
-        <View style={styles.taskFooter}>
-          <Text style={styles.taskCreator}>
-            <MaterialCommunityIcons name="account" size={12} color={theme.textMuted} /> {item.creator?.fullName || 'Admin'}
-          </Text>
-          <Text style={styles.taskDate}>{new Date(item.createdAt).toLocaleDateString()}</Text>
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  ); 
-};
+        </LinearGradient>
+      </TouchableOpacity>
+    ); 
+  };
 
   const renderContent = () => {
     let currentTasks = [];
@@ -1457,7 +1443,13 @@ useEffect(() => {
           </>
         }
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refreshTasks} colors={[theme.primary]} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={refreshTasks} 
+            colors={[theme.primary]} 
+            tintColor={theme.primary}
+            progressBackgroundColor={theme.card}
+          />
         }
         ListEmptyComponent={showEmpty ? (
           <View style={styles.emptyContainer}>
@@ -1479,7 +1471,7 @@ useEffect(() => {
     );
   };
 
-  // ===== BOTTOM TABS - UPDATED =====
+  // ===== BOTTOM TABS =====
   const renderBottomTabs = () => {
     return (
       <LinearGradient
@@ -1487,7 +1479,6 @@ useEffect(() => {
         style={[styles.bottomTab, { height: 70 + insets.bottom, paddingBottom: insets.bottom }]}
       >
         {isAdmin ? (
-          // ADMIN: Shows Dashboard + All Tasks
           <>
             <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
               <MaterialCommunityIcons name="view-dashboard" size={24} color={selectedTab === 'all' ? theme.textMuted : theme.textMuted} />
@@ -1499,7 +1490,6 @@ useEffect(() => {
             </TouchableOpacity>
           </>
         ) : (
-          // MEMBER: Shows Dashboard + My Tasks only (NO All Tasks)
           <>
             <TouchableOpacity style={styles.tabButton} onPress={handleDashboardPress} activeOpacity={0.7}>
               <MaterialCommunityIcons name="view-dashboard" size={24} color={selectedTab === 'my' ? theme.textMuted : theme.textMuted} />
@@ -1623,7 +1613,6 @@ useEffect(() => {
 
       {isAdmin && selectedTab === 'all' && (
         <View style={styles.floatingButtonsContainer}>
-          {/* Pending Review Button with Badge */}
           <TouchableOpacity 
             onPress={() => navigation.navigate('PendingVerifications', { groupId, groupName, userRole })}
           >
@@ -1639,14 +1628,12 @@ useEffect(() => {
             </LinearGradient>
           </TouchableOpacity>
           
-          {/* Assign Button */}
           <TouchableOpacity onPress={handleNavigateToAssignment}>
             <LinearGradient colors={[theme.primary, theme.primaryDark]} style={[styles.floatingButton, styles.assignButton]}>
               <MaterialCommunityIcons name="account-switch" size={22} color="white" />
             </LinearGradient>
           </TouchableOpacity>
           
-          {/* Create Task Button */}
           <TouchableOpacity onPress={handleCreateTask}>
             <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={[styles.floatingButton, styles.createButton]}>
               <MaterialCommunityIcons name="plus" size={28} color={theme.textMuted} />
@@ -1669,4 +1656,4 @@ useEffect(() => {
       />
     </ScreenWrapper>
   );
-}
+} 

@@ -62,9 +62,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
     }, [groupId])
   ); 
 
-  // In TeamOverviewScreen.tsx - Update loadTeamData function
-
-  const loadTeamData = async () => {
+ const loadTeamData = async () => {
   const hasToken = await checkToken();
   if (!hasToken) return;
 
@@ -107,7 +105,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
             });
             
             if (tasksResult.success) {
-              // ✅ Filter out historical (deleted task) assignments before computing stats
+              // Filter out historical (deleted task) assignments before computing stats
               const allAssignments = tasksResult.data?.assignments || [];
               const activeAssignments = allAssignments.filter((a: any) => !a.isHistorical);
 
@@ -125,13 +123,18 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
                 (a: any) => a.verified === false
               ).length;
 
+              // ✅ FIX: Pending Verification = has photo AND not verified (submitted, waiting for admin)
               const pendingVerification = activeAssignments.filter(
-                (a: any) => a.completed && a.verified === null
+                (a: any) => a.photoUrl !== null && a.verified === null
               ).length;
 
-              const pending = activeAssignments.filter(
-                (a: any) => !a.completed && !a.expired
+              // ✅ FIX: Not Started = no photo, not completed, not expired, not verified
+              const notStarted = activeAssignments.filter(
+                (a: any) => !a.photoUrl && !a.completed && !a.expired && a.verified !== true && a.verified !== false
               ).length;
+
+              // ✅ For UI display, "Pending" means "Not Started" (tasks that need action)
+              const pending = notStarted;
 
               const expired = activeAssignments.filter(
                 (a: any) => a.expired === true
@@ -156,6 +159,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
                 verified,
                 rejected,
                 pendingVerification,
+                notStarted,
                 pending,
                 expired,
                 earnedPoints,
@@ -170,6 +174,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
                 rejected,
                 pending,
                 pendingVerification,
+                notStarted,
                 expired,
                 totalPoints,
                 earnedPoints,
@@ -185,6 +190,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
                 rejected: 0,
                 pending: 0,
                 pendingVerification: 0,
+                notStarted: 0,
                 expired: 0,
                 totalPoints: 0,
                 earnedPoints: 0,
@@ -200,6 +206,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
               rejected: 0,
               pending: 0,
               pendingVerification: 0,
+              notStarted: 0,
               expired: 0,
               totalPoints: 0,
               earnedPoints: 0,

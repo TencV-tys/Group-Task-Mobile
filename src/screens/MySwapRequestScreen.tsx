@@ -437,7 +437,7 @@ export const MySwapRequestsScreen = () => {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>My Swap Requests</Text>
         <TouchableOpacity
@@ -471,6 +471,7 @@ export const MySwapRequestsScreen = () => {
             onRefresh={handleRefresh}
             colors={[theme.primary]}
             tintColor={theme.primary}
+            progressBackgroundColor={theme.bgSecondary}
           />
         }
         onEndReached={handleLoadMore}

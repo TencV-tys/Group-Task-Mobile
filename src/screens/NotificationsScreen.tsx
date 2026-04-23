@@ -281,7 +281,7 @@ export default function NotificationsScreen({ navigation }: any) {
           onPress={() => navigation.goBack()} 
           style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
@@ -336,6 +336,7 @@ export default function NotificationsScreen({ navigation }: any) {
             onRefresh={handleRefresh}
             colors={[theme.primary]}
             tintColor={theme.primary}
+            progressBackgroundColor={theme.bgSecondary}
           />
         }
         onEndReached={handleLoadMore}

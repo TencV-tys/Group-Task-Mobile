@@ -52,7 +52,7 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
       </ScreenWrapper>
     );
   }
-
+ 
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       {/* Header */}
@@ -61,7 +61,7 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
           onPress={handleBack}
           style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         
         <Text style={[styles.headerTitle, { color: theme.text }]}>Privacy Policy</Text>

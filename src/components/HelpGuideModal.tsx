@@ -1,4 +1,4 @@
-// src/components/HelpGuideModal.tsx
+// src/components/HelpGuideModal.tsx - FULLY FIXED
 
 import React, { useState } from 'react';
 import {
@@ -28,7 +28,10 @@ export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ visible, onClose
   };
 
   const renderSection = (title: string, icon: string, content: string, sectionKey: string) => (
-    <View style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}>
+    <View 
+      key={sectionKey}
+      style={[styles.section, { borderColor: theme.border, backgroundColor: theme.card }]}
+    >
       <TouchableOpacity 
         style={styles.sectionHeader} 
         onPress={() => toggleSection(sectionKey)}
@@ -161,7 +164,7 @@ export const HelpGuideModal: React.FC<HelpGuideModalProps> = ({ visible, onClose
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: theme.bgTertiary }]}>
-              <MaterialCommunityIcons name="close" size={20} color={theme.textMuted} />
+              <MaterialCommunityIcons name="close" size={20} color={theme.primary} />
             </TouchableOpacity>
           </View>
 
@@ -236,7 +239,6 @@ const styles = StyleSheet.create({
   },
   modalBody: {
     padding: 16,
-    maxHeight: '100%',
   },
   welcomeCard: {
     flexDirection: 'row',

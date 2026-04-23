@@ -535,7 +535,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
     <ScreenWrapper style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>
           {currentDraftId ? 'Edit Draft' : 'Create Task'}

@@ -168,13 +168,13 @@ export default function TaskDraftsScreen({ navigation, route }: any) {
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
       <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {groupId ? `${groupName} Drafts` : 'My Drafts'}
         </Text>
         <TouchableOpacity onPress={() => loadDrafts()} style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
-          <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
+          <MaterialCommunityIcons name="refresh" size={20} color={theme.primary} />
         </TouchableOpacity>
       </View>
 

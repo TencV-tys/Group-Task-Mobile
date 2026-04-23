@@ -123,7 +123,7 @@ export default function JoinGroupScreen({ navigation, route }: any) {
                 style={styles.backButton}
                 activeOpacity={0.7}
               >
-                <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
+                <MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} />
               </TouchableOpacity>
               
               <View style={styles.headerCenter}>

@@ -888,19 +888,19 @@ const handleChooseGroupPhoto = async () => {
         style={[styles.header, { borderBottomColor: theme.border }]}
       >
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Group Info</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity onPress={() => fetchData(true)} style={styles.headerIcon}>
-            <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
+            <MaterialCommunityIcons name="refresh" size={20} color={theme.primary} />
           </TouchableOpacity>
           {currentUserRole === 'ADMIN' && (
             <TouchableOpacity 
               onPress={() => setShowSettingsModal(true)} 
               style={styles.headerIcon}
             >
-              <MaterialCommunityIcons name="cog" size={20} color={theme.textMuted} />
+              <MaterialCommunityIcons name="cog" size={20} color={theme.primary} />
             </TouchableOpacity>
           )}
         </View>
@@ -916,6 +916,7 @@ const handleChooseGroupPhoto = async () => {
             onRefresh={() => fetchData(true)}
             colors={[theme.primary]}
             tintColor={theme.primary}
+            progressBackgroundColor={theme.bgSecondary}
           />
         }
         showsVerticalScrollIndicator={false}

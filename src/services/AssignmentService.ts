@@ -188,6 +188,9 @@ export interface VerifyAssignmentResponse {
   };
 }
 
+
+// services/AssignmentService.ts - UPDATE TodayAssignment interface
+
 export interface TodayAssignment {
   id: string;
   taskId: string;
@@ -211,7 +214,24 @@ export interface TodayAssignment {
   };
   willBePenalized?: boolean;
   finalPoints?: number;
+  
+  // ✅ ADD THESE MISSING FIELDS
+  completed?: boolean;
+  verified?: boolean | null;
+  expired?: boolean;
+  photoUrl?: string | null;
+  partiallyExpired?: boolean;
+  completedTimeSlotIds?: string[];
+  missedTimeSlotIds?: string[];
+  timeSlots?: Array<{
+    id: string;
+    startTime: string;
+    endTime: string;
+    label?: string;
+    points?: number;
+  }>;
 }
+
  
 export class AssignmentService {
   
@@ -495,7 +515,6 @@ static async getUserAssignments(
   }
 }
  
-// services/AssignmentService.ts - ADD THIS LOG to getTodayAssignments
 
 static async getTodayAssignments(groupId?: string) {
   console.log('🔵🔵🔵 [FRONTEND] getTodayAssignments CALLED 🔵🔵🔵');
@@ -517,7 +536,6 @@ static async getTodayAssignments(groupId?: string) {
     
     console.log('👤 Current user ID:', user.id);
     
-    // Get all assignments for the user
     const userAssignmentsResult = await this.getUserAssignments(user.id);
     
     console.log('📊 [getTodayAssignments] getUserAssignments result:', {
@@ -537,15 +555,13 @@ static async getTodayAssignments(groupId?: string) {
     const allAssignments = userAssignmentsResult.data?.assignments || [];
     console.log(`📊 Total assignments found: ${allAssignments.length}`);
     
-    // Log all assignments
     if (allAssignments.length > 0) {
       console.log('📋 All assignments:');
       allAssignments.forEach((a: any, i: number) => {
-        console.log(`   ${i+1}. ${a.taskTitle} - Due: ${a.dueDate} - Completed: ${a.completed} - IsDueToday: ${a.isDueToday}`);
+        console.log(`   ${i+1}. ${a.taskTitle} - Due: ${a.dueDate} - Completed: ${a.completed} - IsDueToday: ${a.isDueToday} - HasPhoto: ${!!a.photoUrl}`);
       });
     }
     
-    // ✅ FIXED: Use UTC for today's date range (consistent with backend)
     const now = new Date();
     const startOfDayUTC = new Date(Date.UTC(
       now.getUTCFullYear(),
@@ -566,9 +582,7 @@ static async getTodayAssignments(groupId?: string) {
       current: now.toISOString()
     });
     
-    // Filter assignments due today using UTC comparison
     const todayAssignments = allAssignments.filter((assignment: any) => {
-      // Skip completed assignments
       if (assignment.completed) {
         console.log(`⏭️ Skipping completed: ${assignment.taskTitle}`);
         return false;
@@ -579,16 +593,16 @@ static async getTodayAssignments(groupId?: string) {
       }
       
       const dueDate = new Date(assignment.dueDate);
-      // ✅ FIXED: Use UTC comparison
       const isDueToday = dueDate >= startOfDayUTC && dueDate <= endOfDayUTC;
-      
-      // Filter by group if specified
       const belongsToGroup = !groupId || assignment.group?.id === groupId;
       
       if (isDueToday) {
         console.log(`✅✅✅ DUE TODAY: ${assignment.taskTitle} (${assignment.id})`);
         console.log(`   Due date UTC: ${dueDate.toISOString()}`);
         console.log(`   Current UTC: ${now.toISOString()}`);
+        console.log(`   Has photo: ${!!assignment.photoUrl}`);
+        console.log(`   Verified: ${assignment.verified}`);
+        console.log(`   Expired: ${assignment.expired}`);
       }
       
       return isDueToday && belongsToGroup;
@@ -596,7 +610,6 @@ static async getTodayAssignments(groupId?: string) {
     
     console.log(`📋 Found ${todayAssignments.length} assignments due today`);
     
-    // Transform to TodayAssignment format
     const formattedAssignments = todayAssignments.map((assignment: any) => {
       const timeValidation = this.validateLocalSubmissionTime(
         assignment.dueDate,
@@ -621,7 +634,11 @@ static async getTodayAssignments(groupId?: string) {
         canSubmit: timeValidation.canSubmit,
         reason: timeValidation.reason,
         willBePenalized: willBePenalized,
-        timeLeft: timeLeft
+        timeLeft: timeLeft,
+        completed: assignment.completed,
+        verified: assignment.verified,
+        expired: assignment.expired,
+        hasPhoto: !!assignment.photoUrl
       });
       
       return {
@@ -637,7 +654,16 @@ static async getTodayAssignments(groupId?: string) {
         reason: timeValidation.canSubmit ? undefined : timeValidation.reason,
         timeSlot: assignment.timeSlot,
         willBePenalized: willBePenalized,
-        finalPoints: finalPoints
+        finalPoints: finalPoints,
+        // ✅ CRITICAL FIELDS FOR STATUS CHECKING
+        completed: assignment.completed,
+        verified: assignment.verified,
+        expired: assignment.expired,
+        photoUrl: assignment.photoUrl,
+        partiallyExpired: assignment.partiallyExpired,
+        completedTimeSlotIds: assignment.completedTimeSlotIds,
+        missedTimeSlotIds: assignment.missedTimeSlotIds,
+        timeSlots: assignment.timeSlots
       };
     });
     
@@ -661,6 +687,7 @@ static async getTodayAssignments(groupId?: string) {
     };
   }
 }
+
 
   // ========== GET GROUP ASSIGNMENTS ==========
   static async getGroupAssignments(

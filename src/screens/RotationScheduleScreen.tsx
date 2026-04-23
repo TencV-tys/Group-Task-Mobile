@@ -639,7 +639,7 @@ const renderTaskItem = (item: any, index: number) => {
           onPress={() => navigation.goBack()}
           style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
@@ -655,7 +655,7 @@ const renderTaskItem = (item: any, index: number) => {
           {refreshing ? (
             <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
+            <MaterialCommunityIcons name="refresh" size={20} color={theme.primary} />
           )}
         </TouchableOpacity>
       </View>
@@ -667,6 +667,7 @@ const renderTaskItem = (item: any, index: number) => {
             onRefresh={refresh}
             colors={[theme.primary]}
             tintColor={theme.primary}
+            progressBackgroundColor={theme.bgSecondary}
           />
         }
         showsVerticalScrollIndicator={false}

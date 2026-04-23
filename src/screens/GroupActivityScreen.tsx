@@ -369,7 +369,7 @@ export default function GroupActivityScreen({ navigation, route }: any) {
       style={[styles.header, { borderBottomColor: theme.border }]}
     >
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
+        <MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} />
       </TouchableOpacity>
       <View style={styles.titleContainer}>
         <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
@@ -418,7 +418,10 @@ export default function GroupActivityScreen({ navigation, route }: any) {
       <ScrollView
         style={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => fetchActivityData(true)} colors={[theme.primary]} tintColor={theme.primary} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => fetchActivityData(true)} colors={[theme.primary]} tintColor={theme.primary} 
+          progressBackgroundColor={theme.bgSecondary}
+          />
+
         }
       >
         {error ? (

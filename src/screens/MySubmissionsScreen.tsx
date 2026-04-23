@@ -440,7 +440,7 @@ useEffect(() => {
         onPress={() => navigation.goBack()} 
         style={[styles.backButton, { backgroundColor: theme.card, shadowColor: '#000' }]}
       >
-        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
       </TouchableOpacity>
       
       <View style={styles.titleContainer}>
@@ -456,7 +456,7 @@ useEffect(() => {
         style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: '#000' }]}
         onPress={handleRefresh}
       >
-        <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
+        <MaterialCommunityIcons name="refresh" size={20} color={theme.primary} />
       </TouchableOpacity>
     </LinearGradient>
   );

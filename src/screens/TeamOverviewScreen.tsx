@@ -428,7 +428,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
   const renderHeader = () => (
     <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
-        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
       </TouchableOpacity>
       
       <View style={styles.titleContainer}>
@@ -440,7 +440,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
         {refreshing ? (
           <ActivityIndicator size="small" color={theme.primary} />
         ) : (
-          <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
+          <MaterialCommunityIcons name="refresh" size={20} color={theme.primary} />
         )}
       </TouchableOpacity>
     </View>
@@ -614,6 +614,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
             onRefresh={handleRefresh}
             colors={[theme.primary]}
             tintColor={theme.primary}
+            progressBackgroundColor={theme.bgSecondary}
           />
         }
         contentContainerStyle={styles.listContent}

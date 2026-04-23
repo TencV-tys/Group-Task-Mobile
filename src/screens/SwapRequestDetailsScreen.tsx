@@ -324,7 +324,7 @@ export const SwapRequestDetailsScreen = () => {
       {/* Header - Fixed layout with centered title */}
       <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} />
         </TouchableOpacity>
         
         <Text style={[styles.headerTitle, { color: theme.text }]}>Swap Request</Text>

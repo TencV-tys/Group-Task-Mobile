@@ -428,7 +428,7 @@ export default function CompleteAssignmentScreen({ navigation, route }: any) {
         style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         disabled={submitting}
       >
-        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
       </TouchableOpacity>
       <View style={styles.titleContainer}>
         <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>Complete Assignment</Text>

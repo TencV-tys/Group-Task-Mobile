@@ -501,11 +501,11 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
       style={[styles.header, { borderBottomColor: theme.border }]}
     >
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <MaterialCommunityIcons name="arrow-left" size={24} color={theme.text} />
+        <MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} />
       </TouchableOpacity>
       <Text style={[styles.headerTitle, { color: theme.text }]}>Member Profile</Text>
       <TouchableOpacity onPress={() => fetchData(true)} style={styles.refreshButton} disabled={refreshing}>
-        <MaterialCommunityIcons name="refresh" size={22} color={theme.text} style={refreshing && styles.rotating} />
+        <MaterialCommunityIcons name="refresh" size={22} color={theme.primary} style={refreshing && styles.rotating} />
       </TouchableOpacity>
     </LinearGradient>
   );

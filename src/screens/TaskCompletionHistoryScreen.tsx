@@ -214,7 +214,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
       style={[styles.header, { borderBottomColor: theme.border }]}
     >
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-        <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
+        <MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} />
       </TouchableOpacity>
       <View style={styles.titleContainer}>
         <Text style={[styles.title, { color: theme.text }]} numberOfLines={1}>
@@ -229,7 +229,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
         <MaterialCommunityIcons
           name="refresh"
           size={24}
-          color={theme.textMuted}
+          color={theme.primary}
           style={refreshing ? styles.rotating : undefined}
         />
       </TouchableOpacity>

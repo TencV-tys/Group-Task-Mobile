@@ -351,7 +351,7 @@ export default function UpdateTaskScreen({ navigation, route }: any) {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={handleCancel} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         <Text style={[styles.title, { color: theme.text }]}>Edit Task</Text>
         <View style={styles.headerSpacer} />

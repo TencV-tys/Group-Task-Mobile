@@ -386,6 +386,7 @@ const handleSubmitReport = async (data: { type: string; description: string }) =
             onRefresh={refreshGroups}
             colors={[theme.primary]}
             tintColor={theme.primary}
+            progressBackgroundColor={theme.bgSecondary}
           />
         }
         ListHeaderComponent={
@@ -460,7 +461,7 @@ const handleSubmitReport = async (data: { type: string; description: string }) =
           onPress={() => navigation.goBack()} 
           style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={theme.primary} />
         </TouchableOpacity>
         
         <View style={styles.titleContainer}>
@@ -478,7 +479,7 @@ const handleSubmitReport = async (data: { type: string; description: string }) =
           {refreshing ? (
             <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={22} color={theme.textMuted} />
+            <MaterialCommunityIcons name="refresh" size={22} color={theme.primary} />
           )}
         </TouchableOpacity>
       </LinearGradient>

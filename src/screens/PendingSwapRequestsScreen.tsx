@@ -475,7 +475,7 @@ export const PendingSwapRequestsScreen = () => {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         
         <View style={styles.headerTitleContainer}>
@@ -496,7 +496,7 @@ export const PendingSwapRequestsScreen = () => {
           style={[styles.historyButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
           onPress={() => (navigation as any).navigate('MySwapRequests')}
         >
-          <MaterialCommunityIcons name="history" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="history" size={22} color={theme.primary} />
         </TouchableOpacity>
       </View>
 
@@ -526,6 +526,7 @@ export const PendingSwapRequestsScreen = () => {
             onRefresh={handleRefresh}
             colors={[theme.primary]}
             tintColor={theme.primary}
+            progressBackgroundColor={theme.bgSecondary}
           />
         }
         ListEmptyComponent={

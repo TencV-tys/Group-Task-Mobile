@@ -391,7 +391,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
         style={[styles.header, { borderBottomColor: theme.border }]}
       >
         <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
-          <MaterialCommunityIcons name="arrow-left" size={20} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={20} color={theme.primary} />
         </TouchableOpacity>
         
         <View style={styles.headerTitleContainer}>
@@ -428,7 +428,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
           {refreshing ? (
             <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color={theme.textMuted} />
+            <MaterialCommunityIcons name="refresh" size={20} color={theme.primary} />
           )}
         </TouchableOpacity>
       </LinearGradient>
@@ -462,6 +462,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
               onRefresh={() => loadData(true)}
               colors={[theme.primary]}
               tintColor={theme.primary}
+              progressBackgroundColor={theme.bgSecondary}
             />
           }
           contentContainerStyle={styles.listContainer}

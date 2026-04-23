@@ -255,7 +255,7 @@ export default function ProfileScreen({ navigation }: any) {
       {/* Header */}
       <Animated.View style={[styles.header, { opacity: animations.header, transform: [{ translateY: animations.header.interpolate({ inputRange: [0, 1], outputRange: [-20, 0] }) }] }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Profile</Text>
         <TouchableOpacity onPress={() => navigateTo('Notifications')} style={styles.notificationButton}>
@@ -271,7 +271,9 @@ export default function ProfileScreen({ navigation }: any) {
       </Animated.View>
 
       <ScrollView
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} tintColor={theme.primary} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[theme.primary]} tintColor={theme.primary}
+        progressBackgroundColor={theme.bgSecondary}
+        />}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >

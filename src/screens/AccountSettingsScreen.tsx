@@ -448,7 +448,7 @@ const isConfirmValid = !!confirmPassword && confirmPasswordError === '' && newPa
             onPress={() => navigation.goBack()}
             style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
           >
-            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+            <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.text }]}>Account Settings</Text>
           <View style={{ width: 36 }} />

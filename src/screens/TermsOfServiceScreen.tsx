@@ -64,7 +64,7 @@ export default function TermsOfServiceScreen({ navigation }: any) {
           onPress={handleBack}
           style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         
         <Text style={[styles.headerTitle, { color: theme.text }]}>Terms of Service</Text>

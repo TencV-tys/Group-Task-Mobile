@@ -9,7 +9,7 @@ import {
   Image,
   TextInput,   
   ActivityIndicator, 
-  Alert,
+  Alert,  
   StatusBar,
   Modal,
   Dimensions
@@ -147,7 +147,7 @@ useFocusEffect(
         style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
       >
-        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+        <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
       </TouchableOpacity>
       
       <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>

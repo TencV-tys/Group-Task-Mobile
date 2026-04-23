@@ -262,6 +262,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
       const dashboardResult = await GroupActivityService.getMemberDashboard(groupId);
       
       if (dashboardResult.success && isMounted.current) {
+      
         setDashboardData(dashboardResult.data);
         setStats(dashboardResult.data.stats);
         setPoints({
@@ -334,7 +335,8 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
   const dueTodayTasks = dashboardData?.tasks?.dueToday || [];
   const upcomingTasks = dashboardData?.tasks?.upcoming || [];
-  const allPendingTasks = [...dueTodayTasks, ...upcomingTasks];
+  const pendingTasksCount = dashboardData?.stats?.pendingTasks || 0;
+console.log('pending tasks from stats:', pendingTasksCount);
   const completedTasks = dashboardData?.stats?.completedTasks || myTasks.filter(t => t.assignment?.completed).length;
   
   let tasksDueToday: any[] = [];
@@ -353,7 +355,17 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
       return dueDate >= startOfDay && dueDate <= endOfDay;
     });
   }
-
+useEffect(() => {
+  if (dashboardData?.tasks) {
+    console.log('📊 [Frontend] Tasks from backend:', {
+      dueTodayCount: dashboardData.tasks.dueToday?.length || 0,
+      upcomingCount: dashboardData.tasks.upcoming?.length || 0,
+      totalCount: (dashboardData.tasks.dueToday?.length || 0) + (dashboardData.tasks.upcoming?.length || 0),
+      dueTodayTasks: dashboardData.tasks.dueToday?.map((t: any) => ({ id: t.id, title: t.title, dueDate: t.dueDate })),
+      upcomingTasks: dashboardData.tasks.upcoming?.map((t: any) => ({ id: t.id, title: t.title, dueDate: t.dueDate }))
+    });
+  }
+}, [dashboardData]);
   const StatCard = ({ title, value, icon, color = theme.primary, subtitle, onPress, navigateTo, navigationParams }: any) => {
     const handlePress = () => {
       if (onPress) {
@@ -478,7 +490,7 @@ const TaskCard = ({ task }: { task: any }) => {
                 <Text style={[styles.pointsText, { color: theme.primary }]}>{task.points || task.assignment?.points || 0} pts</Text>
               </LinearGradient>
               
-              {/* Status Badge */}
+              {/* Status Badge */} 
               <LinearGradient 
                 colors={[statusColor + '20', statusColor + '10']} 
                 start={{ x: 0, y: 0 }} 
@@ -632,7 +644,7 @@ const TaskCard = ({ task }: { task: any }) => {
         <View style={styles.statsGrid}>
           <StatCard
             title="Pending Tasks" 
-            value={allPendingTasks.length}
+            value={pendingTasksCount}
             icon="clock-outline"
             color={theme.primary}
             navigateTo="GroupTasks"

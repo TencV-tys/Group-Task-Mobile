@@ -83,6 +83,7 @@ const fetchStats = async () => {
     const user = await TokenUtils.getUser();
     if (!user) return;
 
+    // ✅ Get ALL assignments without status filter
     const result = await AssignmentService.getUserAssignments(user.id);
     
     if (result.success && result.data?.assignments) {
@@ -99,6 +100,8 @@ const fetchStats = async () => {
       const rejected = assignments.filter((a: any) => 
         a.verified === false
       ).length;
+      
+      console.log(`📊 Stats - Pending: ${pending}, Verified: ${verified}, Rejected: ${rejected}`);
       
       setStats({
         pendingVerification: pending,
@@ -130,64 +133,61 @@ const fetchSubmissions = async (page: number, reset = false) => {
   }
   
   try {
-    let statusParam = '';
-    switch (filter) {
-      case 'pending':
-        statusParam = '';
-        break;
-      case 'verified':
-        statusParam = 'verified';
-        break;
-      case 'rejected':
-        statusParam = 'rejected';
-        break;
-    }
+    console.log(`📥 Fetching ${filter} submissions, page ${page}`);
     
-    console.log(`📥 Fetching ${filter} submissions, page ${page}, statusParam: ${statusParam || 'none'}`);
-    
+    // ✅ Get ALL assignments first (without status filter)
     const result = await AssignmentService.getUserAssignments(user.id, {
-      status: statusParam || undefined,
       limit: PAGE_SIZE,
       offset: page * PAGE_SIZE
     });
     
     if (result.success && result.data?.assignments) {
-      let assignments = result.data.assignments;
+      let allAssignments = result.data.assignments;
+      console.log(`📊 Total assignments from API: ${allAssignments.length}`);
+      
+      // ✅ Filter on the frontend based on the selected filter
+      let filteredAssignments = [];
+      let total = 0;
       
       if (filter === 'pending') {
-        assignments = assignments.filter((a: any) => 
+        filteredAssignments = allAssignments.filter((a: any) => 
           a.photoUrl !== null && a.verified === null
         );
-        console.log(`📊 Pending filter: ${assignments.length} assignments (has photo, not verified)`);
+        console.log(`📊 Pending filter: ${filteredAssignments.length} assignments (has photo, not verified)`);
       } else if (filter === 'verified') {
-        assignments = assignments.filter((a: any) => a.verified === true);
-        console.log(`📊 Verified filter: ${assignments.length} assignments`);
+        filteredAssignments = allAssignments.filter((a: any) => a.verified === true);
+        console.log(`📊 Verified filter: ${filteredAssignments.length} assignments`);
       } else if (filter === 'rejected') {
-        assignments = assignments.filter((a: any) => a.verified === false);
-        console.log(`📊 Rejected filter: ${assignments.length} assignments`);
+        filteredAssignments = allAssignments.filter((a: any) => a.verified === false);
+        console.log(`📊 Rejected filter: ${filteredAssignments.length} assignments`);
       }
       
-      let total = 0;
-      if (filter === 'pending') {
+      // ✅ Get total count for pagination
+      if (reset) {
+        // Get all assignments to count total for this filter
         const allResult = await AssignmentService.getUserAssignments(user.id);
         if (allResult.success && allResult.data?.assignments) {
-          total = allResult.data.assignments.filter((a: any) => 
-            a.photoUrl !== null && a.verified === null
-          ).length;
+          const all = allResult.data.assignments;
+          if (filter === 'pending') {
+            total = all.filter((a: any) => a.photoUrl !== null && a.verified === null).length;
+          } else if (filter === 'verified') {
+            total = all.filter((a: any) => a.verified === true).length;
+          } else if (filter === 'rejected') {
+            total = all.filter((a: any) => a.verified === false).length;
+          }
         }
       } else {
-        total = result.data.total || assignments.length;
+        total = totalCount;
       }
       
       setTotalCount(total);
-      const newHasMore = (page * PAGE_SIZE + assignments.length) < total;
+      const newHasMore = (page * PAGE_SIZE + filteredAssignments.length) < total;
       setHasMore(newHasMore);
       
-      const processed = assignments.map((assignment: any, idx: number) => ({
+      const processed = filteredAssignments.map((assignment: any, idx: number) => ({
         ...assignment,
         uniqueKey: `${assignment.id}-${filter}-${page}-${idx}`,
         dueDateFormatted: formatUTCDate(assignment.dueDate),
-        // ✅ Format time slot to PHT if exists
         timeSlotFormatted: assignment.timeSlot ? formatTimeSlotToPHT(assignment.timeSlot) : null,
         status: filter === 'pending' ? 'pending_verification' : 
                 filter === 'verified' ? 'verified' : 'rejected',

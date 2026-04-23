@@ -1,4 +1,4 @@
-// src/screens/TaskCompletionHistoryScreen.tsx - FIXED
+// src/screens/TaskCompletionHistoryScreen.tsx - FULLY UPDATED WITH PHT TIME CONVERSION
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -27,7 +27,26 @@ import { useTheme } from '../context/ThemeContext';
 
 const { height: screenHeight } = Dimensions.get('window');
 
-// ✅ Convert UTC date string to PHT (UTC+8)
+// ✅ Convert 24hr time to 12hr format with AM/PM
+const formatTo12Hour = (time24: string): string => {
+  if (!time24) return '';
+  const [hourStr, minuteStr] = time24.split(':');
+  let hour = parseInt(hourStr || '0', 10);
+  const minute = minuteStr || '00';
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12 || 12;
+  return `${hour}:${minute} ${ampm}`;
+};
+
+// ✅ Format time slot to PHT (12-hour with AM/PM)
+const formatTimeSlotToPHT = (timeSlot: any): string => {
+  if (!timeSlot) return '';
+  const start12 = formatTo12Hour(timeSlot.startTime);
+  const end12 = formatTo12Hour(timeSlot.endTime);
+  return `${start12} - ${end12}`;
+};
+
+// ✅ Convert UTC date string to PHT (UTC+8) for date only
 const formatDatePHT = (dateString: string) => {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -39,6 +58,7 @@ const formatDatePHT = (dateString: string) => {
   });
 };
 
+// ✅ Convert UTC date string to PHT full datetime
 const formatDateTimePHT = (dateString: string) => {
   if (!dateString) return '';
   const date = new Date(dateString);
@@ -66,13 +86,8 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
   const [searchQuery, setSearchQuery] = useState('');
   const [authError, setAuthError] = useState(false);
 
-  // ✅ FIX: Default is an empty Set — all task cards start CLOSED.
-  // Never auto-expand on fetch. Only toggled by user interaction.
+  // Default is an empty Set — all task cards start CLOSED.
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-
-  // ✅ FIX: Removed isFirstLoad ref entirely — it was the root cause of the
-  // broken default-closed behaviour. The useEffect that flipped it ran after
-  // fetchHistory already read it, so the auto-expand guard never fired correctly.
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
@@ -102,9 +117,7 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     initialize();
   }, [groupId]);
 
-  // ✅ Re-fetch when filters change (selectedTaskId / selectedWeek).
-  // We use a mounted ref only to skip the very first render — this is safe
-  // because the initialize() above already calls fetchHistory() on mount.
+  // Re-fetch when filters change
   const mountedRef = useRef(false);
   useEffect(() => {
     if (!mountedRef.current) {
@@ -154,11 +167,6 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
           .filter((taskGroup: any) => taskGroup.completions.length > 0);
 
         setHistoryData({ ...result.data, tasks: filteredTasks });
-
-        // ✅ FIX: No auto-expand here at all. expandedTasks stays as-is (empty
-        // Set on first load, or whatever the user has toggled). Cards are closed
-        // by default and only open when the user taps them.
-
       } else {
         setError(result.message || 'Failed to load completion history');
         if (result.message?.toLowerCase().includes('token') ||
@@ -174,7 +182,6 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     }
   };
 
-  // ✅ Functional update prevents stale-closure bugs
   const toggleTaskExpanded = useCallback((taskId: string) => {
     setExpandedTasks(prev => {
       const next = new Set(prev);
@@ -200,7 +207,6 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     task.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // ✅ Clear search when modal closes
   const closeTaskSelector = () => {
     setShowTaskSelector(false);
     setSearchQuery('');
@@ -260,13 +266,11 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
         animationType="slide"
         onRequestClose={closeTaskSelector}
       >
-        {/* Overlay tap closes modal AND clears search */}
         <TouchableOpacity
           style={styles.modalOverlay}
           activeOpacity={1}
           onPress={closeTaskSelector}
         >
-          {/* Stop propagation so tapping inside modal doesn't close it */}
           <TouchableOpacity
             activeOpacity={1}
             onPress={e => e.stopPropagation()}
@@ -401,114 +405,118 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
     </LinearGradient>
   );
 
-  const renderCompletionItem = (completion: any, taskTitle: string) => (
-    <TouchableOpacity
-      key={completion.assignmentId}
-      onPress={() =>
-        navigation.navigate('AssignmentDetails', {
-          assignmentId: completion.assignmentId,
-          isAdmin: userRole === 'ADMIN',
-          onVerified: () => fetchHistory(true),
-        })
-      }
-      activeOpacity={0.7}
-    >
-      <LinearGradient
-        colors={[theme.bgSecondary, theme.bgTertiary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.completionCard, { borderColor: theme.border }]}
+  const renderCompletionItem = (completion: any, taskTitle: string) => {
+    // ✅ Format time slot to PHT if exists
+    const timeSlotDisplay = completion.timeSlot ? formatTimeSlotToPHT(completion.timeSlot) : null;
+    
+    return (
+      <TouchableOpacity
+        key={completion.assignmentId}
+        onPress={() =>
+          navigation.navigate('AssignmentDetails', {
+            assignmentId: completion.assignmentId,
+            isAdmin: userRole === 'ADMIN',
+            onVerified: () => fetchHistory(true),
+          })
+        }
+        activeOpacity={0.7}
       >
-        <View style={styles.completionHeader}>
-          <View style={styles.userInfo}>
-            <LinearGradient
-              colors={[theme.bgSecondary, theme.bgTertiary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.userAvatar}
-            >
-              {completion.userAvatar ? (
-                <Image source={{ uri: completion.userAvatar }} style={styles.avatarImage} />
-              ) : (
-                <Text style={[styles.userInitial, { color: theme.textSecondary }]}>
-                  {completion.userName?.charAt(0) || '?'}
+        <LinearGradient
+          colors={[theme.bgSecondary, theme.bgTertiary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.completionCard, { borderColor: theme.border }]}
+        >
+          <View style={styles.completionHeader}>
+            <View style={styles.userInfo}>
+              <LinearGradient
+                colors={[theme.bgSecondary, theme.bgTertiary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.userAvatar}
+              >
+                {completion.userAvatar ? (
+                  <Image source={{ uri: completion.userAvatar }} style={styles.avatarImage} />
+                ) : (
+                  <Text style={[styles.userInitial, { color: theme.textSecondary }]}>
+                    {completion.userName?.charAt(0) || '?'}
+                  </Text>
+                )}
+              </LinearGradient>
+              <View style={styles.userDetails}>
+                <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
+                  {completion.userName}
                 </Text>
-              )}
-            </LinearGradient>
-            <View style={styles.userDetails}>
-              <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
-                {completion.userName}
-              </Text>
-              <Text style={[styles.completionDate, { color: theme.textMuted }]}>
-                {formatDateTimePHT(completion.completedAt)}
-              </Text>
+                <Text style={[styles.completionDate, { color: theme.textMuted }]}>
+                  {formatDateTimePHT(completion.completedAt)}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.completionMeta}>
+              <LinearGradient
+                colors={completion.week === selectedWeek ? [theme.primary, theme.primaryDark] : [theme.primaryLight, theme.primaryLight]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.weekBadge}
+              >
+                <Text style={[styles.weekBadgeText, { color: completion.week === selectedWeek ? '#fff' : theme.primary }]}>
+                  Week {completion.week}
+                </Text>
+              </LinearGradient>
+              <LinearGradient
+                colors={[theme.primaryLight, theme.primaryLight]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.verifiedBadge}
+              >
+                <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
+                <Text style={[styles.verifiedText, { color: theme.primary }]}>Verified</Text>
+              </LinearGradient>
             </View>
           </View>
-          <View style={styles.completionMeta}>
-            <LinearGradient
-              colors={completion.week === selectedWeek ? [theme.primary, theme.primaryDark] : [theme.primaryLight, theme.primaryLight]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.weekBadge}
-            >
-              <Text style={[styles.weekBadgeText, { color: completion.week === selectedWeek ? '#fff' : theme.primary }]}>
-                Week {completion.week}
-              </Text>
-            </LinearGradient>
-            <LinearGradient
-              colors={[theme.primaryLight, theme.primaryLight]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.verifiedBadge}
-            >
-              <MaterialCommunityIcons name="check-circle" size={12} color={theme.primary} />
-              <Text style={[styles.verifiedText, { color: theme.primary }]}>Verified</Text>
-            </LinearGradient>
-          </View>
-        </View>
-        <View style={styles.completionDetails}>
-          <View style={styles.detailRow}>
-            <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.detailIcon}>
-              <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
-            </LinearGradient>
-            <Text style={[styles.detailText, { color: theme.textMuted }]}>{completion.points} pts</Text>
-          </View>
-          {completion.isPartial && (
+          <View style={styles.completionDetails}>
             <View style={styles.detailRow}>
               <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.detailIcon}>
-                <MaterialCommunityIcons name="clock-outline" size={12} color={theme.primary} />
+                <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
               </LinearGradient>
-              <Text style={[styles.detailText, { color: theme.primary }]}>Partial</Text>
+              <Text style={[styles.detailText, { color: theme.textMuted }]}>{completion.points} pts</Text>
             </View>
-          )}
-          {completion.timeSlot && (
-            <View style={styles.detailRow}>
-              <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.detailIcon}>
-                <MaterialCommunityIcons name="clock" size={12} color={theme.textMuted} />
-              </LinearGradient>
-              <Text style={[styles.detailText, { color: theme.textMuted }]}>
-                {completion.timeSlot.startTime} - {completion.timeSlot.endTime}
-              </Text>
-            </View>
-          )}
-          {completion.dueDate && (
-            <View style={styles.detailRow}>
-              <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.detailIcon}>
-                <MaterialCommunityIcons name="calendar" size={12} color={theme.textMuted} />
-              </LinearGradient>
-              <Text style={[styles.detailText, { color: theme.textMuted }]}>
-                Due {formatDatePHT(completion.dueDate)}
-              </Text>
-            </View>
-          )}
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
+            {completion.isPartial && (
+              <View style={styles.detailRow}>
+                <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} style={styles.detailIcon}>
+                  <MaterialCommunityIcons name="clock-outline" size={12} color={theme.primary} />
+                </LinearGradient>
+                <Text style={[styles.detailText, { color: theme.primary }]}>Partial</Text>
+              </View>
+            )}
+            {/* ✅ Time slot with PHT 12-hour format */}
+            {timeSlotDisplay && (
+              <View style={styles.detailRow}>
+                <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.detailIcon}>
+                  <MaterialCommunityIcons name="clock" size={12} color={theme.textMuted} />
+                </LinearGradient>
+                <Text style={[styles.detailText, { color: theme.textMuted }]}>
+                  {timeSlotDisplay}
+                </Text>
+              </View>
+            )}
+            {completion.dueDate && (
+              <View style={styles.detailRow}>
+                <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.detailIcon}>
+                  <MaterialCommunityIcons name="calendar" size={12} color={theme.textMuted} />
+                </LinearGradient>
+                <Text style={[styles.detailText, { color: theme.textMuted }]}>
+                  Due {formatDatePHT(completion.dueDate)}
+                </Text>
+              </View>
+            )}
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   const renderTaskGroup = ({ item: taskGroup }: { item: any }) => {
-    // ✅ FIX: Default is CLOSED. expandedTasks starts as empty Set, so
-    // isExpanded is false for every card until the user taps to open it.
     const isExpanded = expandedTasks.has(taskGroup.taskId);
     const completionCount = taskGroup.completions.length;
     const displayedCompletions = isExpanded
@@ -523,7 +531,6 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
         end={{ x: 1, y: 1 }}
         style={[styles.taskGroup, { shadowColor: theme.shadow }]}
       >
-        {/* Header tap toggles expand/collapse */}
         <TouchableOpacity onPress={() => toggleTaskExpanded(taskGroup.taskId)} activeOpacity={0.7}>
           <View style={[styles.taskGroupHeader, { borderBottomColor: theme.border }]}>
             <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.taskGroupIcon}>
@@ -543,7 +550,6 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
           </View>
         </TouchableOpacity>
 
-        {/* ✅ Only render completions list when expanded */}
         {isExpanded && (
           <View style={styles.completionsList}>
             {displayedCompletions.map((completion: any) =>
@@ -552,7 +558,6 @@ export default function TaskCompletionHistoryScreen({ navigation, route }: any) 
           </View>
         )}
 
-        {/* Show more / Show less — only visible when expanded and has overflow */}
         {isExpanded && hasMore && (
           <TouchableOpacity
             style={styles.showMoreButton}

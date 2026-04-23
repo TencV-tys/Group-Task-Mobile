@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  RefreshControl,
+  RefreshControl, 
   Image, 
   Alert, 
   Animated,
@@ -192,6 +192,48 @@ export default function HomeScreen({ navigation }: any) {
       loadPendingForMe();
     }, [loadUnreadCount, loadPendingForMe])
   );
+
+  // In HomeScreen.tsx, add this right after getting homeData:
+
+useEffect(() => {
+  if (homeData?.currentWeekTasks) {
+    console.log('🔍🔍🔍 [DEBUG] CurrentWeekTasks count:', homeData.currentWeekTasks.length);
+    console.log('📊 [DEBUG] Task breakdown:');
+    
+    const verified = homeData.currentWeekTasks.filter((t: any) => t.verified === true);
+    const rejected = homeData.currentWeekTasks.filter((t: any) => t.verified === false);
+    const pendingVerification = homeData.currentWeekTasks.filter((t: any) => t.photoUrl !== null && t.verified === null);
+    const expired = homeData.currentWeekTasks.filter((t: any) => t.expired === true);
+    const completed = homeData.currentWeekTasks.filter((t: any) => t.completed === true);
+    const notStarted = homeData.currentWeekTasks.filter((t: any) => 
+      t.verified !== true && 
+      t.verified !== false && 
+      (!t.photoUrl || t.photoUrl === null) && 
+      t.expired !== true && 
+      t.completed !== true
+    );
+    
+    console.log(`   ✅ Verified: ${verified.length}`);
+    console.log(`   ❌ Rejected: ${rejected.length}`);
+    console.log(`   ⏳ Pending Verification (has photo): ${pendingVerification.length}`);
+    console.log(`   ⏰ Expired: ${expired.length}`);
+    console.log(`   ✓ Completed: ${completed.length}`);
+    console.log(`   📋 NOT STARTED (actionable): ${notStarted.length}`);
+    
+    // Log first task to see its fields
+    if (homeData.currentWeekTasks.length > 0) {
+      console.log('📋 First task fields:', {
+        id: homeData.currentWeekTasks[0].id,
+        title: homeData.currentWeekTasks[0].title,
+        completed: homeData.currentWeekTasks[0].completed,
+        verified: homeData.currentWeekTasks[0].verified,
+        photoUrl: homeData.currentWeekTasks[0].photoUrl,
+        expired: homeData.currentWeekTasks[0].expired,
+        partiallyExpired: homeData.currentWeekTasks[0].partiallyExpired
+      });
+    }
+  } 
+}, [homeData]);
 
   // ── derived data ────────────────────────────────────────────────────────
   const user            = homeData?.user         || { fullName: 'User', email: '', avatarUrl: null };
@@ -537,19 +579,21 @@ const upcomingTasks = useMemo(
             </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupsScroll}>
-              {groups.slice(0, 6).map((group: any) => {
-                const groupTaskCount = currentWeekTasks.filter(
-                  (t: any) => t.groupId === group.id
-                ).length;
+               {groups.slice(0, 6).map((group: any) => {
+  // ✅ FIXED: Count ONLY actionable tasks (not started)
+  const groupTaskCount = currentWeekTasks.filter(
+    (t: any) => t.groupId === group.id && isActionable(t)
+  ).length;
 
-                const isGroupAdmin = group.role === 'ADMIN';
-                const badgeLabel = groupTaskCount > 0
-                  ? `${groupTaskCount} task${groupTaskCount > 1 ? 's' : ''}`
-                  : isGroupAdmin
-                    ? 'admin'
-                    : 'no tasks';
-                const badgeBg    = groupTaskCount > 0 ? theme.primaryLight : theme.bgTertiary;
-                const badgeColor = groupTaskCount > 0 ? theme.primary : theme.textMuted;
+  const isGroupAdmin = group.role === 'ADMIN';
+  const badgeLabel = groupTaskCount > 0
+    ? `${groupTaskCount} task${groupTaskCount > 1 ? 's' : ''}`
+    : isGroupAdmin
+      ? 'admin'
+      : 'no tasks';
+  const badgeBg    = groupTaskCount > 0 ? theme.primaryLight : theme.bgTertiary;
+  const badgeColor = groupTaskCount > 0 ? theme.primary : theme.textMuted;
+
 
                 return (
                   <TouchableOpacity

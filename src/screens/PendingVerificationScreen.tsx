@@ -1,4 +1,4 @@
-// src/screens/PendingVerificationsScreen.tsx - FILTER OUT DELETED TASKS FROM ALL TABS
+// src/screens/PendingVerificationsScreen.tsx - FULLY UPDATED WITH PH TIME
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -20,7 +20,74 @@ import { TokenUtils } from '../utils/tokenUtils';
 import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext';
 
-const PAGE_SIZE = 20; 
+const PAGE_SIZE = 20;
+
+// ✅ Convert UTC to Philippine Time (UTC+8)
+const toPHT = (date: Date | string): Date => {
+  const d = new Date(date);
+  return new Date(d.getTime() + (8 * 60 * 60 * 1000));
+};
+
+// ✅ Format date to Philippine Time with AM/PM
+const formatPHTDate = (date: Date | string | null | undefined): string => {
+  if (!date) return 'N/A';
+  try {
+    const phtDate = toPHT(date);
+    return phtDate.toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch (e) {
+    return 'Invalid date';
+  }
+};
+
+// ✅ Format time to 12-hour format with AM/PM
+const formatTime12Hour = (timeString: string): string => {
+  if (!timeString) return '';
+  const [hourStr, minuteStr] = timeString.split(':');
+  let hour = parseInt(hourStr || '0', 10);
+  const minute = minuteStr || '00';
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12 || 12;
+  return `${hour}:${minute} ${ampm}`;
+};
+
+// ✅ Format datetime to full PHT with time
+const formatPHTDateTime = (date: Date | string | null | undefined): string => {
+  if (!date) return 'N/A';
+  try {
+    const phtDate = toPHT(date);
+    return phtDate.toLocaleString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (e) {
+    return 'Invalid date';
+  }
+};
+
+// ✅ Format relative time in PHT
+const formatTimeAgo = (date: Date | null): string => {
+  if (!date) return 'Unknown';
+  const now = new Date();
+  const phtNow = toPHT(now);
+  const phtDate = toPHT(date);
+  const diffMs = phtNow.getTime() - phtDate.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
+  if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
+  return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
+};
 
 export default function PendingVerificationsScreen({ navigation, route }: any) {
   const { theme, isDark } = useTheme();
@@ -95,11 +162,9 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   };
 
   const isDeletedTask = (assignment: any): boolean => {
-    // Check if task is deleted
     const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
     const isHistorical = assignment.isHistorical === true;
     const hasTaskTitleOnly = assignment.taskTitle && !assignment.taskId;
-    
     return isTaskDeleted || isHistorical || hasTaskTitleOnly;
   };
 
@@ -140,21 +205,11 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           limit: PAGE_SIZE,
           offset: offset 
         });
-        console.log('📥 Pending result structure:', {
-          hasData: !!result.data,
-          assignmentsCount: result.data?.assignments?.length,
-          total: result.data?.total
-        });
       } else if (filter === 'verified') {
         result = await AssignmentService.getGroupAssignments(groupId, {
           status: 'verified',
           limit: PAGE_SIZE,
           offset: offset
-        });
-        console.log('📥 Verified result:', {
-          success: result.success,
-          total: result.total,
-          assignmentsCount: result.assignments?.length
         });
       } else if (filter === 'rejected') {
         result = await AssignmentService.getGroupAssignments(groupId, {
@@ -176,7 +231,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           total = result.total || 0;
         }
         
-        // ✅ FILTER OUT DELETED TASKS FROM ALL ASSIGNMENTS
+        // Filter out deleted tasks
         const filteredAssignments = assignments.filter((assignment: any) => {
           const isDeleted = isDeletedTask(assignment);
           if (isDeleted) {
@@ -191,6 +246,16 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           const isDeleted = isDeletedTask(assignment);
           const taskTitle = assignment.task?.title || assignment.taskTitle || 'Unknown Task';
           
+          // ✅ Get the correct timestamp based on filter
+          let eventDate = null;
+          if (filter === 'pending') {
+            eventDate = assignment.completedAt || assignment.updatedAt;
+          } else if (filter === 'verified') {
+            eventDate = assignment.verifiedAt || assignment.updatedAt || assignment.completedAt;
+          } else {
+            eventDate = assignment.verifiedAt || assignment.updatedAt || assignment.completedAt;
+          }
+          
           return {
             ...assignment,
             id: assignment.id,
@@ -200,8 +265,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
             taskId: assignment.task?.id || assignment.taskId,
             taskTitle: isDeleted ? `🗑️ ${taskTitle} (Deleted)` : taskTitle,
             taskPoints: assignment.task?.points || assignment.taskPoints || 0,
-            submittedAt: assignment.submittedAt ? new Date(assignment.submittedAt) : 
-                        (assignment.completedAt ? new Date(assignment.completedAt) : null),
+            eventDate: eventDate ? new Date(eventDate) : null,
             dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
             completed: assignment.completed || false,
             verified: assignment.verified,
@@ -212,11 +276,11 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
             isTaskDeleted: isDeleted,
             isPartial: assignment.isPartial || false,
             slotsCompleted: assignment.slotsCompleted || 0,
-            totalSlots: assignment.totalSlots || 1
+            totalSlots: assignment.totalSlots || 1,
+            points: assignment.points || 0
           };
         });
         
-        // Update total count to exclude deleted tasks
         const newTotal = total - (assignments.length - filteredAssignments.length);
         setTotalCount(newTotal);
         const newHasMore = (offset + processed.length) < newTotal;
@@ -228,7 +292,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           setSubmissions(prev => [...prev, ...processed]);
         }
         
-        console.log(`✅ Loaded ${processed.length} items (deleted filtered out). Total: ${newTotal}, HasMore: ${newHasMore}`);
+        console.log(`✅ Loaded ${processed.length} items. Total: ${newTotal}, HasMore: ${newHasMore}`);
       } else {
         setError(result.message || 'Failed to load submissions');
       }
@@ -244,21 +308,16 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   };
 
   const handleLoadMore = useCallback(() => {
-    if (isLoadingMore || !hasMore || loading || refreshing) {
-      console.log('🚫 Skip load more:', { isLoadingMore, hasMore, loading, refreshing });
-      return;
-    }
+    if (isLoadingMore || !hasMore || loading || refreshing) return;
     
     const nextPage = currentPageRef.current + 1;
     const offset = nextPage * PAGE_SIZE;
     
     if (offset >= totalCount && totalCount > 0) {
-      console.log('🏁 Already loaded all items');
       setHasMore(false);
       return;
     }
     
-    console.log(`📥 Loading more: page ${nextPage}, offset ${offset}`);
     currentPageRef.current = nextPage;
     fetchSubmissions(nextPage, false);
   }, [isLoadingMore, hasMore, loading, refreshing, totalCount]);
@@ -280,7 +339,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     if (assignment.isTaskDeleted) {
       Alert.alert(
         'Task Deleted',
-        `The task "${assignment.taskTitle.replace('🗑️ ', '').replace(' (Deleted)', '')}" has been deleted and is no longer available for review.\n\nYou can still see the submission details but cannot verify it.`,
+        `The task "${assignment.taskTitle.replace('🗑️ ', '').replace(' (Deleted)', '')}" has been deleted.`,
         [{ text: 'OK' }]
       );
       return;
@@ -300,11 +359,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
   const handleQuickApprove = async (assignment: any) => {
     if (assignment.isTaskDeleted) {
-      Alert.alert(
-        'Cannot Approve',
-        `The task "${assignment.taskTitle.replace('🗑️ ', '').replace(' (Deleted)', '')}" has been deleted and cannot be approved.`,
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Cannot Approve', 'This task has been deleted.');
       return;
     }
 
@@ -317,7 +372,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
     Alert.alert(
       'Approve Submission',
-      `Are you sure you want to approve "${assignment.taskTitle}"?`,
+      `Approve "${assignment.taskTitle}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -331,16 +386,13 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               });
               
               if (result.success) {
-                Alert.alert('Success', 'Submission approved successfully');
-                currentPageRef.current = 0;
-                setHasMore(true);
-                fetchSubmissions(0, true);
-                fetchStats();
+                Alert.alert('Success', 'Submission approved');
+                handleRefresh();
               } else {
-                Alert.alert('Error', result.message || 'Failed to approve submission');
+                Alert.alert('Error', result.message || 'Failed to approve');
               }
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to approve submission');
+              Alert.alert('Error', err.message || 'Failed to approve');
             }
           }
         }
@@ -350,11 +402,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
   const handleQuickReject = async (assignment: any) => {
     if (assignment.isTaskDeleted) {
-      Alert.alert(
-        'Cannot Reject',
-        `The task "${assignment.taskTitle.replace('🗑️ ', '').replace(' (Deleted)', '')}" has been deleted.`,
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Cannot Reject', 'This task has been deleted.');
       return;
     }
 
@@ -367,7 +415,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
     Alert.alert(
       'Reject Submission',
-      `Are you sure you want to reject "${assignment.taskTitle}"?`,
+      `Reject "${assignment.taskTitle}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -382,15 +430,12 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
               
               if (result.success) {
                 Alert.alert('Success', 'Submission rejected');
-                currentPageRef.current = 0;
-                setHasMore(true);
-                fetchSubmissions(0, true);
-                fetchStats();
+                handleRefresh();
               } else {
-                Alert.alert('Error', result.message || 'Failed to reject submission');
+                Alert.alert('Error', result.message || 'Failed to reject');
               }
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to reject submission');
+              Alert.alert('Error', err.message || 'Failed to reject');
             }
           }
         }
@@ -398,18 +443,19 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     );
   };
 
-  const formatTimeAgo = (date: Date | null) => {
-    if (!date) return 'Unknown';
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+  const getEventText = (item: any): string => {
+    if (!item.eventDate) {
+      if (filter === 'pending') return 'Not submitted yet';
+      if (filter === 'verified') return 'Verified';
+      return 'Rejected';
+    }
     
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+    const date = item.eventDate;
+    const formattedDate = formatPHTDateTime(date);
+    
+    if (filter === 'pending') return `Submitted ${formatTimeAgo(date)} (${formattedDate})`;
+    if (filter === 'verified') return `Verified ${formatTimeAgo(date)} (${formattedDate})`;
+    return `Rejected ${formatTimeAgo(date)} (${formattedDate})`;
   };
 
   const renderStatsBar = () => {
@@ -545,10 +591,15 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 
   const renderSubmissionItem = ({ item }: any) => {
     const isPending = filter === 'pending';
-    const isSubmitted = item.completed === true && item.verified === null;
     const isDeletedTask = item.isTaskDeleted === true;
+    const pointsToShow = item.points || item.taskPoints || 0;
+    const eventText = getEventText(item);
     
-    // ✅ Don't render if it's a deleted task (they are filtered out anyway, but as safety)
+    // Format time slot in 12-hour format
+    const timeSlotDisplay = item.timeSlot 
+      ? `${formatTime12Hour(item.timeSlot.startTime)} - ${formatTime12Hour(item.timeSlot.endTime)}`
+      : null;
+    
     if (isDeletedTask) return null;
     
     return (
@@ -581,14 +632,12 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
                 {item.userName}
               </Text>
               <Text style={[styles.submissionTime, { color: theme.textMuted }]}>
-                {item.submittedAt 
-                  ? `Submitted ${formatTimeAgo(item.submittedAt)}`
-                  : 'Not submitted yet'}
+                {eventText}
               </Text>
             </View>
           </View>
           
-          {isPending && item.completed === true && item.verified === null && (
+          {isPending && (
             <LinearGradient
               colors={[theme.primaryLight, theme.primaryLight]}
               start={{ x: 0, y: 0 }}
@@ -642,14 +691,14 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
         <View style={styles.detailsRow}>
           <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
             <MaterialCommunityIcons name="star" size={14} color={theme.primary} />
-            <Text style={[styles.detailText, { color: theme.textSecondary }]}>{item.taskPoints} pts</Text>
+            <Text style={[styles.detailText, { color: theme.textSecondary }]}>{pointsToShow} pts</Text>
           </View>
           
           {item.dueDate && (
             <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
               <MaterialCommunityIcons name="calendar" size={14} color={theme.textMuted} />
               <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-                {item.dueDate.toLocaleDateString()}
+                {formatPHTDate(item.dueDate)}
               </Text>
             </View>
           )}
@@ -658,7 +707,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
             <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
               <MaterialCommunityIcons name="clock" size={14} color={theme.textMuted} />
               <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-                {item.timeSlot.startTime} - {item.timeSlot.endTime}
+                {timeSlotDisplay}
               </Text>
             </View>
           )}
@@ -700,7 +749,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
           ) : null}
         </View>
 
-        {isPending && isSubmitted && (
+        {isPending && (
           <View style={[styles.quickActions, { borderTopColor: theme.borderLight }]}>
             <TouchableOpacity
               style={styles.quickRejectButton}
@@ -850,9 +899,7 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -873,22 +920,9 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center'
-  },
-  subtitle: {
-    fontSize: 12,
-    marginTop: 2,
-    textAlign: 'center'
-  },
+  titleContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
+  title: { fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  subtitle: { fontSize: 12, marginTop: 2, textAlign: 'center' },
   refreshButton: {
     width: 36,
     height: 36,
@@ -907,20 +941,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     justifyContent: 'space-around'
   },
-  statItem: {
-    alignItems: 'center'
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: 4
-  },
-  statLabel: {
-    fontSize: 12,
-  },
-  statDivider: {
-    width: 1,
-  },
+  statItem: { alignItems: 'center' },
+  statNumber: { fontSize: 20, fontWeight: '700', marginBottom: 4 },
+  statLabel: { fontSize: 12 },
+  statDivider: { width: 1 },
   filterContainer: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -938,92 +962,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
-  activeFilterTab: {
-    borderWidth: 1,
-  },
-  filterText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
+  activeFilterTab: { borderWidth: 1 },
+  filterText: { fontSize: 13, fontWeight: '500' },
   activeFilterText: {},
-  badge: {
-    borderRadius: 12,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 4
-  },
-  badgeText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold'
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20
-  },
-  errorText: {
-    textAlign: 'center',
-    marginBottom: 16,
-    fontSize: 16,
-    marginTop: 12
-  },
-  retryButton: {
-    borderRadius: 8,
-    overflow: 'hidden'
-  },
-  retryButtonGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 12
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16
-  },
-  listContainer: {
-    padding: 16,
-    paddingBottom: 20,
-    flexGrow: 1,
-  },
-  footerLoader: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 20,
-    gap: 8,
-  },
-  footerText: {
-    fontSize: 12,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 20,
-    flex: 1,
-  },
-  emptyText: {
-    fontSize: 16,
-    marginBottom: 8,
-    marginTop: 16,
-    textAlign: 'center',
-    fontWeight: '600'
-  },
-  emptySubtext: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20
-  },
+  badge: { borderRadius: 12, paddingHorizontal: 6, paddingVertical: 2, marginLeft: 4 },
+  badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14 },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { textAlign: 'center', marginBottom: 16, fontSize: 16, marginTop: 12 },
+  retryButton: { borderRadius: 8, overflow: 'hidden' },
+  retryButtonGradient: { paddingHorizontal: 24, paddingVertical: 12 },
+  retryButtonText: { color: 'white', fontWeight: '600', fontSize: 16 },
+  listContainer: { padding: 16, paddingBottom: 20, flexGrow: 1 },
+  footerLoader: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 20, gap: 8 },
+  footerText: { fontSize: 12 },
+  emptyContainer: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 20, flex: 1 },
+  emptyText: { fontSize: 16, marginBottom: 8, marginTop: 16, textAlign: 'center', fontWeight: '600' },
+  emptySubtext: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
   submissionCard: {
     borderRadius: 16,
     padding: 16,
@@ -1033,202 +989,38 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-  },
-  avatarImage: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-  },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  userDetails: {
-    flex: 1
-  },
-  userName: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 2
-  },
-  submissionTime: {
-    fontSize: 12,
-  },
-  pendingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4
-  },
-  pendingBadgeText: {
-    fontSize: 11,
-    fontWeight: '600'
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4
-  },
-  verifiedBadgeText: {
-    fontSize: 11,
-    fontWeight: '600'
-  },
-  rejectedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4
-  },
-  rejectedBadgeText: {
-    fontSize: 11,
-    fontWeight: '600'
-  },
-  taskInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  taskTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    flex: 1,
-    lineHeight: 20
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 12
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  detailText: {
-    fontSize: 12,
-  },
-  evidenceRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-    paddingTop: 8,
-    borderTopWidth: 1,
-  },
-  hasPhotoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4
-  },
-  hasPhotoText: {
-    fontSize: 11,
-    fontWeight: '500'
-  },
-  noPhotoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4
-  },
-  noPhotoText: {
-    fontSize: 11,
-    fontWeight: '500'
-  },
-  hasNotesBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4
-  },
-  hasNotesText: {
-    fontSize: 11,
-    fontWeight: '500'
-  },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  quickRejectButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    flex: 1,
-  },
-  quickApproveButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    flex: 1,
-  },
-  quickActionGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    gap: 4,
-  },
-  quickRejectText: {
-    fontSize: 13,
-    fontWeight: '600'
-  },
-  quickApproveText: {
-    fontSize: 13,
-    fontWeight: '600'
-  },
-  adminNotesPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 8,
-    marginTop: 8,
-    gap: 6,
-    borderWidth: 1,
-  },
-  adminNotesText: {
-    fontSize: 12,
-    flex: 1,
-    fontStyle: 'italic'
-  }
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  userInfo: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  avatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
+  avatarImage: { width: 38, height: 38, borderRadius: 19 },
+  avatarText: { fontSize: 16, fontWeight: '600' },
+  userDetails: { flex: 1 },
+  userName: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
+  submissionTime: { fontSize: 12 },
+  pendingBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
+  pendingBadgeText: { fontSize: 11, fontWeight: '600' },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
+  verifiedBadgeText: { fontSize: 11, fontWeight: '600' },
+  rejectedBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
+  rejectedBadgeText: { fontSize: 11, fontWeight: '600' },
+  taskInfo: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, padding: 12, borderRadius: 8, borderWidth: 1 },
+  taskTitle: { fontSize: 14, fontWeight: '500', flex: 1, lineHeight: 20 },
+  detailsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 12 },
+  detailItem: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
+  detailText: { fontSize: 12 },
+  evidenceRow: { flexDirection: 'row', gap: 8, marginBottom: 12, paddingTop: 8, borderTopWidth: 1 },
+  hasPhotoBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
+  hasPhotoText: { fontSize: 11, fontWeight: '500' },
+  noPhotoBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
+  noPhotoText: { fontSize: 11, fontWeight: '500' },
+  hasNotesBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, gap: 4 },
+  hasNotesText: { fontSize: 11, fontWeight: '500' },
+  quickActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8, paddingTop: 12, borderTopWidth: 1 },
+  quickRejectButton: { borderRadius: 8, overflow: 'hidden', flex: 1 },
+  quickApproveButton: { borderRadius: 8, overflow: 'hidden', flex: 1 },
+  quickActionGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 8, gap: 4 },
+  quickRejectText: { fontSize: 13, fontWeight: '600' },
+  quickApproveText: { fontSize: 13, fontWeight: '600' },
+  adminNotesPreview: { flexDirection: 'row', alignItems: 'center', padding: 8, borderRadius: 8, marginTop: 8, gap: 6, borderWidth: 1 },
+  adminNotesText: { fontSize: 12, flex: 1, fontStyle: 'italic' }
 });

@@ -1,4 +1,4 @@
-// src/screens/FullLeaderboardScreen.tsx - WITH ACCESS CONTROL FOR MEMBERS
+// src/screens/FullLeaderboardScreen.tsx - WITH FIXED ADMIN ACCESS CONTROL
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -28,8 +28,14 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
   const [totalPoints, setTotalPoints] = useState(0);
   const [authError, setAuthError] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
 
-  const isAdmin = userRole === 'ADMIN';
+  // ✅ FIX: More robust admin check - case insensitive and multiple formats
+  const isAdmin = userRole === 'ADMIN' || userRole === 'admin' || currentUserRole === 'ADMIN' || currentUserRole === 'admin';
+  
+  console.log('📱 [FullLeaderboardScreen] Route params:', { groupId, groupName, userRole });
+  console.log('📱 [FullLeaderboardScreen] isAdmin:', isAdmin);
+  console.log('📱 [FullLeaderboardScreen] currentUserRole:', currentUserRole);
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
@@ -41,12 +47,17 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     return hasToken;
   }, []);
 
-  // Get current user ID
+  // Get current user ID and role
   useEffect(() => {
     const getCurrentUser = async () => {
       const user = await TokenUtils.getUser();
       if (user) {
         setCurrentUserId(user.id);
+        // ✅ Also get user role from token/user object
+        if (user.role) {
+          setCurrentUserRole(user.role);
+        }
+        console.log('📱 [FullLeaderboardScreen] Current user:', { id: user.id, role: user.role });
       }
     };
     getCurrentUser();
@@ -84,9 +95,9 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
 
     try {
       const result = await GroupActivityService.getLeaderboard(groupId);
-      console.log('fullleaderboard:', result);
+      console.log('fullleaderboard result:', result);
       if (result.success && result.data?.leaderboard) {
-        console.log('fullleaderboard:', result.data?.leaderboard);
+        console.log('fullleaderboard data length:', result.data.leaderboard.length);
         setLeaderboard(result.data.leaderboard);
         setTotalPoints(result.data.totalPoints || 0);
       } else {
@@ -112,7 +123,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
     loadLeaderboardData();
   };
 
-  // ✅ Handle leaderboard item press - with access control
+  // ✅ FIXED: Handle leaderboard item press - with proper access control
   const handleLeaderboardPress = (member: any) => {
     const memberId = member.userId;
     if (!memberId) {
@@ -120,17 +131,21 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
       return;
     }
     
+    console.log('📱 [LeaderboardPress] Member:', { memberId, currentUserId, isAdmin });
+    
     // ✅ Check if user is clicking on their own profile
     if (memberId === currentUserId) {
       // Navigate to own details
+      console.log('📱 [LeaderboardPress] Navigating to own profile');
       navigation.navigate('MemberContributions', { 
         groupId, 
         groupName, 
         memberId,
-        userRole: userRole || 'MEMBER'
+        userRole: 'MEMBER' // They are viewing themselves
       });
     } else if (isAdmin) {
-      // Admin can view any member's details
+      // ✅ Admin can view any member's details
+      console.log('📱 [LeaderboardPress] Admin viewing member:', member.fullName);
       navigation.navigate('MemberContributions', { 
         groupId, 
         groupName, 
@@ -139,6 +154,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
       });
     } else {
       // Member trying to view another member's details - show alert
+      console.log('📱 [LeaderboardPress] Member blocked from viewing other member');
       Alert.alert(
         'Access Denied',
         'You can only view your own contributions. Admins can view all members.',
@@ -188,7 +204,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
             index === 0 && { borderColor: '#FFD700', borderWidth: 1.5 },
             index === 1 && { borderColor: '#C0C0C0', borderWidth: 1.5 },
             index === 2 && { borderColor: '#CD7F32', borderWidth: 1.5 },
-            isCurrentUser && styles.currentUserItem,
+            isCurrentUser && { borderColor: theme.primary, borderWidth: 2, backgroundColor: theme.primaryLight + '20' },
           ]}
         >
           <View style={styles.rankContainer}>
@@ -273,7 +289,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
           onPress={() => navigation.goBack()}
           style={[styles.backButton, { backgroundColor: theme.card }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.text} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Leaderboard</Text>
         <TouchableOpacity 
@@ -284,7 +300,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
           {refreshing ? (
             <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color={theme.text} />
+            <MaterialCommunityIcons name="refresh" size={20} color={theme.primary} />
           )}
         </TouchableOpacity>
       </View>
@@ -298,6 +314,13 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
       >
         <MaterialCommunityIcons name="account-group" size={16} color={theme.textMuted} />
         <Text style={[styles.groupBannerText, { color: theme.textSecondary }]}>{groupName}</Text>
+        {/* ✅ Show admin badge for admins */}
+        {isAdmin && (
+          <View style={styles.adminBadge}>
+            <MaterialCommunityIcons name="shield-crown" size={14} color="#FFD700" />
+            <Text style={styles.adminBadgeText}>Admin</Text>
+          </View>
+        )}
       </LinearGradient>
 
       <FlatList
@@ -311,6 +334,7 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
             onRefresh={handleRefresh}
             colors={[theme.primary]}
             tintColor={theme.primary}
+            progressBackgroundColor={theme.bgSecondary}
           />
         }
         ListHeaderComponent={
@@ -325,6 +349,12 @@ export const FullLeaderboardScreen = ({ navigation, route }: any) => {
             <Text style={[styles.statsSubtitle, { color: theme.textMuted }]}>
               {leaderboard.length} members • Based on verified points only
             </Text>
+            {/* ✅ Show admin hint */}
+            {isAdmin && (
+              <Text style={[styles.adminHint, { color: theme.textMuted }]}>
+                👑 As admin, you can view any member's contributions
+              </Text>
+            )}
           </View>
         }
         ListEmptyComponent={
@@ -398,9 +428,30 @@ const styles = StyleSheet.create({
   groupBannerText: {
     fontSize: 14,
     fontWeight: '500',
+    flex: 1,
+  },
+  adminBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  adminBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFD700',
+  },
+  adminHint: {
+    fontSize: 11,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   listContent: {
     padding: 16,
+  
   },
   statsHeader: {
     marginBottom: 20,
@@ -515,11 +566,6 @@ const styles = StyleSheet.create({
   pointsLabel: {
     fontSize: 10,
   },
-  currentUserItem: {
-    borderWidth: 2,
-    borderColor: '#2b8a3e',
-    backgroundColor: '#ebfbee',
-  },
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -574,4 +620,4 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#fff',
   },
-});
+}); 

@@ -432,7 +432,7 @@ const loadGroupData = async () => {
   const handleViewFullLeaderboard = async () => {
     const hasToken = await checkToken();
     if (!hasToken) return;
-    navigation.navigate('FullLeaderboard', { groupId, groupName });
+    navigation.navigate('FullLeaderboard', { groupId, groupName,userRole });
     onClose();
   };
 
@@ -638,7 +638,7 @@ const renderLeaderboardItem = (item: any, index: number) => {
               <Text style={[styles.modalTitle, { color: theme.text }]}>{groupName}</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={[styles.closeButton, { backgroundColor: theme.bgTertiary }]}>
-              <MaterialCommunityIcons name="close" size={20} color={theme.textMuted} />
+              <MaterialCommunityIcons name="close" size={20} color={theme.primary} />
             </TouchableOpacity>
           </View>
 

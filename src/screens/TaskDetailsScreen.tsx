@@ -811,7 +811,7 @@ const renderAllWeekAssignments = () => {
     
     return 0;
   });
-  
+
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>

@@ -1,4 +1,4 @@
-// src/screens/NeglectedTasksScreen.tsx - FIXED with direct navigation to AssignmentDetails
+// src/screens/NeglectedTasksScreen.tsx - WITH PHT TIME CONVERSION
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -33,6 +33,62 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
 
   const isMounted = useRef(true);
   const initialLoadDone = useRef(false);
+
+  // ✅ Convert UTC to Philippine Time (UTC+8)
+  const toPHT = (date: Date | string): Date => {
+    const d = new Date(date);
+    // Add 8 hours for PHT
+    return new Date(d.getTime() + (8 * 60 * 60 * 1000));
+  };
+
+  // ✅ Format date to Philippine Time with AM/PM
+  const formatPHTDate = (date: Date | string | null | undefined): string => {
+    if (!date) return 'N/A';
+    try {
+      const phtDate = toPHT(date);
+      return phtDate.toLocaleDateString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (e) {
+      return 'Invalid date';
+    }
+  };
+
+  // ✅ Format time to 12-hour format with AM/PM
+  const formatTime12Hour = (timeString: string): string => {
+    if (!timeString) return '';
+    
+    // Handle format like "09:00" or "14:30"
+    const [hourStr, minuteStr] = timeString.split(':');
+    let hour = parseInt(hourStr || '0', 10);
+    const minute = minuteStr || '00';
+    
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    hour = hour % 12;
+    if (hour === 0) hour = 12;
+    
+    return `${hour}:${minute} ${ampm}`;
+  };
+
+  // ✅ Format datetime to full PHT with time
+  const formatPHTDateTime = (date: Date | string | null | undefined): string => {
+    if (!date) return 'N/A';
+    try {
+      const phtDate = toPHT(date);
+      return phtDate.toLocaleString('en-PH', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch (e) {
+      return 'Invalid date';
+    }
+  };
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
@@ -98,7 +154,7 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
       } else {
         result = await AssignmentService.getUserNeglectedTasks({ groupId });
         if (result.success && isMounted.current) {
-          console.log('User Neglected data: ',result.data.tasks)
+          console.log('User Neglected data: ', result.data.tasks);
           setNeglectedTasks(result.data.tasks || []);
           const totalCount = result.data.summary?.total || result.data.total || 0;
           setStats({
@@ -129,7 +185,7 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
     }
   }, []);
 
-  // ✅ FIXED: Navigate directly to AssignmentDetails
+  // ✅ Navigate directly to AssignmentDetails
   const handleTaskPress = (task: any) => {
     console.log('📋 Navigating to AssignmentDetails for neglected task:', task.id);
     navigation.navigate('AssignmentDetails', {
@@ -139,88 +195,125 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
     });
   };
 
-  const renderTaskItem = ({ item }: any) => (
-    <TouchableOpacity
-      style={[styles.taskCard, { borderColor: theme.errorBorder ?? '#ffc9c9' }]}
-      onPress={() => handleTaskPress(item)}
-      activeOpacity={0.7}
-    >
-      <LinearGradient
-        colors={[theme.card, theme.bgSecondary]}
-        style={styles.taskCardGradient}
+  const renderTaskItem = ({ item }: any) => {
+    // ✅ Format dates in PHT
+    const dueDateFormatted = formatPHTDateTime(item.dueDate);
+    const expiredAtFormatted = formatPHTDateTime(item.expiredAt);
+    
+    // ✅ Format time slot in 12-hour format
+    const timeSlotFormatted = item.timeSlot 
+      ? `${formatTime12Hour(item.timeSlot.startTime)} - ${formatTime12Hour(item.timeSlot.endTime)}`
+      : '';
+    
+    return (
+      <TouchableOpacity
+        style={[styles.taskCard, { borderColor: theme.errorBorder ?? '#ffc9c9' }]}
+        onPress={() => handleTaskPress(item)}
+        activeOpacity={0.7}
       >
-        <View style={styles.taskHeader}>
-          <View style={styles.taskTitleContainer}>
-            <MaterialCommunityIcons name="timer-off" size={20} color={theme.error} />
-            <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={1}>
-              {item.taskTitle}
-            </Text>
-          </View>
-          <Text style={[styles.pointsLost, { color: theme.error }]}>-{item.points} pts</Text>
-        </View>
-
-        {isAdmin && item.user && (
-          <View style={[styles.userInfo, { backgroundColor: theme.bgSecondary }]}>
-            <LinearGradient
-              colors={[theme.primary, theme.primaryDark]}
-              style={styles.userAvatar}
-            >
-              <Text style={styles.userAvatarText}>
-                {item.user.fullName?.charAt(0) || 'U'}
+        <LinearGradient
+          colors={[theme.card, theme.bgSecondary]}
+          style={styles.taskCardGradient}
+        >
+          <View style={styles.taskHeader}>
+            <View style={styles.taskTitleContainer}>
+              <MaterialCommunityIcons name="timer-off" size={20} color={theme.error} />
+              <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={1}>
+                {item.taskTitle}
               </Text>
-            </LinearGradient>
-            <Text style={[styles.userName, { color: theme.textSecondary }]}>
-              {item.user.fullName}
-            </Text>
+            </View>
+            <Text style={[styles.pointsLost, { color: theme.error }]}>-{item.points} pts</Text>
           </View>
-        )}
 
-        <View style={styles.taskDetails}>
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="calendar" size={14} color={theme.textMuted} />
-            <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-              Due: {new Date(item.dueDate).toLocaleDateString()}
-            </Text>
-          </View>
-          <View style={styles.detailRow}>
-            <MaterialCommunityIcons name="clock-alert" size={14} color={theme.error} />
-            <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-              Missed: {item.expiredAt ? new Date(item.expiredAt).toLocaleDateString() : 'N/A'}
-            </Text>
-          </View>
-          {item.timeSlot && (
-            <View style={styles.detailRow}>
-              <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
-              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
-                {item.timeSlot.startTime} - {item.timeSlot.endTime}
-                {item.timeSlot.label && ` (${item.timeSlot.label})`}
+          {isAdmin && item.user && (
+            <View style={[styles.userInfo, { backgroundColor: theme.bgSecondary }]}>
+              <LinearGradient
+                colors={[theme.primary, theme.primaryDark]}
+                style={styles.userAvatar}
+              >
+                <Text style={styles.userAvatarText}>
+                  {item.user.fullName?.charAt(0) || 'U'}
+                </Text>
+              </LinearGradient>
+              <Text style={[styles.userName, { color: theme.textSecondary }]}>
+                {item.user.fullName}
               </Text>
             </View>
           )}
-        </View>
 
-        {item.notes && item.notes.includes('[NEGLECTED]') && (
-          <LinearGradient
-            colors={[theme.errorBg ?? '#fff5f5', theme.errorBg ?? '#ffe3e3']}
-            style={styles.notesContainer}
-          >
-            <MaterialCommunityIcons name="alert-circle" size={14} color={theme.error} />
-            <Text style={[styles.notesText, { color: theme.error }]} numberOfLines={2}>
-              {item.notes}
+          <View style={styles.taskDetails}>
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="calendar" size={14} color={theme.textMuted} />
+              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+                Due: {dueDateFormatted}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <MaterialCommunityIcons name="clock-alert" size={14} color={theme.error} />
+              <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+                Missed: {expiredAtFormatted}
+              </Text>
+            </View>
+            {item.timeSlot && (
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+                <Text style={[styles.detailText, { color: theme.textSecondary }]}>
+                  {timeSlotFormatted}
+                  {item.timeSlot.label && ` (${item.timeSlot.label})`}
+                </Text>
+              </View>
+            )}
+            {/* ✅ Show days ago in PHT */}
+            {item.daysAgo !== undefined && item.daysAgo > 0 && (
+              <View style={styles.detailRow}>
+                <MaterialCommunityIcons name="calendar-remove" size={14} color={theme.error} />
+                <Text style={[styles.detailText, { color: theme.error, fontWeight: '500' }]}>
+                  {item.daysAgo} day{item.daysAgo !== 1 ? 's' : ''} ago
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {item.missedSlotsDetails && item.missedSlotsDetails.length > 0 && (
+            <View style={[styles.missedSlotsContainer, { backgroundColor: theme.errorBg ?? '#fff5f5' }]}>
+              <Text style={[styles.missedSlotsTitle, { color: theme.error }]}>
+                Missed Time Slots:
+              </Text>
+              {item.missedSlotsDetails.map((slot: any, idx: number) => (
+                <View key={idx} style={styles.missedSlotRow}>
+                  <MaterialCommunityIcons name="timer-off" size={12} color={theme.error} />
+                  <Text style={[styles.missedSlotText, { color: theme.textSecondary }]}>
+                    {formatTime12Hour(slot.startTime)} - {formatTime12Hour(slot.endTime)}
+                    {slot.label && ` (${slot.label})`} • -{slot.points} pts
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {item.notes && item.notes.includes('[EXPIRED]') && (
+            <LinearGradient
+              colors={[theme.errorBg ?? '#fff5f5', theme.errorBg ?? '#ffe3e3']}
+              style={styles.notesContainer}
+            >
+              <MaterialCommunityIcons name="alert-circle" size={14} color={theme.error} />
+              <Text style={[styles.notesText, { color: theme.error }]} numberOfLines={2}>
+                {item.notes}
+              </Text>
+            </LinearGradient>
+          )}
+          
+          {/* ✅ Add indicator that this is a neglected task */}
+          <View style={styles.neglectedFooter}>
+            <MaterialCommunityIcons name="timer-off" size={12} color={theme.error} />
+            <Text style={[styles.neglectedFooterText, { color: theme.error }]}>
+              Task was missed - No points awarded
             </Text>
-          </LinearGradient>
-        )}
-        
-        {/* ✅ Add indicator that this is a neglected task */}
-        <View style={styles.neglectedFooter}>
-          <MaterialCommunityIcons name="timer-off" size={12} color={theme.error} />
-          <Text style={[styles.neglectedFooterText, { color: theme.error }]}>
-            Task was missed - No points awarded
-          </Text>
-        </View>
-      </LinearGradient>
-    </TouchableOpacity>
-  );
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   const renderHeader = () => {
     if (!stats) return null;
@@ -335,7 +428,7 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
           onPress={() => navigation.goBack()}
           style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
-          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.textMuted} />
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
           {groupName} - Neglected Tasks
@@ -611,4 +704,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     lineHeight: 20,
   },
-}); 
+  missedSlotsContainer: {
+    marginTop: 8,
+    padding: 8,
+    borderRadius: 8,
+  },
+  missedSlotsTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  missedSlotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  missedSlotText: {
+    fontSize: 11,
+  },
+});

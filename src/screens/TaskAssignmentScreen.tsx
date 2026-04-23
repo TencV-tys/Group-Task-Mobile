@@ -1,4 +1,4 @@
-// src/screens/TaskAssignmentScreen.tsx - FULLY UPDATED with Avatar Images
+// src/screens/TaskAssignmentScreen.tsx - FULLY UPDATED CLEAN VERSION
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
@@ -21,6 +21,7 @@ import { ScreenWrapper } from '../components/ScreenWrapper';
 import { useTheme } from '../context/ThemeContext'; 
 import { useRealtimeTasks } from '../hooks/useRealtimeTasks';
 import { useRealtimeSwapRequests } from '../hooks/useRealtimeSwapRequests';
+import { RotationPreviewModal } from '../components/RotationPreviewModal';
 
 export default function TaskAssignmentScreen({ navigation, route }: any) {
   const { theme } = useTheme();
@@ -41,6 +42,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
   const [selectedTask, setSelectedTask] = useState<any>(null);
   const [showAssigneeModal, setShowAssigneeModal] = useState(false);
   const [isReassigning, setIsReassigning] = useState(false);
+  const [showRotationPreview, setShowRotationPreview] = useState(false);
 
   // ===== REAL-TIME UPDATES =====
   const { events: taskEvents, clearTaskUpdated } = useRealtimeTasks(groupId);
@@ -183,7 +185,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
       (item.acquiredViaSwap === true && item.swapScope === 'week') ||
       (item.assignment?.acquiredViaSwap === true && item.assignment?.swapScope === 'week') ||
       (item.userAssignment?.acquiredViaSwap === true && item.userAssignment?.swapScope === 'week');
-    console.log('🔍 Task:', item.title, 'isAcquiredViaWeekSwap:', isAcquiredViaWeekSwap);
+    
     const swappedFromName = 
       item.swappedFromName ||
       item.assignment?.swappedFromName ||
@@ -208,7 +210,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
           end={{ x: 1, y: 1 }}
           style={[
             styles.taskCard, 
-            { borderColor: theme.border, shadowColor: theme.shadow },
+            { borderColor: theme.border },
             isAcquiredViaWeekSwap && styles.swappedTaskCard
           ]}
         >
@@ -383,56 +385,79 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
 
   return (
     <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>
-      {/* Header */}
+      {/* ===== CLEAN HEADER WITH TEST ROTATION BUTTON ===== */}
       <LinearGradient
         colors={[theme.card, theme.bgSecondary]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[styles.header, { borderBottomColor: theme.border }]}
       >
-        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}>
-          <MaterialCommunityIcons name="arrow-left" size={20} color={theme.primary} />
+        {/* LEFT: Back Button */}
+        <TouchableOpacity 
+          onPress={() => navigation.goBack()} 
+          style={[styles.backButton, { backgroundColor: theme.card }]}
+        >
+          <MaterialCommunityIcons name="arrow-left" size={22} color={theme.primary} />
         </TouchableOpacity>
         
-        <View style={styles.headerTitleContainer}>
-          <Text style={[styles.headerTitle, { color: theme.text }]}>
+        {/* CENTER: Title & Stats */}
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
             {groupName || 'Task Assignments'}
           </Text>
           <View style={styles.headerStats}>
-            <LinearGradient
-              colors={[theme.bgSecondary, theme.bgTertiary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.headerStat}
-            >
-              <MaterialCommunityIcons name="format-list-checks" size={12} color={theme.textMuted} />
-              <Text style={[styles.headerStatText, { color: theme.textSecondary }]}>{tasks.length} tasks</Text>
-            </LinearGradient>
-            <LinearGradient
-              colors={[theme.bgSecondary, theme.bgTertiary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.headerStat}
-            >
-              <MaterialCommunityIcons name="account-group" size={12} color={theme.textMuted} />
-              <Text style={[styles.headerStatText, { color: theme.textSecondary }]}>{membersInRotation.length} members in rotation</Text>
-            </LinearGradient>
+            <View style={styles.statChip}>
+              <MaterialCommunityIcons name="format-list-checks" size={11} color={theme.textMuted} />
+              <Text style={[styles.statText, { color: theme.textSecondary }]}>{tasks.length} tasks</Text>
+            </View>
+            <View style={styles.statChip}>
+              <MaterialCommunityIcons name="account-group" size={11} color={theme.textMuted} />
+              <Text style={[styles.statText, { color: theme.textSecondary }]}>{membersInRotation.length} members</Text>
+            </View>
           </View>
         </View>
         
-        <TouchableOpacity 
-          onPress={() => loadData(true)}
-          disabled={refreshing}
-          style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
-        >
-          {refreshing ? (
-            <ActivityIndicator size="small" color={theme.primary} />
-          ) : (
-            <MaterialCommunityIcons name="refresh" size={20} color={theme.primary} />
-          )}
-        </TouchableOpacity>
+        {/* RIGHT: Action Buttons */}
+        <View style={styles.headerRight}>
+          {/* Test Rotation Button - KEPT USEFUL */}
+          <TouchableOpacity 
+            style={styles.testRotationButton}
+            onPress={() => setShowRotationPreview(true)}
+          >
+            <LinearGradient
+              colors={[theme.primaryLight, theme.primaryLight]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.testRotationGradient}
+            >
+              <MaterialCommunityIcons name="sync" size={14} color={theme.primary} />
+              <Text style={[styles.testRotationText, { color: theme.primary }]}>Preview</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          
+          {/* Refresh Button */}
+          <TouchableOpacity 
+            style={styles.refreshButton}
+            onPress={() => loadData(true)}
+            disabled={refreshing}
+          >
+            <LinearGradient
+              colors={[theme.bgSecondary, theme.bgTertiary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.refreshGradient}
+            >
+              {refreshing ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : (
+                <MaterialCommunityIcons name="refresh" size={18} color={theme.primary} />
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
+      {/* MAIN CONTENT */}
       {error ? (
         <View style={styles.errorContainer}>
           <MaterialCommunityIcons name="alert-circle" size={48} color={theme.error} />
@@ -468,7 +493,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <MaterialCommunityIcons name="clipboard" size={48} color={theme.border} />
+              <MaterialCommunityIcons name="clipboard-list" size={48} color={theme.border} />
               <Text style={[styles.emptyText, { color: theme.textMuted }]}>No tasks found</Text>
               <Text style={[styles.emptySubtext, { color: theme.textPlaceholder }]}>
                 Create tasks in the Tasks screen first
@@ -478,14 +503,14 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
         />
       )}
 
-      {/* Assignee Selection Modal */}
+      {/* MODALS */}
       <Modal
         visible={showAssigneeModal}
         animationType="slide"
         transparent={true}
         onRequestClose={() => !isReassigning && setShowAssigneeModal(false)}
       >
-        <View style={[styles.modalContainer, { backgroundColor: theme.overlay }]}>
+        <View style={[styles.modalContainer, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
           <LinearGradient
             colors={[theme.card, theme.bgSecondary]}
             start={{ x: 0, y: 0 }}
@@ -516,7 +541,6 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 Select a member to assign this task for this week:
               </Text>
               
-              {/* Assignment Rules Info */}
               <LinearGradient
                 colors={[theme.primaryLight, theme.primaryLight]}
                 start={{ x: 0, y: 0 }}
@@ -529,7 +553,6 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 </Text>
               </LinearGradient>
 
-              {/* Available Members Section */}
               <Text style={[styles.sectionHeader, { color: theme.text, borderBottomColor: theme.border }]}>
                 Available Members
               </Text>
@@ -605,9 +628,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                             {isCurrentAssignee && ' (Current)'}
                           </Text>
                           <View style={styles.memberMeta}>
-                            <Text style={[styles.memberRole, { color: theme.textMuted }]}>
-                              Member
-                            </Text>
+                            <Text style={[styles.memberRole, { color: theme.textMuted }]}>Member</Text>
                             {member.rotationOrder && (
                               <LinearGradient
                                 colors={[theme.bgSecondary, theme.bgTertiary]}
@@ -641,7 +662,6 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 });
               })()}
 
-              {/* Already Assigned Members */}
               {(() => {
                 const assignedMemberIds = getAssignedMembersForWeek();
                 const assignedMembers = membersInRotation.filter(member => 
@@ -689,9 +709,7 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                                 {member.fullName}
                               </Text>
                               <View style={styles.memberMeta}>
-                                <Text style={[styles.memberRole, styles.disabledText, { color: theme.textPlaceholder }]}>
-                                  Member
-                                </Text>
+                                <Text style={[styles.memberRole, styles.disabledText, { color: theme.textPlaceholder }]}>Member</Text>
                                 {assignedTask && (
                                   <Text style={[styles.memberOrder, styles.disabledText, { color: theme.textPlaceholder }]}>
                                     {assignedTask.title}
@@ -733,10 +751,19 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
           </LinearGradient>
         </View>
       </Modal>
+      
+      {/* Rotation Preview Modal - Preview ONLY, no apply button */}
+      <RotationPreviewModal
+        visible={showRotationPreview}
+        onClose={() => setShowRotationPreview(false)}
+        groupId={groupId}
+        groupName={groupName}
+      />
     </ScreenWrapper>
   );
 }
 
+// ===== STYLES =====
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
@@ -750,6 +777,8 @@ const styles = StyleSheet.create({
     marginTop: 12, 
     fontSize: 14 
   },
+  
+  // ===== HEADER STYLES =====
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -757,11 +786,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
+    minHeight: 70,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     shadowOffset: { width: 0, height: 2 },
@@ -769,44 +799,70 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  headerTitleContainer: {
+  headerCenter: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 8
+    justifyContent: 'center',
+    paddingHorizontal: 8,
   },
-  headerTitle: { 
-    fontSize: 16, 
-    fontWeight: '600', 
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 4
+    marginBottom: 4,
+    maxWidth: 180,
   },
   headerStats: {
     flexDirection: 'row',
     gap: 8,
   },
-  headerStat: {
+  statChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.05)',
   },
-  headerStatText: {
-    fontSize: 11,
+  statText: {
+    fontSize: 10,
     fontWeight: '500',
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  testRotationButton: {
+    overflow: 'hidden',
+    borderRadius: 20,
+  },
+  testRotationGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 6,
+    borderRadius: 20,
+  },
+  testRotationText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   refreshButton: {
+    overflow: 'hidden',
+    borderRadius: 20,
+  },
+  refreshGradient: {
     width: 36,
     height: 36,
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
   },
+
+  // ===== ERROR STYLES =====
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -831,6 +887,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16
   },
+  
+  // ===== LIST STYLES =====
   listContainer: { 
     padding: 16 
   },
@@ -961,8 +1019,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   assigneeInfo: {
-    flex: 1
-  },
+    flex: 1  },
   assigneeName: {
     fontSize: 14,
     fontWeight: '500',
@@ -1012,6 +1069,8 @@ const styles = StyleSheet.create({
     fontSize: 12
   },
   changeButtonTextDisabled: {},
+  
+  // ===== EMPTY STATE =====
   emptyContainer: {
     alignItems: 'center',
     padding: 40
@@ -1026,6 +1085,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center'
   },
+  
+  // ===== MODAL STYLES =====
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end'
@@ -1033,7 +1094,7 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: '92%',
+    maxHeight: '90%',
     overflow: 'hidden',
   },
   modalHeader: {
@@ -1226,5 +1287,5 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-  }
+  },
 });

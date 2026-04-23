@@ -9,7 +9,7 @@ const API_URL = `${API_BASE_URL}/api/tasks`;
 function cleanTaskData(obj: any): any {
   if (obj === null || obj === undefined) {
     return undefined;
-  }
+  } 
   
   if (Array.isArray(obj)) {
     return obj
@@ -363,6 +363,39 @@ export class TaskService {
       return {
         success: false,
         message: error.message || 'Failed to get rotation status'
+      };
+    }
+  }
+
+   static async previewRotation(groupId: string) {
+    try {
+      console.log(`TaskService: Previewing rotation for group ${groupId}`);
+      
+      const headers = await TokenUtils.getAuthHeaders();
+      
+      const response = await fetch(`${API_URL}/group/${groupId}/preview-rotation`, {
+        method: 'GET',
+        headers,
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log(`✅ Rotation preview retrieved: Week ${result.data.currentWeek} → Week ${result.data.nextWeek}`);
+        console.log(`   Members: ${result.data.membersInRotation}, Tasks: ${result.data.tasksCount}`);
+        console.log(`   Offset: ${result.data.rotationOffset}`);
+        if (result.data.conflicts?.length > 0) {
+          console.log(`   ⚠️ Conflicts detected: ${result.data.conflicts.length}`);
+        }
+      }
+      
+      return result;
+
+    } catch (error: any) {
+      console.error('TaskService.previewRotation error:', error);
+      return {
+        success: false,
+        message: error.message || 'Failed to preview rotation'
       };
     }
   }

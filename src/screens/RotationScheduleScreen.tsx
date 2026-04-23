@@ -91,89 +91,135 @@ export default function RotationScheduleScreen({ route, navigation }: any) {
     }
   }, [weeks, selectedWeek, currentWeek, setSelectedWeek]);
 
-  // Extract members and tasks from current week data
-  useEffect(() => {
-    if (selectedWeekData && selectedWeekData.tasks) {
-      const memberMap = new Map();
-      const taskList: any[] = [];
-      
-      selectedWeekData.tasks.forEach((task: any) => {
-        if (task.assigneeId && task.assigneeName) {
-          memberMap.set(task.assigneeId, {
-            id: task.assigneeId,
-            name: task.assigneeName,
-            avatarUrl: task.assigneeAvatar
-          });
-        }
-        
-        taskList.push({
-          id: task.taskId,
-          title: task.taskTitle,
-          points: task.points || 0,
-          currentAssigneeId: task.assigneeId,
-          currentAssigneeName: task.assigneeName
-        });
-      });
-      
-      setMembers(Array.from(memberMap.values()));
-      
-      const sortedTasks = [...taskList].sort((a, b) => b.points - a.points);
-      setTasks(sortedTasks);
-      
-      generatePredictions(Array.from(memberMap.values()), sortedTasks);
-    }
-  }, [selectedWeekData]);
+// In RotationScheduleScreen.tsx - FIXED member extraction
 
-  // Generate predictions with WEEKLY rotation
-  const generatePredictions = (memberList: any[], taskList: any[]) => {
-    if (memberList.length === 0 || taskList.length === 0) return;
+useEffect(() => {
+  if (selectedWeekData && selectedWeekData.tasks) {
+    const memberMap = new Map();
+    const taskList: any[] = [];
     
-    const taskCount = taskList.length;
-    const sortedTasks = [...taskList].sort((a, b) => b.points - a.points);
-    const sortedMembers = [...memberList].sort((a, b) => a.name.localeCompare(b.name));
-    
-    const preds = [];
-    
-    for (let weekOffset = 0; weekOffset < 8; weekOffset++) {
-      const weekNumber = currentWeek + weekOffset + 1;
-      const assignments = [];
-      
-      for (let i = 0; i < sortedMembers.length; i++) {
-        const taskIndex = (i + weekOffset) % taskCount;
-        
-        assignments.push({
-          memberId: sortedMembers[i].id,
-          memberName: sortedMembers[i].name,
-          taskId: sortedTasks[taskIndex].id,
-          taskTitle: sortedTasks[taskIndex].title,
-          taskPoints: sortedTasks[taskIndex].points,
-          taskRank: taskIndex + 1,
-          weekNumber
+    selectedWeekData.tasks.forEach((task: any) => {
+      if (task.assigneeId && task.assigneeName) {
+        // ✅ CRITICAL: Store the CORRECT rotationOrder
+        // The rotationOrder comes from the backend's member order
+        memberMap.set(task.assigneeId, {
+          id: task.assigneeId,
+          name: task.assigneeName,
+          avatarUrl: task.assigneeAvatar,
+          rotationOrder: task.assigneeRotationOrder || task.rotationOrder || memberMap.size + 1
         });
       }
       
-      const pointsByMember: Record<string, number> = {};
-      assignments.forEach(a => {
-        pointsByMember[a.memberId] = (pointsByMember[a.memberId] || 0) + a.taskPoints;
+      taskList.push({
+        id: task.taskId,
+        title: task.taskTitle,
+        points: task.points || 0,
+        currentAssigneeId: task.assigneeId,
+        currentAssigneeName: task.assigneeName
       });
+    });
+    
+    // ✅ Convert Map to array and sort by rotationOrder
+    const membersArray = Array.from(memberMap.values());
+    const sortedMembers = membersArray.sort((a, b) => a.rotationOrder - b.rotationOrder);
+    
+    console.log('📊 Extracted members with rotationOrder:', sortedMembers);
+    
+    setMembers(sortedMembers);
+    
+    const sortedTasks = [...taskList].sort((a, b) => b.points - a.points);
+    setTasks(sortedTasks);
+    
+    generatePredictions(sortedMembers, sortedTasks);
+  }
+}, [selectedWeekData]);
+
+  // In useRotationSchedule.ts - COMPLETELY FIXED generatePredictions
+
+const generatePredictions = (memberList: any[], taskList: any[]) => {
+  if (memberList.length === 0 || taskList.length === 0) return;
+  
+  const taskCount = taskList.length;
+  
+  // ✅ Sort tasks by points HIGHEST to LOWEST (same as backend)
+  const sortedTasks = [...taskList].sort((a, b) => b.points - a.points);
+  
+  // ✅ FIX: Sort members by rotationOrder (NOT by name!)
+  // This MUST match the backend order: orderBy: { rotationOrder: 'asc' }
+  const sortedMembers = [...memberList].sort((a, b) => {
+    // Use rotationOrder if available
+    if (a.rotationOrder !== undefined && b.rotationOrder !== undefined) {
+      return a.rotationOrder - b.rotationOrder;
+    }
+    // Fallback to name if no rotationOrder
+    return a.name.localeCompare(b.name);
+  });
+  
+  console.log('\n🎯 ========== PREDICTIONS GENERATED ==========');
+  console.log(`📊 Current Week: ${currentWeek}`);
+  console.log(`👥 Members (${sortedMembers.length}):`, sortedMembers.map((m, i) => `${i}:${m.name}(Order:${m.rotationOrder || i+1})`).join(', '));
+  console.log(`📋 Tasks (${taskCount}):`, sortedTasks.map((t, i) => `${i}:${t.title}(${t.points}pts)`).join(', '));
+  console.log(`🔄 Formula: taskIndex = (memberIndex + (weekNumber - 1)) % ${taskCount}`);
+  console.log('==============================================\n');
+  
+  const preds = [];
+  
+  // ✅ Start from Week 2 (next week)
+  for (let weekOffset = 1; weekOffset <= 8; weekOffset++) {
+    const weekNumber = currentWeek + weekOffset;
+    const assignments = [];
+    
+    console.log(`\n📅 PREDICTING WEEK ${weekNumber} (offset: ${weekOffset}):`);
+    console.log(`   Formula: taskIndex = (memberIndex + ${weekNumber - 1}) % ${taskCount}`);
+    
+    // 🔑 KEY: Using the SAME formula as backend rotateGroupTasks
+    for (let i = 0; i < sortedMembers.length; i++) {
+      const member = sortedMembers[i];
+      // Member at position i gets task at index (i + (weekNumber - 1)) % taskCount
+      const taskIndex = (i + (weekNumber - 1)) % taskCount;
+      const task = sortedTasks[taskIndex];
       
-      const points = Object.values(pointsByMember);
-      const maxPoints = Math.max(...points);
-      const minPoints = Math.min(...points);
-      const fairnessScore = maxPoints > 0 ? Math.round(100 - ((maxPoints - minPoints) / maxPoints) * 100) : 100;
+      console.log(`   Member ${i} (${member.name}) → taskIndex ${taskIndex} → ${task.title} (${task.points}pts)`);
       
-      preds.push({
-        weekNumber,
-        assignments,
-        fairnessScore,
-        maxPoints,
-        minPoints
+      assignments.push({
+        memberId: member.id,
+        memberName: member.name,
+        memberRotationOrder: member.rotationOrder || i + 1,
+        taskId: task.id,
+        taskTitle: task.title,
+        taskPoints: task.points,
+        taskRank: taskIndex + 1,
+        weekNumber
       });
     }
     
-    setPredictions(preds);
-    setRotationCycle(taskCount);
-  };
+    // Calculate fairness score for this week
+    const pointsByMember: Record<string, number> = {};
+    assignments.forEach(a => {
+      pointsByMember[a.memberId] = (pointsByMember[a.memberId] || 0) + a.taskPoints;
+    });
+    
+    const points = Object.values(pointsByMember);
+    const maxPoints = Math.max(...points);
+    const minPoints = Math.min(...points);
+    const fairnessScore = maxPoints > 0 ? Math.round(100 - ((maxPoints - minPoints) / maxPoints) * 100) : 100;
+    
+    console.log(`   📊 Week ${weekNumber} Fairness: ${fairnessScore}% (max:${maxPoints}, min:${minPoints})`);
+    
+    preds.push({
+      weekNumber,
+      assignments,
+      fairnessScore,
+      maxPoints,
+      minPoints
+    });
+  }
+  
+  console.log('\n✅ ========== PREDICTIONS COMPLETE ==========\n');
+  
+  setPredictions(preds);
+  setRotationCycle(taskCount);
+};
 
   // ✅ Helper function to convert 24h time to 12h AM/PM format
 const formatTo12Hour = (time24: string) => {
@@ -346,48 +392,88 @@ const getVerifiedDistributionByDay = () => {
     );
   };
 
-  const renderCycleSummary = () => {
-    if (predictions.length === 0) return null;
-    
-    const firstPrediction = predictions[0];
-    const membersList = firstPrediction.assignments.map((a: any) => ({
-      id: a.memberId,
-      name: a.memberName
-    }));
-    
-    const memberCount = membersList.length;
-    
-    return (
-      <LinearGradient
-        colors={[theme.card, theme.bgSecondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.cycleCard, { borderColor: theme.border }]}
-      >
-        <Text style={[styles.cycleTitle, { color: theme.primary }]}>🔄 Weekly Rotation Cycle</Text>
-        <Text style={[styles.cycleDescription, { color: theme.textMuted }]}>
-          Tasks rotate to the NEXT member EVERY WEEK • After {memberCount} weeks, each task returns to its original member
-        </Text>
+ const renderCycleSummary = () => {
+  if (predictions.length === 0) return null;
+  
+  // ✅ Get current week assignments (Week 1)
+  const currentWeekTasks = selectedWeekData?.tasks || [];
+  
+  // Create a map of memberId -> taskRank for current week
+  const currentWeekMap = new Map();
+  const allTasks = [...currentWeekTasks];
+  const sortedByPoints = [...allTasks].sort((a, b) => b.points - a.points);
+  
+  currentWeekTasks.forEach((task: any) => {
+    const rank = sortedByPoints.findIndex(t => t.taskId === task.taskId) + 1;
+    currentWeekMap.set(task.assigneeId, {
+      taskRank: rank,
+      taskTitle: task.taskTitle,
+      taskPoints: task.points
+    });
+  });
+  
+  const firstPrediction = predictions[0];
+  const membersList = firstPrediction?.assignments?.map((a: any) => ({
+    id: a.memberId,
+    name: a.memberName
+  })) || [];
+  
+  const memberCount = membersList.length;
+  
+  return (
+    <LinearGradient
+      colors={[theme.card, theme.bgSecondary]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.cycleCard, { borderColor: theme.border }]}
+    >
+      <Text style={[styles.cycleTitle, { color: theme.primary }]}>🔄 Weekly Rotation Cycle</Text>
+      <Text style={[styles.cycleDescription, { color: theme.textMuted }]}>
+        Tasks rotate to the NEXT member EVERY WEEK • After {memberCount} weeks, each task returns to its original member
+      </Text>
+      
+      <View style={styles.cycleGrid}>
+        {/* Header Row */}
+        <View style={styles.cycleHeader}>
+          <Text style={[styles.cycleMemberName, { color: theme.textMuted, fontWeight: '700' }]}>Member</Text>
+          <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 1</Text>
+          <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 2</Text>
+          <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 3</Text>
+          <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 4</Text>
+        </View>
         
-        <View style={styles.cycleGrid}>
-          <View style={styles.cycleHeader}>
-            <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Member</Text>
-            <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 1</Text>
-            <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 2</Text>
-            <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 3</Text>
-            <Text style={[styles.cycleHeaderText, { color: theme.textMuted }]}>Week 4</Text>
-          </View>
+        {/* Data Rows */}
+        {membersList.slice(0, 4).map((member: any) => {
+          const week1Data = currentWeekMap.get(member.id);
           
-          {membersList.slice(0, 4).map((member: any, idx: number) => (
+          return (
             <View key={member.id} style={styles.cycleRow}>
               <Text style={[styles.cycleMemberName, { color: theme.text }]} numberOfLines={1}>
-                {member.name.split(' ')[0]}
+                {member.name?.split(' ')[0] || member.name}
               </Text>
-              {[0, 1, 2, 3].map(weekOffset => {
+              
+              {/* Week 1 - from actual current week */}
+              <View style={styles.cycleCell}>
+                {week1Data && (
+                  <LinearGradient
+                    colors={[getTaskRankColor(week1Data.taskRank, rotationCycle) + '20', getTaskRankColor(week1Data.taskRank, rotationCycle) + '10']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.cycleRankBadge, { borderColor: getTaskRankColor(week1Data.taskRank, rotationCycle) }]}
+                  >
+                    <Text style={[styles.cycleRankText, { color: getTaskRankColor(week1Data.taskRank, rotationCycle) }]}>
+                      #{week1Data.taskRank}
+                    </Text>
+                  </LinearGradient>
+                )}
+              </View>
+              
+              {/* Weeks 2, 3, 4 from predictions */}
+              {[0, 1, 2].map(weekOffset => {
                 const pred = predictions[weekOffset];
                 if (!pred) return <View key={weekOffset} style={styles.cycleCell} />;
                 
-                const assignment = pred.assignments.find((a: any) => a.memberId === member.id);
+                const assignment = pred.assignments?.find((a: any) => a.memberId === member.id);
                 if (!assignment) return <View key={weekOffset} style={styles.cycleCell} />;
                 
                 const rankColor = getTaskRankColor(assignment.taskRank, rotationCycle);
@@ -408,16 +494,17 @@ const getVerifiedDistributionByDay = () => {
                 );
               })}
             </View>
-          ))}
-        </View>
-        
-        <Text style={[styles.cycleNote, { color: theme.textMuted }]}>
-          * Tasks rotate to the NEXT member each week • After {memberCount} weeks, every member has held every task
-        </Text>
-      </LinearGradient>
-    );
-  };
-
+          );
+        })}
+      </View>
+      
+      <Text style={[styles.cycleNote, { color: theme.textMuted }]}>
+        * Tasks rotate to the NEXT member each week • After {memberCount} weeks, every member has held every task
+      </Text>
+    </LinearGradient>
+  );
+};
+  
   // ✅ UPDATED: Week tab with badge OUTSIDE the button
   const renderWeekTab = (week: any) => {
     if (!week) return null;

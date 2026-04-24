@@ -513,14 +513,13 @@ const renderLeaderboardItem = (item: any, index: number) => {
 
   const isCurrentUser = item.userId === currentUserId;
 
-  // Optional: Add Cloudinary URL optimization
-  const getOptimizedAvatarUrl = (url: string) => {
-    if (!url) return null;
-    if (url.includes('cloudinary.com')) {
-      return url.replace('/upload/', '/upload/w_32,h_32,c_fill/');
-    }
-    return url;
-  };
+const getOptimizedAvatarUrl = (url: string) => {
+  if (!url) return null;
+  if (url.includes('cloudinary.com')) {
+    return url.replace('/upload/', '/upload/w_96,h_96,c_fill,q_auto,f_auto/');
+  }
+  return url;
+};
 
   return (
     <TouchableOpacity
@@ -556,12 +555,13 @@ const renderLeaderboardItem = (item: any, index: number) => {
           {/* ✅ UPDATED: Cloudinary avatar with fallback */}
           {item.avatarUrl ? (
             <Image 
-              source={{ uri: getOptimizedAvatarUrl(item.avatarUrl) } as any} 
-              style={styles.userAvatarImage}
-              onError={(e) => {
+  source={{ uri: getOptimizedAvatarUrl(item.avatarUrl) } as any} 
+  style={styles.userAvatarImage}
+  resizeMode="cover"
+    onError={(e) => {
                 console.log('Failed to load avatar:', item.avatarUrl);
               }}
-            />
+/>
           ) : (
             <View style={styles.userAvatar}>
               <Text style={styles.userInitial}>

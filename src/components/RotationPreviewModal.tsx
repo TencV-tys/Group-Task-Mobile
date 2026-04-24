@@ -1,4 +1,4 @@
-// src/components/RotationPreviewModal.tsx - COMPLETE VERSION WITH EXPLANATION
+// src/components/RotationPreviewModal.tsx - COMPLETE FIXED VERSION
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -150,10 +150,28 @@ export const RotationPreviewModal: React.FC<RotationPreviewModalProps> = ({
     );
   };
 
+  // ✅ FIXED: Sort by task points (HIGHEST to LOWEST) - NO rotation order!
 const renderAssignmentSection = (title: string, assignments: any[], isCurrent: boolean) => {
   if (!assignments || assignments.length === 0) return null;
   
-  const sorted = [...assignments].sort((a, b) => a.rotationOrder - b.rotationOrder);
+  // Filter out "No task assigned" entries
+  const validAssignments = assignments.filter(a => a.taskId !== null && a.taskPoints > 0);
+  
+  if (validAssignments.length === 0) {
+    return (
+      <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
+        <View style={styles.emptyAssignments}>
+          <Text style={[styles.emptyAssignmentsText, { color: theme.textMuted }]}>
+            No assignments for this week
+          </Text>
+        </View>
+      </View>
+    );
+  }
+  
+  // ✅ Sort by task points (HIGHEST to LOWEST) - THIS IS WHAT YOU WANT
+  const sorted = [...validAssignments].sort((a, b) => b.taskPoints - a.taskPoints);
   
   return (
     <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -174,23 +192,24 @@ const renderAssignmentSection = (title: string, assignments: any[], isCurrent: b
             ]}
           >
             <View style={styles.memberInfo}>
+              {/* ✅ Show rank by POINTS (1, 2, 3...) NOT rotation order */}
               <LinearGradient
                 colors={isHighest ? ['#FFD700', '#FFA500'] : [theme.primary, theme.primaryDark]}
                 style={[styles.rankBadge, isHighest && styles.highestBadge]}
               >
-                <Text style={styles.rankText}>{item.rotationOrder}</Text>
+                <Text style={styles.rankText}>{idx + 1}</Text>
               </LinearGradient>
               <Text style={[styles.memberName, { color: theme.text }]}>
                 {item.memberName}
               </Text>
               {isHighest && (
                 <View style={styles.topRankTag}>
-                  <Text style={styles.topRankTagText}>🏆 Top</Text>
+                  <Text style={styles.topRankTagText}>🏆 Highest Points</Text>
                 </View>
               )}
               {isLowest && (
                 <View style={styles.bottomRankTag}>
-                  <Text style={styles.bottomRankTagText}>⬇️ Bottom</Text>
+                  <Text style={styles.bottomRankTagText}>⬇️ Lowest Points</Text>
                 </View>
               )}
             </View>
@@ -216,7 +235,6 @@ const renderAssignmentSection = (title: string, assignments: any[], isCurrent: b
   );
 };
 
-
   const renderArrow = () => (
     <View style={styles.arrowContainer}>
       <LinearGradient
@@ -234,51 +252,58 @@ const renderAssignmentSection = (title: string, assignments: any[], isCurrent: b
     </View>
   );
 
-  // ✅ UPDATED: Manual Override Explanation Component - Don't Mind Version
-const renderManualOverrideExplanation = () => {
-  if (!previewData?.conflicts || previewData.conflicts.length === 0) return null;
-  
-  return (
-    <View style={[styles.explanationCard, { 
-      backgroundColor: theme.primaryLight + '20', 
-      borderColor: theme.primaryBorder,
-      marginBottom: 16,
-      borderRadius: 12,
-      borderWidth: 1,
-      padding: 14
-    }]}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <MaterialCommunityIcons name="account-check" size={22} color={theme.primary} />
-        <Text style={[styles.explanationTitle, { color: theme.primary, fontWeight: '700', fontSize: 11 }]}>
-          💡 Don't Mind the Manual Overrides
+  // ✅ UPDATED: Manual Override Explanation
+  const renderManualOverrideExplanation = () => {
+    if (!previewData?.conflicts || previewData.conflicts.length === 0) return null;
+    
+    return (
+      <View style={[styles.explanationCard, { 
+        backgroundColor: theme.primaryLight + '20', 
+        borderColor: theme.primaryBorder,
+        marginBottom: 16,
+        borderRadius: 12,
+        borderWidth: 1,
+        padding: 14
+      }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <MaterialCommunityIcons name="account-check" size={22} color={theme.primary} />
+          <Text style={[styles.explanationTitle, { color: theme.primary, fontWeight: '700', fontSize: 11 }]}>
+            💡 Don't Mind the Manual Overrides
+          </Text>
+        </View>
+        
+        <Text style={[styles.explanationText, { color: theme.text, fontSize: 13, lineHeight: 20, marginBottom: 8 }]}>
+          • <Text style={{ fontWeight: '700' }}>"Conflicts" are NOT errors!</Text> They just show that your manual preference differs from auto-rotation.
+        </Text>
+        
+        <Text style={[styles.explanationText, { color: theme.text, fontSize: 13, lineHeight: 20, marginBottom: 8 }]}>
+          • <Text style={{ fontWeight: '700' }}>Manual assignments</Text> are for setting up your PREFERRED starting week - THAT'S THE WHOLE POINT!
+        </Text>
+        
+        <Text style={[styles.explanationText, { color: theme.text, fontSize: 13, lineHeight: 20, marginBottom: 8 }]}>
+          • After Week 1, <Text style={{ fontWeight: '700' }}>automatic rotation takes over</Text> and handles fairness automatically.
+        </Text>
+        
+        <Text style={[styles.explanationText, { color: theme.text, fontSize: 13, lineHeight: 20, marginBottom: 8 }]}>
+          • <Text style={{ fontWeight: '700' }}>You can still manually reassign anytime</Text> - your preference ALWAYS wins for the current week.
+        </Text>
+        
+        <Text style={[styles.explanationText, { color: theme.primary, fontSize: 13, lineHeight: 20, fontStyle: 'italic', marginTop: 4 }]}>
+          ✅ Bottom Line: Manual overrides = YOUR choice. Auto-rotation = FAIRNESS over time. Both work together perfectly!
         </Text>
       </View>
-      
-      <Text style={[styles.explanationText, { color: theme.text, fontSize: 13, lineHeight: 20, marginBottom: 8 }]}>
-        • <Text style={{ fontWeight: '700' }}>"Conflicts" are NOT errors!</Text> They just show that your manual preference differs from auto-rotation.
-      </Text>
-      
-      <Text style={[styles.explanationText, { color: theme.text, fontSize: 13, lineHeight: 20, marginBottom: 8 }]}>
-        • <Text style={{ fontWeight: '700' }}>Manual assignments</Text> are for setting up your PREFERRED starting week - THAT'S THE WHOLE POINT!
-      </Text>
-      
-      <Text style={[styles.explanationText, { color: theme.text, fontSize: 13, lineHeight: 20, marginBottom: 8 }]}>
-        • After Week 1, <Text style={{ fontWeight: '700' }}>automatic rotation takes over</Text> and handles fairness automatically.
-      </Text>
-      
-      <Text style={[styles.explanationText, { color: theme.text, fontSize: 13, lineHeight: 20, marginBottom: 8 }]}>
-        • <Text style={{ fontWeight: '700' }}>You can still manually reassign anytime</Text> - your preference ALWAYS wins for the current week.
-      </Text>
-      
-      <Text style={[styles.explanationText, { color: theme.primary, fontSize: 13, lineHeight: 20, fontStyle: 'italic', marginTop: 4 }]}>
-        ✅ Bottom Line: Manual overrides = YOUR choice. Auto-rotation = FAIRNESS over time. Both work together perfectly!
-      </Text>
-    </View>
-  );
-};
+    );
+  };
   
   const renderConflicts = () => {
     if (!previewData?.conflicts || previewData.conflicts.length === 0) return null;
+    
+    // Filter conflicts to only show meaningful ones (skip "No task assigned" conflicts if desired)
+    const meaningfulConflicts = previewData.conflicts.filter((conflict: any) => 
+      conflict.currentTaskTitle !== "No task assigned"
+    );
+    
+    if (meaningfulConflicts.length === 0) return null;
     
     return (
       <View style={[styles.conflictsSection, { backgroundColor: theme.errorBg, borderColor: theme.errorBorder }]}>
@@ -286,7 +311,7 @@ const renderManualOverrideExplanation = () => {
           <MaterialCommunityIcons name="alert-circle" size={20} color={theme.error} />
           <Text style={[styles.conflictsTitle, { color: theme.error }]}>⚠️ Manual Overrides Detected</Text>
         </View>
-        {previewData.conflicts.map((conflict: any, idx: number) => (
+        {meaningfulConflicts.map((conflict: any, idx: number) => (
           <View key={idx} style={styles.conflictItem}>
             <Text style={[styles.conflictMember, { color: theme.text }]}>{conflict.memberName}</Text>
             <Text style={[styles.conflictDetail, { color: theme.textMuted }]}>
@@ -301,25 +326,40 @@ const renderManualOverrideExplanation = () => {
     );
   };
 
+  // ✅ FIXED: Only show members with ACTUAL assignments
   const renderRotationVisual = () => {
     if (!previewData?.currentAssignments || !previewData?.previewAssignments) return null;
     
     const members = previewData.currentAssignments;
     const preview = previewData.previewAssignments;
     
+    // ✅ FILTER OUT members with "No task assigned" or 0 points
+    const validEntries = [];
+    for (let i = 0; i < members.length; i++) {
+      const member = members[i];
+      if (member.taskId !== null && member.taskPoints > 0) {
+        validEntries.push({
+          current: member,
+          preview: preview[i]
+        });
+      }
+    }
+    
+    if (validEntries.length === 0) return null;
+    
     return (
       <View style={[styles.rotationVisual, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
         <Text style={[styles.visualTitle, { color: theme.text }]}>🔄 How Rotation Works</Text>
         <View style={styles.visualGrid}>
-          {members.slice(0, 3).map((member: any, idx: number) => {
-            const currentTask = member.taskTitle.substring(0, 15);
-            const previewTask = preview[idx]?.taskTitle.substring(0, 15);
-            const isMoving = currentTask !== previewTask;
+          {validEntries.slice(0, 3).map((entry, idx) => {
+            const currentTask = entry.current.taskTitle?.substring(0, 15) || '';
+            const previewTask = entry.preview?.taskTitle?.substring(0, 15) || '';
+            const isMoving = currentTask !== previewTask && previewTask !== '';
             
             return (
-              <View key={member.memberId} style={styles.visualRow}>
+              <View key={entry.current.memberId} style={styles.visualRow}>
                 <Text style={[styles.visualMember, { color: theme.primary }]}>
-                  {member.memberName.split(' ')[0]}
+                  {entry.current.memberName?.split(' ')[0] || entry.current.memberName}
                 </Text>
                 <View style={styles.visualArrow}>
                   <Text style={[styles.visualTask, { color: theme.textSecondary }]}>
@@ -331,7 +371,7 @@ const renderManualOverrideExplanation = () => {
                     <MaterialCommunityIcons name="minus" size={16} color={theme.textMuted} />
                   )}
                   <Text style={[styles.visualTask, { color: theme.text }]}>
-                    {previewTask}
+                    {previewTask || 'No task'}
                   </Text>
                 </View>
               </View>
@@ -374,7 +414,7 @@ const renderManualOverrideExplanation = () => {
               }} 
               style={styles.closeButton}
             >
-              <MaterialCommunityIcons name="close" size={24} color={theme.textMuted} />
+              <MaterialCommunityIcons name="close" size={24} color={theme.primary} />
             </TouchableOpacity>
           </View>
 
@@ -417,7 +457,6 @@ const renderManualOverrideExplanation = () => {
                 
                 {renderRotationVisual()}
                 
-                {/* ✅ Manual Override Explanation - Shows only when conflicts exist */}
                 {renderManualOverrideExplanation()}
                 
                 {renderConflicts()}
@@ -648,24 +687,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     flex: 1,
   },
-  conflictRow: {
-    backgroundColor: 'rgba(255, 0, 0, 0.05)',
-  },
-  highestRow: {
-    backgroundColor: 'rgba(255, 215, 0, 0.05)',
-  },
-  lowestRow: {
-    backgroundColor: 'rgba(134, 142, 150, 0.05)',
-  },
-  conflictBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-    gap: 4,
-  },
-  conflictText: {
-    fontSize: 11,
-  },
   arrowContainer: {
     alignItems: 'center',
     marginVertical: 8,
@@ -863,4 +884,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
   },
+  emptyAssignments: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyAssignmentsText: {
+    fontSize: 13,
+    textAlign: 'center',
+  },
+highestRow: {
+  backgroundColor: 'rgba(255, 215, 0, 0.08)', // Gold tint for highest points
+  borderLeftWidth: 3,
+  borderLeftColor: '#FFD700',
+},
+lowestRow: {
+  backgroundColor: 'rgba(134, 142, 150, 0.08)', // Gray tint for lowest points
+  borderLeftWidth: 3,
+  borderLeftColor: '#868e96',
+},
 });

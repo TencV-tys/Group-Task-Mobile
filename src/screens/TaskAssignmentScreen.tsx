@@ -105,26 +105,34 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
     }
   }, [authError, navigation]);
 
-  // Get members already assigned to tasks for current week
+  
   const getAssignedMembersForWeek = useCallback(() => {
-    const assignedMemberIds = new Set<string>();
+  const assignedMemberIds = new Set<string>();
+  
+  console.log('🔍 [getAssignedMembersForWeek] Tasks count:', tasks.length);
+  
+  tasks.forEach((task: any) => {
+    console.log(`   Task: ${task.title}, currentAssignee: ${task.currentAssignee}`);
     
-    tasks.forEach((task: any) => {
-      if (task.currentAssignee) {
-        assignedMemberIds.add(task.currentAssignee);
-      }
-      
-      if (task.assignments && Array.isArray(task.assignments)) {
-        task.assignments.forEach((assignment: any) => {
-          if (assignment.user && assignment.user.id) {
-            assignedMemberIds.add(assignment.user.id);
-          }
-        });
-      }
-    });
+    if (task.currentAssignee) {
+      assignedMemberIds.add(task.currentAssignee);
+      console.log(`      → Added assignee: ${task.currentAssignee}`);
+    }
     
-    return assignedMemberIds;
-  }, [tasks]);
+    if (task.assignments && Array.isArray(task.assignments)) {
+      task.assignments.forEach((assignment: any) => {
+        if (assignment.user && assignment.user.id) {
+          assignedMemberIds.add(assignment.user.id);
+          console.log(`      → Added from assignments: ${assignment.user.id}`);
+        }
+      });
+    }
+  });
+  
+  console.log('🔍 [getAssignedMembersForWeek] Final assigned IDs:', Array.from(assignedMemberIds));
+  return assignedMemberIds;
+}, [tasks]);
+
 
   // Check if a task is assigned to a member
   const isTaskAssigned = useCallback((task: any) => {
@@ -562,7 +570,8 @@ export default function TaskAssignmentScreen({ navigation, route }: any) {
                 const availableMembers = membersInRotation.filter(member => 
                   !assignedMemberIds.has(member.userId)
                 );
-                
+                console.log('🔍 MODAL - availableMembers length:', availableMembers.length);
+console.log('🔍 MODAL - availableMembers:', availableMembers.map(m => m.fullName));
                 if (availableMembers.length === 0) {
                   return (
                     <View style={[styles.emptyMembers, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
@@ -1094,8 +1103,9 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%',
+    maxHeight: '90%', 
     overflow: 'hidden',
+    flex:1
   },
   modalHeader: {
     flexDirection: 'row',
@@ -1123,7 +1133,7 @@ const styles = StyleSheet.create({
     lineHeight: 20
   },
   modalBody: {
-    flex: 1,
+    flexShrink: 1,
   },
   modalBodyContent: {
     padding: 20,
@@ -1287,5 +1297,5 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 15,
     fontWeight: '600',
-  },
+  }, 
 });

@@ -1,4 +1,4 @@
-// src/hooks/useTaskAssignment.ts - UPDATED VERSION
+// src/hooks/useTaskAssignment.ts - COMPLETELY FIXED
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { TaskService } from '../services/TaskService';
@@ -15,10 +15,13 @@ export const useTaskAssignment = (groupId: string) => {
   const [authError, setAuthError] = useState(false);
 
   const membersInRotation = useMemo(() => {
-    return members.filter(member => 
+    console.log('🔍 [useTaskAssignment] Computing membersInRotation from:', members.length);
+    const filtered = members.filter(member => 
       member.inRotation === true && 
       member.role !== 'ADMIN'
-    ); 
+    );
+    console.log(`   Filtered: ${filtered.length} members in rotation`);
+    return filtered;
   }, [members]);
 
   const getAssignableMembers = useCallback((assignedMemberIds: Set<string>) => {
@@ -40,71 +43,80 @@ export const useTaskAssignment = (groupId: string) => {
     return hasToken;
   }, []);
 
-  // In useTaskAssignment.ts - Simplified loadData
+  const loadData = useCallback(async (isRefreshing = false) => {
+    const hasToken = await checkToken();
+    if (!hasToken) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
-const loadData = useCallback(async (isRefreshing = false) => {
-  const hasToken = await checkToken();
-  if (!hasToken) {
-    setLoading(false);
-    setRefreshing(false);
-    return;
-  }
-
-  if (isRefreshing) {
-    setRefreshing(true);
-  } else {
-    setLoading(true);
-  }
-  setError(null);
-  setAuthError(false);
-
-  try {
-    console.log('========================================');
-    console.log('🔍 [useTaskAssignment] STARTING LOAD DATA');
-    console.log(`📦 Group ID: ${groupId}`);
-    console.log('========================================');
-    
-    // Get group tasks - swap info is already attached from backend
-    const tasksResult = await TaskService.getGroupTasks(groupId);
-    
-    if (tasksResult.success) {
-      console.log(`📊 [useTaskAssignment] Loaded ${tasksResult.tasks?.length || 0} tasks`);
-      console.log(`   Swapped tasks: ${tasksResult.tasks?.filter((t: any) => t.acquiredViaSwap).length || 0}`);
-      
-      // ✅ Use tasks directly - swap info already attached
-      setTasks(tasksResult.tasks || []);
+    if (isRefreshing) {
+      setRefreshing(true);
     } else {
-      setError(tasksResult.message || 'Failed to load tasks');
-      if (tasksResult.message?.toLowerCase().includes('token') || 
-          tasksResult.message?.toLowerCase().includes('auth')) {
-        setAuthError(true);
+      setLoading(true);
+    }
+    setError(null);
+    setAuthError(false);
+
+    try {
+      console.log('========================================');
+      console.log('🔍 [useTaskAssignment] STARTING LOAD DATA');
+      console.log(`📦 Group ID: ${groupId}`);
+      console.log('========================================');
+      
+      // ✅ LOAD MEMBERS FIRST - ALWAYS
+      console.log('📡 Fetching members...');
+      const membersResult = await GroupMembersService.getGroupMembers(groupId);
+      
+      if (membersResult.success) {
+        const memberList = membersResult.members || [];
+        console.log(`✅ Loaded ${memberList.length} members`);
+        console.log('   Member details:', memberList.map((m: any) => ({
+          name: m.fullName,
+          role: m.role,
+          inRotation: m.inRotation,
+          userId: m.userId
+        })));
+        setMembers(memberList);
+      } else {
+        console.error('❌ Failed to load members:', membersResult.message);
+        setMembers([]);
       }
+
+      // ✅ LOAD TASKS SECOND
+      console.log('📡 Fetching tasks...');
+      const tasksResult = await TaskService.getGroupTasks(groupId);
+      
+      if (tasksResult.success) {
+        const taskList = tasksResult.tasks || [];
+        console.log(`✅ Loaded ${taskList.length} tasks`);
+        setTasks(taskList);
+      } else {
+        console.warn('⚠️ Failed to load tasks:', tasksResult.message);
+        setTasks([]);
+      }
+
+      // ✅ LOAD GROUP INFO
+      const groupResult = await GroupMembersService.getGroupInfo(groupId);
+      if (groupResult.success) {
+        setGroupInfo(groupResult.group);
+      }
+
+      console.log('========================================');
+      console.log('✅ [useTaskAssignment] LOAD DATA COMPLETE');
+      console.log(`   Members: ${membersResult.success ? (membersResult.members?.length || 0) : 0}`);
+      console.log(`   Tasks: ${tasksResult.success ? (tasksResult.tasks?.length || 0) : 0}`);
+      console.log('========================================\n');
+
+    } catch (err: any) {
+      console.error('❌ [useTaskAssignment] Error loading data:', err);
+      setError(err.message || 'Failed to load data');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-
-    // Get members
-    const membersResult = await GroupMembersService.getGroupMembers(groupId);
-    if (membersResult.success) {
-      setMembers(membersResult.members || []);
-    }
-
-    // Get group info
-    const groupResult = await GroupMembersService.getGroupInfo(groupId);
-    if (groupResult.success) {
-      setGroupInfo(groupResult.group);
-    }
-
-    console.log('========================================');
-    console.log('✅ [useTaskAssignment] LOAD DATA COMPLETE');
-    console.log('========================================\n');
-
-  } catch (err: any) {
-    console.error('❌ [useTaskAssignment] Error loading data:', err);
-    setError(err.message || 'Failed to load data');
-  } finally {
-    setLoading(false);
-    setRefreshing(false);
-  }
-}, [groupId, checkToken]);
+  }, [groupId, checkToken]);
 
   const reassignTask = useCallback(async (taskId: string, targetUserId: string) => {
     try {
@@ -140,13 +152,14 @@ const loadData = useCallback(async (isRefreshing = false) => {
     }
   }, [groupId, loadData]);
 
+  // ✅ Return membersInRotation for direct use in screen
   return {
     loading,
     refreshing,
     error,
     tasks,
     members,
-    membersInRotation,
+    membersInRotation,  // ← This is computed from members
     groupInfo,
     authError,
     loadData,

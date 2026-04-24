@@ -111,21 +111,25 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
   const isAdmin = userRole === 'ADMIN';
 
   useEffect(() => {
-    if (!isAdmin) {
-      Alert.alert('Access Denied', 'Only administrators can access this screen');
-      navigation.goBack();
-      return;
-    }
-    
-    currentPageRef.current = 0;
-    setSubmissions([]);
-    setTotalCount(0);
-    setHasMore(true);
-    setLoading(true);
-    
-    fetchStats();
-    fetchSubmissions(0, true);
-  }, [groupId, filter]);
+  if (!isAdmin) {
+    Alert.alert('Access Denied', 'Only administrators can access this screen');
+    navigation.goBack();
+    return;
+  }
+  
+  // ✅ Reset all state when filter changes
+  currentPageRef.current = 0;
+  setSubmissions([]);
+  setTotalCount(0);
+  setHasMore(true);
+  setLoading(true);
+  setRefreshing(false);
+  setError(null);
+  
+  // Fetch fresh data
+  fetchStats();
+  fetchSubmissions(0, true);
+}, [groupId, filter]); // ✅ Add filter as dependency
 
   const fetchStats = async () => {
     const hasToken = await TokenUtils.checkToken({
@@ -161,19 +165,15 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     }
   };
 
-  const isDeletedTask = (assignment: any, currentFilter: string): boolean => {
-  const hasNoTaskId = !assignment.taskId || assignment.taskId === null;
-  
-  // Pending: hide if no task
-  if (currentFilter === 'pending') {
-    return hasNoTaskId;
-  }
-  
-  // Verified & Rejected: ONLY show active tasks (hide if deleted)
-  return hasNoTaskId;
-};
+  const isDeletedTask = (assignment: any): boolean => {
+    const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
+    const isHistorical = assignment.isHistorical === true;
+    const hasTaskTitleOnly = assignment.taskTitle && !assignment.taskId;
+    return isTaskDeleted || isHistorical || hasTaskTitleOnly;
+  };
 
   const fetchSubmissions = async (page: number, reset = false) => {
+  // ✅ Allow reset to bypass the lock
   if (isLoadingRef.current && !reset) return;
   
   const hasToken = await TokenUtils.checkToken({
@@ -188,24 +188,27 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     return;
   }
 
+  // ✅ Set lock BEFORE any state changes for reset
   isLoadingRef.current = true;
   
   if (reset) {
-    setLoading(true);
+    // ✅ Clear all data immediately for reset
     setSubmissions([]);
     setTotalCount(0);
     setHasMore(true);
     currentPageRef.current = 0;
+    setLoading(true);
+    setRefreshing(false); // Reset refreshing state
   } else {
     setIsLoadingMore(true);
   }
   
-  setError(null);
+  setError(null); 
   
   try {
     const offset = page * PAGE_SIZE;
     
-    console.log(`📥 Fetching ${filter} submissions for group: ${groupId}, page: ${page}, offset: ${offset}`);
+    console.log(`📥 Fetching ${filter} submissions for group: ${groupId}, page: ${page}, offset: ${offset}, reset: ${reset}`);
     
     let result;
     
@@ -229,50 +232,34 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     }
     
     if (result.success) {
-      let assignments: any[] = [];
+      let assignments = [];
       let total = 0;
       
-      // ✅ SWITCH STATEMENT - Clean and no TypeScript errors
-      switch (filter) {
-        case 'pending':
-          assignments = result.data?.assignments || [];
-          total = result.data?.total || 0;
-          console.log(`📊 PENDING: Got ${assignments.length} assignments, total: ${total}`);
-          break;
-        case 'verified':
-          assignments = result.assignments || [];
-          total = result.total || 0;
-          // Filter for verified
-          assignments = assignments.filter(a => a.verified === true);
-          total = assignments.length;
-          console.log(`🔍 VERIFIED: ${assignments.length} assignments (verified=true)`);
-          break;
-        case 'rejected':
-          assignments = result.assignments || [];
-          total = result.total || 0;
-          // Filter for rejected
-          assignments = assignments.filter(a => a.verified === false);
-          total = assignments.length;
-          console.log(`🔍 REJECTED: ${assignments.length} assignments (verified=false)`);
-          break;
+      if (filter === 'pending') {
+        assignments = result.data?.assignments || [];
+        total = result.data?.total || 0;
+      } else {
+        assignments = result.assignments || [];
+        total = result.total || 0;
       }
+      
+      console.log(`📥 Raw assignments: ${assignments.length}, total: ${total}`);
       
       // Filter out deleted tasks
       const filteredAssignments = assignments.filter((assignment: any) => {
-        const isDeleted = isDeletedTask(assignment,filter);
+        const isDeleted = isDeletedTask(assignment);
         if (isDeleted) {
           console.log(`🗑️ Filtering out deleted task: ${assignment.taskTitle || assignment.task?.title}`);
         }
         return !isDeleted;
       });
       
-      console.log(`📥 After deleted filter: ${filteredAssignments.length} assignments, total: ${total}`);
+      console.log(`📥 After filter: ${filteredAssignments.length} assignments`);
       
       const processed = filteredAssignments.map((assignment: any) => {
-        const isDeleted = isDeletedTask(assignment,filter);
+        const isDeleted = isDeletedTask(assignment);
         const taskTitle = assignment.task?.title || assignment.taskTitle || 'Unknown Task';
         
-        // ✅ Clean eventDate logic
         let eventDate = null;
         if (filter === 'pending') {
           eventDate = assignment.completedAt || assignment.updatedAt;
@@ -312,11 +299,11 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
       
       if (reset) {
         setSubmissions(processed);
+        console.log(`✅ Reset: Loaded ${processed.length} items fresh`);
       } else {
         setSubmissions(prev => [...prev, ...processed]);
+        console.log(`✅ Load more: Added ${processed.length} items, total now: ${submissions.length + processed.length}`);
       }
-      
-      console.log(`✅ Loaded ${processed.length} items. Total: ${newTotal}, HasMore: ${newHasMore}`);
     } else {
       setError(result.message || 'Failed to load submissions');
     }
@@ -330,6 +317,8 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     isLoadingRef.current = false;
   }
 };
+
+
 
   const handleLoadMore = useCallback(() => {
     if (isLoadingMore || !hasMore || loading || refreshing) return;
@@ -346,13 +335,13 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     fetchSubmissions(nextPage, false);
   }, [isLoadingMore, hasMore, loading, refreshing, totalCount]);
 
-  const handleRefresh = useCallback(() => {
-    setRefreshing(true);
-    currentPageRef.current = 0;
-    setHasMore(true);
-    fetchSubmissions(0, true);
-    fetchStats();
-  }, []);
+ const handleRefresh = useCallback(() => {
+  console.log('🔄 Manual refresh triggered');
+  setRefreshing(true);
+  // ✅ Force reset by calling fetchSubmissions with reset=true
+  fetchSubmissions(0, true);
+  fetchStats();
+}, [filter, groupId]); // ✅ Add dependencies
 
   const handleFilterChange = (newFilter: 'pending' | 'verified' | 'rejected') => {
     if (newFilter === filter) return;

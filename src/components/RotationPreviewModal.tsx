@@ -56,6 +56,12 @@ export const RotationPreviewModal: React.FC<RotationPreviewModalProps> = ({
       if (result.success) {
         setPreviewData(result.data);
         
+        // Check if there are no tasks
+        if (!result.data.tasksCount || result.data.tasksCount === 0) {
+          console.log('⚠️ No recurring tasks found for preview');
+          return;
+        }
+        
         console.log('\n📊 ========== ROTATION PREVIEW DATA ==========');
         console.log(`📅 Current Week: ${result.data.currentWeek}`);
         console.log(`📅 Next Week: ${result.data.nextWeek}`);
@@ -104,7 +110,12 @@ export const RotationPreviewModal: React.FC<RotationPreviewModalProps> = ({
         
       } else {
         console.log(`❌ [fetchPreview] Error: ${result.message}`);
-        Alert.alert('Error', result.message || 'Failed to load preview');
+        // Don't show alert for no tasks - show friendly message in modal
+        if (result.message?.includes('No recurring tasks')) {
+          setPreviewData({ noTasks: true, message: result.message });
+        } else {
+          Alert.alert('Error', result.message || 'Failed to load preview');
+        }
       }
     } catch (error: any) {
       console.error('❌ [fetchPreview] Exception:', error);
@@ -122,7 +133,7 @@ export const RotationPreviewModal: React.FC<RotationPreviewModalProps> = ({
   };
 
   const renderTasksOrder = () => {
-    if (!previewData?.tasksSortedByPoints) return null;
+    if (!previewData?.tasksSortedByPoints || previewData.tasksSortedByPoints.length === 0) return null;
     
     return (
       <View style={[styles.tasksOrderSection, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}>
@@ -150,90 +161,86 @@ export const RotationPreviewModal: React.FC<RotationPreviewModalProps> = ({
     );
   };
 
-  // ✅ FIXED: Sort by task points (HIGHEST to LOWEST) - NO rotation order!
-const renderAssignmentSection = (title: string, assignments: any[], isCurrent: boolean) => {
-  if (!assignments || assignments.length === 0) return null;
-  
-  // Filter out "No task assigned" entries
-  const validAssignments = assignments.filter(a => a.taskId !== null && a.taskPoints > 0);
-  
-  if (validAssignments.length === 0) {
+  const renderAssignmentSection = (title: string, assignments: any[], isCurrent: boolean) => {
+    if (!assignments || assignments.length === 0) return null;
+    
+    const validAssignments = assignments.filter(a => a.taskId !== null && a.taskPoints > 0);
+    
+    if (validAssignments.length === 0) {
+      return (
+        <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
+          <View style={styles.emptyAssignments}>
+            <Text style={[styles.emptyAssignmentsText, { color: theme.textMuted }]}>
+              No assignments for this week
+            </Text>
+          </View>
+        </View>
+      );
+    }
+    
+    const sorted = [...validAssignments].sort((a, b) => b.taskPoints - a.taskPoints);
+    
     return (
       <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
-        <View style={styles.emptyAssignments}>
-          <Text style={[styles.emptyAssignmentsText, { color: theme.textMuted }]}>
-            No assignments for this week
-          </Text>
-        </View>
+        {sorted.map((item, idx) => {
+          const pointsColor = getPointsColor(item.taskPoints, idx);
+          const isHighest = idx === 0;
+          const isLowest = idx === sorted.length - 1;
+          
+          return (
+            <View 
+              key={item.memberId} 
+              style={[
+                styles.assignmentRow, 
+                { borderBottomColor: theme.border },
+                isHighest && styles.highestRow,
+                isLowest && styles.lowestRow
+              ]}
+            >
+              <View style={styles.memberInfo}>
+                <LinearGradient
+                  colors={isHighest ? ['#FFD700', '#FFA500'] : [theme.primary, theme.primaryDark]}
+                  style={[styles.rankBadge, isHighest && styles.highestBadge]}
+                >
+                  <Text style={styles.rankText}>{idx + 1}</Text>
+                </LinearGradient>
+                <Text style={[styles.memberName, { color: theme.text }]}>
+                  {item.memberName}
+                </Text>
+                {isHighest && (
+                  <View style={styles.topRankTag}>
+                    <Text style={styles.topRankTagText}>🏆 Highest Points</Text>
+                  </View>
+                )}
+                {isLowest && (
+                  <View style={styles.bottomRankTag}>
+                    <Text style={styles.bottomRankTagText}>⬇️ Lowest Points</Text>
+                  </View>
+                )}
+              </View>
+              
+              <View style={styles.taskInfo}>
+                <LinearGradient
+                  colors={[`${pointsColor}20`, `${pointsColor}10`]}
+                  style={[styles.pointsBadge, { borderColor: pointsColor }]}
+                >
+                  <MaterialCommunityIcons name="star" size={12} color={pointsColor} />
+                  <Text style={[styles.pointsText, { color: pointsColor }]}>
+                    {item.taskPoints} pts
+                  </Text>
+                </LinearGradient>
+                <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
+                  {item.taskTitle}
+                </Text>
+              </View>
+            </View>
+          );
+        })}
       </View>
     );
-  }
-  
-  // ✅ Sort by task points (HIGHEST to LOWEST) - THIS IS WHAT YOU WANT
-  const sorted = [...validAssignments].sort((a, b) => b.taskPoints - a.taskPoints);
-  
-  return (
-    <View style={[styles.section, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
-      {sorted.map((item, idx) => {
-        const pointsColor = getPointsColor(item.taskPoints, idx);
-        const isHighest = idx === 0;
-        const isLowest = idx === sorted.length - 1;
-        
-        return (
-          <View 
-            key={item.memberId} 
-            style={[
-              styles.assignmentRow, 
-              { borderBottomColor: theme.border },
-              isHighest && styles.highestRow,
-              isLowest && styles.lowestRow
-            ]}
-          >
-            <View style={styles.memberInfo}>
-              {/* ✅ Show rank by POINTS (1, 2, 3...) NOT rotation order */}
-              <LinearGradient
-                colors={isHighest ? ['#FFD700', '#FFA500'] : [theme.primary, theme.primaryDark]}
-                style={[styles.rankBadge, isHighest && styles.highestBadge]}
-              >
-                <Text style={styles.rankText}>{idx + 1}</Text>
-              </LinearGradient>
-              <Text style={[styles.memberName, { color: theme.text }]}>
-                {item.memberName}
-              </Text>
-              {isHighest && (
-                <View style={styles.topRankTag}>
-                  <Text style={styles.topRankTagText}>🏆 Highest Points</Text>
-                </View>
-              )}
-              {isLowest && (
-                <View style={styles.bottomRankTag}>
-                  <Text style={styles.bottomRankTagText}>⬇️ Lowest Points</Text>
-                </View>
-              )}
-            </View>
-            
-            <View style={styles.taskInfo}>
-              <LinearGradient
-                colors={[`${pointsColor}20`, `${pointsColor}10`]}
-                style={[styles.pointsBadge, { borderColor: pointsColor }]}
-              >
-                <MaterialCommunityIcons name="star" size={12} color={pointsColor} />
-                <Text style={[styles.pointsText, { color: pointsColor }]}>
-                  {item.taskPoints} pts
-                </Text>
-              </LinearGradient>
-              <Text style={[styles.taskTitle, { color: theme.text }]} numberOfLines={2}>
-                {item.taskTitle}
-              </Text>
-            </View>
-          </View>
-        );
-      })}
-    </View>
-  );
-};
+  };
 
   const renderArrow = () => (
     <View style={styles.arrowContainer}>
@@ -252,7 +259,6 @@ const renderAssignmentSection = (title: string, assignments: any[], isCurrent: b
     </View>
   );
 
-  // ✅ UPDATED: Manual Override Explanation
   const renderManualOverrideExplanation = () => {
     if (!previewData?.conflicts || previewData.conflicts.length === 0) return null;
     
@@ -298,7 +304,6 @@ const renderAssignmentSection = (title: string, assignments: any[], isCurrent: b
   const renderConflicts = () => {
     if (!previewData?.conflicts || previewData.conflicts.length === 0) return null;
     
-    // Filter conflicts to only show meaningful ones (skip "No task assigned" conflicts if desired)
     const meaningfulConflicts = previewData.conflicts.filter((conflict: any) => 
       conflict.currentTaskTitle !== "No task assigned"
     );
@@ -326,14 +331,12 @@ const renderAssignmentSection = (title: string, assignments: any[], isCurrent: b
     );
   };
 
-  // ✅ FIXED: Only show members with ACTUAL assignments
   const renderRotationVisual = () => {
     if (!previewData?.currentAssignments || !previewData?.previewAssignments) return null;
     
     const members = previewData.currentAssignments;
     const preview = previewData.previewAssignments;
     
-    // ✅ FILTER OUT members with "No task assigned" or 0 points
     const validEntries = [];
     for (let i = 0; i < members.length; i++) {
       const member = members[i];
@@ -382,6 +385,31 @@ const renderAssignmentSection = (title: string, assignments: any[], isCurrent: b
     );
   };
 
+  // ✅ Render No Tasks View
+  const renderNoTasksView = () => (
+    <View style={styles.noTasksContainer}>
+      <MaterialCommunityIcons name="clipboard-remove" size={64} color={theme.textMuted} />
+      <Text style={[styles.noTasksTitle, { color: theme.text }]}>No Tasks to Preview</Text>
+      <Text style={[styles.noTasksMessage, { color: theme.textMuted }]}>
+        Create recurring tasks first to see rotation preview.
+      </Text>
+      <TouchableOpacity 
+        style={styles.createTaskButton}
+        onPress={() => {
+          console.log('🔚 [RotationPreviewModal] Closed - no tasks');
+          onClose();
+        }}
+      >
+        <LinearGradient
+          colors={[theme.primary, theme.primaryDark]}
+          style={styles.createTaskButtonGradient}
+        >
+          <Text style={styles.createTaskButtonText}>Close</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <Modal
       visible={visible}
@@ -426,65 +454,72 @@ const renderAssignmentSection = (title: string, assignments: any[], isCurrent: b
               </View>
             ) : previewData ? (
               <>
-                <View style={styles.infoHeader}>
-                  <Text style={[styles.groupName, { color: theme.text }]}>{groupName}</Text>
-                  <View style={styles.weekInfo}>
-                    <LinearGradient
-                      colors={[theme.primaryLight, theme.primaryLight]}
-                      style={styles.weekBadge}
-                    >
-                      <Text style={[styles.weekText, { color: theme.primary }]}>
-                        Week {previewData.currentWeek}
+                {/* ✅ Check if no tasks */}
+                {(!previewData.tasksCount || previewData.tasksCount === 0) ? (
+                  renderNoTasksView()
+                ) : (
+                  <>
+                    <View style={styles.infoHeader}>
+                      <Text style={[styles.groupName, { color: theme.text }]}>{groupName}</Text>
+                      <View style={styles.weekInfo}>
+                        <LinearGradient
+                          colors={[theme.primaryLight, theme.primaryLight]}
+                          style={styles.weekBadge}
+                        >
+                          <Text style={[styles.weekText, { color: theme.primary }]}>
+                            Week {previewData.currentWeek}
+                          </Text>
+                        </LinearGradient>
+                        <MaterialCommunityIcons name="arrow-right" size={20} color={theme.primary} />
+                        <LinearGradient
+                          colors={[theme.primary, theme.primaryDark]}
+                          style={styles.nextWeekBadge}
+                        >
+                          <Text style={styles.nextWeekText}>Week {previewData.nextWeek}</Text>
+                        </LinearGradient>
+                      </View>
+                    </View>
+
+                    {renderTasksOrder()}
+                    
+                    {renderAssignmentSection('📋 CURRENT ASSIGNMENTS', previewData.currentAssignments, true)}
+                    
+                    {renderArrow()}
+                    
+                    {renderAssignmentSection('🔄 AFTER ROTATION (AUTOMATIC)', previewData.previewAssignments, false)}
+                    
+                    {renderRotationVisual()}
+                    
+                    {renderManualOverrideExplanation()}
+                    
+                    {renderConflicts()}
+                    
+                    <View style={styles.infoNote}>
+                      <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
+                      <Text style={[styles.infoNoteText, { color: theme.textMuted }]}>
+                        This is a PREVIEW only. No changes have been made to the system.
                       </Text>
-                    </LinearGradient>
-                    <MaterialCommunityIcons name="arrow-right" size={20} color={theme.primary} />
-                    <LinearGradient
-                      colors={[theme.primary, theme.primaryDark]}
-                      style={styles.nextWeekBadge}
-                    >
-                      <Text style={styles.nextWeekText}>Week {previewData.nextWeek}</Text>
-                    </LinearGradient>
-                  </View>
-                </View>
+                    </View>
 
-                {renderTasksOrder()}
-                
-                {renderAssignmentSection('📋 CURRENT ASSIGNMENTS', previewData.currentAssignments, true)}
-                
-                {renderArrow()}
-                
-                {renderAssignmentSection('🔄 AFTER ROTATION (AUTOMATIC)', previewData.previewAssignments, false)}
-                
-                {renderRotationVisual()}
-                
-                {renderManualOverrideExplanation()}
-                
-                {renderConflicts()}
-                
-                <View style={styles.infoNote}>
-                  <MaterialCommunityIcons name="information" size={16} color={theme.primary} />
-                  <Text style={[styles.infoNoteText, { color: theme.textMuted }]}>
-                    This is a PREVIEW only. No changes have been made to the system.
-                  </Text>
-                </View>
-
-                <View style={styles.buttonContainer}>
-                  <TouchableOpacity
-                    style={styles.closeOnlyButton}
-                    onPress={() => {
-                      console.log('🔚 [RotationPreviewModal] Closed via Close button');
-                      onClose();
-                    }}
-                  >
-                    <LinearGradient
-                      colors={[theme.primary, theme.primaryDark]}
-                      style={styles.closeButtonGradient}
-                    >
-                      <MaterialCommunityIcons name="check" size={18} color="#fff" />
-                      <Text style={styles.closeButtonText}>Close</Text>
-                    </LinearGradient>
-                  </TouchableOpacity>
-                </View>
+                    <View style={styles.buttonContainer}>
+                      <TouchableOpacity
+                        style={styles.closeOnlyButton}
+                        onPress={() => {
+                          console.log('🔚 [RotationPreviewModal] Closed via Close button');
+                          onClose();
+                        }}
+                      >
+                        <LinearGradient
+                          colors={[theme.primary, theme.primaryDark]}
+                          style={styles.closeButtonGradient}
+                        >
+                          <MaterialCommunityIcons name="check" size={18} color="#fff" />
+                          <Text style={styles.closeButtonText}>Close</Text>
+                        </LinearGradient>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
               </>
             ) : (
               <View style={styles.errorContainer}>
@@ -892,14 +927,46 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: 'center',
   },
-highestRow: {
-  backgroundColor: 'rgba(255, 215, 0, 0.08)', // Gold tint for highest points
-  borderLeftWidth: 3,
-  borderLeftColor: '#FFD700',
-},
-lowestRow: {
-  backgroundColor: 'rgba(134, 142, 150, 0.08)', // Gray tint for lowest points
-  borderLeftWidth: 3,
-  borderLeftColor: '#868e96',
-},
+  highestRow: {
+    backgroundColor: 'rgba(255, 215, 0, 0.08)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#FFD700',
+  },
+  lowestRow: {
+    backgroundColor: 'rgba(134, 142, 150, 0.08)',
+    borderLeftWidth: 3,
+    borderLeftColor: '#868e96',
+  },
+  // ✅ No Tasks Styles
+  noTasksContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 20,
+  },
+  noTasksTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noTasksMessage: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  createTaskButton: {
+    borderRadius: 25,
+    overflow: 'hidden',
+  },
+  createTaskButtonGradient: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  createTaskButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
 });

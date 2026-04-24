@@ -161,151 +161,175 @@ export default function PendingVerificationsScreen({ navigation, route }: any) {
     }
   };
 
-  const isDeletedTask = (assignment: any): boolean => {
-    const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
-    const isHistorical = assignment.isHistorical === true;
-    const hasTaskTitleOnly = assignment.taskTitle && !assignment.taskId;
-    return isTaskDeleted || isHistorical || hasTaskTitleOnly;
-  };
+  const isDeletedTask = (assignment: any, currentFilter: string): boolean => {
+  const hasNoTaskId = !assignment.taskId || assignment.taskId === null;
+  
+  // Pending: hide if no task
+  if (currentFilter === 'pending') {
+    return hasNoTaskId;
+  }
+  
+  // Verified & Rejected: ONLY show active tasks (hide if deleted)
+  return hasNoTaskId;
+};
 
   const fetchSubmissions = async (page: number, reset = false) => {
-    if (isLoadingRef.current && !reset) return;
-    
-    const hasToken = await TokenUtils.checkToken({
-      showAlert: false,
-      onAuthError: () => setAuthError(true)
-    });
-    
-    if (!hasToken) {
-      setLoading(false);
-      setRefreshing(false);
-      setIsLoadingMore(false);
-      return;
-    }
+  if (isLoadingRef.current && !reset) return;
+  
+  const hasToken = await TokenUtils.checkToken({
+    showAlert: false,
+    onAuthError: () => setAuthError(true)
+  });
+  
+  if (!hasToken) {
+    setLoading(false);
+    setRefreshing(false);
+    setIsLoadingMore(false);
+    return;
+  }
 
-    isLoadingRef.current = true;
+  isLoadingRef.current = true;
+  
+  if (reset) {
+    setLoading(true);
+    setSubmissions([]);
+    setTotalCount(0);
+    setHasMore(true);
+    currentPageRef.current = 0;
+  } else {
+    setIsLoadingMore(true);
+  }
+  
+  setError(null);
+  
+  try {
+    const offset = page * PAGE_SIZE;
     
-    if (reset) {
-      setLoading(true);
-    } else {
-      setIsLoadingMore(true);
+    console.log(`📥 Fetching ${filter} submissions for group: ${groupId}, page: ${page}, offset: ${offset}`);
+    
+    let result;
+    
+    if (filter === 'pending') {
+      result = await AssignmentService.getPendingVerifications(groupId, {
+        limit: PAGE_SIZE,
+        offset: offset 
+      });
+    } else if (filter === 'verified') {
+      result = await AssignmentService.getGroupAssignments(groupId, {
+        status: 'verified',
+        limit: PAGE_SIZE,
+        offset: offset
+      });
+    } else if (filter === 'rejected') {
+      result = await AssignmentService.getGroupAssignments(groupId, {
+        status: 'rejected',
+        limit: PAGE_SIZE,
+        offset: offset
+      });
     }
     
-    setError(null); 
-    
-    try {
-      const offset = page * PAGE_SIZE;
+    if (result.success) {
+      let assignments: any[] = [];
+      let total = 0;
       
-      console.log(`📥 Fetching ${filter} submissions for group: ${groupId}, page: ${page}, offset: ${offset}`);
-      
-      let result;
-      
-      if (filter === 'pending') {
-        result = await AssignmentService.getPendingVerifications(groupId, {
-          limit: PAGE_SIZE,
-          offset: offset 
-        });
-      } else if (filter === 'verified') {
-        result = await AssignmentService.getGroupAssignments(groupId, {
-          status: 'verified',
-          limit: PAGE_SIZE,
-          offset: offset
-        });
-      } else if (filter === 'rejected') {
-        result = await AssignmentService.getGroupAssignments(groupId, {
-          status: 'rejected',
-          limit: PAGE_SIZE,
-          offset: offset
-        });
-      }
-      
-      if (result.success) {
-        let assignments = [];
-        let total = 0;
-        
-        if (filter === 'pending') {
+      // ✅ SWITCH STATEMENT - Clean and no TypeScript errors
+      switch (filter) {
+        case 'pending':
           assignments = result.data?.assignments || [];
           total = result.data?.total || 0;
-        } else {
+          console.log(`📊 PENDING: Got ${assignments.length} assignments, total: ${total}`);
+          break;
+        case 'verified':
           assignments = result.assignments || [];
           total = result.total || 0;
-        }
-        
-        // Filter out deleted tasks
-        const filteredAssignments = assignments.filter((assignment: any) => {
-          const isDeleted = isDeletedTask(assignment);
-          if (isDeleted) {
-            console.log(`🗑️ Filtering out deleted task: ${assignment.taskTitle || assignment.task?.title}`);
-          }
-          return !isDeleted;
-        });
-        
-        console.log(`📥 Got ${assignments.length} assignments, filtered to ${filteredAssignments.length}, total: ${total}`);
-        
-        const processed = filteredAssignments.map((assignment: any) => {
-          const isDeleted = isDeletedTask(assignment);
-          const taskTitle = assignment.task?.title || assignment.taskTitle || 'Unknown Task';
-          
-          // ✅ Get the correct timestamp based on filter
-          let eventDate = null;
-          if (filter === 'pending') {
-            eventDate = assignment.completedAt || assignment.updatedAt;
-          } else if (filter === 'verified') {
-            eventDate = assignment.verifiedAt || assignment.updatedAt || assignment.completedAt;
-          } else {
-            eventDate = assignment.verifiedAt || assignment.updatedAt || assignment.completedAt;
-          }
-          
-          return {
-            ...assignment,
-            id: assignment.id,
-            userName: assignment.user?.fullName || assignment.userName || 'Unknown User',
-            userAvatar: assignment.user?.avatarUrl || assignment.userAvatar,
-            userId: assignment.user?.id || assignment.userId,
-            taskId: assignment.task?.id || assignment.taskId,
-            taskTitle: isDeleted ? `🗑️ ${taskTitle} (Deleted)` : taskTitle,
-            taskPoints: assignment.task?.points || assignment.taskPoints || 0,
-            eventDate: eventDate ? new Date(eventDate) : null,
-            dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
-            completed: assignment.completed || false,
-            verified: assignment.verified,
-            photoUrl: assignment.photoUrl,
-            notes: assignment.notes,
-            adminNotes: assignment.adminNotes,
-            timeSlot: assignment.timeSlot,
-            isTaskDeleted: isDeleted,
-            isPartial: assignment.isPartial || false,
-            slotsCompleted: assignment.slotsCompleted || 0,
-            totalSlots: assignment.totalSlots || 1,
-            points: assignment.points || 0
-          };
-        });
-        
-        const newTotal = total - (assignments.length - filteredAssignments.length);
-        setTotalCount(newTotal);
-        const newHasMore = (offset + processed.length) < newTotal;
-        setHasMore(newHasMore);
-        
-        if (reset) {
-          setSubmissions(processed);
-        } else {
-          setSubmissions(prev => [...prev, ...processed]);
-        }
-        
-        console.log(`✅ Loaded ${processed.length} items. Total: ${newTotal}, HasMore: ${newHasMore}`);
-      } else {
-        setError(result.message || 'Failed to load submissions');
+          // Filter for verified
+          assignments = assignments.filter(a => a.verified === true);
+          total = assignments.length;
+          console.log(`🔍 VERIFIED: ${assignments.length} assignments (verified=true)`);
+          break;
+        case 'rejected':
+          assignments = result.assignments || [];
+          total = result.total || 0;
+          // Filter for rejected
+          assignments = assignments.filter(a => a.verified === false);
+          total = assignments.length;
+          console.log(`🔍 REJECTED: ${assignments.length} assignments (verified=false)`);
+          break;
       }
-    } catch (err: any) {
-      console.error('Error fetching submissions:', err);
-      setError(err.message || 'Network error');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setIsLoadingMore(false);
-      isLoadingRef.current = false;
+      
+      // Filter out deleted tasks
+      const filteredAssignments = assignments.filter((assignment: any) => {
+        const isDeleted = isDeletedTask(assignment,filter);
+        if (isDeleted) {
+          console.log(`🗑️ Filtering out deleted task: ${assignment.taskTitle || assignment.task?.title}`);
+        }
+        return !isDeleted;
+      });
+      
+      console.log(`📥 After deleted filter: ${filteredAssignments.length} assignments, total: ${total}`);
+      
+      const processed = filteredAssignments.map((assignment: any) => {
+        const isDeleted = isDeletedTask(assignment,filter);
+        const taskTitle = assignment.task?.title || assignment.taskTitle || 'Unknown Task';
+        
+        // ✅ Clean eventDate logic
+        let eventDate = null;
+        if (filter === 'pending') {
+          eventDate = assignment.completedAt || assignment.updatedAt;
+        } else {
+          eventDate = assignment.verifiedAt || assignment.updatedAt || assignment.completedAt;
+        }
+        
+        return {
+          ...assignment,
+          id: assignment.id,
+          userName: assignment.user?.fullName || assignment.userName || 'Unknown User',
+          userAvatar: assignment.user?.avatarUrl || assignment.userAvatar,
+          userId: assignment.user?.id || assignment.userId,
+          taskId: assignment.task?.id || assignment.taskId,
+          taskTitle: isDeleted ? `🗑️ ${taskTitle} (Deleted)` : taskTitle,
+          taskPoints: assignment.task?.points || assignment.taskPoints || 0,
+          eventDate: eventDate ? new Date(eventDate) : null,
+          dueDate: assignment.dueDate ? new Date(assignment.dueDate) : null,
+          completed: assignment.completed || false,
+          verified: assignment.verified,
+          photoUrl: assignment.photoUrl,
+          notes: assignment.notes,
+          adminNotes: assignment.adminNotes,
+          timeSlot: assignment.timeSlot,
+          isTaskDeleted: isDeleted,
+          isPartial: assignment.isPartial || false,
+          slotsCompleted: assignment.slotsCompleted || 0,
+          totalSlots: assignment.totalSlots || 1,
+          points: assignment.points || 0
+        };
+      });
+      
+      const newTotal = total;
+      setTotalCount(newTotal);
+      const newHasMore = (offset + processed.length) < newTotal;
+      setHasMore(newHasMore);
+      
+      if (reset) {
+        setSubmissions(processed);
+      } else {
+        setSubmissions(prev => [...prev, ...processed]);
+      }
+      
+      console.log(`✅ Loaded ${processed.length} items. Total: ${newTotal}, HasMore: ${newHasMore}`);
+    } else {
+      setError(result.message || 'Failed to load submissions');
     }
-  };
+  } catch (err: any) {
+    console.error('Error fetching submissions:', err);
+    setError(err.message || 'Network error');
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+    setIsLoadingMore(false);
+    isLoadingRef.current = false;
+  }
+};
 
   const handleLoadMore = useCallback(() => {
     if (isLoadingMore || !hasMore || loading || refreshing) return;

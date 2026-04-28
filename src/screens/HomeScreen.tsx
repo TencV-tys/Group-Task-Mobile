@@ -1,4 +1,5 @@
-// src/screens/HomeScreen.tsx - Option C: Task-First, Group-Labeled
+// src/screens/HomeScreen.tsx - UPDATED with suspension blocking & time priority
+
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import {
   View,
@@ -58,10 +59,37 @@ const dueLabelText = (task: any): string => {
   return '';
 };
 
-// Add this helper function at the top of HomeScreen (outside component)
+// ✅ NEW: Calculate urgency score for sorting
+const getUrgencyScore = (task: any): number => {
+  if (!task.timeSlot) return 0;
+  
+  const now = new Date();
+  const dueDate = new Date(task.dueDate);
+  const [endHour, endMinute] = task.timeSlot.endTime.split(':').map(Number);
+  
+  const endTimeUTC = new Date(Date.UTC(
+    dueDate.getUTCFullYear(),
+    dueDate.getUTCMonth(),
+    dueDate.getUTCDate(),
+    endHour - 8, endMinute, 0, 0
+  ));
+  
+  const timeUntilEnd = endTimeUTC.getTime() - now.getTime();
+  const minutesUntil = Math.floor(timeUntilEnd / 60000);
+  
+  // Lower = more urgent
+  if (minutesUntil < 0) return 0;      // Already passed (go to bottom)
+  if (minutesUntil <= 5) return 1;     // Very urgent
+  if (minutesUntil <= 15) return 2;    // Urgent
+  if (minutesUntil <= 30) return 3;    // Soon
+  if (minutesUntil <= 60) return 4;    // Within hour
+  if (minutesUntil <= 120) return 5;   // Within 2 hours
+  if (minutesUntil <= 240) return 6;   // Within 4 hours
+  return 7; // Later
+};
+
 const convertUTCToPHT = (utcDateString: string): { date: string; time: string } => {
   const date = new Date(utcDateString);
-  // Add 8 hours to convert UTC to PHT
   const phtDate = new Date(date.getTime() + 8 * 60 * 60 * 1000);
   
   const year = phtDate.getUTCFullYear();
@@ -80,11 +108,9 @@ const convertUTCToPHT = (utcDateString: string): { date: string; time: string } 
   };
 };
 
-// Helper to format time slot to PHT
 const formatTimeSlotToPHT = (timeSlot: any) => {
   if (!timeSlot) return '';
   
-  // Convert start time (PHT string) to display format
   const formatTime = (time24: string) => {
     const [hours, minutes] = time24.split(':').map(Number);
     const period = hours >= 12 ? 'PM' : 'AM';
@@ -185,85 +211,70 @@ export default function HomeScreen({ navigation }: any) {
       ]);
     }
   }, [authError, navigation]);
-
-  useFocusEffect(
+ 
+  useFocusEffect( 
     useCallback(() => {
       loadUnreadCount();
       loadPendingForMe();
     }, [loadUnreadCount, loadPendingForMe])
   );
-
-  // In HomeScreen.tsx, add this right after getting homeData:
-
+  // In HomeScreen.tsx, right after getting homeData
 useEffect(() => {
-  if (homeData?.currentWeekTasks) {
-    console.log('🔍🔍🔍 [DEBUG] CurrentWeekTasks count:', homeData.currentWeekTasks.length);
-    console.log('📊 [DEBUG] Task breakdown:');
-    
-    const verified = homeData.currentWeekTasks.filter((t: any) => t.verified === true);
-    const rejected = homeData.currentWeekTasks.filter((t: any) => t.verified === false);
-    const pendingVerification = homeData.currentWeekTasks.filter((t: any) => t.photoUrl !== null && t.verified === null);
-    const expired = homeData.currentWeekTasks.filter((t: any) => t.expired === true);
-    const completed = homeData.currentWeekTasks.filter((t: any) => t.completed === true);
-    const notStarted = homeData.currentWeekTasks.filter((t: any) => 
-      t.verified !== true && 
-      t.verified !== false && 
-      (!t.photoUrl || t.photoUrl === null) && 
-      t.expired !== true && 
-      t.completed !== true
-    );
-    
-    console.log(`   ✅ Verified: ${verified.length}`);
-    console.log(`   ❌ Rejected: ${rejected.length}`);
-    console.log(`   ⏳ Pending Verification (has photo): ${pendingVerification.length}`);
-    console.log(`   ⏰ Expired: ${expired.length}`);
-    console.log(`   ✓ Completed: ${completed.length}`);
-    console.log(`   📋 NOT STARTED (actionable): ${notStarted.length}`);
-    
-    // Log first task to see its fields
-    if (homeData.currentWeekTasks.length > 0) {
-      console.log('📋 First task fields:', {
-        id: homeData.currentWeekTasks[0].id,
-        title: homeData.currentWeekTasks[0].title,
-        completed: homeData.currentWeekTasks[0].completed,
-        verified: homeData.currentWeekTasks[0].verified,
-        photoUrl: homeData.currentWeekTasks[0].photoUrl,
-        expired: homeData.currentWeekTasks[0].expired,
-        partiallyExpired: homeData.currentWeekTasks[0].partiallyExpired
-      });
-    }
-  } 
+  if (homeData?.groups) {
+    console.log('🔴🔴🔴 GROUPS FROM BACKEND 🔴🔴🔴');
+    homeData.groups.forEach((group: any) => {
+      console.log(`Group: ${group.name}`);
+      console.log(`  - status: ${group.status}`);
+      console.log(`  - isDeleted: ${group.isDeleted}`);
+      console.log(`  - type: ${typeof group.status}`);
+    });
+  }
 }, [homeData]);
 
-  // ── derived data ────────────────────────────────────────────────────────
-  const user            = homeData?.user         || { fullName: 'User', email: '', avatarUrl: null };
-  const recentActivity  = homeData?.recentActivity  || [];
-  const currentWeekTasks = homeData?.currentWeekTasks || [];
-  const overdueTasks    = homeData?.overdueTasks    || [];
-  const groups          = homeData?.groups          || [];
-  const swapRequests    = homeData?.stats?.swapRequests || 0;
+  // ── derived data with SUSPENSION FILTERING ────────────────────────────────
+  const user = homeData?.user || { fullName: 'User', email: '', avatarUrl: null };
+  const recentActivity = homeData?.recentActivity || [];
+  const allCurrentWeekTasks = homeData?.currentWeekTasks || [];
+  const overdueTasks = homeData?.overdueTasks || [];
+  
+  // ✅ FILTER: Only show ACTIVE groups (not suspended, not deleted)
+  const groups = (homeData?.groups || []).filter((group: any) => 
+    group.status !== 'SUSPENDED' && !group.isDeleted
+  );
+  
+  const swapRequests = homeData?.stats?.swapRequests || 0;
+
+  // ✅ FILTER: Only show tasks from ACTIVE groups
+  const activeGroupIds = new Set(groups.map(g => g.id));
+  const currentWeekTasks = allCurrentWeekTasks.filter((task: any) => 
+    activeGroupIds.has(task.groupId)
+  );
 
   const isActionable = (task: any) => {
-  // ✅ Exclude tasks that are already processed
-  if (task.verified === true) return false;      // Already verified
-  if (task.verified === false) return false;     // Rejected
-  if (task.photoUrl !== null && task.verified === null) return false; // Pending verification
-  if (task.expired === true) return false;       // Expired/missed
-  if (task.completed === true) return false;     // Completed
-  
-  return true; // Only show actionable tasks
-};
+    if (task.verified === true) return false;
+    if (task.verified === false) return false;
+    if (task.photoUrl !== null && task.verified === null) return false;
+    if (task.expired === true) return false;
+    if (task.completed === true) return false;
+    return true;
+  };
 
-  // Update the memoized filters
-const todayTasks = useMemo(
-  () => currentWeekTasks.filter((t: any) => isToday(t.dueDate) && isActionable(t)),
-  [currentWeekTasks]
-);
+  // ✅ UPDATED: Sort Today's Focus by urgency (current time priority)
+  const todayTasks = useMemo(() => {
+    const tasks = currentWeekTasks.filter((t: any) => isToday(t.dueDate) && isActionable(t));
+    
+    // Sort by urgency score (smaller = more urgent)
+    return tasks.sort((a: any, b: any) => {
+      const urgencyA = getUrgencyScore(a);
+      const urgencyB = getUrgencyScore(b);
+      return urgencyA - urgencyB;
+    });
+  }, [currentWeekTasks]);
 
-const upcomingTasks = useMemo(
-  () => currentWeekTasks.filter((t: any) => !isToday(t.dueDate) && isActionable(t)),
-  [currentWeekTasks]
-);
+  const upcomingTasks = useMemo(
+    () => currentWeekTasks.filter((t: any) => !isToday(t.dueDate) && isActionable(t)),
+    [currentWeekTasks]
+  );
 
   // ── handlers ────────────────────────────────────────────────────────────
   const handleRefresh = useCallback(() => {
@@ -273,6 +284,16 @@ const upcomingTasks = useMemo(
   }, [refreshHomeData, loadPendingForMe, loadUnreadCount]);
 
   const handleGroupPress = useCallback((group: any) => {
+    // ✅ Check if group is suspended or deleted before navigating
+    if (group.status === 'SUSPENDED') {
+      Alert.alert('⚠️ Group Suspended', `"${group.name}" has been suspended. You cannot access it.`);
+      return;
+    }
+    if (group.isDeleted) {
+      Alert.alert('🗑️ Group Deleted', `"${group.name}" has been deleted.`);
+      return;
+    }
+    
     navigation.navigate('GroupTasks', {
       groupId:   group.id,
       groupName: group.name,
@@ -362,57 +383,66 @@ const upcomingTasks = useMemo(
     );
   }, [rotationAlerts, styles, navigation, groups, handleDismissRotationAlert]);
 
-
-
-  const renderTaskCard = useCallback((task: any) => {
-  const dueToday    = isToday(task.dueDate);
-  const dueTomorrow = isTomorrow(task.dueDate);
-  const label       = dueLabelText(task);
-  const dueColor = dueToday ? theme.error : dueTomorrow ? '#e67700' : theme.textMuted;
-  
-  const timeSlotText = task.timeSlot ? formatTimeSlotToPHT(task.timeSlot) : '';
-  const phtDisplay = convertUTCToPHT(task.dueDate);
-  const displayDate = dueToday ? 'Today' : dueTomorrow ? 'Tomorrow' : phtDisplay.date;
-  
-  return (
-    <TouchableOpacity
-      key={task.id}
-      style={styles.taskCard}
-      onPress={() => {
-        navigation.navigate('TaskDetails', {
-          taskId: task.taskId,
-          groupId: task.groupId,
-          userRole: 'MEMBER',
-        });
-      }}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.taskDot, { backgroundColor: dueToday ? theme.error : theme.primary }]} />
-      <View style={styles.taskContent}>
-        <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
-        <View style={styles.taskMetaRow}>
-          <View style={[styles.groupPill, { backgroundColor: theme.primaryLight }]}>
-            <Text style={[styles.groupPillText, { color: theme.primary }]} numberOfLines={1}>
-              {task.groupName}
-            </Text>
+  const renderTaskCard = useCallback((task: any, isUrgent?: boolean) => {
+    const dueToday    = isToday(task.dueDate);
+    const dueTomorrow = isTomorrow(task.dueDate);
+    const label       = dueLabelText(task);
+    const dueColor = dueToday ? theme.error : dueTomorrow ? '#e67700' : theme.textMuted;
+    
+    const timeSlotText = task.timeSlot ? formatTimeSlotToPHT(task.timeSlot) : '';
+    const phtDisplay = convertUTCToPHT(task.dueDate);
+    const displayDate = dueToday ? 'Today' : dueTomorrow ? 'Tomorrow' : phtDisplay.date;
+    
+    // ✅ Highlight urgent tasks
+    const urgencyScore = getUrgencyScore(task);
+    const isVeryUrgent = urgencyScore <= 2;
+    
+    return (
+      <TouchableOpacity
+        key={task.id}
+        style={[
+          styles.taskCard,
+          isVeryUrgent && styles.urgentTaskCard
+        ]}
+        onPress={() => {
+          navigation.navigate('TaskDetails', {
+            taskId: task.taskId,
+            groupId: task.groupId,
+            userRole: 'MEMBER', 
+          });
+        }}
+        activeOpacity={0.7} 
+      >
+        <View style={[styles.taskDot, { backgroundColor: dueToday ? theme.error : isVeryUrgent ? '#e67700' : theme.primary }]} />
+        <View style={styles.taskContent}>
+          <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
+          <View style={styles.taskMetaRow}>
+            <View style={[styles.groupPill, { backgroundColor: theme.primaryLight }]}>
+              <Text style={[styles.groupPillText, { color: theme.primary }]} numberOfLines={1}>
+                {task.groupName}
+              </Text>
+            </View>
+            {timeSlotText ? (
+              <Text style={[styles.taskMetaText, { color: theme.textMuted }]}>{timeSlotText}</Text>
+            ) : null}
           </View>
-          {timeSlotText ? (
-            <Text style={[styles.taskMetaText, { color: theme.textMuted }]}>{timeSlotText}</Text>
-          ) : null}
         </View>
-      </View>
-      <View style={styles.taskRight}>
-        <Text style={styles.taskPoints}>+{task.points} pts</Text>
-        {label ? (
-          <Text style={[styles.taskDueLabel, { color: dueColor }]}>{label}</Text>
-        ) : (
-          <Text style={[styles.taskDueLabel, { color: theme.textMuted }]}>{displayDate}</Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
-}, [theme, styles, navigation]);
-
+        <View style={styles.taskRight}>
+          <Text style={styles.taskPoints}>+{task.points} pts</Text>
+          {label ? (
+            <Text style={[styles.taskDueLabel, { color: dueColor }]}>{label}</Text>
+          ) : (
+            <Text style={[styles.taskDueLabel, { color: theme.textMuted }]}>{displayDate}</Text>
+          )}
+          {isVeryUrgent && (
+            <View style={styles.urgentIndicator}>
+              <Text style={styles.urgentText}>URGENT</Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  }, [theme, styles, navigation]);
 
   // ── loading / error states ───────────────────────────────────────────────
   if (loading && !refreshing) {
@@ -509,7 +539,7 @@ const upcomingTasks = useMemo(
           </View>
         )}
 
-        {/* ── Today's Focus ── */}
+        {/* ── Today's Focus (SORTED BY URGENCY) ── */}
         <Animated.View style={[
           styles.section,
           {
@@ -519,6 +549,7 @@ const upcomingTasks = useMemo(
         ]}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Today's focus</Text>
+            <Text style={styles.sectionSubtitle}>Most urgent first</Text>
             {todayTasks.length > 3 && (
               <TouchableOpacity onPress={handleViewAllTasks}>
                 <Text style={styles.seeAllText}>See all ({todayTasks.length})</Text>
@@ -562,7 +593,7 @@ const upcomingTasks = useMemo(
           </Animated.View>
         )}
 
-        {/* ── Your Groups ── */}
+        {/* ── Your Groups (Only ACTIVE groups) ── */}
         {groups.length > 0 && (
           <Animated.View style={[
             styles.section,
@@ -579,21 +610,17 @@ const upcomingTasks = useMemo(
             </View>
 
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupsScroll}>
-               {groups.slice(0, 6).map((group: any) => {
-  // ✅ FIXED: Count ONLY actionable tasks (not started)
-  const groupTaskCount = currentWeekTasks.filter(
-    (t: any) => t.groupId === group.id && isActionable(t)
-  ).length;
+              {groups.slice(0, 6).map((group: any) => {
+                const groupTaskCount = currentWeekTasks.filter(
+                  (t: any) => t.groupId === group.id && isActionable(t)
+                ).length;
 
-  const isGroupAdmin = group.role === 'ADMIN';
-  const badgeLabel = groupTaskCount > 0
-    ? `${groupTaskCount} task${groupTaskCount > 1 ? 's' : ''}`
-    : isGroupAdmin
-      ? 'admin'
-      : 'no tasks';
-  const badgeBg    = groupTaskCount > 0 ? theme.primaryLight : theme.bgTertiary;
-  const badgeColor = groupTaskCount > 0 ? theme.primary : theme.textMuted;
-
+                const isGroupAdmin = group.role === 'ADMIN'; 
+                const badgeLabel = groupTaskCount > 0
+                  ? `${groupTaskCount} task${groupTaskCount > 1 ? 's' : ''}`
+                  : isGroupAdmin ? 'admin' : 'no tasks';
+                const badgeBg = groupTaskCount > 0 ? theme.primaryLight : theme.bgTertiary;
+                const badgeColor = groupTaskCount > 0 ? theme.primary : theme.textMuted;
 
                 return (
                   <TouchableOpacity
@@ -611,7 +638,6 @@ const upcomingTasks = useMemo(
                     )}
                     <Text style={styles.groupName} numberOfLines={1}>{group.name || 'Group'}</Text>
 
-                    {/* task count / role badge */}
                     <View style={[styles.groupTaskBadge, { backgroundColor: badgeBg }]}>
                       <Text style={[styles.groupTaskBadgeText, { color: badgeColor }]}>
                         {badgeLabel}

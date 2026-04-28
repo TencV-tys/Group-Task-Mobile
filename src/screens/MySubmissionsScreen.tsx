@@ -78,40 +78,12 @@ export default function MySubmissionsScreen({ navigation, route }: any) {
     fetchStats();
   }, [filter]);
 
-const fetchStats = async () => {
-  try {
-    const user = await TokenUtils.getUser();
-    if (!user) return;
-
-    // ✅ Get ALL assignments without status filter
-    const result = await AssignmentService.getUserAssignments(user.id);
-    
-    if (result.success && result.data?.assignments) {
-      const assignments = result.data.assignments;
-      
-      const pending = assignments.filter((a: any) => 
-        a.photoUrl !== null && a.verified === null
-      ).length;
-      
-      const verified = assignments.filter((a: any) => 
-        a.verified === true
-      ).length;
-      
-      const rejected = assignments.filter((a: any) => 
-        a.verified === false
-      ).length;
-      
-      console.log(`📊 Stats - Pending: ${pending}, Verified: ${verified}, Rejected: ${rejected}`);
-      
-      setStats({
-        pendingVerification: pending,
-        verifiedAssignments: verified,
-        rejectedAssignments: rejected
-      });
-    }
-  } catch (err) {
-    console.error('Error fetching stats:', err);
-  }
+  // Add this helper function near the top of MySubmissionsScreen.tsx
+const isDeletedTask = (assignment: any): boolean => {
+  const isTaskDeleted = !assignment.taskId || assignment.taskId === null;
+  const isHistorical = assignment.isHistorical === true;
+  const hasTaskTitleOnly = assignment.taskTitle && !assignment.taskId;
+  return isTaskDeleted || isHistorical || hasTaskTitleOnly;
 };
 
 const fetchSubmissions = async (page: number, reset = false) => {
@@ -145,35 +117,39 @@ const fetchSubmissions = async (page: number, reset = false) => {
       let allAssignments = result.data.assignments;
       console.log(`📊 Total assignments from API: ${allAssignments.length}`);
       
-      // ✅ Filter on the frontend based on the selected filter
+      // ✅ Filter out deleted tasks FIRST
+      const activeAssignments = allAssignments.filter((a: any) => !isDeletedTask(a));
+      console.log(`📊 After removing deleted tasks: ${activeAssignments.length} assignments`);
+      
+      // ✅ Then filter based on status
       let filteredAssignments = [];
       let total = 0;
       
       if (filter === 'pending') {
-        filteredAssignments = allAssignments.filter((a: any) => 
+        filteredAssignments = activeAssignments.filter((a: any) => 
           a.photoUrl !== null && a.verified === null
         );
         console.log(`📊 Pending filter: ${filteredAssignments.length} assignments (has photo, not verified)`);
       } else if (filter === 'verified') {
-        filteredAssignments = allAssignments.filter((a: any) => a.verified === true);
+        filteredAssignments = activeAssignments.filter((a: any) => a.verified === true);
         console.log(`📊 Verified filter: ${filteredAssignments.length} assignments`);
       } else if (filter === 'rejected') {
-        filteredAssignments = allAssignments.filter((a: any) => a.verified === false);
+        filteredAssignments = activeAssignments.filter((a: any) => a.verified === false);
         console.log(`📊 Rejected filter: ${filteredAssignments.length} assignments`);
       }
       
-      // ✅ Get total count for pagination
+      // ✅ Get total count for pagination (only active tasks)
       if (reset) {
         // Get all assignments to count total for this filter
         const allResult = await AssignmentService.getUserAssignments(user.id);
         if (allResult.success && allResult.data?.assignments) {
-          const all = allResult.data.assignments;
+          const allActive = allResult.data.assignments.filter((a: any) => !isDeletedTask(a));
           if (filter === 'pending') {
-            total = all.filter((a: any) => a.photoUrl !== null && a.verified === null).length;
+            total = allActive.filter((a: any) => a.photoUrl !== null && a.verified === null).length;
           } else if (filter === 'verified') {
-            total = all.filter((a: any) => a.verified === true).length;
+            total = allActive.filter((a: any) => a.verified === true).length;
           } else if (filter === 'rejected') {
-            total = all.filter((a: any) => a.verified === false).length;
+            total = allActive.filter((a: any) => a.verified === false).length;
           }
         }
       } else {
@@ -221,6 +197,44 @@ const fetchSubmissions = async (page: number, reset = false) => {
     isLoadingRef.current = false;
   }
 };
+
+const fetchStats = async () => {
+  try {
+    const user = await TokenUtils.getUser();
+    if (!user) return;
+
+    // ✅ Get ALL assignments without status filter
+    const result = await AssignmentService.getUserAssignments(user.id);
+    
+    if (result.success && result.data?.assignments) {
+      // ✅ Filter out deleted tasks first
+      const activeAssignments = result.data.assignments.filter((a: any) => !isDeletedTask(a));
+      
+      const pending = activeAssignments.filter((a: any) => 
+        a.photoUrl !== null && a.verified === null
+      ).length;
+      
+      const verified = activeAssignments.filter((a: any) => 
+        a.verified === true
+      ).length;
+      
+      const rejected = activeAssignments.filter((a: any) => 
+        a.verified === false
+      ).length;
+      
+      console.log(`📊 Stats (active only) - Pending: ${pending}, Verified: ${verified}, Rejected: ${rejected}`);
+      
+      setStats({
+        pendingVerification: pending,
+        verifiedAssignments: verified,
+        rejectedAssignments: rejected
+      });
+    }
+  } catch (err) {
+    console.error('Error fetching stats:', err);
+  }
+};
+
 
 useEffect(() => {
   return () => {
@@ -775,7 +789,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
   },
-  submittedDate: {
+  submittedDate: { 
     fontSize: 11,
     marginTop: 8,
     fontStyle: 'italic',

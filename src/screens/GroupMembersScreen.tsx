@@ -17,6 +17,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as SecureStore from 'expo-secure-store';
+import * as Clipboard from 'expo-clipboard';
 
 import { GroupMembersService } from '../services/GroupMemberService';
 import { GroupSettingsService } from '../services/GroupSettingsService';
@@ -242,7 +243,16 @@ export default function GroupMembersScreen({ navigation, route }: any) {
       title: `Join ${groupInfo?.name || groupName}`
     }).catch(err => console.error('Error sharing:', err));
   };
-
+const handleCopyInviteCode = async () => {
+  const code = inviteCode || groupInfo?.inviteCode;
+  if (!code) {
+    Alert.alert('Error', 'No invite code available');
+    return;
+  }
+  
+  await Clipboard.setStringAsync(code);
+  Alert.alert('✅ Copied!', 'Invite code copied to clipboard');
+};
   const handleEditGroup = () => {
     setShowEditModal(true);
   };
@@ -1049,7 +1059,7 @@ const handleChooseGroupPhoto = async () => {
               style={[styles.inviteCodeCard, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}
               onPress={() => {
                 Alert.alert('Invite Code', inviteCodeToShow, [
-                  { text: 'Copy', onPress: () => {/* Copy to clipboard */} },
+                  { text: 'Copy', onPress: () => {handleCopyInviteCode} },
                   { text: 'Share', onPress: handleShareInvite },
                   { text: 'Cancel', style: 'cancel' }
                 ]);

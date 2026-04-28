@@ -480,4 +480,361 @@ multiSlotBadgeText: {
   fontWeight: '500',
   marginLeft: 2,
 },
+ urgentTaskCard: {
+    borderLeftWidth: 3,
+    borderLeftColor: theme.error,
+    backgroundColor: theme.errorBg + '20',
+  },
+  
+  urgentIndicator: {
+    backgroundColor: theme.error,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 4,
+  },
+  
+  urgentText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+
+  // Section subtitle (for "Most urgent first" text)
+  sectionSubtitle: {
+    fontSize: 12,
+    color: theme.textMuted,
+    marginLeft: 8,
+  },
+
+  // Suspended/Deleted group card style
+  disabledGroupCard: {
+    opacity: 0.6,
+    backgroundColor: theme.bgSecondary,
+  },
+
+  suspendedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    backgroundColor: theme.errorBg,
+    marginTop: 4,
+    gap: 4,
+  },
+
+  suspendedText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  // Completed/Pending assignment styles
+  completedAssignment: {
+    backgroundColor: theme.primaryLight,
+  },
+
+  pendingAssignment: {
+    backgroundColor: theme.bgSecondary,
+  },
+
+  myAssignment: {
+    borderLeftWidth: 2,
+    borderLeftColor: theme.primary,
+  },
+
+  // Assignment info styles
+  assignmentInfo: {
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+
+  assignmentHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+
+  assignmentStatus: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+
+  unassignedInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+
+  unassignedText: {
+    fontSize: 12,
+    color: theme.textMuted,
+    fontStyle: 'italic',
+  },
+
+  // Progress bar styles
+  progressContainer: {
+    marginTop: 10,
+    marginBottom: 4,
+  },
+
+  progressBar: {
+    height: 4,
+    backgroundColor: theme.border,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.primary,
+    borderRadius: 2,
+  },
+
+  progressText: {
+    fontSize: 10,
+    color: theme.textMuted,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  // Today section FAB
+  todayFAB: {
+    position: 'absolute',
+    bottom: 80,
+    right: 16,
+    left: 16,
+    zIndex: 100,
+  },
+
+  todayFABContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+
+  todayFABTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+
+  todayFABTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  todayFABCount: {
+    color: '#fff',
+    fontSize: 11,
+    opacity: 0.9,
+  },
+
+  // Today section styles
+  todaySection: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    padding: 12,
+  },
+
+  urgentSection: {
+    backgroundColor: theme.errorBg,
+  },
+
+  warningSection: {
+    backgroundColor: theme.primaryLight,
+  },
+
+  todaySectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  todaySectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+
+  todaySectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  todaySectionViewAll: {
+    fontSize: 12,
+    color: theme.primary,
+    fontWeight: '500',
+  },
+
+  todayTaskItem: {
+    backgroundColor: theme.card,
+    borderRadius: 10,
+    marginBottom: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: theme.border,
+  },
+
+  lateTaskItem: {
+    borderLeftWidth: 3,
+    borderLeftColor: theme.error,
+  },
+
+  urgentTaskItem: {
+    borderLeftWidth: 3,
+    borderLeftColor: theme.error,
+  },
+
+  warningTaskItem: {
+    borderLeftWidth: 3,
+    borderLeftColor: theme.primary,
+  },
+
+  todayTaskItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+
+  todayTaskItemIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  lateIcon: {
+    backgroundColor: theme.error,
+  },
+
+  urgentIcon: {
+    backgroundColor: theme.error,
+  },
+
+  warningIcon: {
+    backgroundColor: theme.primaryLight,
+  },
+
+  todayTaskItemInfo: {
+    flex: 1,
+  },
+
+  todayTaskItemTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: theme.text,
+  },
+
+  todayTaskItemTime: {
+    fontSize: 11,
+    color: theme.textMuted,
+  },
+
+  todayMoreButton: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+
+  todayMoreButtonText: {
+    fontSize: 12,
+    color: theme.primary,
+    fontWeight: '500',
+  },
+
+  // Rotation banner styles
+  rotationBanner: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+
+  rotationBannerGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    gap: 10,
+  },
+
+  rotationBannerText: {
+    flex: 1,
+  },
+
+  rotationBannerTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+
+  warningTitle: {
+    color: theme.error,
+  },
+
+  successTitle: {
+    color: theme.primary,
+  },
+
+  rotationBannerMessage: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+
+  warningMessage: {
+    color: theme.error,
+  },
+
+  successMessage: {
+    color: theme.primary,
+  },
+
+  // Connection status
+  connectionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+
+  connectionDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+
+  connectionText: {
+    fontSize: 10,
+    color: theme.textMuted,
+  },
+
+  // Rotation warning badge
+  rotationWarningBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginTop: 4,
+    gap: 4,
+  },
+
+  rotationWarningText: {
+    fontSize: 10,
+    color: theme.primary,
+    fontWeight: '500',
+  },
 });

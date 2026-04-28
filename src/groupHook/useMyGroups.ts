@@ -65,10 +65,13 @@ export function useMyGroups() {
         }
         
         const groupsWithAvatars = groupsArray.map(group => ({
-          ...group,
-          avatarUrl: group.avatarUrl || group.avatar || null
-        }));
-        
+  ...group,
+  avatarUrl: group.avatarUrl || group.avatar || null,
+  // ✅ Preserve status fields
+  status: group.status || 'ACTIVE',
+  isDeleted: group.isDeleted || false,
+  statusReason: group.statusReason || null
+}));
         setGroups(groupsWithAvatars);
         setAuthError(false);
         console.log(`✅ useMyGroups: Loaded ${groupsWithAvatars.length} groups`);

@@ -1,4 +1,5 @@
-// src/screens/MyGroupsScreen.tsx - Dark Mode Added
+// src/screens/MyGroupsScreen.tsx - UPDATED with suspension blocking
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -65,7 +66,9 @@ export default function MyGroupsScreen({ navigation }: any) {
           createdById: newGroup.createdById,
           userRole: 'ADMIN',
           memberCount: 1,
-          taskCount: 0
+          taskCount: 0,
+          status: 'ACTIVE',
+          isDeleted: false
         });
         Alert.alert('Success!', 'Group created successfully');
       }
@@ -85,7 +88,9 @@ export default function MyGroupsScreen({ navigation }: any) {
           createdById: newGroup.createdById,
           userRole: 'MEMBER',
           memberCount: newGroup.memberCount || 1,
-          taskCount: newGroup.taskCount || 0
+          taskCount: newGroup.taskCount || 0,
+          status: 'ACTIVE',
+          isDeleted: false
         });
         Alert.alert('Success!', 'Joined group successfully');
       }
@@ -93,6 +98,16 @@ export default function MyGroupsScreen({ navigation }: any) {
   };
 
   const handleGroupPress = (group: any) => {
+    // ✅ BLOCK if suspended or deleted
+    if (group.status === 'SUSPENDED') {
+      Alert.alert('⚠️ Group Suspended', `"${group.name}" has been suspended. You cannot access it.`);
+      return;
+    }
+    if (group.isDeleted) {
+      Alert.alert('🗑️ Group Deleted', `"${group.name}" has been deleted.`);
+      return;
+    }
+    
     navigation.navigate('GroupTasks', { 
       groupId: group.id,
       groupName: group.name,
@@ -101,6 +116,15 @@ export default function MyGroupsScreen({ navigation }: any) {
   };
 
   const handleManageGroup = (group: any) => {
+    if (group.status === 'SUSPENDED') {
+      Alert.alert('⚠️ Group Suspended', `Cannot manage a suspended group.`);
+      return;
+    }
+    if (group.isDeleted) {
+      Alert.alert('🗑️ Group Deleted', `Cannot manage a deleted group.`);
+      return;
+    }
+    
     navigation.navigate('GroupMembers', { 
       groupId: group.id,
       groupName: group.name,
@@ -110,6 +134,15 @@ export default function MyGroupsScreen({ navigation }: any) {
   };
 
   const handleInviteGroup = (group: any) => {
+    if (group.status === 'SUSPENDED') {
+      Alert.alert('⚠️ Group Suspended', `Cannot invite to a suspended group.`);
+      return;
+    }
+    if (group.isDeleted) {
+      Alert.alert('🗑️ Group Deleted', `Cannot invite to a deleted group.`);
+      return;
+    }
+    
     Alert.alert(
       'Invite Code',
       `Share this code to invite members:\n\n📋 ${group.inviteCode || 'No invite code available'}`,
@@ -135,6 +168,15 @@ export default function MyGroupsScreen({ navigation }: any) {
   };
 
   const handleTasksGroup = (group: any) => {
+    if (group.status === 'SUSPENDED') {
+      Alert.alert('⚠️ Group Suspended', `Cannot view tasks for a suspended group.`);
+      return;
+    }
+    if (group.isDeleted) {
+      Alert.alert('🗑️ Group Deleted', `Cannot view tasks for a deleted group.`);
+      return;
+    }
+    
     navigation.navigate('GroupTasks', { 
       groupId: group.id,
       groupName: group.name,
@@ -147,33 +189,29 @@ export default function MyGroupsScreen({ navigation }: any) {
     setReportModalVisible(true);
   };
 
-// In MyGroupsScreen.tsx - Update handleSubmitReport
-
-const handleSubmitReport = async (data: { type: string; description: string }) => {
-  if (!selectedGroupForReport) return;
-  
-  try {
-    const result = await ReportService.submitGroupReport(selectedGroupForReport.id, data);
+  const handleSubmitReport = async (data: { type: string; description: string }) => {
+    if (!selectedGroupForReport) return;
     
-    if (!result.success) {
-      // ✅ Throw error with the message from backend
-      throw new Error(result.message || 'Failed to submit report');
+    try {
+      const result = await ReportService.submitGroupReport(selectedGroupForReport.id, data);
+      
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to submit report');
+      }
+      
+      return result;
+    } catch (error: any) {
+      console.error('Report submission error:', error);
+      throw error;
     }
-    
-    // ✅ Only store on success - let the backend response determine success
-    return result;
-  } catch (error: any) {
-    console.error('Report submission error:', error);
-    throw error;
-  }
-};
+  };
 
   const filteredGroups = groups.filter(group => 
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     group.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderGroupIcon = (group: any, isAdmin: boolean) => {
+  const renderGroupIcon = (group: any, isAdmin: boolean, isDisabled: boolean) => {
     if (group.avatarUrl) {
       return (
         <View style={styles.groupIconContainer}>
@@ -182,10 +220,10 @@ const handleSubmitReport = async (data: { type: string; description: string }) =
             style={[
               styles.groupIcon,
               styles.groupAvatarImage,
-              { borderColor: isAdmin ? theme.primary : theme.border }
+              { borderColor: isAdmin && !isDisabled ? theme.primary : theme.border, opacity: isDisabled ? 0.5 : 1 }
             ]}
           />
-          {isAdmin && (
+          {isAdmin && !isDisabled && (
             <LinearGradient
               colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
@@ -202,22 +240,22 @@ const handleSubmitReport = async (data: { type: string; description: string }) =
       return (
         <View style={styles.groupIconContainer}>
           <LinearGradient
-            colors={isAdmin ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
+            colors={isAdmin && !isDisabled ? [theme.primary, theme.primaryDark] : [theme.bgSecondary, theme.bgTertiary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[
               styles.groupIcon,
-              { borderWidth: 1, borderColor: isAdmin ? theme.primary : theme.border }
+              { borderWidth: 1, borderColor: isAdmin && !isDisabled ? theme.primary : theme.border, opacity: isDisabled ? 0.5 : 1 }
             ]}
           >
             <Text style={[
               styles.groupIconText,
-              { color: isAdmin ? '#fff' : theme.textSecondary }
+              { color: isAdmin && !isDisabled ? '#fff' : theme.textSecondary }
             ]}>
               {groupName.charAt(0).toUpperCase()}
             </Text>
           </LinearGradient>
-          {isAdmin && (
+          {isAdmin && !isDisabled && (
             <LinearGradient
               colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
@@ -236,41 +274,86 @@ const handleSubmitReport = async (data: { type: string; description: string }) =
     const groupName = item.name || 'Unnamed Group';
     const userRole = item.userRole || item.role || 'MEMBER';
     const isAdmin = userRole === 'ADMIN';
+    const isSuspended = item.status === 'SUSPENDED';
+    const isDeleted = item.isDeleted === true;
+    const isDisabled = isSuspended || isDeleted;
+    
+    let statusText = '';
+    let statusColor = theme.textMuted;
+    let statusBg = theme.bgSecondary;
+    
+    if (isSuspended) {
+      statusText = 'Suspended';
+      statusColor = theme.error;
+      statusBg = theme.errorBg;
+    } else if (isDeleted) {
+      statusText = 'Deleted';
+      statusColor = theme.textMuted;
+      statusBg = theme.bgSecondary;
+    }
     
     return (
       <TouchableOpacity 
-        style={[styles.groupCard, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow }]}
+        style={[
+          styles.groupCard, 
+          { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.shadow },
+          isDisabled && styles.disabledGroupCard
+        ]}
         onPress={() => handleGroupPress(item)}
         activeOpacity={0.7}
       >
         <View style={styles.groupHeader}>
-          {renderGroupIcon(item, isAdmin)}
+          {renderGroupIcon(item, isAdmin, isDisabled)}
           
           <View style={styles.groupMainInfo}>
             <View style={styles.groupTitleRow}>
-              <Text style={[styles.groupName, { color: theme.text }]} numberOfLines={1}>{groupName}</Text>
-              <LinearGradient
-                colors={isAdmin ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.roleBadge}
-              > 
-                <Text style={[
-                  styles.groupRole,
-                  isAdmin && styles.adminRoleText,
-                  { color: isAdmin ? theme.primary : theme.textSecondary }
-                ]}>
-                  {isAdmin ? 'Admin' : 'Member'}
-                </Text>
-              </LinearGradient>
+              <Text style={[styles.groupName, { color: theme.text, opacity: isDisabled ? 0.5 : 1 }]} numberOfLines={1}>
+                {groupName}
+              </Text>
+              
+              {/* Status Badge */}
+              {isDisabled && (
+                <LinearGradient
+                  colors={[statusBg, statusBg]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.statusBadge}
+                >
+                  <MaterialCommunityIcons 
+                    name={isSuspended ? "alert" : "delete"} 
+                    size={10} 
+                    color={statusColor} 
+                  />
+                  <Text style={[styles.statusBadgeText, { color: statusColor }]}>
+                    {statusText}
+                  </Text>
+                </LinearGradient>
+              )}
+              
+              {!isDisabled && (
+                <LinearGradient
+                  colors={isAdmin ? [theme.primaryLight, theme.primaryLight] : [theme.bgSecondary, theme.bgTertiary]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.roleBadge}
+                > 
+                  <Text style={[
+                    styles.groupRole,
+                    isAdmin && styles.adminRoleText,
+                    { color: isAdmin ? theme.primary : theme.textSecondary }
+                  ]}>
+                    {isAdmin ? 'Admin' : 'Member'}
+                  </Text>
+                </LinearGradient>
+              )}
             </View>
             
             {item.description ? (
-              <Text style={[styles.groupDescription, { color: theme.textSecondary }]} numberOfLines={2}>
+              <Text style={[styles.groupDescription, { color: theme.textSecondary, opacity: isDisabled ? 0.5 : 1 }]} numberOfLines={2}>
                 {item.description}
               </Text>
             ) : (
-              <Text style={[styles.groupNoDescription, { color: theme.textPlaceholder }]}>No description</Text>
+              <Text style={[styles.groupNoDescription, { color: theme.textPlaceholder, opacity: isDisabled ? 0.5 : 1 }]}>No description</Text>
             )}
             
             <View style={styles.groupQuickStats}>
@@ -286,53 +369,70 @@ const handleSubmitReport = async (data: { type: string; description: string }) =
           </View>
         </View>
         
-        <View style={[styles.groupActions, { borderTopColor: theme.borderLight }]}>
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: theme.bgSecondary }]}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleInviteGroup(item);
-            }}
-          >
-            <MaterialCommunityIcons name="account-plus" size={16} color={theme.primary} />
-            <Text style={[styles.actionButtonText, { color: theme.textSecondary }]}>Invite</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.actionButton, { backgroundColor: theme.bgSecondary }]}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleTasksGroup(item);
-            }}
-          >
-            <MaterialCommunityIcons name="clipboard-text" size={16} color={theme.textSecondary} />
-            <Text style={[styles.actionButtonText, { color: theme.textSecondary }]}>Tasks</Text>
-          </TouchableOpacity>
-          
-          {isAdmin && (
+        {!isDisabled && (
+          <View style={[styles.groupActions, { borderTopColor: theme.borderLight }]}>
             <TouchableOpacity 
               style={[styles.actionButton, { backgroundColor: theme.bgSecondary }]}
               onPress={(e) => {
                 e.stopPropagation();
-                handleManageGroup(item);
+                handleInviteGroup(item);
               }}
             >
-              <MaterialCommunityIcons name="cog" size={16} color={theme.textSecondary} />
-              <Text style={[styles.actionButtonText, { color: theme.textSecondary }]}>Manage</Text>
+              <MaterialCommunityIcons name="account-plus" size={16} color={theme.primary} />
+              <Text style={[styles.actionButtonText, { color: theme.textSecondary }]}>Invite</Text>
             </TouchableOpacity>
-          )}
+            
+            <TouchableOpacity 
+              style={[styles.actionButton, { backgroundColor: theme.bgSecondary }]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleTasksGroup(item);
+              }}
+            >
+              <MaterialCommunityIcons name="clipboard-text" size={16} color={theme.textSecondary} />
+              <Text style={[styles.actionButtonText, { color: theme.textSecondary }]}>Tasks</Text>
+            </TouchableOpacity>
+            
+            {isAdmin && (
+              <TouchableOpacity 
+                style={[styles.actionButton, { backgroundColor: theme.bgSecondary }]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleManageGroup(item);
+                }}
+              >
+                <MaterialCommunityIcons name="cog" size={16} color={theme.textSecondary} />
+                <Text style={[styles.actionButtonText, { color: theme.textSecondary }]}>Manage</Text>
+              </TouchableOpacity>
+            )}
 
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.reportButton, { backgroundColor: theme.errorBg }]}
-            onPress={(e) => {
-              e.stopPropagation();
-              handleReportGroup(item);
-            }}
-          >
-            <MaterialCommunityIcons name="flag" size={16} color={theme.error} />
-            <Text style={[styles.actionButtonText, styles.reportButtonText, { color: theme.error }]}>Report</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.reportButton, { backgroundColor: theme.errorBg }]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleReportGroup(item);
+              }}
+            >
+              <MaterialCommunityIcons name="flag" size={16} color={theme.error} />
+              <Text style={[styles.actionButtonText, styles.reportButtonText, { color: theme.error }]}>Report</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        {isDisabled && (
+          <View style={[styles.groupActions, { borderTopColor: theme.borderLight, justifyContent: 'center' }]}>
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.disabledActionButton, { backgroundColor: theme.bgSecondary }]}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleReportGroup(item);
+              }}
+            >
+              <MaterialCommunityIcons name="flag" size={16} color={theme.error} />
+              <Text style={[styles.actionButtonText, { color: theme.error }]}>Report</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </TouchableOpacity>
     );
   };
@@ -469,10 +569,10 @@ const handleSubmitReport = async (data: { type: string; description: string }) =
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
             {groups.length} {groups.length === 1 ? 'group' : 'groups'}
           </Text>
-        </View>
+        </View> 
         
         <TouchableOpacity 
-          onPress={refreshGroups}
+          onPress={refreshGroups} 
           disabled={refreshing}
           style={[styles.refreshButton, { backgroundColor: theme.card, shadowColor: theme.shadow }]}
         >
@@ -640,6 +740,9 @@ const styles = StyleSheet.create({
     elevation: 2,
     borderWidth: 1,
   },
+  disabledGroupCard: {
+    opacity: 0.7,
+  },
   groupHeader: {
     flexDirection: 'row',
     marginBottom: 12,
@@ -683,12 +786,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 6,
+    flexWrap: 'wrap',
+    gap: 6,
   },
   groupName: {
     fontSize: 16,
     fontWeight: '600',
     flex: 1,
-    marginRight: 8,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   roleBadge: {
     paddingHorizontal: 8,
@@ -740,6 +856,9 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
     borderRadius: 8,
+  },
+  disabledActionButton: {
+    opacity: 0.5,
   },
   actionButtonText: {
     fontSize: 12,

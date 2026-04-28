@@ -41,54 +41,44 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
     return new Date(d.getTime() + (8 * 60 * 60 * 1000));
   };
 
-  // ✅ Format date to Philippine Time with AM/PM
-  const formatPHTDate = (date: Date | string | null | undefined): string => {
-    if (!date) return 'N/A';
-    try {
-      const phtDate = toPHT(date);
-      return phtDate.toLocaleDateString('en-PH', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch (e) {
-      return 'Invalid date';
-    }
-  };
+  const formatPHTDate = (utcDate: string | null | undefined): string => {
+  if (!utcDate) return 'N/A';
+  try {
+    const date = new Date(utcDate);
+    const phtDate = new Date(date.getTime() + (8 * 60 * 60 * 1000));
+    return phtDate.toLocaleDateString('en-PH', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch (e) {
+    return 'Invalid date';
+  }
+};
 
-  // ✅ Format time to 12-hour format with AM/PM
-  const formatTime12Hour = (timeString: string): string => {
-    if (!timeString) return '';
-    
-    // Handle format like "09:00" or "14:30"
-    const [hourStr, minuteStr] = timeString.split(':');
-    let hour = parseInt(hourStr || '0', 10);
-    const minute = minuteStr || '00';
-    
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    hour = hour % 12;
-    if (hour === 0) hour = 12;
-    
-    return `${hour}:${minute} ${ampm}`;
-  };
+const formatPHTDateTime = (utcDate: string) => {
+  const date = new Date(utcDate);
+  return date.toLocaleString('en-PH', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'Asia/Manila'  // ← Let the formatter handle conversion
+  });
+};
 
-  // ✅ Format datetime to full PHT with time
-  const formatPHTDateTime = (date: Date | string | null | undefined): string => {
-    if (!date) return 'N/A';
-    try {
-      const phtDate = toPHT(date);
-      return phtDate.toLocaleString('en-PH', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      });
-    } catch (e) {
-      return 'Invalid date';
-    }
-  };
+// ✅ Time slot times are already in PHT from backend, just convert to 12-hour format
+const formatTime12Hour = (timeString: string): string => {
+  if (!timeString) return '';
+  const [hourStr, minuteStr] = timeString.split(':');
+  let hour = parseInt(hourStr || '0', 10);
+  const minute = minuteStr || '00';
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  hour = hour % 12 || 12;
+  return `${hour}:${minute} ${ampm}`;
+};
 
   const checkToken = useCallback(async (): Promise<boolean> => {
     const hasToken = await TokenUtils.checkToken({
@@ -185,15 +175,56 @@ export const NeglectedTasksScreen = ({ navigation, route }: any) => {
     }
   }, []);
 
-  // ✅ Navigate directly to AssignmentDetails
-  const handleTaskPress = (task: any) => {
-    console.log('📋 Navigating to AssignmentDetails for neglected task:', task.id);
-    navigation.navigate('AssignmentDetails', {
-      assignmentId: task.id,
-      isAdmin: isAdmin,
-      onVerified: () => loadNeglectedTasks(true)
+  // In NeglectedTasksScreen.tsx - Add this debug effect
+
+useEffect(() => {
+  if (neglectedTasks.length > 0) {
+    console.log('\n🔍🔍🔍 [DEBUG] Neglected Tasks Time Data 🔍🔍🔍');
+    neglectedTasks.forEach((task, index) => {
+      console.log(`\n📦 Task ${index + 1}: ${task.taskTitle}`);
+      console.log(`   Raw dueDate (UTC): ${task.dueDate}`);
+      console.log(`   Raw expiredAt (UTC): ${task.expiredAt}`);
+      console.log(`   Time Slot:`, task.timeSlot);
+      console.log(`   Slot startTime (PHT): ${task.timeSlot?.startTime}`);
+      console.log(`   Slot endTime (PHT): ${task.timeSlot?.endTime}`);
+      console.log(`   Slot label: ${task.timeSlot?.label}`);
+      console.log(`   Points: ${task.points}`);
+      
+      // Check PHT conversion
+      const dueDate = new Date(task.dueDate);
+      const dueDatePHT = new Date(dueDate.getTime() + 8 * 60 * 60 * 1000);
+      console.log(`   Due Date PHT: ${dueDatePHT.toISOString()}`);
+      console.log(`   Due Date PHT (local): ${dueDatePHT.toLocaleString()}`);
+      
+      // Check when it should have been submitted
+      if (task.timeSlot) {
+        const [endHour, endMinute] = task.timeSlot.endTime.split(':').map(Number);
+        const slotEndPHT = new Date(dueDatePHT);
+        slotEndPHT.setHours(endHour, endMinute, 0, 0);
+        console.log(`   Slot end PHT: ${slotEndPHT.toLocaleString()}`);
+        console.log(`   Grace period ended: ${new Date(slotEndPHT.getTime() + 30 * 60000).toLocaleString()}`);
+      }
     });
-  };
+    console.log('\n🔍🔍🔍 END DEBUG 🔍🔍🔍\n');
+  }
+}, [neglectedTasks]);
+
+  // ✅ Navigate directly to AssignmentDetails
+const handleTaskPress = (task: any) => {
+  // ✅ Use originalAssignmentId, NOT the synthetic id
+  const realAssignmentId = task.originalAssignmentId || task.id;
+  
+  console.log('📋 Navigating to AssignmentDetails for neglected task:', {
+    syntheticId: task.id,
+    realId: realAssignmentId
+  });
+  
+  navigation.navigate('AssignmentDetails', {
+    assignmentId: realAssignmentId,  // ← Use REAL ID!
+    isAdmin: isAdmin,
+    onVerified: () => loadNeglectedTasks(true)
+  });
+};
 
   const renderTaskItem = ({ item }: any) => {
     // ✅ Format dates in PHT

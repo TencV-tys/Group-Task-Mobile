@@ -1059,7 +1059,7 @@ const handleChooseGroupPhoto = async () => {
               style={[styles.inviteCodeCard, { backgroundColor: theme.bgSecondary, borderColor: theme.border }]}
               onPress={() => {
                 Alert.alert('Invite Code', inviteCodeToShow, [
-                  { text: 'Copy', onPress: () => {handleCopyInviteCode} },
+                  { text: 'Copy', onPress: () => {handleCopyInviteCode();} },
                   { text: 'Share', onPress: handleShareInvite },
                   { text: 'Cancel', style: 'cancel' }
                 ]);

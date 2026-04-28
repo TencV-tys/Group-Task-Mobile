@@ -174,18 +174,18 @@ const groupedMyTasks = useMemo(() => {
     taskData.rawAssignments.push(assignment);
     
     if (assignment.verified === true) {
-      taskData.verifiedCount++;
-      taskData.earnedPoints += points;
-    } 
-    else if (assignment.verified === false) {
-      taskData.rejectedCount++;
-    } 
-    else if (assignment.expired === true) {
-      taskData.missedCount++;
-    } 
-    else {
-      taskData.pendingCount++;
-    }
+  taskData.verifiedCount++;
+  taskData.earnedPoints += points;
+} 
+else if (assignment.verified === false) {
+  taskData.rejectedCount++;
+} 
+else if (assignment.expired === true || assignment.partiallyExpired === true) {
+  taskData.missedCount++;
+} 
+else {
+  taskData.pendingCount++;
+}
     
     taskData.totalPoints += points;
   });
@@ -309,9 +309,9 @@ const groupedAllTasks = useMemo(() => {
           taskData.earnedPoints += points;
         } else if (assignment.verified === false) {
           taskData.rejectedCount++;
-        } else if (assignment.expired === true) {
-          taskData.missedCount++;
-        }
+        }else if (assignment.expired === true || assignment.partiallyExpired === true) {
+  taskData.missedCount++;
+}
         
         taskData.totalPoints += points;
         taskData.assignments.push(assignment);
@@ -603,7 +603,7 @@ const groupedAllTasks = useMemo(() => {
             userAssignment: userAssignment || task.userAssignment,
           };
         });
-        setTasks(processedTasks);
+        setTasks(processedTasks); 
         analyzeTaskCreationDays(processedTasks);
         initialLoadDone.current = true;
       } else {

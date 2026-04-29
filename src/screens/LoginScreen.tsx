@@ -1,4 +1,4 @@
-// src/screens/LoginScreen.tsx - FULLY UPDATED with remaining attempts counter
+// src/screens/LoginScreen.tsx - UPDATED to match SignupScreen styling
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -16,6 +16,7 @@ import {
   Animated,
   Pressable,
   Alert,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -209,8 +210,8 @@ export default function LoginScreen({ navigation }: any) {
     handleChange, 
     handleSubmit, 
     resetForm,
-    remainingAttempts,  // ✅ ADD THIS
-    isLocked            // ✅ ADD THIS
+    remainingAttempts,
+    isLocked
   } = useLoginForm();
 
   const [showPassword, setShowPassword] = useState(false);
@@ -226,7 +227,7 @@ export default function LoginScreen({ navigation }: any) {
   const formSlide = useRef(new Animated.Value(28)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
 
-  // ✅ Get remaining attempts message
+  // Get remaining attempts message
   const getRemainingAttemptsMessage = () => {
     if (isLocked) {
       return { message: '⚠️ Account temporarily locked due to too many failed attempts', type: 'error' };
@@ -356,12 +357,15 @@ export default function LoginScreen({ navigation }: any) {
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-            {/* ── Header */}
+            {/* ── Header with GT Logo Image (matching SignupScreen) ── */}
             <Animated.View style={[styles.headerContainer, { opacity: logoAnim, transform: [{ scale: logoScale }] }]}>
               <View style={styles.logoWrapper}>
                 <View style={styles.logoContainer}>
-                  <Text style={styles.logoCheck}>✓</Text>
-                  <Text style={styles.logoText}>GT</Text>
+                  <Image 
+                    source={require('../../assets/GTRLOGO.jpeg')}
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                  />
                 </View>
               </View>
               <Text style={styles.title}>Welcome back</Text>
@@ -383,7 +387,7 @@ export default function LoginScreen({ navigation }: any) {
             >
               <InlineBanner message={banner.message} type={banner.type} />
 
-              {/* ✅ REMAINING ATTEMPTS BANNER */}
+              {/* Remaining attempts banner */}
               {attemptsInfo && (
                 <LinearGradient
                   colors={[COLORS.errorBg, COLORS.errorBg]}
@@ -523,24 +527,23 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 10,
   },
-  logoContainer: { 
+  // ✅ Updated to match SignupScreen styling
+  logoContainer: {
     width: 80,
     height: 80,
     borderRadius: 22,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.25)',
-  },  
-  logoCheck: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.7)',
-    position: 'absolute',
-    top: 11,
-    left: 11,
   },
-  logoText: { fontSize: 30, fontWeight: '900', color: COLORS.white, letterSpacing: 1.5, marginTop: 4 },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
   title: { fontSize: 26, fontWeight: '800', color: COLORS.black, marginBottom: 6, letterSpacing: -0.5 },
   subtitle: { fontSize: 14, color: COLORS.gray, textAlign: 'center' },
 
@@ -559,7 +562,6 @@ const styles = StyleSheet.create({
   bannerDot: { width: 6, height: 6, borderRadius: 3, flexShrink: 0 },
   bannerText: { fontSize: 13, fontWeight: '500', flex: 1 },
 
-  // ✅ New warning banner style
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -635,4 +637,4 @@ const styles = StyleSheet.create({
   signupRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: 10 },
   linkText: { color: COLORS.gray, fontSize: 14 },
   linkBold: { color: COLORS.primary, fontSize: 14, fontWeight: '700' },
-}); 
+});

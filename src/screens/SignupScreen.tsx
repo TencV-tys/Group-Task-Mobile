@@ -1,4 +1,4 @@
-// src/screens/SignupScreen.tsx - FULLY UPDATED with backend matching validation
+// src/screens/SignupScreen.tsx - UPDATED with GT Logo Image
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -15,6 +15,7 @@ import {
   Animated,
   Pressable,
   Alert,
+  Image,  // ✅ ADDED: Import Image component
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSignupForm } from '../authHook/useSignupForm';
@@ -62,7 +63,6 @@ const validateEmail = (email: string): string => {
   return '';
 };
 
-// ✅ UPDATED: Match backend requirements (8 chars, uppercase, lowercase, number, special)
 const validatePassword = (password: string): string => {
   if (!password) return 'Password is required';
   if (password.length < 8) return `Password must be at least 8 characters (need ${8 - password.length} more)`;
@@ -87,7 +87,7 @@ const validateConfirmPassword = (password: string, confirm: string): string => {
   return '';
 };
 
-// ─── Password Strength (updated for 8 char minimum) ────────────────────────────
+// ─── Password Strength ─────────────────────────────────────────────────────────
 type StrengthLevel = 'weak' | 'fair' | 'good' | 'strong';
 
 const getPasswordStrength = (password: string) => {
@@ -401,7 +401,6 @@ export default function SignupScreen({ navigation }: any) {
     const passErr = validatePassword(formData.password);
     const confirmErr = validateConfirmPassword(formData.password, formData.confirmPassword);
 
-    // Show specific validation errors with Alert for better UX
     if (nameErr) {
       Alert.alert('Invalid Name', nameErr);
       shake();
@@ -435,7 +434,6 @@ export default function SignupScreen({ navigation }: any) {
         navigation.reset({ index: 0, routes: [{ name: 'Home' }] });
       }, 800);
     } else {
-      // Show server error in Alert
       Alert.alert('Signup Failed', result.message || 'Something went wrong. Please try again.');
       shake();
     }
@@ -457,12 +455,15 @@ export default function SignupScreen({ navigation }: any) {
             showsVerticalScrollIndicator={false}
             bounces={false}
           >
-            {/* ── Header */}
+            {/* ── Header with GT Logo Image (matching LoginScreen) ── */}
             <Animated.View style={[styles.headerContainer, { opacity: logoAnim, transform: [{ scale: logoScale }] }]}>
               <View style={styles.logoWrapper}>
                 <View style={styles.logoContainer}>
-                  <Text style={styles.logoCheck}>✓</Text>
-                  <Text style={styles.logoText}>GT</Text>
+                  <Image 
+                    source={require('../../assets/GTRLOGO.jpeg')}  // ✅ Using same image as LoginScreen
+                    style={styles.logoImage}
+                    resizeMode="contain"
+                  />
                 </View>
               </View>
               <Text style={styles.title}>Create account</Text>
@@ -489,7 +490,6 @@ export default function SignupScreen({ navigation }: any) {
                 transform: [{ translateY: formSlide }, { translateX: shakeAnim }],
               }}
             >
-              {/* Inline banner */}
               <InlineBanner message={banner.message} type={banner.type} />
 
               {/* Full Name */}
@@ -528,7 +528,7 @@ export default function SignupScreen({ navigation }: any) {
                 <FieldError message={emailError} />
               </View>
 
-              {/* Gender — pill tabs */}
+              {/* Gender */}
               <GenderPills
                 selectedValue={formData.gender}
                 onValueChange={(v: string) => handleChange('gender', v)}
@@ -631,7 +631,6 @@ const styles = StyleSheet.create({
   },
   containerWithKeyboard: { justifyContent: 'flex-start', paddingTop: 20 },
 
-  // Progress bar
   progressTrack: {
     height: 3,
     backgroundColor: COLORS.tertiary,
@@ -645,7 +644,7 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
 
-  // Header
+  // Header with Image Logo
   headerContainer: { alignItems: 'center', marginBottom: 20 },
   logoWrapper: {
     marginBottom: 18,
@@ -656,17 +655,21 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   logoContainer: {
-    width: 76,
-    height: 76,
+    width: 80,
+    height: 80,
     borderRadius: 22,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
     borderWidth: 3,
     borderColor: 'rgba(255,255,255,0.25)',
   },
-  logoCheck: { fontSize: 12, color: 'rgba(255,255,255,0.7)', position: 'absolute', top: 10, left: 10 },
-  logoText: { fontSize: 28, fontWeight: '900', color: COLORS.white, letterSpacing: 1.5, marginTop: 4 },
+  logoImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
   title: { fontSize: 24, fontWeight: '800', color: COLORS.black, marginBottom: 6, letterSpacing: -0.5 },
   subtitle: { fontSize: 13, color: COLORS.gray, textAlign: 'center', lineHeight: 18 },
 

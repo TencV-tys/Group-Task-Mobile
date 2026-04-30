@@ -105,11 +105,21 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     clearAssignmentUpdated
   } = useRealtimeAssignments(groupId, currentUserId || '');
 
+ 
   const {
-    events: swapEvents,
-    clearSwapCreated,
-    clearSwapResponded,
-  } = useRealtimeSwapRequests(groupId, currentUserId || '');
+  events: swapEvents,
+  clearSwapRequested,
+  clearSwapCreated,
+  clearSwapResponded,
+  clearSwapAccepted,
+  clearSwapRejected,
+  clearSwapCancelled,
+  clearSwapExpired,
+  clearSwapPendingApproval,
+  clearSwapAdminAction,
+  clearSwapReadyForAcceptance,
+  clearAll
+} = useRealtimeSwapRequests(groupId, currentUserId || '');
 
   // ===== CHECK IF TASK IS ASSIGNED =====
   const isTaskAssigned = useCallback((task: any): boolean => {
@@ -118,6 +128,8 @@ export default function GroupTasksScreen({ navigation, route }: any) {
     return false;
   }, []);
 
+
+  
   
 const groupedMyTasks = useMemo(() => {
   if (selectedTab !== 'my') return [];
@@ -220,7 +232,7 @@ else {
         displayText = 'Pending Verification';
       } else {
         statusEmoji = '⏳';
-        displayText = 'Not Started';
+        displayText = 'Not Started'; 
       }
     } else {
       if (effectiveMissed > 0 && effectiveRejected > 0) {
@@ -312,7 +324,7 @@ const groupedAllTasks = useMemo(() => {
         }else if (assignment.expired === true || assignment.partiallyExpired === true) {
   taskData.missedCount++;
 }
-        
+         
         taskData.totalPoints += points;
         taskData.assignments.push(assignment);
       });
@@ -794,23 +806,12 @@ const groupedAllTasks = useMemo(() => {
     }
   }, [assignmentEvents.assignmentVerified, refreshTasks, clearAssignmentVerified]);
 
-  useEffect(() => {
-    if (swapEvents.swapCreated) {
-      refreshTasks();
-      clearSwapCreated();
-    }
-  }, [swapEvents.swapCreated, refreshTasks, clearSwapCreated]);
 
   useEffect(() => {
     if (groupId && userRole === 'ADMIN') checkStatus();
   }, [groupId, tasks.length, checkStatus, userRole]);
 
-  useEffect(() => {
-    if (swapEvents.swapResponded) {
-      refreshTasks();
-      clearSwapResponded();
-    }
-  }, [swapEvents.swapResponded, refreshTasks, clearSwapResponded]);
+  
 
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
@@ -823,6 +824,131 @@ const groupedAllTasks = useMemo(() => {
     
     return unsubscribe;
   }, [navigation, groupId, loadingUser, loadPendingForMe, refreshTasks]);
+
+
+
+// Listen for swap created events (when someone creates a swap request)
+useEffect(() => {
+  if (swapEvents.swapCreated) {
+    console.log('🔄 Swap created detected, refreshing tasks...', swapEvents.swapCreated);
+    refreshTasks();
+    
+    // Also refresh swap counts for the user
+    if (!isAdmin) {
+      loadPendingForMe(groupId, true);
+    }
+    
+    clearSwapCreated();
+  }
+}, [swapEvents.swapCreated, refreshTasks, clearSwapCreated, isAdmin, groupId, loadPendingForMe]);
+
+// Listen for swap responded events (when someone accepts/rejects a swap)
+useEffect(() => {
+  if (swapEvents.swapResponded) {
+    console.log('🔄 Swap responded detected, refreshing tasks...', swapEvents.swapResponded);
+    refreshTasks();
+    
+    if (!isAdmin) {
+      loadPendingForMe(groupId, true);
+    }
+    
+    clearSwapResponded();
+  }
+}, [swapEvents.swapResponded, refreshTasks, clearSwapResponded, isAdmin, groupId, loadPendingForMe]);
+
+// Listen for swap accepted events
+useEffect(() => {
+  if (swapEvents.swapAccepted) {
+    console.log('🔄 Swap accepted detected, refreshing tasks...', swapEvents.swapAccepted);
+    refreshTasks();
+    
+    if (!isAdmin) {
+      loadPendingForMe(groupId, true);
+    }
+    
+    clearSwapAccepted();
+  }
+}, [swapEvents.swapAccepted, refreshTasks, clearSwapAccepted, isAdmin, groupId, loadPendingForMe]);
+
+// Listen for swap rejected events
+useEffect(() => {
+  if (swapEvents.swapRejected) {
+    console.log('🔄 Swap rejected detected, refreshing tasks...', swapEvents.swapRejected);
+    refreshTasks();
+    
+    if (!isAdmin) {
+      loadPendingForMe(groupId, true);
+    }
+    
+    clearSwapRejected();
+  }
+}, [swapEvents.swapRejected, refreshTasks, clearSwapRejected, isAdmin, groupId, loadPendingForMe]);
+
+// Listen for swap cancelled events
+useEffect(() => {
+  if (swapEvents.swapCancelled) {
+    console.log('🔄 Swap cancelled detected, refreshing tasks...', swapEvents.swapCancelled);
+    refreshTasks();
+    
+    if (!isAdmin) {
+      loadPendingForMe(groupId, true);
+    }
+    
+    clearSwapCancelled();
+  }
+}, [swapEvents.swapCancelled, refreshTasks, clearSwapCancelled, isAdmin, groupId, loadPendingForMe]);
+
+// Listen for swap expired events
+useEffect(() => {
+  if (swapEvents.swapExpired) {
+    console.log('🔄 Swap expired detected, refreshing tasks...', swapEvents.swapExpired);
+    refreshTasks();
+    
+    if (!isAdmin) {
+      loadPendingForMe(groupId, true);
+    }
+    
+    clearSwapExpired();
+  }
+}, [swapEvents.swapExpired, refreshTasks, clearSwapExpired, isAdmin, groupId, loadPendingForMe]);
+
+// Listen for swap ready for acceptance events
+useEffect(() => {
+  if (swapEvents.swapReadyForAcceptance) {
+    console.log('🔄 Swap ready for acceptance detected, refreshing tasks...', swapEvents.swapReadyForAcceptance);
+    refreshTasks();
+    
+    if (!isAdmin) {
+      loadPendingForMe(groupId, true);
+    }
+    
+    clearSwapReadyForAcceptance();
+  }
+}, [swapEvents.swapReadyForAcceptance, refreshTasks, clearSwapReadyForAcceptance, isAdmin, groupId, loadPendingForMe]);
+
+// Fix this useEffect (add clearSwapPendingApproval)
+useEffect(() => {
+  if (swapEvents.swapPendingApproval) {
+    console.log('🔄 Swap pending approval detected...');
+    refreshTasks();
+    if (!isAdmin) {
+      loadPendingForMe(groupId, true);
+    }
+    clearSwapPendingApproval();  // ✅ Add this
+  }
+}, [swapEvents.swapPendingApproval, refreshTasks, clearSwapPendingApproval, isAdmin, groupId, loadPendingForMe]);  // ✅ Add to deps
+
+// Fix this useEffect (add clearSwapAdminAction)
+useEffect(() => {
+  if (swapEvents.swapAdminAction) {
+    console.log('🔄 Swap admin action detected...');
+    refreshTasks();
+    if (!isAdmin) {
+      loadPendingForMe(groupId, true);
+    }
+    clearSwapAdminAction();  // ✅ Add this
+  }
+}, [swapEvents.swapAdminAction, refreshTasks, clearSwapAdminAction, isAdmin, groupId, loadPendingForMe]);  // ✅ Add to deps
 
   // ===== HANDLER FUNCTIONS =====
   
@@ -932,6 +1058,7 @@ const groupedAllTasks = useMemo(() => {
   const handleViewDrafts = () => {
     navigation.navigate('TaskDrafts', { groupId, groupName });
   };
+
 
   const renderAssignmentInfo = (task: any) => {
     const hasAssignment = task.userAssignment || task.assignments?.length > 0;

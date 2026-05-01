@@ -196,6 +196,7 @@ export interface TodayAssignment {
   taskId: string;
   taskTitle: string;
   taskPoints: number;
+  points: number; 
   group: {
     id: string;
     name: string;
@@ -515,6 +516,7 @@ static async getUserAssignments(
   }
 }
  
+// services/AssignmentService.ts - FIXED getTodayAssignments
 
 static async getTodayAssignments(groupId?: string) {
   console.log('🔵🔵🔵 [FRONTEND] getTodayAssignments CALLED 🔵🔵🔵');
@@ -583,10 +585,24 @@ static async getTodayAssignments(groupId?: string) {
     });
     
     const todayAssignments = allAssignments.filter((assignment: any) => {
+      // ✅ Skip completed assignments
       if (assignment.completed) {
         console.log(`⏭️ Skipping completed: ${assignment.taskTitle}`);
         return false;
       }
+      
+      // ✅ Skip assignments with photo (already submitted, pending verification)
+      if (assignment.photoUrl) {
+        console.log(`⏭️ Skipping already submitted (pending verification): ${assignment.taskTitle}`);
+        return false;
+      }
+      
+      // ✅ Skip verified or rejected
+      if (assignment.verified === true || assignment.verified === false) {
+        console.log(`⏭️ Skipping verified/rejected: ${assignment.taskTitle}`);
+        return false;
+      }
+      
       if (!assignment.dueDate) {
         console.log(`⏭️ No due date: ${assignment.taskTitle}`);
         return false;
@@ -603,6 +619,8 @@ static async getTodayAssignments(groupId?: string) {
         console.log(`   Has photo: ${!!assignment.photoUrl}`);
         console.log(`   Verified: ${assignment.verified}`);
         console.log(`   Expired: ${assignment.expired}`);
+        console.log(`   Backend finalPoints: ${assignment.finalPoints}`);
+        console.log(`   Backend willBePenalized: ${assignment.willBePenalized}`);
       }
       
       return isDueToday && belongsToGroup;
@@ -610,31 +628,14 @@ static async getTodayAssignments(groupId?: string) {
     
     console.log(`📋 Found ${todayAssignments.length} assignments due today`);
     
+    // ✅ USE BACKEND VALUES - NO LOCAL RECALCULATION
     const formattedAssignments = todayAssignments.map((assignment: any) => {
-      const timeValidation = this.validateLocalSubmissionTime(
-        assignment.dueDate,
-        assignment.timeSlot,
-        now
-      );
-      
-      let timeLeft: number | undefined;
-      let willBePenalized = false;
-      let finalPoints = assignment.points;
-      
-      if (timeValidation.canSubmit && timeValidation.timeLeft) {
-        timeLeft = timeValidation.timeLeft;
-        willBePenalized = timeValidation.willBePenalized || false;
-        
-        if (willBePenalized) {
-          finalPoints = Math.floor(assignment.points * 0.5);
-        }
-      }
-      
+      // Just use what the backend already calculated
       console.log(`📝 Assignment: ${assignment.taskTitle}`, {
-        canSubmit: timeValidation.canSubmit,
-        reason: timeValidation.reason,
-        willBePenalized: willBePenalized,
-        timeLeft: timeLeft,
+        backend_finalPoints: assignment.finalPoints,
+        backend_willBePenalized: assignment.willBePenalized,
+        backend_submissionStatus: assignment.submissionStatus,
+        backend_timeLeft: assignment.timeLeft,
         completed: assignment.completed,
         verified: assignment.verified,
         expired: assignment.expired,
@@ -646,15 +647,18 @@ static async getTodayAssignments(groupId?: string) {
         taskId: assignment.taskId,
         taskTitle: assignment.taskTitle,
         taskPoints: assignment.points,
+        points: assignment.points,  // ✅ Use backend points
         group: assignment.group,
         dueDate: assignment.dueDate,
-        canSubmit: timeValidation.canSubmit,
-        timeLeft: timeLeft,
-        timeLeftText: timeValidation.timeLeftText,
-        reason: timeValidation.canSubmit ? undefined : timeValidation.reason,
+        // ✅ USE BACKEND VALIDATION VALUES
+        canSubmit: assignment.canSubmit ?? false,
+        timeLeft: assignment.timeLeft,
+        timeLeftText: assignment.timeLeftText,
+        reason: assignment.reason,
         timeSlot: assignment.timeSlot,
-        willBePenalized: willBePenalized,
-        finalPoints: finalPoints,
+        willBePenalized: assignment.willBePenalized ?? false,
+        finalPoints: assignment.finalPoints ?? assignment.points,  // ✅ Use backend finalPoints
+        submissionStatus: assignment.submissionStatus,
         // ✅ CRITICAL FIELDS FOR STATUS CHECKING
         completed: assignment.completed,
         verified: assignment.verified,
@@ -676,7 +680,7 @@ static async getTodayAssignments(groupId?: string) {
         total: formattedAssignments.length 
       },
       message: 'Today\'s assignments retrieved successfully'
-    };
+    }; 
     
   } catch (error: any) {
     console.error('❌ AssignmentService.getTodayAssignments error:', error);
@@ -686,8 +690,7 @@ static async getTodayAssignments(groupId?: string) {
       message: error.message || 'Failed to load today\'s assignments'
     };
   }
-}
-
+} 
 
   // ========== GET GROUP ASSIGNMENTS ==========
   static async getGroupAssignments(

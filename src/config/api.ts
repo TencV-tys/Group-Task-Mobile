@@ -8,7 +8,7 @@ export const getBackendIP = (): string => {
   const hostUri = Constants.expoConfig?.hostUri;
   
   if (!hostUri) return 'localhost'; // Fallback
-  
+   
   const [currentIP] = hostUri.split(':');
   
   // If device is on 192.168.1.x (office WiFi), backend is at 192.168.1.29
@@ -30,7 +30,7 @@ export const getBackendIP = (): string => {
 };
 
 // Export the full API URL
-export const API_BASE_URL = `http://${getBackendIP()}:${PORT}`;
-
+//export const API_BASE_URL = `http://${getBackendIP()}:${PORT}`;
+export const API_BASE_URL = "https://group-task-server-production.up.railway.app"; 
 // Log it for debugging
 console.log('🌐 Backend URL:', API_BASE_URL); 

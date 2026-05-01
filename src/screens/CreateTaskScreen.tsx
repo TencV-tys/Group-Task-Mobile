@@ -541,7 +541,7 @@ export default function CreateTaskScreen({ navigation, route }: any) {
           {currentDraftId ? 'Edit Draft' : 'Create Task'}
         </Text>
         <View style={styles.headerSpacer} />
-      </View>
+      </View> 
 
       <KeyboardAvoidingView
         style={styles.container}

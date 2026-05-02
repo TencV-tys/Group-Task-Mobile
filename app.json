@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "GroupTaskMobile",
+    "name": "Group Task",
     "slug": "grouptask",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/GTRLOGO.jpeg",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "light", 
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/GTRLOGO.jpeg",
@@ -22,7 +22,7 @@
             "CFBundleURLSchemes": [
               "grouptask",
               "exp"
-            ]
+            ] 
           }
         ]
       }

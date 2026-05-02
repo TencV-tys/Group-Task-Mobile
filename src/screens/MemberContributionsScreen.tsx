@@ -12,7 +12,7 @@ import {
   StatusBar,
   Alert,
   Image,
-  LayoutAnimation,
+  LayoutAnimation, 
   UIManager, 
   Platform,
   Dimensions
@@ -125,8 +125,21 @@ export default function MemberContributionsScreen({ navigation, route }: any) {
           isMissed: assignment.isMissed,
           expired: assignment.expired
         });
+
+        // Add this debug log
+console.log(`🔍 [DISPLAY] Assignment: ${assignment.taskTitle}`, {
+  verified: assignment.verified,
+  isMissed: assignment.isMissed,
+  points: assignment.points,
+  earnedPoints: assignment.earnedPoints,
+  totalPoints: assignment.totalPoints,
+  isMultiSlot: assignment.isMultiSlot,
+  completedTimeSlotIds: assignment.completedTimeSlotIds,
+  missedTimeSlotIds: assignment.missedTimeSlotIds,
+  timeSlots: assignment.timeSlots?.length
+});
       });
-    });
+    }); 
   }
 }, [data]);
 

@@ -17,9 +17,6 @@ import { API_BASE_URL } from './src/config/api';
 import { SocketAuthBridge } from './src/components/SocketAuthBridge';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Navigation ref removed - not needed anymore
-// export const navigationRef = React.createRef<any>();
-
 // Configure notification handler for when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -78,18 +75,46 @@ const linking = {
     const url = await Linking.getInitialURL();
     return url;
   },
+  // ✅ FIXED: Added proper type for the listener parameter
   subscribe(listener: (url: string) => void) {
     const subscription = Linking.addEventListener('url', ({ url }) => listener(url));
     return () => subscription.remove();
   },
 };
 
-// Register for push notifications
+// 🔥 CORRECTED: Configure Android notification channels for pop-up notifications
+async function configureAndroidNotifications() {
+  if (Platform.OS !== 'android') {
+    return;
+  }
+
+  try {
+    // Create a channel with HIGH importance for pop-up notifications
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'General Notifications',
+      importance: Notifications.AndroidImportance.HIGH,
+      vibrationPattern: [0, 250, 250, 250],
+      enableVibrate: true,  // ✅ FIXED: 'enableVibrate' not 'enableVibration'
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      bypassDnd: true,
+      lightColor: '#2b8a3e',
+    });
+
+    console.log('✅ Android notification channel configured for pop-up display');
+  } catch (error) {
+    console.error('❌ Failed to configure Android channels:', error);
+  }
+}
+
+// Updated: Register for push notifications with Android channel support
 async function registerForPushNotifications() {
   if (!Device.isDevice) {
     console.log('📱 Must use physical device for Push Notifications');
     return;
   }
+
+  // 🔥 Configure Android channels FIRST
+  await configureAndroidNotifications();
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -128,20 +153,20 @@ async function registerForPushNotifications() {
       } else {
         console.log('❌ Failed to register push token:', result.message);
       }
+    } else {
+      console.log('⚠️ No user logged in, will register token after login');
+      // Store token to register after login
+      await AsyncStorage.setItem('pendingPushToken', token.data);
     }
   } catch (error) {
     console.error('Error registering for push notifications:', error);
   }
 }
 
-// Handle notification tap - NAVIGATION REMOVED, just log it
+// Handle notification tap
 async function handleNotificationResponse(response: Notifications.NotificationResponse) {
   const { data } = response.notification.request.content;
-  console.log('🔘 Notification tapped (navigation disabled):', data);
-  console.log('📱 App will open to last screen - navigation removed');
-  
-  // No navigation code - just log and let app open normally
-  // The app will open to whatever screen was last active
+  console.log('🔘 Notification tapped:', data);
 }
 
 export default function App() {
@@ -187,7 +212,7 @@ export default function App() {
       if (result.success) {
         console.log('✅ Auto-login successful!');
         setInitialRoute('Home');
-        registerForPushNotifications();
+        await registerForPushNotifications();
       } else {
         console.log('❌ No existing session or auto-login failed:', result.message);
         setInitialRoute('Login');
@@ -222,7 +247,6 @@ export default function App() {
         <SocketProvider>
           <SocketAuthBridge />
           <NavigationContainer
-    
             linking={linking}
             fallback={
               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>

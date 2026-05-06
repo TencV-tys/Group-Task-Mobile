@@ -43,3 +43,5 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+google-services.json
+group-task-b0c43-d1622c33b9d4.json

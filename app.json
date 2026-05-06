@@ -28,7 +28,7 @@
       }
     },
     "android": {
-        "googleServicesFile": "$GOOGLE_SERVICES_JSON",
+        "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/GTRLOGO.jpeg",
         "backgroundColor": "#ffffff"

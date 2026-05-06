@@ -4,11 +4,11 @@
     "slug": "grouptask",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/GTRLOGO.jpeg",
+    "icon": "./assets/GTRLOGO.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/GTRLOGO.jpeg",
+      "image": "./assets/GTRLOGO.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -30,7 +30,7 @@
     "android": {
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/GTRLOGO.jpeg",
+        "foregroundImage": "./assets/GTRLOGO.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
@@ -58,19 +58,20 @@
       ]
     },
     "web": {
-      "favicon": "./assets/GTRLOGO.jpeg"
+      "favicon": "./assets/GTRLOGO.png"
     },
     "plugins": [
       "expo-secure-store",
       [
         "expo-notifications",
         {
-          "icon": "./assets/GTRLOGO.jpeg",
+          "icon": "./assets/GTRLOGO.png",
           "color": "#ffffff",
           "defaultChannel": "default",
           "sounds": []
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

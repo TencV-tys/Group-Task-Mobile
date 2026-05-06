@@ -1,4 +1,4 @@
-// App.tsx - NOTIFICATIONS KEPT, NAVIGATION REMOVED
+// App.tsx
 
 import React, { useEffect, useRef, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
@@ -17,7 +17,7 @@ import { API_BASE_URL } from './src/config/api';
 import { SocketAuthBridge } from './src/components/SocketAuthBridge';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Configure notification handler for when app is in foreground
+// ✅ Show notifications even when the app is in the foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -75,105 +75,144 @@ const linking = {
     const url = await Linking.getInitialURL();
     return url;
   },
-  // ✅ FIXED: Added proper type for the listener parameter
   subscribe(listener: (url: string) => void) {
     const subscription = Linking.addEventListener('url', ({ url }) => listener(url));
     return () => subscription.remove();
   },
 };
 
-// 🔥 CORRECTED: Configure Android notification channels for pop-up notifications
+// ✅ FIXED: Removed invalid `enableVibrate` field (not a valid API property).
+// This channel MUST be set up before requesting the push token so Android
+// knows which channel to deliver notifications to.
 async function configureAndroidNotifications() {
-  if (Platform.OS !== 'android') {
-    return;
-  }
+  if (Platform.OS !== 'android') return;
 
   try {
-    // Create a channel with HIGH importance for pop-up notifications
     await Notifications.setNotificationChannelAsync('default', {
       name: 'General Notifications',
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: Notifications.AndroidImportance.HIGH, // Required for heads-up pop-ups
       vibrationPattern: [0, 250, 250, 250],
-      enableVibrate: true,  // ✅ FIXED: 'enableVibrate' not 'enableVibration'
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       bypassDnd: true,
       lightColor: '#2b8a3e',
+      showBadge: true,
     });
 
-    console.log('✅ Android notification channel configured for pop-up display');
+    console.log('✅ Android notification channel configured');
   } catch (error) {
-    console.error('❌ Failed to configure Android channels:', error);
+    console.error('❌ Failed to configure Android notification channel:', error);
   }
 }
 
-// Updated: Register for push notifications with Android channel support
-async function registerForPushNotifications() {
+// ✅ Extracted token registration logic so it can be called from both
+// auto-login AND after a manual login (see registerPendingPushToken below).
+async function registerForPushNotifications(): Promise<string | null> {
   if (!Device.isDevice) {
-    console.log('📱 Must use physical device for Push Notifications');
-    return;
+    console.log('📱 Push notifications require a physical device');
+    return null;
   }
 
-  // 🔥 Configure Android channels FIRST
+  // Always configure the Android channel first
   await configureAndroidNotifications();
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
-  
+
   if (existingStatus !== 'granted') {
     const { status } = await Notifications.requestPermissionsAsync();
     finalStatus = status;
-  }  
-  
-  if (finalStatus !== 'granted') {
-    console.log('❌ Failed to get push token for push notification!');
-    return;
   }
-  
+
+  if (finalStatus !== 'granted') {
+    console.log('❌ Push notification permission denied');
+    return null;
+  }
+
   try {
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    const token = await Notifications.getExpoPushTokenAsync({ projectId });
-    
-    console.log('📱 Expo Push Token:', token.data);
-    
-    const user = await TokenUtils.getUser();
-    if (user) {
-      const headers = await TokenUtils.getAuthHeaders();
-      const response = await fetch(`${API_BASE_URL}/api/notifications/register-push-token`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          expoPushToken: token.data,
-          deviceType: Platform.OS
-        })
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        console.log('✅ Push token registered with backend');
-      } else {
-        console.log('❌ Failed to register push token:', result.message);
-      }
-    } else {
-      console.log('⚠️ No user logged in, will register token after login');
-      // Store token to register after login
-      await AsyncStorage.setItem('pendingPushToken', token.data);
+    if (!projectId) {
+      console.error('❌ Missing EAS projectId in app.json extra.eas.projectId');
+      return null;
     }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    const token = tokenData.data;
+    console.log('📱 Expo Push Token:', token);
+    return token;
   } catch (error) {
-    console.error('Error registering for push notifications:', error);
+    console.error('❌ Failed to get Expo push token:', error);
+    return null;
   }
 }
 
-// Handle notification tap
-async function handleNotificationResponse(response: Notifications.NotificationResponse) {
+// ✅ Sends the token to your backend. Call this whenever a user is confirmed
+// logged in — both after auto-login and after manual login.
+export async function sendPushTokenToBackend(token: string): Promise<void> {
+  try {
+    const user = await TokenUtils.getUser();
+    if (!user) {
+      // No user yet — save token and send it after login
+      await AsyncStorage.setItem('pendingPushToken', token);
+      console.log('⚠️ No user session yet, push token saved for after login');
+      return;
+    }
+
+    const headers = await TokenUtils.getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/notifications/register-push-token`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        expoPushToken: token,
+        deviceType: Platform.OS,
+      }),
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      console.log('✅ Push token registered with backend');
+      await AsyncStorage.removeItem('pendingPushToken'); // Clean up if it was stored
+    } else {
+      console.log('❌ Backend rejected push token:', result.message);
+    }
+  } catch (error) {
+    console.error('❌ Error sending push token to backend:', error);
+  }
+}
+
+// ✅ Call this from your Login screen after a successful manual login.
+// It picks up any token that was stored before the user session was ready.
+export async function registerPendingPushToken(): Promise<void> {
+  try {
+    // Try using the already-stored pending token first
+    const pending = await AsyncStorage.getItem('pendingPushToken');
+    if (pending) {
+      console.log('📱 Found pending push token, registering now...');
+      await sendPushTokenToBackend(pending);
+      return;
+    }
+
+    // Otherwise request a fresh token and register it
+    const token = await registerForPushNotifications();
+    if (token) {
+      await sendPushTokenToBackend(token);
+    }
+  } catch (error) {
+    console.error('❌ Error registering pending push token:', error);
+  }
+}
+
+// Handle notification tap (foreground + background)
+function handleNotificationResponse(response: Notifications.NotificationResponse) {
   const { data } = response.notification.request.content;
-  console.log('🔘 Notification tapped:', data);
+  console.log('🔘 Notification tapped, data:', data);
+  // TODO: navigate to the relevant screen using data.type or data.notificationId
 }
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [initialRoute, setInitialRoute] = useState<'Login' | 'Home'>('Login');
 
-  // Clean up report keys on mount
+  // Clean up stale report keys on mount
   useEffect(() => {
     const cleanup = async () => {
       const allKeys = await AsyncStorage.getAllKeys();
@@ -186,45 +225,55 @@ export default function App() {
     cleanup();
   }, []);
 
-  // Set up notification listeners
+  // Notification listeners
   useEffect(() => {
-    const notificationSubscription = Notifications.addNotificationReceivedListener(notification => {
+    const receivedSub = Notifications.addNotificationReceivedListener(notification => {
       console.log('📨 Notification received in foreground:', notification);
     });
 
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
+    const responseSub = Notifications.addNotificationResponseReceivedListener(
       handleNotificationResponse
     );
-    
+
     return () => {
-      notificationSubscription.remove();
-      responseSubscription.remove();
+      receivedSub.remove();
+      responseSub.remove();
     };
   }, []);
 
-  // Auto-login check
-  useEffect(() => { 
+  // Auto-login + push token registration
+  useEffect(() => {
     const checkAutoLogin = async () => {
       console.log('🔍 Checking for existing session...');
-      
+
       const result = await AuthService.autoLogin();
-      
+
       if (result.success) {
-        console.log('✅ Auto-login successful!');
+        console.log('✅ Auto-login successful');
         setInitialRoute('Home');
-        await registerForPushNotifications();
+
+        // ✅ Get token and send to backend now that user is logged in
+        const token = await registerForPushNotifications();
+        if (token) {
+          await sendPushTokenToBackend(token);
+        }
       } else {
-        console.log('❌ No existing session or auto-login failed:', result.message);
+        console.log('❌ No existing session:', result.message);
         setInitialRoute('Login');
+
+        // ✅ Still get the token and store it — will be sent after manual login
+        const token = await registerForPushNotifications();
+        if (token) {
+          await AsyncStorage.setItem('pendingPushToken', token);
+        }
       }
-      
+
       setIsLoading(false);
     };
-    
+
     checkAutoLogin();
   }, []);
 
-  // Show loading screen while checking auto-login
   if (isLoading) {
     return (
       <SafeAreaProvider>
@@ -257,7 +306,7 @@ export default function App() {
             <AppNavigator initialRoute={initialRoute} />
           </NavigationContainer>
         </SocketProvider>
-      </ThemeProvider> 
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

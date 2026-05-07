@@ -362,7 +362,7 @@ export default function LoginScreen({ navigation }: any) {
               <View style={styles.logoWrapper}>
                 <View style={styles.logoContainer}>
                   <Image 
-                    source={require('../../assets/GTRLOGO.jpeg')}
+                    source={require('../../assets/GTRLOGO.png')}
                     style={styles.logoImage}
                     resizeMode="contain"
                   />

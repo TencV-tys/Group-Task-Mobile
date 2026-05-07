@@ -460,7 +460,7 @@ export default function SignupScreen({ navigation }: any) {
               <View style={styles.logoWrapper}>
                 <View style={styles.logoContainer}>
                   <Image 
-                    source={require('../../assets/GTRLOGO.jpeg')}  // ✅ Using same image as LoginScreen
+                    source={require('../../assets/GTRLOGO.png')}  // ✅ Using same image as LoginScreen
                     style={styles.logoImage}
                     resizeMode="contain"
                   />

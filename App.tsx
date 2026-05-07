@@ -24,10 +24,10 @@ Notifications.setNotificationHandler({
     shouldPlaySound: true,
     shouldSetBadge: true,
     shouldShowBanner: true,
+    shouldShowList: true,  // ← ADD THIS (required)
     priority: Notifications.AndroidNotificationPriority.MAX,
   }),
 });
-
 const linking = {
   prefixes: [
     'exp://192.168.1.18:8081',

@@ -17,14 +17,14 @@ import { API_BASE_URL } from './src/config/api';
 import { SocketAuthBridge } from './src/components/SocketAuthBridge';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// ✅ Show notifications even when the app is in the foreground
+// ✅ Updated notification handler for better popup support
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
     shouldShowBanner: true,
-    shouldShowList: true,
+    priority: Notifications.AndroidNotificationPriority.MAX,
   }),
 });
 
@@ -81,39 +81,54 @@ const linking = {
   },
 };
 
-// ✅ FIXED: Removed invalid `enableVibrate` field (not a valid API property).
-// This channel MUST be set up before requesting the push token so Android
-// knows which channel to deliver notifications to.
+// ✅ UPDATED: Better Android notification channel configuration for standalone apps
 async function configureAndroidNotifications() {
   if (Platform.OS !== 'android') return;
 
   try {
+    // Delete existing channel to ensure fresh configuration
+    await Notifications.deleteNotificationChannelAsync('default').catch(() => {});
+    
+    // Create channel with MAX importance for popup notifications
     await Notifications.setNotificationChannelAsync('default', {
       name: 'General Notifications',
-      importance: Notifications.AndroidImportance.HIGH, // Required for heads-up pop-ups
+      importance: Notifications.AndroidImportance.MAX, // Changed from HIGH to MAX
       vibrationPattern: [0, 250, 250, 250],
       lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
       bypassDnd: true,
-      lightColor: '#2b8a3e',
+      lightColor: '#4F46E5', // Your brand color
       showBadge: true,
+      enableVibrate: true,
+      enableLights: true,
     });
 
-    console.log('✅ Android notification channel configured');
+    console.log('✅ Android notification channel configured with MAX importance');
+    
+    // Test local notification to verify channel works
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "✅ Notifications Working!",
+        body: "You will now receive notifications",
+        data: { test: "success" },
+      },
+      trigger: null, // Show immediately
+    });
   } catch (error) {
     console.error('❌ Failed to configure Android notification channel:', error);
   }
 }
 
-// ✅ Extracted token registration logic so it can be called from both
-// auto-login AND after a manual login (see registerPendingPushToken below).
+// ✅ UPDATED: Register for push notifications with better Android handling
 async function registerForPushNotifications(): Promise<string | null> {
   if (!Device.isDevice) {
     console.log('📱 Push notifications require a physical device');
     return null;
   }
 
-  // Always configure the Android channel first
-  await configureAndroidNotifications();
+  // Always configure the Android channel first (especially important for standalone)
+  if (Platform.OS === 'android') {
+    await configureAndroidNotifications();
+  }
 
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
@@ -244,6 +259,11 @@ export default function App() {
   // Auto-login + push token registration
   useEffect(() => {
     const checkAutoLogin = async () => {
+      // ⭐ IMPORTANT: Configure Android channel FIRST for standalone apps
+      if (Platform.OS === 'android') {
+        await configureAndroidNotifications();
+      }
+      
       console.log('🔍 Checking for existing session...');
 
       const result = await AuthService.autoLogin();

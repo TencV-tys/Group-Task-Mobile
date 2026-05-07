@@ -17,6 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.yourcompany.grouptaskmobile",
       "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"],
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
@@ -29,6 +30,7 @@
     },
     "android": {
       "googleServicesFile": "./google-services.json",
+      "useNextNotificationsApi": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/GTRLOGO.png",
         "backgroundColor": "#ffffff"
@@ -39,7 +41,8 @@
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.WAKE_LOCK"
       ],
       "intentFilters": [
         {
@@ -63,12 +66,25 @@
     "plugins": [
       "expo-secure-store",
       [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 23,
+            "targetSdkVersion": 34,
+            "compileSdkVersion": 34,
+            "buildToolsVersion": "34.0.0",
+            "kotlinVersion": "1.9.24"
+          }
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/GTRLOGO.png",
-          "color": "#ffffff",
+          "color": "#4F46E5",
           "defaultChannel": "default",
-          "sounds": []
+          "sounds": [],
+          "enableBackgroundRemoteNotifications": true
         }
       ]
     ],

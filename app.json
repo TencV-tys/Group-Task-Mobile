@@ -2,7 +2,7 @@
   "expo": {
     "name": "Group Task",
     "slug": "grouptask",
-    "version": "1.0.0",
+    "version": "1.1.5",
     "orientation": "portrait",
     "icon": "./assets/GTRLOGO.png",
     "userInterfaceStyle": "light",

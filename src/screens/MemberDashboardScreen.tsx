@@ -1,4 +1,4 @@
-// src/screens/MemberDashboardScreen.tsx - UPDATED with PHT time conversion
+// src/screens/MemberDashboardScreen.tsx - COMPLETELY FIXED
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
@@ -28,7 +28,6 @@ import { useTheme } from '../context/ThemeContext';
 import { makeMemberDashboardStyles } from '../styles/memberDashboard.styles';
 import { API_BASE_URL } from '../config/api';
 
-// ✅ Helper function to convert 24h time to 12h AM/PM format
 const formatTo12Hour = (time24: string) => {
   if (!time24) return '';
   const [hours, minutes] = time24.split(':').map(Number);
@@ -38,7 +37,6 @@ const formatTo12Hour = (time24: string) => {
   return `${hours12}:${minutesStr} ${period}`;
 };
 
-// ✅ Helper to convert UTC date to PHT and format time slot
 const formatTimeSlotToPHT = (timeSlot: any) => {
   if (!timeSlot) return '';
   return `${formatTo12Hour(timeSlot.startTime)} - ${formatTo12Hour(timeSlot.endTime)}`;
@@ -69,33 +67,31 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   
   const { totalPendingForMe, loadPendingForMe } = useSwapRequests();
 
-  console.log('🏠 [MemberDashboard] Component mounted with params:', { groupId, groupName });
-  console.log('🏠 [MemberDashboard] Current userId:', currentUserId);
-  console.log('🏠 [MemberDashboard] Current mySwapRequestsCount:', mySwapRequestsCount);
-  console.log('🏠 [MemberDashboard] Current pendingForMeCount:', pendingForMeCount);
-
-  useEffect(() => {
-    const getUserId = async () => {
-      try {
-        const user = await TokenUtils.getUser();
-        if (user) {
-          setCurrentUserId(user.id);
-          console.log('👤 [MemberDashboard] Current user ID set:', user.id);
-          await fetchMySwapRequestsCount();
-          await fetchPendingForMeCount();
-        } else {
-          console.log('⚠️ [MemberDashboard] No user found');
-        }
-      } catch (error) {
-        console.error('❌ [MemberDashboard] Error getting user ID:', error);
-      }
-    };
-    getUserId();
+  // ✅ CORRECT: Calculate completion rate from myTasks (which has ALL tasks)
+  const calculateCompletionRate = useCallback(() => {
+    if (myTasks.length === 0) return 0;
     
-    return () => {
-      isMounted.current = false;
-    };
-  }, []);
+    let totalAssignments = 0;
+    let completedAssignments = 0;
+    
+    myTasks.forEach((task: any) => {
+      const assignment = task.assignment;
+      if (!assignment) return;
+      
+      totalAssignments++;
+      if (assignment.verified === true) {
+        completedAssignments++;
+      }
+    });
+    
+    console.log('📊 Completion rate calculation:', {
+      totalAssignments,
+      completedAssignments,
+      rate: totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0
+    });
+    
+    return totalAssignments > 0 ? Math.round((completedAssignments / totalAssignments) * 100) : 0;
+  }, [myTasks]);
 
   const fetchMySwapRequestsCount = useCallback(async () => {
     if (!currentUserId) return;
@@ -113,7 +109,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
         setMySwapRequestsCount(0);
       }
     } catch (error) {
-      console.error('❌ [MemberDashboard] Error fetching my swap requests:', error);
+      console.error('❌ Error fetching my swap requests:', error);
       setMySwapRequestsCount(0);
     } finally {
       setLoadingSwaps(false);
@@ -141,12 +137,24 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   }, [currentUserId]);
 
   useEffect(() => {
-    console.log('🔄 [MemberDashboard] mySwapRequestsCount changed to:', mySwapRequestsCount);
-  }, [mySwapRequestsCount]);
-  
-  useEffect(() => {
-    console.log('🔄 [MemberDashboard] pendingForMeCount changed to:', pendingForMeCount);
-  }, [pendingForMeCount]);
+    const getUserId = async () => {
+      try {
+        const user = await TokenUtils.getUser();
+        if (user) {
+          setCurrentUserId(user.id);
+          await fetchMySwapRequestsCount();
+          await fetchPendingForMeCount();
+        }
+      } catch (error) {
+        console.error('❌ Error getting user ID:', error);
+      }
+    };
+    getUserId();
+    
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const { events: taskEvents, clearRotationCompleted } = useRealtimeTasks(groupId);
   const { events: assignmentEvents } = useRealtimeAssignments(groupId, currentUserId || '');
@@ -243,83 +251,50 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
     }
   }, [authError, navigation]);
 
+  
   const loadDashboardData = async (isRefreshing = false) => {
-    const hasToken = await checkToken();
-    if (!hasToken) {
+  const hasToken = await checkToken();
+  if (!hasToken) {
+    setLoading(false);
+    setRefreshing(false);
+    return;
+  }
+
+  if (isRefreshing) {
+    setRefreshing(true);
+  } else if (!initialLoadDone.current) {
+    setLoading(true);
+  }
+  setError(null);
+
+  try {
+    const dashboardResult = await GroupActivityService.getMemberDashboard(groupId);
+    
+    if (dashboardResult.success && isMounted.current) {
+      setDashboardData(dashboardResult.data);
+      setStats(dashboardResult.data.stats);
+      setPoints({
+        thisWeek: dashboardResult.data.stats.pointsThisWeek || 0,
+        total: dashboardResult.data.stats.totalPoints || 0
+      });
+      
+      // ✅ FIX: Don't try to get myTasks from dueToday/upcoming (they're empty)
+      // Instead, we'll use stats for progress bar
+      setMyTasks([]); // Clear myTasks since we're not using it
+      initialLoadDone.current = true;
+    }
+  } catch (err: any) {
+    console.error('❌ Error loading dashboard:', err);
+    if (isMounted.current) {
+      setError(err.message || 'Failed to load dashboard data');
+    }
+  } finally {
+    if (isMounted.current) { 
       setLoading(false);
       setRefreshing(false);
-      return;
     }
-
-    if (isRefreshing) {
-      setRefreshing(true);
-    } else if (!initialLoadDone.current) {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      const dashboardResult = await GroupActivityService.getMemberDashboard(groupId);
-      
-      if (dashboardResult.success && isMounted.current) {
-      
-        setDashboardData(dashboardResult.data);
-        setStats(dashboardResult.data.stats);
-        setPoints({
-          thisWeek: dashboardResult.data.stats.pointsThisWeek || 0,
-          total: dashboardResult.data.stats.totalPoints || 0
-        });
-        
-        const allTasks = [
-          ...(dashboardResult.data.tasks?.dueToday || []),
-          ...(dashboardResult.data.tasks?.upcoming || [])
-        ];
-        setMyTasks(allTasks);
-        initialLoadDone.current = true;
-      } else {
-        const tasksResult = await TaskService.getMyTasks(groupId);
-        if (tasksResult.success && isMounted.current) {
-          setMyTasks(tasksResult.tasks || []);
-          
-          const thisWeek = tasksResult.tasks
-            ?.filter((t: any) => {
-              const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-              return t.assignment?.completed && new Date(t.assignment.completedAt) > weekAgo;
-            })
-            .reduce((sum: number, t: any) => sum + (t.assignment?.points || 0), 0);
-
-          const total = tasksResult.tasks
-            ?.filter((t: any) => t.assignment?.completed)
-            .reduce((sum: number, t: any) => sum + (t.assignment?.points || 0), 0);
-
-          setPoints({ thisWeek: thisWeek || 0, total: total || 0 });
-        }
-
-        const statsResult = await TaskService.getTaskStatistics(groupId);
-        if (statsResult.success && isMounted.current) {
-          setStats(statsResult.statistics);
-        }
-      }
-
-      await loadPendingForMe(groupId);
-      
-      if (currentUserId) {
-        await fetchMySwapRequestsCount();
-        await fetchPendingForMeCount();
-      }
-
-    } catch (err: any) {
-      console.error('❌ [MemberDashboard] Error loading dashboard:', err);
-      if (isMounted.current) {
-        setError(err.message || 'Failed to load dashboard data');
-      }
-    } finally {
-      if (isMounted.current) { 
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }
-  };
+  }
+};
 
   const refreshDashboardData = useCallback(() => {
     loadDashboardData(true);
@@ -327,7 +302,7 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
 
   const handleRefresh = () => {
     refreshDashboardData();
-  };
+  }; 
 
   const handleSettingsPress = () => {
     setShowSettingsModal(true);
@@ -336,36 +311,13 @@ export const MemberDashboardScreen = ({ navigation, route }: any) => {
   const dueTodayTasks = dashboardData?.tasks?.dueToday || [];
   const upcomingTasks = dashboardData?.tasks?.upcoming || [];
   const pendingTasksCount = dashboardData?.stats?.pendingTasks || 0;
-console.log('pending tasks from stats:', pendingTasksCount);
   const completedTasks = dashboardData?.stats?.completedTasks || myTasks.filter(t => t.assignment?.completed).length;
   
   let tasksDueToday: any[] = [];
   if (dashboardData?.tasks?.dueToday) {
     tasksDueToday = dashboardData.tasks.dueToday;
-  } else {
-    const today = new Date();
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    tasksDueToday = myTasks.filter(t => {
-      if (t.assignment?.completed) return false;
-      const dueDate = new Date(t.assignment?.dueDate);
-      return dueDate >= startOfDay && dueDate <= endOfDay;
-    });
   }
-useEffect(() => {
-  if (dashboardData?.tasks) {
-    console.log('📊 [Frontend] Tasks from backend:', {
-      dueTodayCount: dashboardData.tasks.dueToday?.length || 0,
-      upcomingCount: dashboardData.tasks.upcoming?.length || 0,
-      totalCount: (dashboardData.tasks.dueToday?.length || 0) + (dashboardData.tasks.upcoming?.length || 0),
-      dueTodayTasks: dashboardData.tasks.dueToday?.map((t: any) => ({ id: t.id, title: t.title, dueDate: t.dueDate })),
-      upcomingTasks: dashboardData.tasks.upcoming?.map((t: any) => ({ id: t.id, title: t.title, dueDate: t.dueDate }))
-    });
-  }
-}, [dashboardData]);
+
   const StatCard = ({ title, value, icon, color = theme.primary, subtitle, onPress, navigateTo, navigationParams }: any) => {
     const handlePress = () => {
       if (onPress) {
@@ -402,120 +354,114 @@ useEffect(() => {
     );
   };
 
-  // ✅ UPDATED TaskCard - NO "Overdue" status
-const TaskCard = ({ task }: { task: any }) => {
-  const isCompleted = task.completed || task.assignment?.completed;
-  const isVerified = task.verified === true;
-  const isRejected = task.verified === false;
-  const isPendingVerification = task.photoUrl !== null && task.verified === null;
-  const isExpired = task.expired === true;
-  const isMissed = task.isMissed === true;
-  
-  const isDueToday = task.isDueToday || task.assignment?.isDueToday;
-  
-  // Determine status display (NO OVERDUE)
-  let statusText = '';
-  let statusColor = '';
-  let statusIcon = '';
-  
-  if (isVerified) {
-    statusText = 'Verified';
-    statusColor = '#2b8a3e';
-    statusIcon = 'check-circle';
-  } else if (isRejected) {
-    statusText = 'Rejected';
-    statusColor = theme.error;
-    statusIcon = 'close-circle';
-  } else if (isPendingVerification) {
-    statusText = 'Pending Review';
-    statusColor = theme.primary;
-    statusIcon = 'clock-check';
-  } else if (isExpired || isMissed) {
-    statusText = 'Missed';
-    statusColor = theme.error;
-    statusIcon = 'timer-off';
-  } else if (isCompleted) {
-    statusText = 'Completed';
-    statusColor = '#2b8a3e';
-    statusIcon = 'check-circle';
-  } else if (isDueToday) {
-    statusText = 'Due Today';
-    statusColor = theme.primary;
-    statusIcon = 'clock-alert';
-  } else {
-    // ✅ Default - just "Pending" (no Overdue)
-    statusText = 'Pending';
-    statusColor = theme.textSecondary;
-    statusIcon = 'clock-outline';
-  }
-  
-  // Get time slot and convert to PHT
-  const timeSlot = task.timeSlot || task.assignment?.timeSlot;
-  const timeSlotDisplay = timeSlot ? formatTimeSlotToPHT(timeSlot) : '';
+  const TaskCard = ({ task }: { task: any }) => {
+    const isCompleted = task.completed || task.assignment?.completed;
+    const isVerified = task.verified === true;
+    const isRejected = task.verified === false;
+    const isPendingVerification = task.photoUrl !== null && task.verified === null;
+    const isExpired = task.expired === true;
+    const isMissed = task.isMissed === true;
+    const isDueToday = task.isDueToday || task.assignment?.isDueToday;
+    
+    let statusText = '';
+    let statusColor = '';
+    let statusIcon = '';
+    
+    if (isVerified) {
+      statusText = 'Verified';
+      statusColor = '#2b8a3e';
+      statusIcon = 'check-circle';
+    } else if (isRejected) {
+      statusText = 'Rejected';
+      statusColor = theme.error;
+      statusIcon = 'close-circle';
+    } else if (isPendingVerification) {
+      statusText = 'Pending Review';
+      statusColor = theme.primary;
+      statusIcon = 'clock-check';
+    } else if (isExpired || isMissed) {
+      statusText = 'Missed';
+      statusColor = theme.error;
+      statusIcon = 'timer-off';
+    } else if (isCompleted) {
+      statusText = 'Completed';
+      statusColor = '#2b8a3e';
+      statusIcon = 'check-circle';
+    } else if (isDueToday) {
+      statusText = 'Due Today';
+      statusColor = theme.primary;
+      statusIcon = 'clock-alert';
+    } else {
+      statusText = 'Pending';
+      statusColor = theme.textSecondary;
+      statusIcon = 'clock-outline';
+    }
+    
+    const timeSlot = task.timeSlot || task.assignment?.timeSlot;
+    const timeSlotDisplay = timeSlot ? formatTimeSlotToPHT(timeSlot) : '';
 
-  return (
-    <TouchableOpacity
-      onPress={() => navigation.navigate('AssignmentDetails', { 
-        assignmentId: task.id || task.assignment?.id, 
-        isAdmin: false 
-      })}
-      activeOpacity={0.7}
-    >
-      <LinearGradient
-        colors={isCompleted || isVerified ? [theme.bgSecondary, theme.bgTertiary] : [theme.card, theme.bgSecondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.taskCard, { borderColor: theme.border }]}
+    return (
+      <TouchableOpacity
+        onPress={() => navigation.navigate('AssignmentDetails', { 
+          assignmentId: task.id || task.assignment?.id, 
+          isAdmin: false 
+        })}
+        activeOpacity={0.7}
       >
-        <View style={styles.taskHeader}>
-          <LinearGradient
-            colors={isCompleted || isVerified ? [theme.textMuted, theme.textMuted] : [theme.primary, theme.primaryDark]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.taskIcon}
-          >
-            <MaterialCommunityIcons 
-              name={isCompleted || isVerified ? "check" : "format-list-checks"} 
-              size={20} 
-              color="#fff" 
-            />
-          </LinearGradient>
-          <View style={styles.taskInfo}>
-            <Text style={[styles.taskTitle, (isCompleted || isVerified) && styles.completedTaskTitle, { color: (isCompleted || isVerified) ? theme.textMuted : theme.text }]} numberOfLines={1}>
-              {task.title || task.taskTitle}
-            </Text>
-            <View style={styles.taskMeta}>
-              <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pointsBadge}>
-                <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
-                <Text style={[styles.pointsText, { color: theme.primary }]}>{task.points || task.assignment?.points || 0} pts</Text>
-              </LinearGradient>
-              
-              {/* Status Badge */} 
-              <LinearGradient 
-                colors={[statusColor + '20', statusColor + '10']} 
-                start={{ x: 0, y: 0 }} 
-                end={{ x: 1, y: 1 }} 
-                style={styles.statusBadge}
-              >
-                <MaterialCommunityIcons name={statusIcon as any} size={10} color={statusColor} />
-                <Text style={[styles.statusBadgeText, { color: statusColor }]}>{statusText}</Text>
-              </LinearGradient>
+        <LinearGradient
+          colors={isCompleted || isVerified ? [theme.bgSecondary, theme.bgTertiary] : [theme.card, theme.bgSecondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[styles.taskCard, { borderColor: theme.border }]}
+        >
+          <View style={styles.taskHeader}>
+            <LinearGradient
+              colors={isCompleted || isVerified ? [theme.textMuted, theme.textMuted] : [theme.primary, theme.primaryDark]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.taskIcon}
+            >
+              <MaterialCommunityIcons 
+                name={isCompleted || isVerified ? "check" : "format-list-checks"} 
+                size={20} 
+                color="#fff" 
+              />
+            </LinearGradient>
+            <View style={styles.taskInfo}>
+              <Text style={[styles.taskTitle, (isCompleted || isVerified) && styles.completedTaskTitle, { color: (isCompleted || isVerified) ? theme.textMuted : theme.text }]} numberOfLines={1}>
+                {task.title || task.taskTitle}
+              </Text>
+              <View style={styles.taskMeta}>
+                <LinearGradient colors={[theme.primaryLight, theme.primaryLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pointsBadge}>
+                  <MaterialCommunityIcons name="star" size={12} color={theme.primary} />
+                  <Text style={[styles.pointsText, { color: theme.primary }]}>{task.points || task.assignment?.points || 0} pts</Text>
+                </LinearGradient>
+                
+                <LinearGradient 
+                  colors={[statusColor + '20', statusColor + '10']} 
+                  start={{ x: 0, y: 0 }} 
+                  end={{ x: 1, y: 1 }} 
+                  style={styles.statusBadge}
+                >
+                  <MaterialCommunityIcons name={statusIcon as any} size={10} color={statusColor} />
+                  <Text style={[styles.statusBadgeText, { color: statusColor }]}>{statusText}</Text>
+                </LinearGradient>
+              </View>
             </View>
           </View>
-        </View>
-        
-        {timeSlotDisplay && (
-          <View style={[styles.timeSlotContainer, { backgroundColor: theme.bgSecondary }]}>
-            <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
-            <Text style={[styles.timeSlotText, { color: theme.textSecondary }]}>
-              {timeSlotDisplay}
-            </Text>
-          </View>
-        )}
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-};
+          
+          {timeSlotDisplay && (
+            <View style={[styles.timeSlotContainer, { backgroundColor: theme.bgSecondary }]}>
+              <MaterialCommunityIcons name="clock-outline" size={14} color={theme.textMuted} />
+              <Text style={[styles.timeSlotText, { color: theme.textSecondary }]}>
+                {timeSlotDisplay}
+              </Text>
+            </View>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading && !refreshing) {
     return (
@@ -607,37 +553,47 @@ const TaskCard = ({ task }: { task: any }) => {
             <Text style={[styles.pointsSubtext, { color: theme.textPlaceholder }]}>lifetime points</Text>
           </LinearGradient>
         </View>
-
-        {/* Progress Bar */}
-        <LinearGradient
-          colors={[theme.card, theme.bgSecondary]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={[styles.progressCard, { borderColor: theme.border }]}
-        >
-          <View style={styles.progressHeader}>
-            <Text style={[styles.progressTitle, { color: theme.textSecondary }]}>Your Completion Rate</Text>
-            <Text style={[styles.progressPercentage, { color: theme.primary }]}>
-              {Math.round((points.total / (dashboardData?.stats?.totalPointsPossible || 1)) * 100)}%
-            </Text>
-          </View>
-          <View style={[styles.progressBarContainer, { backgroundColor: theme.bgTertiary }]}>
-            <View
-              style={[
-                styles.progressBar,
-                {
-                  width: `${Math.min(100, Math.round((points.total / (dashboardData?.stats?.totalPointsPossible || 1)) * 100))}%`,
-                  backgroundColor: theme.primary
-                }
-              ]}
-            />
-          </View>
-          <View style={styles.progressStats}>
-            <Text style={[styles.progressStatsText, { color: theme.textMuted }]}>
-              {points.total} of {dashboardData?.stats?.totalPointsPossible || 0} points earned
-            </Text>
-          </View>
-        </LinearGradient>
+          
+       {/* Progress Bar */}
+<LinearGradient
+  colors={[theme.card, theme.bgSecondary]}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 1 }}
+  style={[styles.progressCard, { borderColor: theme.border }]}
+>
+  <View style={styles.progressHeader}>
+    <Text style={[styles.progressTitle, { color: theme.textSecondary }]}>Your Completion Rate</Text>
+    <Text style={[styles.progressPercentage, { color: theme.primary }]}>
+      {(() => {
+        const totalAssignments = stats?.totalAssignments || 0;
+        const completedTasks = stats?.completedTasks || 0;
+        if (totalAssignments === 0) return 0;
+        return Math.round((completedTasks / totalAssignments) * 100);
+      })()}%
+    </Text>
+  </View>
+  <View style={[styles.progressBarContainer, { backgroundColor: theme.bgTertiary }]}>
+    <View
+      style={[
+        styles.progressBar,
+        {
+          width: `${(() => {
+            const totalAssignments = stats?.totalAssignments || 0;
+            const completedTasks = stats?.completedTasks || 0;
+            if (totalAssignments === 0) return 0;
+            return Math.round((completedTasks / totalAssignments) * 100);
+          })()}%`,
+          backgroundColor: theme.primary
+        }
+      ]}
+    />
+  </View>
+  <View style={styles.progressStats}>
+    <Text style={[styles.progressStatsText, { color: theme.textMuted }]}>
+      {stats?.completedTasks || 0} of {stats?.totalAssignments || 0} assignments completed
+    </Text>
+  </View>
+</LinearGradient>
 
         {/* Quick Stats */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Your Stats</Text>

@@ -84,9 +84,7 @@
           "color": "#4F46E5",
           "defaultChannel": "default",
           "sounds": [],
-          "enableBackgroundRemoteNotifications": true,
-           "androidMode": "collapse",
-      "androidCollapsedTitle": "New notification"
+          "enableBackgroundRemoteNotifications": true
         }
       ]
     ],

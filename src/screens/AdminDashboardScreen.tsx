@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Alert,
+  Alert, 
   Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -848,7 +848,7 @@ const StatCard = ({
                 </View>
                 <View style={styles.progressStats}>
                   <Text style={styles.progressStatsText}>
-                    {stats.weeklyCompletion?.completed || 0} of {stats.weeklyCompletion?.activeTotal || stats.weeklyCompletion?.total || 0} active tasks
+                    {stats.weeklyCompletion?.completed || 0} of {stats.weeklyCompletion?.total || 0} active tasks
                   </Text>
                   <Text style={styles.progressStatsText}>
                     {stats.points?.earned || 0} pts earned
@@ -886,7 +886,7 @@ const StatCard = ({
               colors={[theme.primary, theme.primaryDark]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.actionGradient}
+              style={styles.actionGradient} 
             >
               <MaterialCommunityIcons name="plus-circle" size={24} color="white" />
               <Text style={styles.actionText}>Create Task</Text>

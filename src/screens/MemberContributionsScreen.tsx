@@ -217,113 +217,120 @@ console.log(`🔍 [DISPLAY] Assignment: ${assignment.taskTitle}`, {
     );
   };
 
+
   const renderOverallStats = () => {
-    if (!data?.summary) return null;
+  if (!data?.summary) return null;
 
-    const summary = data.summary;
-    const weeks = data?.weeks || [];
-    
-    let verifiedSlotsCount = 0;
-    let pendingReviewCount = 0;
-    let notStartedCount = 0;
-    let rejectedSlotsCount = 0;
-    let expiredSlotsCount = 0;
-    
-    weeks.forEach((week: any) => {
-      week.assignments.forEach((assignment: any) => {
-        if (assignment.verified === true) {
-          verifiedSlotsCount++;
-        } 
-        else if (assignment.verified === false) {
-          rejectedSlotsCount++;
-        } 
-        // ✅ Pending Review = has photo, not verified
-        else if (assignment.photoUrl !== null && assignment.verified === null) {
-          pendingReviewCount++;
-        } 
-        // ✅ Not Started = no submission, not completed, not expired
-        else if (!assignment.completed && !assignment.isMissed && !assignment.expired && !assignment.photoUrl) {
-          notStartedCount++;
+  const summary = data.summary;
+  
+  // ✅ Use POINTS from backend (already correctly calculated)
+  const totalPoints = summary.totalPoints || 0;    // 70
+  const earnedPoints = summary.earnedPoints || 0;  // 4
+  const completionRate = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;  // 6%
+
+  // Optional: Keep slot counts for display as secondary info
+  const weeks = data?.weeks || [];
+  let verifiedSlotsCount = 0;
+  let pendingReviewCount = 0;
+  let notStartedCount = 0;
+  let rejectedSlotsCount = 0;
+  let expiredSlotsCount = 0;
+  
+  weeks.forEach((week: any) => {
+    week.assignments.forEach((assignment: any) => {
+      if (assignment.verified === true) {
+        verifiedSlotsCount++;
+      } 
+      else if (assignment.verified === false) {
+        rejectedSlotsCount++;
+      } 
+      else if (assignment.photoUrl !== null && assignment.verified === null) {
+        pendingReviewCount++;
+      } 
+      else if (!assignment.completed && !assignment.isMissed && !assignment.expired && !assignment.photoUrl) {
+        notStartedCount++;
+      }
+      else {
+        const isExpired = assignment.isMissed === true || assignment.expired === true;
+        if (isExpired && !assignment.verified) {
+          expiredSlotsCount++;
         }
-        else {
-          const isExpired = assignment.isMissed === true || assignment.expired === true;
-          if (isExpired && !assignment.verified) {
-            expiredSlotsCount++;
-          }
-        }
-      });
+      }
     });
+  });
 
-    const totalActive = verifiedSlotsCount + pendingReviewCount + notStartedCount;
-    const completionRate = totalActive > 0 ? Math.round((verifiedSlotsCount / totalActive) * 100) : 0;
+  const totalAllSlots = verifiedSlotsCount + pendingReviewCount + notStartedCount + rejectedSlotsCount + expiredSlotsCount;
+  const activeSlots = pendingReviewCount + notStartedCount;
 
-    return (
-      <LinearGradient
-        colors={[theme.card, theme.bgSecondary]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={[styles.statsCard, { borderColor: theme.border }]}
-      >
-        <Text style={[styles.statsTitle, { color: theme.text }]}>Performance Overview</Text>
+  return (
+    <LinearGradient
+      colors={[theme.card, theme.bgSecondary]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.statsCard, { borderColor: theme.border }]}
+    >
+      <Text style={[styles.statsTitle, { color: theme.text }]}>Performance Overview</Text>
+      
+      <View style={styles.statsGrid}>
+        <View style={styles.statBox}>
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
+            <Text style={[styles.statNumber, { color: theme.primary }]}>{verifiedSlotsCount}</Text>
+          </LinearGradient>
+          <Text style={[styles.statLabel, { color: theme.primary }]}>Verified</Text>
+        </View>
         
-        <View style={styles.statsGrid}>
-          <View style={styles.statBox}>
-            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
-              <Text style={[styles.statNumber, { color: theme.primary }]}>{verifiedSlotsCount}</Text>
-            </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.primary }]}>Verified</Text>
-          </View>
-          
-          <View style={styles.statBox}>
-            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
-              <Text style={[styles.statNumber, { color: theme.textSecondary }]}>{pendingReviewCount}</Text>
-            </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Pending Review</Text>
-          </View>
-          
-          <View style={styles.statBox}>
-            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
-              <Text style={[styles.statNumber, { color: theme.textSecondary }]}>{notStartedCount}</Text>
-            </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Not Started</Text>
-          </View>
-          
-          <View style={styles.statBox}>
-            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
-              <Text style={[styles.statNumber, { color: theme.error }]}>{rejectedSlotsCount}</Text>
-            </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Rejected</Text>
-          </View>
-          
-          <View style={styles.statBox}>
-            <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
-              <Text style={[styles.statNumber, { color: theme.textMuted }]}>{expiredSlotsCount}</Text>
-            </LinearGradient>
-            <Text style={[styles.statLabel, { color: theme.textMuted }]}>Missed</Text>
-          </View>
+        <View style={styles.statBox}>
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
+            <Text style={[styles.statNumber, { color: theme.textSecondary }]}>{pendingReviewCount}</Text>
+          </LinearGradient>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Pending Review</Text>
         </View>
-
-        <View style={styles.statsDivider} />
-
-        <View style={styles.statsRow}>
-          <View style={styles.statsRowItem}>
-            <Text style={[styles.statsRowValue, { color: theme.text }]}>{summary.earnedPoints || 0}</Text>
-            <Text style={[styles.statsRowLabel, { color: theme.textMuted }]}>Total Points</Text>
-          </View>
-          <View style={[styles.statsDividerVertical, { backgroundColor: theme.border }]} />
-          <View style={styles.statsRowItem}>
-            <Text style={[styles.statsRowValue, { color: theme.text }]}>{completionRate}%</Text>
-            <Text style={[styles.statsRowLabel, { color: theme.textMuted }]}>Completion Rate</Text>
-          </View>
-          <View style={[styles.statsDividerVertical, { backgroundColor: theme.border }]} />
-          <View style={styles.statsRowItem}>
-            <Text style={[styles.statsRowValue, { color: theme.text }]}>{totalActive}</Text>
-            <Text style={[styles.statsRowLabel, { color: theme.textMuted }]}>Active Slots</Text>
-          </View>
+        
+        <View style={styles.statBox}>
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
+            <Text style={[styles.statNumber, { color: theme.textSecondary }]}>{notStartedCount}</Text>
+          </LinearGradient>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Not Started</Text>
         </View>
-      </LinearGradient>
-    );
-  };
+        
+        <View style={styles.statBox}>
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
+            <Text style={[styles.statNumber, { color: theme.error }]}>{rejectedSlotsCount}</Text>
+          </LinearGradient>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Rejected</Text>
+        </View>
+        
+        <View style={styles.statBox}>
+          <LinearGradient colors={[theme.bgSecondary, theme.bgTertiary]} style={styles.statCircle}>
+            <Text style={[styles.statNumber, { color: theme.textMuted }]}>{expiredSlotsCount}</Text>
+          </LinearGradient>
+          <Text style={[styles.statLabel, { color: theme.textMuted }]}>Missed</Text>
+        </View>
+      </View>
+
+      <View style={styles.statsDivider} />
+
+      <View style={styles.statsRow}>
+        <View style={styles.statsRowItem}>
+          <Text style={[styles.statsRowValue, { color: theme.text }]}>{earnedPoints}</Text>
+          <Text style={[styles.statsRowLabel, { color: theme.textMuted }]}>Points Earned</Text>
+        </View>
+        <View style={[styles.statsDividerVertical, { backgroundColor: theme.border }]} />
+        <View style={styles.statsRowItem}>
+          {/* ✅ FIXED: POINTS-based completion rate (6%) */}
+          <Text style={[styles.statsRowValue, { color: theme.text }]}>{completionRate}%</Text>
+          <Text style={[styles.statsRowLabel, { color: theme.textMuted }]}>Completion Rate</Text>
+        </View>
+        <View style={[styles.statsDividerVertical, { backgroundColor: theme.border }]} />
+        <View style={styles.statsRowItem}>
+          <Text style={[styles.statsRowValue, { color: theme.text }]}>{activeSlots}</Text>
+          <Text style={[styles.statsRowLabel, { color: theme.textMuted }]}>Active Slots</Text>
+        </View>
+      </View>
+    </LinearGradient>
+  );
+};
+ 
 
   const renderWeekDetails = (week: any) => {
     const isExpanded = selectedWeek === week.week;

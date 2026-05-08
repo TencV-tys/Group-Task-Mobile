@@ -1,4 +1,4 @@
-// src/screens/DetailedStatisticsScreen.tsx - COMPLETE FIXED FOR MEMBERS
+// src/screens/DetailedStatisticsScreen.tsx - COMPLETE FIXED FOR MEMBERS (Slot-Based)
 
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -43,7 +43,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
       showAlert: false,
       onAuthError: () => setAuthError(true)
     });
-    
+     
     setAuthError(!hasToken);
     return hasToken;
   }, []);
@@ -70,6 +70,36 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     }
   }, [authError, navigation]);
 
+  // ✅ Helper function to calculate slot-based completion rate for members
+  const calculateSlotCompletionRate = useCallback((dashboardData: any) => {
+    const dueToday = dashboardData?.tasks?.dueToday || [];
+    const upcoming = dashboardData?.tasks?.upcoming || [];
+    const allTasks = [...dueToday, ...upcoming];
+    
+    if (allTasks.length === 0) return { rate: 0, verifiedSlots: 0, totalSlots: 0 };
+    
+    let totalSlots = 0;
+    let verifiedSlots = 0;
+    
+    allTasks.forEach((task: any) => {
+      // For multi-slot tasks, count each slot individually
+      if (task.timeSlots && task.timeSlots.length > 1) {
+        const completedSlotIds = task.completedTimeSlotIds || [];
+        totalSlots += task.timeSlots.length;
+        verifiedSlots += completedSlotIds.length;
+      } else {
+        // Single slot task
+        totalSlots += 1;
+        if (task.verified === true) {
+          verifiedSlots += 1;
+        }
+      }
+    });
+    
+    const rate = totalSlots > 0 ? Math.round((verifiedSlots / totalSlots) * 100) : 0;
+    return { rate, verifiedSlots, totalSlots };
+  }, []);
+
   const loadStatistics = async () => {
     const hasToken = await checkToken();
     if (!hasToken) {
@@ -95,7 +125,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
         const activityResult = await GroupActivityService.getGroupActivitySummary(groupId);
         
         if (taskStatsResult.success) {
-          setStats(taskStatsResult.statistics);
+          setStats(taskStatsResult.statistics); 
         }
         if (activityResult.success) {
           setActivityData(activityResult.data);
@@ -105,7 +135,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
         const memberResult = await GroupActivityService.getMemberDashboard(groupId);
         if (memberResult.success && memberResult.data) {
           setMemberDashboard(memberResult.data);
-          console.log('📊 [DetailedStatistics] Member dashboard data:', JSON.stringify(memberResult.data, null, 2));
+          console.log('📊 [DetailedStatistics] Member dashboard data loaded');
           
           try {
             const neglectedResult = await AssignmentService.getUserNeglectedTasks(groupId);
@@ -146,7 +176,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     );
   }
 
-  // Calculate members in rotation (for both admin and member)
+  // Calculate members in rotation
   const membersInRotationCount = groupMembers.filter(m => m.inRotation === true).length;
   const totalMembersCount = groupMembers.length;
 
@@ -166,73 +196,99 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
   let userNeglected = 0;
   let userTotalAssignments = 0;
   
+  // ✅ SLOT-BASED COMPLETION FOR MEMBERS
+  let memberCompletionRate = 0;
+  let memberVerifiedSlots = 0;
+  let memberTotalSlots = 0;
   if (isAdmin && activityData) {
-    // ADMIN: Use activity data
-    const summary = activityData.summary || {};
-    totalMembers = summary.totalMembers || 0;
-    totalTasks = summary.totalTasks || 0;
-    
-    const assignments = summary.assignments || {};
-    verifiedCount = assignments.verified || 0;
-    neglectedCount = assignments.neglected || 0;
-    pendingCount = assignments.pendingVerification || 0;
-    rejectedCount = assignments.rejected || 0;
-    
-    const points = summary.points || {};
-    totalPointsPossible = points.total || 0;
-    earnedPoints = points.earned || 0;
-    weeklyTotalAssignments = assignments.total || 0;
-    
-    // Admin stats from taskStats
-    if (stats) {
-      userPoints = stats.userStats?.userPoints || 0;
-    }
-  } else if (!isAdmin && memberDashboard) {
-    // MEMBER: Use member dashboard data
-    const groupInfo = memberDashboard.group || {};
-    const memberStats = memberDashboard.stats || {};
-    
-    totalMembers = groupInfo.memberCount || 0;
-    totalTasks = 0; // Members don't need total tasks count
-    
-    // ✅ Use memberStats from memberDashboard (correct data)
-    const pendingTasks = memberStats.pendingTasks || 0;
-    const completedTasks = memberStats.completedTasks || 0;
-    const myNeglectedCount = memberStats.myNeglectedCount || 0;
-    const totalAssignments = memberStats.totalAssignments || 0;
-    const totalPoints = memberStats.totalPoints || 0;
-    const totalPointsPossibleFromApi = memberStats.totalPointsPossible || 0;
-    const pointsThisWeek = memberStats.pointsThisWeek || 0;
-    
-    verifiedCount = completedTasks;  // Completed tasks = verified assignments count
-    neglectedCount = myNeglectedCount;
-    pendingCount = pendingTasks;
-    rejectedCount = 0;
-    
-    // ✅ Use the correct totalPointsPossible from API (60)
-    totalPointsPossible = totalPointsPossibleFromApi;
-    earnedPoints = totalPoints;
-    weeklyTotalAssignments = totalAssignments;
-    
-    // User performance stats
-    userTotalAssignments = totalAssignments;
-    userCompleted = completedTasks;
-    userPending = pendingTasks;
-    userNeglected = myNeglectedCount;
-    userPoints = totalPoints;
-    
-    console.log('📊 [DetailedStatistics] Member stats loaded:', {
-      totalAssignments,
-      completedTasks,
-      pendingTasks,
-      myNeglectedCount,
-      totalPoints,
-      totalPointsPossible,
-      pointsThisWeek,
-      membersInRotation: membersInRotationCount,
-      totalMembers: totalMembersCount
-    });
-  } else {
+  // ADMIN: Use activity data
+  const summary = activityData.summary || {};
+  totalMembers = summary.totalMembers || 0;
+  totalTasks = summary.totalTasks || 0;
+  
+  const assignments = summary.assignments || {};
+  
+  // ✅ Get the correct counts from assignments object
+  const totalAssignments = assignments.total || 0;
+  const verifiedAssignments = assignments.verified || 0;
+  const neglectedAssignments = assignments.neglected || 0;
+  const pendingReview = assignments.pendingVerification || 0;
+  
+  verifiedCount = verifiedAssignments;
+  neglectedCount = neglectedAssignments;
+  pendingCount = pendingReview;
+  rejectedCount = assignments.rejected || 0;
+  
+  const points = summary.points || {};
+  totalPointsPossible = points.total || 0;
+  earnedPoints = points.earned || 0;
+  weeklyTotalAssignments = totalAssignments;
+  
+  // ✅ CORRECT: Use assignment-based completion for Admin too
+  memberTotalSlots = totalAssignments;
+  memberVerifiedSlots = verifiedAssignments;
+  memberCompletionRate = totalAssignments > 0 
+    ? Math.round((verifiedAssignments / totalAssignments) * 100) 
+    : 0;
+  
+  console.log('📊 [Admin] Stats:', {
+    totalAssignments,
+    verifiedAssignments,
+    completionRate: memberCompletionRate,
+    totalPointsPossible,
+    earnedPoints
+  });
+  
+  if (stats) {
+    userPoints = stats.userStats?.userPoints || 0;
+  }
+}else if (!isAdmin && memberDashboard) {
+  // MEMBER: Use member dashboard data
+  const groupInfo = memberDashboard.group || {};
+  const memberStats = memberDashboard.stats || {};
+  
+  totalMembers = groupInfo.memberCount || 0;
+  
+  // ✅ Get counts from stats (these are accurate from backend)
+  const pendingTasks = memberStats.pendingTasks || 0;
+  const completedTasks = memberStats.completedTasks || 0;
+  const myNeglectedCount = memberStats.myNeglectedCount || 0;
+  const totalAssignments = memberStats.totalAssignments || 0;
+  const totalPoints = memberStats.totalPoints || 0;
+  const totalPointsPossibleFromApi = memberStats.totalPointsPossible || 0;
+  
+  verifiedCount = completedTasks;
+  neglectedCount = myNeglectedCount;
+  pendingCount = pendingTasks;
+  rejectedCount = 0;
+  
+  totalPointsPossible = totalPointsPossibleFromApi;
+  earnedPoints = totalPoints;
+  weeklyTotalAssignments = totalAssignments;
+  
+  // User performance stats
+  userTotalAssignments = totalAssignments;
+  userCompleted = completedTasks;
+  userPending = pendingTasks;
+  userNeglected = myNeglectedCount;
+  userPoints = totalPoints;
+  
+  // ✅ CORRECT: Completion rate based on assignments, not points
+  memberTotalSlots = totalAssignments;
+  memberVerifiedSlots = completedTasks;
+  memberCompletionRate = totalAssignments > 0 
+    ? Math.round((completedTasks / totalAssignments) * 100) 
+    : 0;
+  
+  console.log('📊 [DetailedStatistics] Member stats:', {
+    totalAssignments,
+    completedTasks,
+    myNeglectedCount,
+    totalPoints,
+    totalPointsPossible,
+    completionRate: memberCompletionRate
+  });
+}  else {
     // Fallback
     const currentWeek = stats?.currentWeek || {};
     verifiedCount = currentWeek.verifiedAssignments || 0;
@@ -244,10 +300,12 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
     totalTasks = stats?.totalTasks || 0;
   }
   
-  const completionRate = totalPointsPossible > 0 
-    ? Math.round((earnedPoints / totalPointsPossible) * 100) 
-    : 0;
-  
+  // For Admin: use points-based completion
+  // For Member: use slot-based completion
+  const completionRateForDisplay = isAdmin 
+    ? (totalPointsPossible > 0 ? Math.round((earnedPoints / totalPointsPossible) * 100) : 0)
+    : memberCompletionRate;
+    
   const allTimePoints = leaderboardData?.totalPoints || 0;
 
   return (
@@ -269,7 +327,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
         </TouchableOpacity>
       </View>
 
-      {/* ✅ ADMIN BANNER - Only visible to admin */}
+      {/* ADMIN BANNER */}
       {isAdmin && (
         <LinearGradient
           colors={[theme.primaryLight, theme.primaryLight]}
@@ -327,9 +385,11 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             <View style={[styles.iconContainer, { backgroundColor: theme.primaryLight }]}>
               <MaterialCommunityIcons name="check-circle" size={22} color={theme.primary} />
             </View>
-            <Text style={[styles.summaryNumber, { color: theme.text }]}>{verifiedCount}</Text>
+            <Text style={[styles.summaryNumber, { color: theme.text }]}>
+              {isAdmin ? verifiedCount : (memberVerifiedSlots > 0 ? memberVerifiedSlots : verifiedCount)}
+            </Text>
             <Text style={[styles.summaryLabel, { color: theme.textMuted }]}>
-              {isAdmin ? 'Verified' : 'Completed'}
+              {isAdmin ? 'Verified' : 'Verified Slots'}
             </Text>
           </LinearGradient>
 
@@ -356,8 +416,17 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
             end={{ x: 1, y: 1 }}
             style={[styles.pointsCard, { borderColor: theme.border }]}
           >
+            {/* Show Total Slots for Members, Total Points for Admin */}
+            {!isAdmin && memberTotalSlots > 0 && (
+              <View style={styles.pointsRow}>
+                <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Total Slots:</Text>
+                <Text style={[styles.pointsValue, { color: theme.text }]}>{memberTotalSlots}</Text>
+              </View>
+            )}
             <View style={styles.pointsRow}>
-              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>Total Points Possible:</Text>
+              <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>
+                {isAdmin ? 'Total Points Possible:' : 'Total Points Possible:'}
+              </Text>
               <Text style={[styles.pointsValue, { color: theme.text }]}>{totalPointsPossible}</Text>
             </View>
             <View style={styles.pointsRow}>
@@ -371,7 +440,6 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
               <Text style={[styles.pointsValue, { color: theme.primary }]}>{allTimePoints}</Text>
             </View>
             
-            {/* Different label for Admin vs Member */}
             <View style={styles.pointsRow}>
               <Text style={[styles.pointsLabel, { color: theme.textSecondary }]}>
                 {isAdmin ? 'Pending Verification:' : 'Pending Tasks:'}
@@ -390,20 +458,23 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
               </View>
             )}
             
-            {/* Completion Rate Bar */}
+            {/* Completion Rate Bar - SLOT-BASED FOR MEMBERS */}
             <View style={[styles.progressBar, { backgroundColor: theme.bgTertiary }]}>
               <LinearGradient
                 colors={[
-                  getCompletionRateColor(completionRate),
-                  getCompletionRateColor(completionRate) + 'dd'
+                  getCompletionRateColor(completionRateForDisplay),
+                  getCompletionRateColor(completionRateForDisplay) + 'dd'
                 ]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
-                style={[styles.progressFill, { width: `${completionRate}%` }]} 
+                style={[styles.progressFill, { width: `${completionRateForDisplay}%` }]} 
               />
             </View>
             <Text style={[styles.completionRate, { color: theme.textMuted }]}>
-              {completionRate}% Completion Rate ({earnedPoints}/{totalPointsPossible} points)
+              {completionRateForDisplay}% Completion Rate 
+              {!isAdmin && memberTotalSlots > 0 
+                ? ` (${memberVerifiedSlots}/${memberTotalSlots} slots verified)`
+                : ` (${earnedPoints}/${totalPointsPossible} points)`}
             </Text>
           </LinearGradient>
         </View>
@@ -465,59 +536,57 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
           </LinearGradient>
         </View>
 
-      {/* Task Distribution */}
-<View style={styles.section}>
-  <Text style={[styles.sectionTitle, { color: theme.text }]}>Task Distribution</Text>
-  <LinearGradient
-    colors={[theme.card, theme.bgSecondary]}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-    style={[styles.distributionCard, { borderColor: theme.border }]}
-  >
-    {/* Only show Daily/Weekly/Recurring for Admin */}
-    {isAdmin && (
-      <>
-        <View style={styles.distributionRow}>
-          <View style={styles.distributionLabel}>
-            <View style={[styles.dot, { backgroundColor: '#4F46E5' }]} />
-            <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Daily Tasks</Text>
-          </View>
-          <Text style={[styles.distributionNumber, { color: theme.text }]}>{stats?.dailyTasks || 0}</Text>
-        </View>
-        <View style={styles.distributionRow}>
-          <View style={styles.distributionLabel}>
-            <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-            <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Weekly Tasks</Text>
-          </View>
-          <Text style={[styles.distributionNumber, { color: theme.text }]}>{stats?.weeklyTasks || 0}</Text>
-        </View>
-        <View style={styles.distributionRow}>
-          <View style={styles.distributionLabel}>
-            <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-            <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Recurring Tasks</Text>
-          </View>
-          <Text style={[styles.distributionNumber, { color: theme.text }]}>{stats?.recurringTasks || 0}</Text>
-        </View>
-      </>
-    )}
+        {/* Task Distribution */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Task Distribution</Text>
+          <LinearGradient
+            colors={[theme.card, theme.bgSecondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={[styles.distributionCard, { borderColor: theme.border }]}
+          >
+            {isAdmin && (
+              <>
+                <View style={styles.distributionRow}>
+                  <View style={styles.distributionLabel}>
+                    <View style={[styles.dot, { backgroundColor: '#4F46E5' }]} />
+                    <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Daily Tasks</Text>
+                  </View>
+                  <Text style={[styles.distributionNumber, { color: theme.text }]}>{stats?.dailyTasks || 0}</Text>
+                </View>
+                <View style={styles.distributionRow}>
+                  <View style={styles.distributionLabel}>
+                    <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                    <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Weekly Tasks</Text>
+                  </View>
+                  <Text style={[styles.distributionNumber, { color: theme.text }]}>{stats?.weeklyTasks || 0}</Text>
+                </View>
+                <View style={styles.distributionRow}>
+                  <View style={styles.distributionLabel}>
+                    <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                    <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Recurring Tasks</Text>
+                  </View>
+                  <Text style={[styles.distributionNumber, { color: theme.text }]}>{stats?.recurringTasks || 0}</Text>
+                </View>
+              </>
+            )}
 
-    {/* Show for both Admin and Member */}
-    <View style={styles.distributionRow}>
-      <View style={styles.distributionLabel}>
-        <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-        <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Members in Rotation</Text>
-      </View>
-      <Text style={[styles.distributionNumber, { color: theme.text }]}>{membersInRotationCount}</Text>
-    </View>
-    <View style={styles.distributionRow}>
-      <View style={styles.distributionLabel}>
-        <View style={[styles.dot, { backgroundColor: theme.primary }]} />
-        <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Total Members</Text>
-      </View>
-      <Text style={[styles.distributionNumber, { color: theme.text }]}>{totalMembersCount}</Text>
-    </View>
-  </LinearGradient>
-</View>
+            <View style={styles.distributionRow}>
+              <View style={styles.distributionLabel}>
+                <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Members in Rotation</Text>
+              </View>
+              <Text style={[styles.distributionNumber, { color: theme.text }]}>{membersInRotationCount}</Text>
+            </View>
+            <View style={styles.distributionRow}>
+              <View style={styles.distributionLabel}>
+                <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+                <Text style={[styles.distributionLabelText, { color: theme.textSecondary }]}>Total Members</Text>
+              </View>
+              <Text style={[styles.distributionNumber, { color: theme.text }]}>{totalMembersCount}</Text>
+            </View>
+          </LinearGradient>
+        </View>
 
         {/* Member's Performance - Only for members */}
         {!isAdmin && (
@@ -580,7 +649,7 @@ export const DetailedStatisticsScreen = ({ navigation, route }: any) => {
                     {task.taskTitle}
                   </Text>
                   <Text style={[styles.neglectedPoints, { color: theme.error }]}>
-                    -{task.pointsLost} pts
+                    -{task.points} pts
                   </Text>
                 </View>
               ))}
@@ -804,4 +873,4 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontStyle: 'italic',
   },
-});
+}); 

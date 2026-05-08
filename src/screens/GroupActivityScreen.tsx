@@ -130,10 +130,8 @@ export default function GroupActivityScreen({ navigation, route }: any) {
     // ✅ Completion rate based on points (matches AdminDashboardScreen)
     const currentWeekTotalPoints = summary.points?.total || 0;
     const currentWeekEarnedPoints = summary.points?.earned || 0;
-    const completionRate = currentWeekTotalPoints > 0 
-      ? Math.round((currentWeekEarnedPoints / currentWeekTotalPoints) * 100) 
-      : 0;
-
+    const completionRate = summary.points?.completionRate || 0; 
+    
     const cards = [
       {
         title: 'Members',

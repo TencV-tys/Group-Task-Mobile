@@ -129,9 +129,7 @@ export default function GroupTasksScreen({ navigation, route }: any) {
   }, []);
 
 
-  
-  
-const groupedMyTasks = useMemo(() => {
+  const groupedMyTasks = useMemo(() => {
   if (selectedTab !== 'my') return [];
   
   const taskMap = new Map();
@@ -186,84 +184,84 @@ const groupedMyTasks = useMemo(() => {
     taskData.rawAssignments.push(assignment);
     
     if (assignment.verified === true) {
-  taskData.verifiedCount++;
-  taskData.earnedPoints += points;
-} 
-else if (assignment.verified === false) {
-  taskData.rejectedCount++;
-} 
-else if (assignment.expired === true || assignment.partiallyExpired === true) {
-  taskData.missedCount++;
-} 
-else {
-  taskData.pendingCount++;
-}
+      taskData.verifiedCount++;
+      taskData.earnedPoints += points;
+    } 
+    else if (assignment.verified === false) {
+      taskData.rejectedCount++;
+    } 
+    else if (assignment.expired === true || assignment.partiallyExpired === true) {
+      taskData.missedCount++;
+    } 
+    else {
+      taskData.pendingCount++;
+    }
     
     taskData.totalPoints += points;
   });
   
   const result = Array.from(taskMap.values()).map(task => {
-    const totalRawSlots = task.rawAssignments.length;
-    const effectiveTotal = totalRawSlots - task.missedCount - task.rejectedCount;
-    const effectiveVerified = task.verifiedCount;
-    const effectiveRejected = task.rejectedCount;
-    const effectiveMissed = task.missedCount;
+    // ✅ CORRECT: Total slots is ALL raw assignments
+    const totalSlots = task.rawAssignments.length;
+    const verifiedCount = task.verifiedCount;
+    const missedCount = task.missedCount;
+    const rejectedCount = task.rejectedCount;
+    const pendingCount = task.pendingCount;
     
-    const isFullyCompleted = effectiveTotal > 0 && effectiveVerified === effectiveTotal;
-    const progressPercentage = effectiveTotal > 0 ? (effectiveVerified / effectiveTotal) * 100 : 0;
+    // ✅ CORRECT: Completion based on TOTAL slots
+    const completionRate = totalSlots > 0 ? (verifiedCount / totalSlots) * 100 : 0;
+    const isFullyCompleted = totalSlots > 0 && verifiedCount === totalSlots;
     
-    const isSingleSlot = totalRawSlots === 1;
+    const isSingleSlot = totalSlots === 1;
     
     let displayText = '';
     let statusEmoji = '';
     
     if (isSingleSlot) {
-      if (effectiveVerified > 0) {
+      if (verifiedCount > 0) {
         statusEmoji = '✅';
         displayText = `Verified • ${task.earnedPoints}/${task.totalPoints} pts`;
-      } else if (task.missedCount > 0) {
+      } else if (missedCount > 0) {
         statusEmoji = '❌';
         displayText = 'Missed';
-      } else if (task.rejectedCount > 0) {
+      } else if (rejectedCount > 0) {
         statusEmoji = '❌';
         displayText = 'Rejected';
-      } else if (task.pendingCount > 0) {
+      } else if (pendingCount > 0) {
         statusEmoji = '⏳';
         displayText = 'Pending Verification';
       } else {
         statusEmoji = '⏳';
-        displayText = 'Not Started'; 
+        displayText = 'Not Started';
       }
     } else {
-      if (effectiveMissed > 0 && effectiveRejected > 0) {
-        statusEmoji = '⚠️';
-        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveRejected} rejected • ${effectiveMissed} missed`;
-      } else if (effectiveMissed > 0) {
-        statusEmoji = '⚠️';
-        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveMissed} missed`;
-      } else if (effectiveRejected > 0) {
-        statusEmoji = '❌';
-        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${effectiveRejected} rejected`;
-      } else if (task.pendingCount > 0 && effectiveVerified === 0) {
-        statusEmoji = '⏳';
-        displayText = `${effectiveVerified}/${effectiveTotal} verified • ${task.pendingCount} pending`;
-      } else if (effectiveVerified === effectiveTotal && effectiveTotal > 0) {
+      // Multi-slot tasks
+      if (verifiedCount === totalSlots) {
         statusEmoji = '✅';
-        displayText = `All ${effectiveTotal} slots verified • ${task.earnedPoints}/${task.totalPoints} pts`;
+        displayText = `All ${totalSlots} slots verified • ${task.earnedPoints}/${task.totalPoints} pts`;
+      } else if (missedCount > 0 && rejectedCount > 0) {
+        statusEmoji = '⚠️';
+        displayText = `${verifiedCount}/${totalSlots} verified • ${rejectedCount} rejected • ${missedCount} missed`;
+      } else if (missedCount > 0) {
+        statusEmoji = '⚠️';
+        displayText = `${verifiedCount}/${totalSlots} verified • ${missedCount} missed`;
+      } else if (rejectedCount > 0) {
+        statusEmoji = '❌';
+        displayText = `${verifiedCount}/${totalSlots} verified • ${rejectedCount} rejected`;
       } else {
         statusEmoji = '⭐';
-        displayText = `${effectiveVerified}/${effectiveTotal} slots • ${task.earnedPoints}/${task.totalPoints} pts`;
+        displayText = `${verifiedCount}/${totalSlots} slots • ${task.earnedPoints}/${task.totalPoints} pts`;
       }
     }
     
     return {
       ...task,
-      effectiveTotal,
-      effectiveVerified,
-      effectiveRejected,
-      effectiveMissed,
+      effectiveTotal: totalSlots,      // ✅ Total all slots
+      effectiveVerified: verifiedCount,
+      effectiveRejected: rejectedCount,
+      effectiveMissed: missedCount,
       isFullyCompleted,
-      progressPercentage,
+      progressPercentage: completionRate,
       displayText,
       statusEmoji,
       isSingleSlot
@@ -272,6 +270,7 @@ else {
   
   return result;
 }, [selectedTab, myTasks, tasks]);
+  
 
 
 const groupedAllTasks = useMemo(() => {

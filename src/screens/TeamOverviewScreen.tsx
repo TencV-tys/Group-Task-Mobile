@@ -62,7 +62,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
     }, [groupId])
   ); 
 
- const loadTeamData = async () => {
+const loadTeamData = async () => {
   const hasToken = await checkToken();
   if (!hasToken) return;
 
@@ -73,85 +73,61 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
 
   try {
     const membersResult = await GroupMembersService.getGroupMembers(groupId);
-    console.log('📦 [TeamOverview] Members result:', membersResult.success ? 'Success' : 'Failed');
     
     if (membersResult.success) {
       const activeMembers = (membersResult.members || []).filter((m: any) => m.isActive !== false);
-      console.log(`👥 [TeamOverview] Total active members: ${activeMembers.length}`);
       
       const admins = activeMembers.filter((m: any) => m.role === 'ADMIN' || m.groupRole === 'ADMIN');
       setAdminCount(admins.length);
-      console.log(`👑 [TeamOverview] Admins: ${admins.length}`);
       
       const regularMembers = activeMembers.filter((m: any) => {
         if (m.role === 'ADMIN' || m.groupRole === 'ADMIN') return false;
         return true;
       });
       
-      console.log(`👥 [TeamOverview] Regular members: ${regularMembers.length}`);
       setAllMembers(regularMembers);
       
       const stats: Record<string, any> = {};
       
-      console.log('📊 [TeamOverview] Fetching stats for each member...');
-      
       await Promise.all(
         regularMembers.map(async (member: any) => {
           try {
-            console.log(`  📈 Fetching stats for: ${member.fullName} (${member.userId})`);
-            
             const tasksResult = await AssignmentService.getUserAssignments(member.userId, {
               limit: 100
-            });
+            }); 
             
             if (tasksResult.success) {
-              // Filter out historical (deleted task) assignments before computing stats
+              // ✅ Fix: Use tasksResult.assignments directly (not tasksResult.data?.assignments)
               const allAssignments = tasksResult.data?.assignments || [];
               const activeAssignments = allAssignments.filter((a: any) => !a.isHistorical);
 
-              console.log(`    📋 ${member.fullName}: ${allAssignments.length} total, ${allAssignments.length - activeAssignments.length} historical (excluded), ${activeAssignments.length} active`);
-
-              const completed = activeAssignments.filter(
-                (a: any) => a.completed
-              ).length;
-
-              const verified = activeAssignments.filter(
-                (a: any) => a.verified === true
-              ).length;
-
-              const rejected = activeAssignments.filter(
-                (a: any) => a.verified === false
-              ).length;
-
-              // ✅ FIX: Pending Verification = has photo AND not verified (submitted, waiting for admin)
+              const completed = activeAssignments.filter((a: any) => a.completed).length;
+              const verified = activeAssignments.filter((a: any) => a.verified === true).length;
+              const rejected = activeAssignments.filter((a: any) => a.verified === false).length;
+              
               const pendingVerification = activeAssignments.filter(
                 (a: any) => a.photoUrl !== null && a.verified === null
               ).length;
-
-              // ✅ FIX: Not Started = no photo, not completed, not expired, not verified
+              
               const notStarted = activeAssignments.filter(
                 (a: any) => !a.photoUrl && !a.completed && !a.expired && a.verified !== true && a.verified !== false
               ).length;
-
-              // ✅ For UI display, "Pending" means "Not Started" (tasks that need action)
+              
               const pending = notStarted;
-
-              const expired = activeAssignments.filter(
-                (a: any) => a.expired === true
-              ).length;
-
+              const expired = activeAssignments.filter((a: any) => a.expired === true).length;
               const totalTasks = activeAssignments.length;
-
-              const earnedPoints = activeAssignments
-                .filter((a: any) => a.verified === true)
-                .reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-
-              const totalPoints = activeAssignments
-                .reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-
-              const completionRate = totalTasks > 0
-                ? Math.round((verified / totalTasks) * 100)
+              
+              // ✅ Use the pre-calculated values from backend
+              const totalPossiblePoints = tasksResult.totalPossiblePoints || 0;
+              const earnedPoints = tasksResult.earnedPoints || 0;
+              
+              // ✅ Calculate completion rate correctly
+              const completionRate = totalPossiblePoints > 0
+                ? Math.round((earnedPoints / totalPossiblePoints) * 100)
                 : 0;
+              
+              // For display in expanded view (total points from assignments)
+              const totalPoints = activeAssignments.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
 
               console.log(`    ✅ ${member.fullName}:`, {
                 totalTasks,
@@ -163,6 +139,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
                 pending,
                 expired,
                 earnedPoints,
+                totalPossiblePoints,
                 totalPoints,
                 completionRate
               });
@@ -182,7 +159,6 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
               };
 
             } else {
-              console.log(`    ❌ Failed to get assignments for ${member.fullName}`);
               stats[member.userId] = {
                 totalTasks: 0,
                 completed: 0,
@@ -221,7 +197,6 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
 
     } else {
       setError(membersResult.message || 'Failed to load team data');
-      console.log('❌ [TeamOverview] Failed to load members:', membersResult.message);
     }
   } catch (err: any) {
     console.error('❌ [TeamOverview] Error loading team data:', err);
@@ -229,9 +204,9 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
   } finally {
     setLoading(false);
     setRefreshing(false);
-    console.log('✅ [TeamOverview] Loading complete');
   }
 };
+
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -376,10 +351,6 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
                 <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
                   <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Total Tasks</Text>
                   <Text style={[styles.detailValue, { color: theme.text }]}>{stats.totalTasks}</Text>
-                </View>
-                <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
-                  <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Completed</Text>
-                  <Text style={[styles.detailValue, { color: theme.primary }]}>{stats.completed}</Text>
                 </View>
                 <View style={[styles.detailItem, { backgroundColor: theme.bgSecondary }]}>
                   <Text style={[styles.detailLabel, { color: theme.textMuted }]}>Verified</Text>
@@ -565,7 +536,7 @@ export const TeamOverviewScreen = ({ navigation, route }: any) => {
       </LinearGradient>
     );
   };
-
+ 
   if (loading && !refreshing) {
     return (
       <ScreenWrapper style={[styles.container, { backgroundColor: theme.bgSecondary }]}>

@@ -444,9 +444,8 @@ static async completeAssignment(
     }
   }
 
-  // services/AssignmentService.ts - REPLACE getUserAssignments with this
-
-static async getUserAssignments(
+ 
+  static async getUserAssignments(
   userId: string, 
   filters?: { status?: string; week?: number; limit?: number; offset?: number; }
 ) {
@@ -480,7 +479,6 @@ static async getUserAssignments(
     
     const result = await response.json();
     
-    // ✅ FIXED: The API returns assignments directly in result.assignments
     console.log('📥 [getUserAssignments] Response keys:', Object.keys(result));
     
     const assignments = result.assignments || [];
@@ -496,13 +494,21 @@ static async getUserAssignments(
       });
     }
     
-    // ✅ Return in the format expected by getTodayAssignments
+    // ✅ IMPORTANT: Log the new fields from backend
+    console.log('📊 [getUserAssignments] Backend points summary:', {
+      totalPossiblePoints: result.totalPossiblePoints,
+      earnedPoints: result.earnedPoints
+    });
+    
+    // ✅ Return the backend fields at the root level
     return {
       success: true,
       data: { 
         assignments: assignments,
         total: result.total || assignments.length
       },
+      totalPossiblePoints: result.totalPossiblePoints || 0,  // ✅ ADD THIS
+      earnedPoints: result.earnedPoints || 0,               // ✅ ADD THIS
       message: result.message || 'Assignments retrieved successfully'
     };
 
@@ -511,7 +517,9 @@ static async getUserAssignments(
     return { 
       success: false, 
       message: error.message || 'Failed to load assignments',
-      data: { assignments: [], total: 0 }
+      data: { assignments: [], total: 0 },
+      totalPossiblePoints: 0,
+      earnedPoints: 0
     };
   }
 }

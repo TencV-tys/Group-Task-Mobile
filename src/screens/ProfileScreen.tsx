@@ -456,7 +456,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
               </View>
               <View style={styles.appDetails}>
-                <View style={styles.detailItem}><Text style={styles.detailLabel}>Version</Text><Text style={styles.detailValue}>1.1.5</Text></View>
+                <View style={styles.detailItem}><Text style={styles.detailLabel}>Version</Text><Text style={styles.detailValue}>1.1.6</Text></View>
                 <View style={styles.detailItem}><Text style={styles.detailLabel}>Build</Text><Text style={styles.detailValue}>2026.02</Text></View>
                 <View style={styles.detailItem}><Text style={styles.detailLabel}>Platform</Text><Text style={styles.detailValue}>React Native</Text></View>
               </View>

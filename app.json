@@ -89,23 +89,8 @@
           "sounds": [],
           "enableBackgroundRemoteNotifications": true
         }
-      ],
-      [
-        "@react-native-firebase/app",
-        {
-          "android": {
-            "allowClearDefaultNotificationChannel": true
-          }
-        }
-      ],
-      [
-        "@react-native-firebase/messaging",
-        {
-          "android": {
-            "allowClearDefaultNotificationChannel": true
-          }
-        }
       ]
+      
     ],
     "extra": {
       "eas": {
